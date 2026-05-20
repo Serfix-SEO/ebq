@@ -78,6 +78,8 @@ class WriterProjectController extends Controller
             'title' => 'nullable|string|max:300',
             'additional_keywords' => 'nullable|array|max:20',
             'additional_keywords.*' => 'string|max:200',
+            'lsi_keywords' => 'nullable|array|max:30',
+            'lsi_keywords.*' => 'string|max:200',
             'country' => 'nullable|string|size:2',
             'language' => 'nullable|string|min:2|max:8',
             'tone' => 'nullable|string|max:32',
@@ -132,6 +134,8 @@ class WriterProjectController extends Controller
             'focus_keyword' => 'nullable|string|min:2|max:200',
             'additional_keywords' => 'nullable|array|max:20',
             'additional_keywords.*' => 'string|max:200',
+            'lsi_keywords' => 'nullable|array|max:30',
+            'lsi_keywords.*' => 'string|max:200',
             'country' => 'nullable|string|size:2',
             'language' => 'nullable|string|min:2|max:8',
             'tone' => 'nullable|string|max:32',
@@ -188,6 +192,12 @@ class WriterProjectController extends Controller
         }
         if (array_key_exists('additional_keywords', $data) && $data['additional_keywords'] !== null) {
             $project->additional_keywords = array_values(array_filter(array_map('strval', $data['additional_keywords'])));
+        }
+        if (array_key_exists('lsi_keywords', $data) && $data['lsi_keywords'] !== null) {
+            $project->lsi_keywords = array_values(array_filter(array_map(
+                static fn ($k) => trim((string) $k),
+                $data['lsi_keywords']
+            ), static fn ($k) => $k !== ''));
         }
         foreach (['country', 'language', 'tone', 'audience'] as $localeField) {
             if (array_key_exists($localeField, $data) && $data[$localeField] !== null) {
@@ -448,6 +458,7 @@ class WriterProjectController extends Controller
             'title' => $p->title,
             'focus_keyword' => $p->focus_keyword,
             'additional_keywords' => is_array($p->additional_keywords) ? $p->additional_keywords : [],
+            'lsi_keywords' => is_array($p->lsi_keywords) ? $p->lsi_keywords : [],
             'country' => $p->country,
             'language' => $p->language,
             'tone' => $p->tone,

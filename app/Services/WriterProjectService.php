@@ -282,6 +282,11 @@ class WriterProjectService
             (array) ($input['additional_keywords'] ?? []),
         ), static fn ($v) => $v !== ''));
 
+        $lsi = array_values(array_filter(array_map(
+            static fn ($v) => is_string($v) ? trim($v) : '',
+            (array) ($input['lsi_keywords'] ?? []),
+        ), static fn ($v) => $v !== ''));
+
         $customPrompt = isset($input['custom_prompt']) && is_string($input['custom_prompt'])
             ? trim($input['custom_prompt'])
             : '';
@@ -292,6 +297,7 @@ class WriterProjectService
             'title' => mb_substr($title, 0, 300),
             'focus_keyword' => mb_substr($kw, 0, 200),
             'additional_keywords' => $additional,
+            'lsi_keywords' => $lsi,
             'country' => $this->normalizeCountry($input['country'] ?? null),
             'language' => $this->normalizeLanguage($input['language'] ?? null),
             'tone' => $this->normalizeTone($input['tone'] ?? null),
@@ -723,6 +729,11 @@ class WriterProjectService
             'selected' => $selected,
             'title' => $project->title,
             'additional_keywords' => is_array($project->additional_keywords) ? $project->additional_keywords : [],
+            // LSI / semantically-related terms the user added on Step 1.
+            // The writer weaves them naturally for topical breadth — no
+            // forced presence per section (that's what additional_keywords
+            // is for).
+            'lsi_keywords' => is_array($project->lsi_keywords) ? $project->lsi_keywords : [],
             // Locale + voice — wired through so the LLM knows the
             // target country / language / tone / reader level. The
             // writer service consumes these in its prompt builder.

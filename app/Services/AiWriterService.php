@@ -78,6 +78,13 @@ class AiWriterService
             array_map('trim', (array) ($input['additional_keywords'] ?? [])),
             static fn ($k) => is_string($k) && $k !== ''
         ));
+        // LSI / semantically-related terms the user typed on Step 1.
+        // Treated as topical-breadth signals rather than per-section
+        // targets — weave where contextually relevant, never stuff.
+        $lsiKeywords = array_values(array_filter(
+            array_map('trim', (array) ($input['lsi_keywords'] ?? [])),
+            static fn ($k) => is_string($k) && $k !== ''
+        ));
         // Free-form "additional writing instructions" the user typed on
         // Step 1 of the wizard. Validated by CustomPromptGuard before
         // it reaches here, but treated as ADVISORY in the system prompt
@@ -181,10 +188,15 @@ class AiWriterService
         //      ADVISORY block below the strict-output rules. Hash is
         //      part of the cache key so changing the prompt
         //      invalidates stale cached drafts.
+        // v23: LSI / semantically-related keywords block added to the
+        //      user message. extraHash includes the LSI list so cache
+        //      invalidates on edit; the version bump invalidates
+        //      pre-LSI cached drafts whose user message lacked the
+        //      block entirely.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
-        $extraHash = substr(hash('sha256', mb_strtolower($title).'|'.implode('|', $additionalKeywords)), 0, 8);
+        $extraHash = substr(hash('sha256', mb_strtolower($title).'|'.implode('|', $additionalKeywords).'|lsi:'.implode('|', $lsiKeywords)), 0, 8);
         $linksHash = substr(hash('sha256', json_encode([
             'i' => $selectedInternal,
             'e' => $selectedExternal,
@@ -193,7 +205,7 @@ class AiWriterService
             ? substr(hash('sha256', mb_strtolower($customPrompt)), 0, 12)
             : '0';
         $cacheKey = sprintf(
-            'ai_writer_v22:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s',
+            'ai_writer_v23:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -214,7 +226,7 @@ class AiWriterService
             return $cached;
         }
 
-        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null, $title, $additionalKeywords, $selectedExternal, $customPrompt);
+        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null, $title, $additionalKeywords, $selectedExternal, $customPrompt, $lsiKeywords);
         // 16k output tokens supports the 20-section cap with room for JSON
         // overhead. Mistral Small's 32k context window comfortably fits
         // input + this output. 240s timeout matches the worst-case wall
@@ -379,6 +391,25 @@ class AiWriterService
             }, $sections);
         }
 
+        // Hard guarantee for USER-MANUAL link entries — the prompt
+        // instructs the model to include every link "no skipping" but
+        // LLMs occasionally drop one, usually the entries that don't
+        // slot cleanly into any section. enforceLockedAnchors above
+        // can only fix the inner text of <a> tags that already exist;
+        // this pass inserts an <a> for any manually-typed URL the
+        // model omitted entirely. Non-manual selected links are left
+        // to the prompt's compliance — only manual entries get this
+        // backstop, because the user typed them verbatim and clearly
+        // expects them to land.
+        $sections = $this->ensureManualLinksPresent($sections, $smartLinks, $selectedExternal);
+
+        // Recount links after injection so the diagnostic block
+        // reflects the post-process output, not the raw model output.
+        $linkCount = 0;
+        foreach ($sections as $section) {
+            $linkCount += preg_match_all('/<a\s+href=/i', (string) ($section['proposed_html'] ?? ''));
+        }
+
         // Auto-build schema suggestions from the generated sections — the
         // user picks which to apply and the plugin writes them into
         // _ebq_schemas. Multiple types stack: Article is always offered
@@ -431,7 +462,7 @@ class AiWriterService
      * @param  list<array{anchor:string,url:string,manual:bool}>  $selectedExternal
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection, string $title, array $additionalKeywords, array $selectedExternal = [], string $customPrompt = ''): array
+    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection, string $title, array $additionalKeywords, array $selectedExternal = [], string $customPrompt = '', array $lsiKeywords = []): array
     {
         $briefBlock = '(none)';
         if (is_array($brief) && ! empty($brief)) {
@@ -803,6 +834,9 @@ SYS;
         $additionalBlock = empty($additionalKeywords)
             ? '(none)'
             : '"' . implode('", "', array_slice($additionalKeywords, 0, 20)) . '"';
+        $lsiBlock = empty($lsiKeywords)
+            ? '(none)'
+            : '"' . implode('", "', array_slice($lsiKeywords, 0, 30)) . '"';
 
         $user = <<<USER
 Target keyword: "{$keyword}"
@@ -813,6 +847,14 @@ User-supplied page title:
 Additional keyphrases (weave naturally into the prose, do NOT keyword-stuff;
 each should appear in at least one section where it fits):
 {$additionalBlock}
+
+LSI / semantically-related terms (use to broaden topical coverage so the
+article reads as authoritative on the subject — sprinkle these where
+contextually relevant across the article, NOT one-per-section, NOT
+keyword-stuffed; aim for at least half of them to appear somewhere in
+the article body where they fit naturally; never invent a sentence
+whose only job is to host an LSI term):
+{$lsiBlock}
 
 CONTENT BRIEF (may be empty):
 {$briefBlock}
@@ -1713,5 +1755,189 @@ USER;
             },
             $html
         );
+    }
+
+    /**
+     * Inject an <a> tag for every manually-typed link entry the LLM
+     * dropped. The prompt forbids skipping, but the model still does
+     * it occasionally — most often for entries whose `best_fit_topic`
+     * doesn't overlap a generated heading. enforceLockedAnchors only
+     * fixes existing <a> tags; this method covers the "anchor never
+     * emitted at all" case.
+     *
+     * Section selection scores each section's h2 + title against the
+     * link's topic by significant-token overlap. The best-fit section
+     * gets a fallback paragraph appended. When no section overlaps,
+     * we add a final "Further reading" section so the curated link is
+     * never silently lost.
+     *
+     * @param  list<array<string,mixed>>  $sections
+     * @param  list<array{url:string,anchor:string,topic:string,source:string,clicks:int}>  $smartLinks
+     * @param  list<array{anchor:string,url:string,manual:bool}>  $selectedExternal
+     * @return list<array<string,mixed>>
+     */
+    private function ensureManualLinksPresent(array $sections, array $smartLinks, array $selectedExternal): array
+    {
+        $manualInternal = array_values(array_filter($smartLinks, static fn (array $l) => ($l['source'] ?? '') === 'user_manual'));
+        $manualExternal = array_values(array_filter($selectedExternal, static fn (array $l) => ! empty($l['manual'])));
+        if ($manualInternal === [] && $manualExternal === []) {
+            return $sections;
+        }
+
+        // Build a case-insensitive set of every URL the model already
+        // emitted in any <a href>.
+        $present = [];
+        foreach ($sections as $s) {
+            $html = (string) ($s['proposed_html'] ?? '');
+            if ($html === '') {
+                continue;
+            }
+            if (preg_match_all('/<a\b[^>]*?href\s*=\s*(["\'])([^"\']+)\1/i', $html, $m)) {
+                foreach ($m[2] as $href) {
+                    $key = strtolower(trim($href));
+                    if ($key !== '') {
+                        $present[$key] = true;
+                    }
+                }
+            }
+        }
+
+        $missing = [];
+        foreach ($manualInternal as $l) {
+            $url = (string) ($l['url'] ?? '');
+            $anchor = (string) ($l['anchor'] ?? '');
+            if ($url === '' || $anchor === '') {
+                continue;
+            }
+            $key = strtolower($url);
+            if (isset($present[$key])) {
+                continue;
+            }
+            $missing[] = [
+                'kind'   => 'internal',
+                'url'    => $url,
+                'anchor' => $anchor,
+                'topic'  => (string) ($l['topic'] ?? $anchor),
+            ];
+            $present[$key] = true; // dedupe duplicate manual entries within the same list
+        }
+        foreach ($manualExternal as $l) {
+            $url = (string) ($l['url'] ?? '');
+            $anchor = (string) ($l['anchor'] ?? '');
+            if ($url === '' || $anchor === '') {
+                continue;
+            }
+            $key = strtolower($url);
+            if (isset($present[$key])) {
+                continue;
+            }
+            $missing[] = [
+                'kind'   => 'external',
+                'url'    => $url,
+                'anchor' => $anchor,
+                'topic'  => $anchor,
+            ];
+            $present[$key] = true;
+        }
+
+        if ($missing === []) {
+            return $sections;
+        }
+
+        foreach ($missing as $entry) {
+            $idx = $this->pickSectionForLink($sections, $entry['topic']);
+            $para = $this->buildFallbackLinkParagraph($entry);
+            if ($idx === null) {
+                $sections[] = [
+                    'title'         => 'Further reading',
+                    'kind'          => 'add',
+                    'anchor'        => null,
+                    'current_html'  => null,
+                    'proposed_html' => '<h2>Further reading</h2>' . $para,
+                    'rationale'     => 'User-supplied link the writer skipped; preserved so the curated entry isn\'t silently dropped.',
+                    'source_tags'   => ['links'],
+                ];
+                continue;
+            }
+            $sections[$idx]['proposed_html'] = (string) ($sections[$idx]['proposed_html'] ?? '') . $para;
+        }
+
+        Log::info('AiWriterService: injected missing manual links', [
+            'count' => count($missing),
+            'urls'  => array_column($missing, 'url'),
+        ]);
+
+        return $sections;
+    }
+
+    /**
+     * Pick the index of the section whose heading best matches the
+     * link's topic. Falls back to the first add/replace section, then
+     * to null when nothing usable exists (caller appends a standalone
+     * "Further reading" section in that case).
+     *
+     * @param  list<array<string,mixed>>  $sections
+     */
+    private function pickSectionForLink(array $sections, string $topic): ?int
+    {
+        $topicTokens = $this->significantTokens($topic);
+        $candidate = null;
+
+        foreach ($sections as $i => $s) {
+            $kind = (string) ($s['kind'] ?? '');
+            if (! in_array($kind, ['add', 'replace'], true)) {
+                continue;
+            }
+            if ($candidate === null) {
+                $candidate = $i; // remember the first eligible section as a no-overlap fallback
+            }
+            if ($topicTokens === []) {
+                break;
+            }
+            $heading = (string) ($s['title'] ?? '');
+            $html = (string) ($s['proposed_html'] ?? '');
+            if (preg_match('/<h2\b[^>]*>(.*?)<\/h2>/is', $html, $hm)) {
+                $heading .= ' ' . strip_tags($hm[1]);
+            }
+            $sectionTokens = $this->significantTokens($heading);
+            if ($sectionTokens === []) {
+                continue;
+            }
+            $score = count(array_intersect($topicTokens, $sectionTokens));
+            // First match wins on ties — earlier sections read more
+            // naturally as the link's home than a buried later one.
+            if ($score > 0) {
+                return $i;
+            }
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * Bolt-on fallback paragraph used only when the LLM dropped a
+     * manually-typed link entirely. The prompt forbids "for more, see
+     * X" bolt-ons in the model's own output; we accept the bolt-on
+     * shape here because the alternative is silently losing the
+     * user's curated link, which is worse.
+     *
+     * @param  array{kind:string,url:string,anchor:string,topic:string}  $entry
+     */
+    private function buildFallbackLinkParagraph(array $entry): string
+    {
+        $url = htmlspecialchars($entry['url'], ENT_QUOTES | ENT_HTML5, 'UTF-8', false);
+        $anchor = htmlspecialchars($entry['anchor'], ENT_QUOTES | ENT_HTML5, 'UTF-8', false);
+        $topicRaw = trim($entry['topic']);
+        $topicVisible = $topicRaw !== '' && mb_strtolower($topicRaw) !== mb_strtolower($entry['anchor'])
+            ? htmlspecialchars($topicRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8', false)
+            : '';
+
+        $tag = $entry['kind'] === 'external'
+            ? '<a href="' . $url . '" target="_blank" rel="noopener">' . $anchor . '</a>'
+            : '<a href="' . $url . '">' . $anchor . '</a>';
+
+        return $topicVisible !== ''
+            ? '<p>For further reading on ' . $topicVisible . ', see ' . $tag . '.</p>'
+            : '<p>See ' . $tag . ' for additional context.</p>';
     }
 }

@@ -52,6 +52,7 @@ class WriterProject extends Model
         'title',
         'focus_keyword',
         'additional_keywords',
+        'lsi_keywords',
         'country',
         'language',
         'tone',
@@ -80,6 +81,7 @@ class WriterProject extends Model
     {
         return [
             'additional_keywords' => 'array',
+            'lsi_keywords' => 'array',
             'brief' => 'array',
             'chat_history' => 'array',
             'images' => 'array',
