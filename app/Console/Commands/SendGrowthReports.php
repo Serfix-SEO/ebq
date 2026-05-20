@@ -2,12 +2,11 @@
 
 namespace App\Console\Commands;
 
-use App\Mail\GrowthReportMail;
 use App\Models\Website;
 use App\Services\ReportDataService;
+use App\Services\Reports\ReportMailDispatcher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class SendGrowthReports extends Command
 {
@@ -15,14 +14,14 @@ class SendGrowthReports extends Command
 
     protected $description = 'Queue one EBQ daily growth report email per website recipient, snapped to the most recent fully-synced GSC day.';
 
-    public function handle(ReportDataService $reports): int
+    public function handle(ReportDataService $reports, ReportMailDispatcher $dispatcher): int
     {
         $mailsQueued = 0;
         $sitesProcessed = 0;
         $sitesSkippedNoData = 0;
         $sitesSkippedNoRecipients = 0;
 
-        Website::query()->with('owner')->chunkById(100, function ($websites) use ($reports, &$mailsQueued, &$sitesProcessed, &$sitesSkippedNoData, &$sitesSkippedNoRecipients) {
+        Website::query()->with('owner')->chunkById(100, function ($websites) use ($reports, $dispatcher, &$mailsQueued, &$sitesProcessed, &$sitesSkippedNoData, &$sitesSkippedNoRecipients) {
             foreach ($websites as $website) {
                 // Snap the report to the most recent GSC date that is
                 // both (a) present in our data and (b) at least
@@ -47,9 +46,12 @@ class SendGrowthReports extends Command
                 }
 
                 foreach ($recipients as $recipient) {
-                    Mail::to($recipient->email)->queue(
-                        new GrowthReportMail($recipient, $website, $date, $date, 'daily')
-                    );
+                    // Dispatcher resolves branding + transport from the
+                    // website owner's plan. Returns null when the plan
+                    // disables `report_whitelabel` (= queued via the
+                    // default mailer) or the resolved transport row when
+                    // a per-tenant OAuth/SMTP route was used.
+                    $dispatcher->send($recipient, $website, $date, $date, 'daily');
                     $mailsQueued++;
                 }
                 $sitesProcessed++;

@@ -59,14 +59,24 @@
         .value-up { color: #16a34a; }
         .value-down { color: #dc2626; }
 
-        .btn { display: inline-block; background: #4f46e5; color: #ffffff !important; text-decoration: none; border-radius: 8px; padding: 12px 28px; font-size: 14px; font-weight: 600; }
+        .btn { display: inline-block; background: {{ $branding->accent_color ?? '#4f46e5' }}; color: #ffffff !important; text-decoration: none; border-radius: 8px; padding: 12px 28px; font-size: 14px; font-weight: 600; }
         .footer { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 24px; }
+        .brand-header { text-align: left; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; }
+        .brand-header img { max-height: 48px; max-width: 240px; display: block; }
+        .brand-header .brand-name { font-size: 14px; font-weight: 700; color: #475569; margin: 0; }
+        .contact-block { font-size: 11px; color: #64748b; line-height: 1.6; margin-top: 12px; }
+        .contact-block strong { color: #475569; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="card">
-        <h1>EBQ {{ ucfirst($reportType) }} Report</h1>
+        @if ($branding->logoUrl())
+            <div class="brand-header"><img src="{{ $branding->logoUrl() }}" alt="{{ $branding->company_name }}"></div>
+        @elseif (! $branding->isDefault())
+            <div class="brand-header"><p class="brand-name">{{ $branding->company_name }}</p></div>
+        @endif
+        <h1>{{ $branding->company_name }} {{ ucfirst($reportType) }} Report</h1>
         <p class="meta">
             <strong>{{ $website->domain }}</strong> &mdash;
             @if ($startDate === $endDate)
@@ -564,7 +574,19 @@
             <a href="{{ route('reports.index') }}" class="btn">View Full Report in Dashboard</a>
         </div>
     </div>
-    <p class="footer">Sent by EBQ &mdash; {{ format_user_now('M d, Y', $user) }}</p>
+    @if (! $branding->isDefault())
+        @if ($branding->footer_text || $branding->contact_email || $branding->contact_phone || $branding->contact_address)
+            <div class="contact-block">
+                @if ($branding->footer_text)<p>{{ $branding->footer_text }}</p>@endif
+                @if ($branding->contact_email)<p><strong>Email:</strong> {{ $branding->contact_email }}</p>@endif
+                @if ($branding->contact_phone)<p><strong>Phone:</strong> {{ $branding->contact_phone }}</p>@endif
+                @if ($branding->contact_address)<p>{{ $branding->contact_address }}</p>@endif
+            </div>
+        @endif
+        <p class="footer">{{ $branding->company_name }} &mdash; {{ format_user_now('M d, Y', $user) }}</p>
+    @else
+        <p class="footer">Sent by EBQ &mdash; {{ format_user_now('M d, Y', $user) }}</p>
+    @endif
 </div>
 </body>
 </html>

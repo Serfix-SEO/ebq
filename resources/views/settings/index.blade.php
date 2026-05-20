@@ -46,6 +46,8 @@
 
             <div x-show="tab === 'reports'" x-cloak class="space-y-6">
                 <livewire:settings.report-recipients />
+                <livewire:settings.report-branding />
+                <livewire:settings.mail-transport />
                 <livewire:settings.gsc-keyword-window />
             </div>
         </div>

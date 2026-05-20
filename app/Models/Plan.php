@@ -37,6 +37,12 @@ class Plan extends Model
         'redirects',
         'dashboard_widget',
         'post_column',
+        // Platform feature — not a plugin flag. Unlocks branded report
+        // emails + PDF attachments and the per-tenant outbound-mail
+        // transport (Gmail / Outlook / SMTP). Reports always send; this
+        // flag just controls whether the customer's saved branding is
+        // applied or the EBQ default is used.
+        'report_whitelabel',
     ];
 
     protected $fillable = [

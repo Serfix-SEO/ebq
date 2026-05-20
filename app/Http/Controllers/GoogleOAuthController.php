@@ -128,7 +128,35 @@ class GoogleOAuthController extends Controller
             ->redirect();
     }
 
-    public function callback(GoogleOAuthService $oauthService): RedirectResponse
+    /**
+     * Incremental-consent flow for the Gmail-send scope. Adds
+     * `gmail.send` to the Analytics/GSC scopes the user has already
+     * granted; Google's `include_granted_scopes=true` preserves the
+     * existing grants so we don't have to re-request them.
+     *
+     * The callback distinguishes this flow from the standard sync flow
+     * by reading `google_oauth.intent` from the session, set here.
+     */
+    public function redirectMailScope(\Illuminate\Http\Request $request): RedirectResponse
+    {
+        $request->session()->put('google_oauth.intent', 'mail_send');
+
+        return Socialite::driver('google')
+            ->scopes([
+                'https://www.googleapis.com/auth/analytics.readonly',
+                'https://www.googleapis.com/auth/webmasters.readonly',
+                'https://www.googleapis.com/auth/indexing',
+                'https://www.googleapis.com/auth/gmail.send',
+            ])
+            ->with([
+                'access_type' => 'offline',
+                'prompt' => 'consent',
+                'include_granted_scopes' => 'true',
+            ])
+            ->redirect();
+    }
+
+    public function callback(GoogleOAuthService $oauthService, \Illuminate\Http\Request $request): RedirectResponse
     {
         // `stateless()` is intentional — Socialite's session-state check
         // can fail across the OAuth round-trip when the host runs behind
@@ -136,6 +164,16 @@ class GoogleOAuthController extends Controller
         // still protected by Google's own state nonce in the redirect.
         $googleUser = Socialite::driver('google')->stateless()->user();
         $oauthService->persistAccount(Auth::user(), $googleUser);
+
+        // If the flow was initiated for the Gmail-send transport, return
+        // to Settings so the user can finish configuring the mail
+        // transport — not to onboarding.
+        $intent = (string) $request->session()->pull('google_oauth.intent', '');
+        if ($intent === 'mail_send') {
+            return redirect()
+                ->route('settings.index')
+                ->with('status', 'Connected to Gmail. You can now send reports from this address.');
+        }
 
         return redirect()->route('onboarding');
     }

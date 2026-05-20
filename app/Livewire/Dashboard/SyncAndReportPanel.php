@@ -2,11 +2,9 @@
 
 namespace App\Livewire\Dashboard;
 
-use App\Mail\GrowthReportMail;
 use App\Models\Website;
 use App\Services\ReportDataService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -88,9 +86,8 @@ class SyncAndReportPanel extends Component
             $emails = [];
 
             foreach ($recipients as $recipient) {
-                Mail::to($recipient->email)->send(
-                    new GrowthReportMail($recipient, $website, $date, $date, 'daily')
-                );
+                app(\App\Services\Reports\ReportMailDispatcher::class)
+                    ->send($recipient, $website, $date, $date, 'daily');
                 $emails[] = $recipient->email;
             }
 

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Jobs\RunCustomPageAudit;
 use App\Jobs\TrackKeywordRankJob;
-use App\Mail\GrowthReportMail;
 use App\Models\CustomPageAudit;
 use App\Models\PageIndexingStatus;
 use App\Models\RankTrackingKeyword;
@@ -27,7 +26,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
 use Throwable;
@@ -1161,14 +1159,12 @@ class PluginHqController extends Controller
         try {
             $emails = [];
             foreach ($recipients as $recipient) {
-                Mail::to($recipient->email)->send(
-                    new GrowthReportMail(
-                        $recipient,
-                        $website,
-                        $dates['start_date'],
-                        $dates['end_date'],
-                        $dates['report_type'],
-                    )
+                app(\App\Services\Reports\ReportMailDispatcher::class)->send(
+                    $recipient,
+                    $website,
+                    $dates['start_date'],
+                    $dates['end_date'],
+                    $dates['report_type'],
                 );
                 $emails[] = $recipient->email;
             }

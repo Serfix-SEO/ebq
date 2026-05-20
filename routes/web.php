@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\GoogleOAuthController;
 use App\Http\Controllers\GoogleCapController;
+use App\Http\Controllers\MicrosoftOAuthController;
 use App\Http\Controllers\PageAuditController;
 use App\Http\Controllers\Admin\ActivityController as AdminActivityController;
 use App\Http\Controllers\Admin\ClientController as AdminClientController;
@@ -125,6 +126,12 @@ Route::middleware(['auth', 'verified', 'throttle:oauth'])->group(function () {
     Route::view('/onboarding', 'onboarding.index')->name('onboarding');
     Route::get('/auth/google/redirect', [GoogleOAuthController::class, 'redirect'])->name('google.redirect');
     Route::get('/auth/google/callback', [GoogleOAuthController::class, 'callback'])->name('google.callback');
+    // Gmail-send scope grant — same controller, requests gmail.send on top
+    // of the existing Analytics/GSC/Indexing scopes via incremental consent.
+    Route::get('/auth/google/mail/redirect', [GoogleOAuthController::class, 'redirectMailScope'])->name('google.mail.redirect');
+    // Microsoft / Outlook OAuth — powers the "send report from Outlook" mail transport.
+    Route::get('/auth/microsoft/redirect', [MicrosoftOAuthController::class, 'redirect'])->name('microsoft.redirect');
+    Route::get('/auth/microsoft/callback', [MicrosoftOAuthController::class, 'callback'])->name('microsoft.callback');
 });
 
 // Google Cross-Account Protection (RISC/CAP) receiver endpoint.

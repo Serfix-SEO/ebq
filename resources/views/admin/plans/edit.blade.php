@@ -166,6 +166,7 @@
                     'redirects'        => ['Redirects manager', '"EBQ Redirects" admin page with CSV import/export.'],
                     'dashboard_widget' => ['Dashboard widget', 'WP Dashboard "EBQ summary" widget on the home screen.'],
                     'post_column'      => ['Post list column', '"EBQ score" column in the wp-admin posts list.'],
+                    'report_whitelabel' => ['Report whitelabel', 'Branded report emails + PDF attachment, plus Gmail/Outlook/SMTP send-as. Off = EBQ default branding and mailer.'],
                 ];
             @endphp
             <div class="border-t border-slate-200 pt-4 space-y-3">

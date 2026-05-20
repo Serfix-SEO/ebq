@@ -63,6 +63,20 @@ return [
         'secret_key' => env('RECAPTCHA_SECRET_KEY', ''),
     ],
 
+    /*
+     * Microsoft / Outlook OAuth — powers the "send report from Outlook"
+     * transport. Requires socialiteproviders/microsoft to be registered
+     * via the event subscriber pattern. Tenant: "common" so both work +
+     * personal accounts can connect; switch to a specific tenant ID for
+     * single-tenant enterprise installs.
+     */
+    'microsoft' => [
+        'client_id' => env('MICROSOFT_CLIENT_ID'),
+        'client_secret' => env('MICROSOFT_CLIENT_SECRET'),
+        'redirect' => env('MICROSOFT_REDIRECT_URI'),
+        'tenant' => env('MICROSOFT_TENANT', 'common'),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
