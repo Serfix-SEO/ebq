@@ -193,6 +193,9 @@ class AiWriterService
         //      invalidates on edit; the version bump invalidates
         //      pre-LSI cached drafts whose user message lacked the
         //      block entirely.
+        // v24: LSI rule rewritten from "aim for half, paraphrase OK" to
+        //      strict verbatim use. Bump invalidates v23 cached drafts
+        //      whose model output was generated under the lax rule.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
@@ -205,7 +208,7 @@ class AiWriterService
             ? substr(hash('sha256', mb_strtolower($customPrompt)), 0, 12)
             : '0';
         $cacheKey = sprintf(
-            'ai_writer_v23:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s',
+            'ai_writer_v24:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -410,6 +413,15 @@ class AiWriterService
             $linkCount += preg_match_all('/<a\s+href=/i', (string) ($section['proposed_html'] ?? ''));
         }
 
+        // Audit verbatim LSI usage — the prompt requires every phrase
+        // to appear word-for-word in the body. Models occasionally still
+        // truncate ("Punjabi comedy shows" → "punjabi comedy") or paraphrase.
+        // We log the misses (and surface a count in diagnostics) so the bug
+        // is observable. No auto-injection: forcing a sentence to host the
+        // verbatim phrase usually reads worse than fixing the prompt; the
+        // log gives us evidence to keep tightening the prompt instead.
+        $lsiAudit = $this->auditLsiUsage($lsiKeywords, $sections);
+
         // Auto-build schema suggestions from the generated sections — the
         // user picks which to apply and the plugin writes them into
         // _ebq_schemas. Multiple types stack: Article is always offered
@@ -445,6 +457,9 @@ class AiWriterService
                 'paa_questions_available' => $availablePaaCount,
                 'gaps_available' => $availableGapsCount,
                 'sections_returned' => count($sections),
+                'lsi_provided' => $lsiAudit['provided'],
+                'lsi_present_verbatim' => $lsiAudit['present'],
+                'lsi_missing' => $lsiAudit['missing'],
             ],
             'schema_suggestions' => $schemaSuggestions,
             'cached' => false,
@@ -848,12 +863,26 @@ Additional keyphrases (weave naturally into the prose, do NOT keyword-stuff;
 each should appear in at least one section where it fits):
 {$additionalBlock}
 
-LSI / semantically-related terms (use to broaden topical coverage so the
-article reads as authoritative on the subject — sprinkle these where
-contextually relevant across the article, NOT one-per-section, NOT
-keyword-stuffed; aim for at least half of them to appear somewhere in
-the article body where they fit naturally; never invent a sentence
-whose only job is to host an LSI term):
+LSI / semantically-related phrases — STRICT VERBATIM USE:
+Each phrase in this list MUST appear in the article body at least once,
+word-for-word, in the same order the user typed it. Rules:
+  • DO NOT truncate the phrase. If the user typed "Punjabi comedy shows",
+    the article MUST contain the full string "Punjabi comedy shows", not
+    "Punjabi comedy" or "comedy shows" or "Punjabi shows".
+  • DO NOT paraphrase. No synonym swaps ("shows" → "programs"), no word
+    reordering, no inserting words between the LSI tokens.
+  • Capitalisation may follow normal sentence flow (lowercase at the
+    start of a clause is fine) but the WORDS themselves must match.
+  • Spread the phrases across sections — do not pile them into a single
+    paragraph and do not stuff one per section mechanically.
+  • If a phrase genuinely doesn't fit any current section's topic, expand
+    the closest-related paragraph by 1–2 sentences so it has a natural
+    home, instead of dropping the phrase.
+  • Never invent a bolt-on sentence whose only job is to host an LSI
+    phrase — the phrase must sit inside an informative sentence that
+    would still make sense if the phrase were swapped for a generic
+    placeholder.
+LSI phrases:
 {$lsiBlock}
 
 CONTENT BRIEF (may be empty):
@@ -1755,6 +1784,76 @@ USER;
             },
             $html
         );
+    }
+
+    /**
+     * Audit verbatim LSI-phrase usage across the generated sections.
+     * The system prompt requires each LSI phrase to appear word-for-word
+     * at least once; this method verifies and logs misses (including
+     * truncations like "Punjabi comedy shows" → "punjabi comedy").
+     *
+     * Matching rules:
+     *   - Plain-text only (strip HTML so an LSI phrase inside an <a>
+     *     anchor counts).
+     *   - Case-insensitive (capitalisation may follow sentence flow).
+     *   - Word-boundary aware on each end so "comedy" inside "comedyshow"
+     *     doesn't falsely satisfy an LSI phrase "comedy".
+     *   - Internal whitespace is collapsed in both haystack and needle
+     *     so non-breaking spaces / double spaces don't cause false misses.
+     *
+     * @param  list<string>             $lsiKeywords
+     * @param  list<array<string,mixed>> $sections
+     * @return array{provided:int,present:list<string>,missing:list<string>}
+     */
+    private function auditLsiUsage(array $lsiKeywords, array $sections): array
+    {
+        $provided = count($lsiKeywords);
+        if ($provided === 0) {
+            return ['provided' => 0, 'present' => [], 'missing' => []];
+        }
+
+        $haystack = '';
+        foreach ($sections as $s) {
+            $html = (string) ($s['proposed_html'] ?? '');
+            if ($html === '') {
+                continue;
+            }
+            $haystack .= ' ' . html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        $haystack = mb_strtolower(preg_replace('/\s+/u', ' ', $haystack) ?? '');
+
+        $present = [];
+        $missing = [];
+        foreach ($lsiKeywords as $phrase) {
+            $needle = mb_strtolower(preg_replace('/\s+/u', ' ', trim($phrase)) ?? '');
+            if ($needle === '') {
+                continue;
+            }
+            // Word-boundary on each end via a non-word-char lookaround,
+            // using Unicode-property classes so non-ASCII LSI phrases
+            // (e.g. "tempeh", "ਪੰਜਾਬੀ") still match correctly.
+            $escaped = preg_quote($needle, '/');
+            $regex = '/(?<![\p{L}\p{N}])'.$escaped.'(?![\p{L}\p{N}])/u';
+            if (preg_match($regex, $haystack) === 1) {
+                $present[] = $phrase;
+            } else {
+                $missing[] = $phrase;
+            }
+        }
+
+        if ($missing !== []) {
+            Log::warning('AiWriterService: LSI phrases missing verbatim from output', [
+                'provided' => $provided,
+                'present'  => count($present),
+                'missing'  => $missing,
+            ]);
+        }
+
+        return [
+            'provided' => $provided,
+            'present'  => $present,
+            'missing'  => $missing,
+        ];
     }
 
     /**
