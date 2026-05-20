@@ -697,6 +697,17 @@ class WriterProjectService
             'competitor_subtopics' => [],
         ];
 
+        // User-curated link picks from the strategy step. Falls back to
+        // the empty shape when the user didn't visit the LinkSuggestions
+        // card or unticked everything — in which case the writer's
+        // existing GSC-derived smart-link path takes over for internal
+        // links and the article ships without explicit external links.
+        $rawSelected = is_array($project->selected_links) ? $project->selected_links : [];
+        $selectedLinks = [
+            'internal' => is_array($rawSelected['internal'] ?? null) ? $rawSelected['internal'] : [],
+            'external' => is_array($rawSelected['external'] ?? null) ? $rawSelected['external'] : [],
+        ];
+
         $payload = $this->writerService->draft($website, 0, [
             'focus_keyword' => $project->focus_keyword,
             'current_html' => '',
@@ -714,6 +725,11 @@ class WriterProjectService
             'language' => (string) ($project->language ?? ''),
             'tone' => (string) ($project->tone ?? ''),
             'audience' => (string) ($project->audience ?? ''),
+            // User-curated links from the strategy step. When internal
+            // is non-empty, AiWriterService bypasses the GSC smart-link
+            // lookup and uses these instead. External is a new prompt
+            // section added when non-empty.
+            'selected_links' => $selectedLinks,
         ]);
 
         if (! is_array($payload) || ($payload['ok'] ?? false) !== true) {

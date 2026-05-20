@@ -149,6 +149,18 @@ class WriterProjectController extends Controller
             'keyword_suggestions' => 'nullable|array',
             'keyword_suggestions.*' => 'string|max:200',
             'link_suggestions' => 'nullable|array',
+            // User's curated picks from `link_suggestions` plus any
+            // manually-typed entries. Internal vs external is a UX
+            // distinction only — both reach the writer as `<a>` targets.
+            'selected_links' => 'nullable|array',
+            'selected_links.internal' => 'nullable|array|max:50',
+            'selected_links.internal.*.anchor' => 'required_with:selected_links.internal|string|max:200',
+            'selected_links.internal.*.url' => 'required_with:selected_links.internal|url|max:2048',
+            'selected_links.internal.*.manual' => 'nullable|boolean',
+            'selected_links.external' => 'nullable|array|max:50',
+            'selected_links.external.*.anchor' => 'required_with:selected_links.external|string|max:200',
+            'selected_links.external.*.url' => 'required_with:selected_links.external|url|max:2048',
+            'selected_links.external.*.manual' => 'nullable|boolean',
             'wp_post_id' => 'nullable|integer|min:1',
         ]);
 
@@ -175,6 +187,23 @@ class WriterProjectController extends Controller
             if (array_key_exists($jsonField, $data) && $data[$jsonField] !== null) {
                 $project->{$jsonField} = $data[$jsonField];
             }
+        }
+        // Normalise selected_links into the canonical {internal:[], external:[]}
+        // shape so downstream code never has to defend against partial input.
+        if (array_key_exists('selected_links', $data) && $data['selected_links'] !== null) {
+            $raw = $data['selected_links'];
+            $project->selected_links = [
+                'internal' => array_values(array_map(static fn (array $l) => [
+                    'anchor' => (string) $l['anchor'],
+                    'url'    => (string) $l['url'],
+                    'manual' => (bool) ($l['manual'] ?? false),
+                ], (array) ($raw['internal'] ?? []))),
+                'external' => array_values(array_map(static fn (array $l) => [
+                    'anchor' => (string) $l['anchor'],
+                    'url'    => (string) $l['url'],
+                    'manual' => (bool) ($l['manual'] ?? false),
+                ], (array) ($raw['external'] ?? []))),
+            ];
         }
         if (array_key_exists('step', $data) && $data['step'] !== null) {
             $project->step = $data['step'];
@@ -402,6 +431,7 @@ class WriterProjectController extends Controller
             'faqs' => is_array($p->faqs) ? $p->faqs : [],
             'keyword_suggestions' => is_array($p->keyword_suggestions) ? $p->keyword_suggestions : [],
             'link_suggestions' => is_array($p->link_suggestions) ? $p->link_suggestions : [],
+            'selected_links' => is_array($p->selected_links) ? $p->selected_links : ['internal' => [], 'external' => []],
             'generated_html' => (string) ($p->generated_html ?? ''),
             'wp_post_id' => $p->wp_post_id,
             'credits_used' => (int) $p->credits_used,

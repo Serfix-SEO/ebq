@@ -96,11 +96,24 @@ class AiWriterService
         }
         $wpPages = is_array($input['wp_pages'] ?? null) ? $input['wp_pages'] : [];
 
+        // User-curated link picks from the writer's strategy step.
+        // When the user ticked suggestions or typed manual links, we
+        // honor that exactly — no GSC fallback for internal in that
+        // case, because the user already curated. External links are
+        // always user-driven (no GSC equivalent), so the array maps
+        // 1:1 to the external_links prompt block when present.
+        $rawSelected = is_array($input['selected_links'] ?? null) ? $input['selected_links'] : [];
+        $selectedInternal = $this->normalizeSelectedLinks($rawSelected['internal'] ?? []);
+        $selectedExternal = $this->normalizeSelectedLinks($rawSelected['external'] ?? []);
+
         // Topic-aware internal-link candidate pool. GSC click data is the
         // moat — pages with proven user demand always beat "exists but
         // unranked" candidates. The wp_pages fallback lets newly-published
-        // content surface before it accumulates GSC impressions.
-        $smartLinks = $this->resolveSmartInternalLinks($website, $excludeUrl, $keyword, $brief, $gaps, $wpPages);
+        // content surface before it accumulates GSC impressions. Only
+        // computed when the user did NOT curate internal links manually.
+        $smartLinks = $selectedInternal === []
+            ? $this->resolveSmartInternalLinks($website, $excludeUrl, $keyword, $brief, $gaps, $wpPages)
+            : $this->smartLinksFromSelection($selectedInternal);
 
         $hasBrief = $brief !== null && ! empty($brief['subtopics'] ?? []);
         $hasGaps = $gaps !== null && ! empty($gaps['missing'] ?? []);
@@ -141,12 +154,19 @@ class AiWriterService
         //      draft form land in the prompt; cache key includes them.
         // v16: strict mode now forbids <h1> in any section (per-section
         //      generation flow was producing duplicate H1s).
+        // v17: user-curated internal + external link selection wired
+        //      into the prompt; cache key includes their hashes so a
+        //      changed picks list invalidates stale cached drafts.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
         $extraHash = substr(hash('sha256', mb_strtolower($title).'|'.implode('|', $additionalKeywords)), 0, 8);
+        $linksHash = substr(hash('sha256', json_encode([
+            'i' => $selectedInternal,
+            'e' => $selectedExternal,
+        ], JSON_UNESCAPED_UNICODE) ?: ''), 0, 12);
         $cacheKey = sprintf(
-            'ai_writer_v16:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s',
+            'ai_writer_v17:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -157,6 +177,7 @@ class AiWriterService
             count($wpPages),
             $selectionHash,
             $extraHash,
+            $linksHash,
         );
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ($cached['ok'] ?? false) === true) {
@@ -165,7 +186,7 @@ class AiWriterService
             return $cached;
         }
 
-        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null, $title, $additionalKeywords);
+        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null, $title, $additionalKeywords, $selectedExternal);
         // 16k output tokens supports the 20-section cap with room for JSON
         // overhead. Mistral Small's 32k context window comfortably fits
         // input + this output. 240s timeout matches the worst-case wall
@@ -348,9 +369,10 @@ class AiWriterService
     /**
      * @param  list<array{url: string, anchor: string, topic: string, clicks: int}>  $smartLinks
      * @param  list<string>  $additionalKeywords
+     * @param  list<array{anchor:string,url:string,manual:bool}>  $selectedExternal
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection, string $title, array $additionalKeywords): array
+    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection, string $title, array $additionalKeywords, array $selectedExternal = []): array
     {
         $briefBlock = '(none)';
         if (is_array($brief) && ! empty($brief)) {
@@ -374,6 +396,9 @@ class AiWriterService
         // Topic-tagged internal links: each entry tells the model which
         // section topic this URL is the strongest fit for, derived from
         // the GSC query that drove the most impressions to that page.
+        // When the user manually curated internal links on the strategy
+        // step, those override the GSC-derived smartLinks via the
+        // resolveSmartInternalLinks() bypass above.
         $smartLinksBlock = empty($smartLinks)
             ? '(none)'
             : json_encode(array_map(static fn (array $l) => [
@@ -381,6 +406,16 @@ class AiWriterService
                 'anchor' => $l['anchor'],
                 'best_fit_topic' => $l['topic'],
             ], $smartLinks), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        // External links the user explicitly added on the strategy step.
+        // No GSC fallback exists for external — if the array is empty
+        // the prompt simply doesn't ask the writer for outbound links.
+        $externalLinksBlock = empty($selectedExternal)
+            ? '(none)'
+            : json_encode(array_map(static fn (array $l) => [
+                'url' => $l['url'],
+                'anchor' => $l['anchor'],
+            ], $selectedExternal), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $gapsBlock = '(none)';
         if (is_array($gaps) && ! empty($gaps)) {
@@ -582,6 +617,15 @@ CONTENT BRIEF (may be empty):
 INTERNAL LINKS — topic-tagged candidates pulled from this site's own GSC
 footprint, ordered by topical fit (may be empty):
 {$smartLinksBlock}
+
+EXTERNAL LINKS — user-curated outbound links the article must cite (may
+be empty). For EVERY entry you MUST include exactly ONE <a href="<url>"
+target="_blank" rel="noopener"><anchor or close paraphrase></a> in the
+response, placed in a section where the cited resource is relevant. If
+no section is a natural fit, weave it into the most adjacent paragraph
+as supporting evidence. Do not invent new URLs; only use the URLs in
+this list. Do not link to the same external URL twice.
+{$externalLinksBlock}
 
 TOPICAL GAPS vs. top SERP (may be empty):
 {$gapsBlock}
@@ -1042,6 +1086,60 @@ USER;
      *
      * Excludes the current post's URL so we don't link the page to itself.
      *
+     * Sanitize a user-supplied list of {anchor, url} dicts into the
+     * canonical shape used by the writer prompt. Drops entries with a
+     * missing/empty anchor or url; trims whitespace; caps each list at
+     * a sensible max so a malformed payload can't blow out the prompt.
+     *
+     * @param  mixed  $list
+     * @return list<array{anchor:string, url:string, manual:bool}>
+     */
+    private function normalizeSelectedLinks(mixed $list): array
+    {
+        if (! is_array($list)) {
+            return [];
+        }
+        $out = [];
+        foreach ($list as $entry) {
+            if (! is_array($entry)) continue;
+            $anchor = trim((string) ($entry['anchor'] ?? ''));
+            $url    = trim((string) ($entry['url'] ?? ''));
+            if ($anchor === '' || $url === '') continue;
+            // Bare existence check; full URL validity was already
+            // enforced by the controller's `url` rule on PATCH.
+            if (! preg_match('#^https?://#i', $url)) continue;
+            $out[] = [
+                'anchor' => mb_substr($anchor, 0, 200),
+                'url'    => mb_substr($url, 0, 2048),
+                'manual' => (bool) ($entry['manual'] ?? false),
+            ];
+            if (count($out) >= 20) break; // sanity cap
+        }
+        return $out;
+    }
+
+    /**
+     * Convert a user-curated internal-link selection into the smart-link
+     * shape consumed by the prompt builder. We don't know which topic
+     * each link best fits when the user picked it, so we use the
+     * anchor itself as the topic label — the writer's section-placement
+     * logic falls back to the closest-related-section rule.
+     *
+     * @param  list<array{anchor:string, url:string, manual:bool}>  $selected
+     * @return list<array{url: string, anchor: string, topic: string, source: string, clicks: int}>
+     */
+    private function smartLinksFromSelection(array $selected): array
+    {
+        return array_map(static fn (array $l) => [
+            'url'    => $l['url'],
+            'anchor' => $l['anchor'],
+            'topic'  => $l['anchor'],
+            'source' => $l['manual'] ? 'user_manual' : 'user_selected',
+            'clicks' => 0,
+        ], $selected);
+    }
+
+    /**
      * @param  list<array{url: string, title?: string}>  $wpPages
      * @return list<array{url: string, anchor: string, topic: string, source: string, clicks: int}>
      */

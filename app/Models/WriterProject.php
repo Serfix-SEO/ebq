@@ -69,6 +69,7 @@ class WriterProject extends Model
         'faqs',
         'keyword_suggestions',
         'link_suggestions',
+        'selected_links',
         'generated_html',
         'wp_post_id',
         'credits_used',
@@ -86,6 +87,7 @@ class WriterProject extends Model
             'faqs' => 'array',
             'keyword_suggestions' => 'array',
             'link_suggestions' => 'array',
+            'selected_links' => 'array',
             'wp_post_id' => 'integer',
             'credits_used' => 'integer',
         ];
