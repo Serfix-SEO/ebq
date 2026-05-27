@@ -8,6 +8,7 @@ use App\Models\KeywordMetric;
 use App\Models\PageIndexingStatus;
 use App\Models\SearchConsoleData;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class ReportDataService
 {
@@ -655,6 +656,26 @@ class ReportDataService
     {
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
 
+        return Cache::remember(
+            sprintf(
+                'report:cannibalization:v1:%d:%s:%s:%d:%s:%d',
+                $websiteId,
+                $start->toDateString(),
+                $end->toDateString(),
+                $limit,
+                $country ?? 'all',
+                ReportCache::version($websiteId),
+            ),
+            now()->addHours(24),
+            fn () => $this->buildCannibalizationReport($websiteId, $start, $end, $limit, $country),
+        );
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function buildCannibalizationReport(int $websiteId, Carbon $start, Carbon $end, int $limit, ?string $country): array
+    {
         $rows = SearchConsoleData::query()
             ->where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
@@ -727,12 +748,33 @@ class ReportDataService
     public function strikingDistance(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null): array
     {
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
+        $country = $this->normalizeCountry($country);
 
+        return Cache::remember(
+            sprintf(
+                'report:strikingDistance:v1:%d:%s:%s:%d:%s:%d',
+                $websiteId,
+                $start->toDateString(),
+                $end->toDateString(),
+                $limit,
+                $country ?? 'all',
+                ReportCache::version($websiteId),
+            ),
+            now()->addHours(24),
+            fn () => $this->buildStrikingDistance($websiteId, $start, $end, $limit, $country),
+        );
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function buildStrikingDistance(int $websiteId, Carbon $start, Carbon $end, int $limit, ?string $country): array
+    {
         $list = SearchConsoleData::query()
             ->where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->where('query', '!=', '')
-            ->when($this->normalizeCountry($country), fn ($q, $c) => $q->where('country', $c))
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as avg_position')
             ->groupBy('query')
             ->get()
@@ -859,6 +901,27 @@ class ReportDataService
      */
     public function contentDecay(int $websiteId, int $limit = 25, ?string $country = null): array
     {
+        $country = $this->normalizeCountry($country);
+
+        return Cache::remember(
+            sprintf(
+                'report:contentDecay:v1:%d:%d:%s:%s:%d',
+                $websiteId,
+                $limit,
+                $country ?? 'all',
+                Carbon::yesterday(config('app.timezone'))->toDateString(),
+                ReportCache::version($websiteId),
+            ),
+            now()->addHours(24),
+            fn () => $this->buildContentDecay($websiteId, $limit, $country),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildContentDecay(int $websiteId, int $limit, ?string $country): array
+    {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
         $start = $end->copy()->subDays(27)->startOfDay();
@@ -866,7 +929,6 @@ class ReportDataService
         $prevStart = $prevEnd->copy()->subDays(27)->startOfDay();
         $yoyEnd = $end->copy()->subYear()->endOfDay();
         $yoyStart = $start->copy()->subYear()->startOfDay();
-        $country = $this->normalizeCountry($country);
 
         $earliest = SearchConsoleData::query()
             ->where('website_id', $websiteId)
@@ -1038,10 +1100,31 @@ class ReportDataService
      */
     public function indexingFailsWithTraffic(int $websiteId, int $windowDays = 14, int $limit = 50, ?string $country = null): array
     {
+        $country = $this->normalizeCountry($country);
+
+        return Cache::remember(
+            sprintf(
+                'report:indexingFails:v1:%d:%d:%d:%s:%s:%d',
+                $websiteId,
+                $windowDays,
+                $limit,
+                $country ?? 'all',
+                Carbon::yesterday(config('app.timezone'))->toDateString(),
+                ReportCache::version($websiteId),
+            ),
+            now()->addHours(24),
+            fn () => $this->buildIndexingFailsWithTraffic($websiteId, $windowDays, $limit, $country),
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildIndexingFailsWithTraffic(int $websiteId, int $windowDays, int $limit, ?string $country): array
+    {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
         $start = $end->copy()->subDays($windowDays - 1)->startOfDay();
-        $country = $this->normalizeCountry($country);
 
         $failing = PageIndexingStatus::query()
             ->where('website_id', $websiteId)
@@ -1096,13 +1179,17 @@ class ReportDataService
     {
         $country = $this->normalizeCountry($country);
 
-        return [
-            'cannibalizations' => count($this->cannibalizationReport($websiteId, null, null, 50, $country)),
-            'striking_distance' => count($this->strikingDistance($websiteId, null, null, 50, $country)),
-            'indexing_fails_with_traffic' => count($this->indexingFailsWithTraffic($websiteId, 14, 50, $country)),
-            'content_decay' => count($this->contentDecay($websiteId, 25, $country)['pages']),
-            'quick_wins' => count($this->quickWins($websiteId, 20)),
-        ];
+        return Cache::remember(
+            sprintf('report:insightCounts:v1:%d:%s:%d', $websiteId, $country ?? 'all', ReportCache::version($websiteId)),
+            now()->addHours(24),
+            fn () => [
+                'cannibalizations' => count($this->cannibalizationReport($websiteId, null, null, 50, $country)),
+                'striking_distance' => count($this->strikingDistance($websiteId, null, null, 50, $country)),
+                'indexing_fails_with_traffic' => count($this->indexingFailsWithTraffic($websiteId, 14, 50, $country)),
+                'content_decay' => count($this->contentDecay($websiteId, 25, $country)['pages']),
+                'quick_wins' => count($this->quickWins($websiteId, 20)),
+            ],
+        );
     }
 
     /**
@@ -1116,6 +1203,24 @@ class ReportDataService
      * @return array<int, array{keyword: string, search_volume: int, cpc: ?float, competition: ?float, current_position: ?float, current_page: ?string, projected_value: ?float, upside_value: ?float, impressions: int}>
      */
     public function quickWins(int $websiteId, int $limit = 20): array
+    {
+        return Cache::remember(
+            sprintf(
+                'report:quickWins:v1:%d:%d:%s:%d',
+                $websiteId,
+                $limit,
+                Carbon::yesterday(config('app.timezone'))->toDateString(),
+                ReportCache::version($websiteId),
+            ),
+            now()->addHours(24),
+            fn () => $this->buildQuickWins($websiteId, $limit),
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildQuickWins(int $websiteId, int $limit): array
     {
         $minVolume = 500;
         $maxCompetition = 0.4;
@@ -1222,6 +1327,24 @@ class ReportDataService
      * @return array<int, array{country: string, clicks: int, prev_clicks: int, change: array<string, mixed>}>
      */
     public function topCountriesTrend(int $websiteId, int $limit = 10): array
+    {
+        return Cache::remember(
+            sprintf(
+                'report:topCountries:v1:%d:%d:%s:%d',
+                $websiteId,
+                $limit,
+                Carbon::yesterday(config('app.timezone'))->toDateString(),
+                ReportCache::version($websiteId),
+            ),
+            now()->addHours(24),
+            fn () => $this->buildTopCountriesTrend($websiteId, $limit),
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildTopCountriesTrend(int $websiteId, int $limit): array
     {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();

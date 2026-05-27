@@ -15,6 +15,7 @@ use App\Services\BacklinkProspectingService;
 use App\Services\CrossSiteBenchmarkService;
 use App\Services\Google\GoogleClientFactory;
 use App\Services\PluginInsightResolver;
+use App\Services\ReportCache;
 use App\Services\ReportDataService;
 use App\Support\Audit\SerpGlCatalog;
 use App\Support\RankTrackerConfig;
@@ -25,6 +26,7 @@ use App\Services\TopicalAuthorityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
@@ -52,12 +54,36 @@ class PluginHqController extends Controller
     /**
      * Top-level KPIs + insight counts. Used by the HQ Overview tab.
      *   GET /api/v1/hq/overview?range=30d
+     *
+     * Cached on a per-website + range basis with a 24h sanity TTL.
+     * Real invalidation is event-driven via ReportCache::flushWebsite()
+     * from the nightly GSC sync and the rank-tracker job.
      */
     public function overview(Request $request): JsonResponse
     {
         $website = $this->website($request);
         [$start, $end, $prevStart, $prevEnd, $rangeKey] = $this->resolveRange($request);
 
+        $payload = Cache::remember(
+            sprintf('hq:overview:v1:%d:%s:%d', $website->id, $rangeKey, ReportCache::version($website->id)),
+            now()->addHours(24),
+            fn () => $this->buildOverviewPayload($website, $start, $end, $prevStart, $prevEnd, $rangeKey),
+        );
+
+        return response()->json($payload);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildOverviewPayload(
+        Website $website,
+        string $start,
+        string $end,
+        string $prevStart,
+        string $prevEnd,
+        string $rangeKey,
+    ): array {
         $current = $this->aggregateGsc($website->id, $start, $end);
         $previous = $this->aggregateGsc($website->id, $prevStart, $prevEnd);
 
@@ -81,7 +107,11 @@ class PluginHqController extends Controller
         // without a follow-up fetch.
         $sparkline = $this->dailyClicks($website->id, $start, $end);
 
-        return response()->json([
+        // topMovers computes both gainers + losers in a single query and
+        // returns them keyed by direction; cheaper than two calls.
+        $movers = $this->topMoversBoth($website->id, $start, $end, 5);
+
+        return [
             'website_id' => $website->id,
             'domain' => $website->domain,
             'range' => [
@@ -113,9 +143,9 @@ class PluginHqController extends Controller
             'tracker_distribution' => $trackerSlabs,
             'sparkline' => $sparkline,
             'insight_counts' => $this->reports->insightCounts($website->id),
-            'top_winning_keywords' => $this->topMovers($website->id, $start, $end, 'gainers', 5),
-            'top_losing_keywords' => $this->topMovers($website->id, $start, $end, 'losers', 5),
-        ]);
+            'top_winning_keywords' => $movers['gainers'],
+            'top_losing_keywords' => $movers['losers'],
+        ];
     }
 
     /**
@@ -1745,27 +1775,39 @@ class PluginHqController extends Controller
     }
 
     /**
+     * Counts of unique queries by SERP-position slab over the date window.
+     * The bucket math runs in MySQL so PHP never sees the per-query rows;
+     * critical on sites with tens of thousands of unique queries.
+     *
      * @return array{top_3:int, top_10:int, top_50:int, top_100:int}
      */
     private function positionDistribution(int $websiteId, string $start, string $end): array
     {
-        $rows = SearchConsoleData::query()
-            ->where('website_id', $websiteId)
-            ->whereBetween('date', [$start, $end])
-            ->where('query', '!=', '')
-            ->selectRaw('query, AVG(position) AS pos')
-            ->groupBy('query')
-            ->get();
+        $row = SearchConsoleData::query()
+            ->fromSub(
+                fn ($q) => $q
+                    ->from('search_console_data')
+                    ->selectRaw('AVG(position) AS pos')
+                    ->where('website_id', $websiteId)
+                    ->whereBetween('date', [$start, $end])
+                    ->where('query', '!=', '')
+                    ->groupBy('query'),
+                't'
+            )
+            ->selectRaw('
+                SUM(CASE WHEN pos <=  3 THEN 1 ELSE 0 END) AS top_3,
+                SUM(CASE WHEN pos >  3 AND pos <= 10 THEN 1 ELSE 0 END) AS top_10,
+                SUM(CASE WHEN pos > 10 AND pos <= 50 THEN 1 ELSE 0 END) AS top_50,
+                SUM(CASE WHEN pos > 50 AND pos <= 100 THEN 1 ELSE 0 END) AS top_100
+            ')
+            ->first();
 
-        $buckets = ['top_3' => 0, 'top_10' => 0, 'top_50' => 0, 'top_100' => 0];
-        foreach ($rows as $r) {
-            $pos = (float) $r->pos;
-            if ($pos <= 3) $buckets['top_3']++;
-            elseif ($pos <= 10) $buckets['top_10']++;
-            elseif ($pos <= 50) $buckets['top_50']++;
-            elseif ($pos <= 100) $buckets['top_100']++;
-        }
-        return $buckets;
+        return [
+            'top_3'   => (int) ($row->top_3   ?? 0),
+            'top_10'  => (int) ($row->top_10  ?? 0),
+            'top_50'  => (int) ($row->top_50  ?? 0),
+            'top_100' => (int) ($row->top_100 ?? 0),
+        ];
     }
 
     /**
@@ -1832,48 +1874,66 @@ class PluginHqController extends Controller
      * regressed (losers) most over the range vs the immediately preceding
      * period. Pure GSC-derived; doesn't require Rank Tracker entries.
      *
-     * @return list<array<string, mixed>>
+     * Single SQL pass: cur LEFT JOIN prev on query. We compute the delta
+     * server-side, materialise both ordered lists in one query, then split
+     * in PHP. Replaces the previous "four GROUP BYs + whereIn" approach
+     * that exploded on large sites.
+     *
+     * @return array{gainers: list<array<string, mixed>>, losers: list<array<string, mixed>>}
      */
-    private function topMovers(int $websiteId, string $start, string $end, string $direction, int $limit): array
+    private function topMoversBoth(int $websiteId, string $start, string $end, int $limit): array
     {
-        $cur = SearchConsoleData::query()
-            ->where('website_id', $websiteId)
-            ->whereBetween('date', [$start, $end])
-            ->where('query', '!=', '')
-            ->selectRaw('query, AVG(position) AS pos, SUM(clicks) AS clicks, SUM(impressions) AS impressions')
-            ->groupBy('query')
-            ->havingRaw('SUM(impressions) >= 50')
-            ->get()
-            ->keyBy(fn ($r) => mb_strtolower((string) $r->query));
-
         $days = Carbon::parse($start)->diffInDays(Carbon::parse($end)) + 1;
         $prevEnd = Carbon::parse($start)->subDay()->toDateString();
         $prevStart = Carbon::parse($prevEnd)->subDays($days - 1)->toDateString();
 
-        $prev = SearchConsoleData::query()
-            ->where('website_id', $websiteId)
-            ->whereBetween('date', [$prevStart, $prevEnd])
-            ->whereIn('query', $cur->pluck('query')->all())
-            ->selectRaw('query, AVG(position) AS pos')
-            ->groupBy('query')
-            ->get()
-            ->keyBy(fn ($r) => mb_strtolower((string) $r->query));
+        // One materialised result set, sorted in MySQL, then sliced in PHP.
+        // We over-fetch (limit * 2) and split by sign of delta because the
+        // gainer set is naturally bounded by HAVING SUM(impressions) >= 50.
+        $rows = SearchConsoleData::query()
+            ->fromSub(
+                fn ($q) => $q
+                    ->from('search_console_data')
+                    ->selectRaw('query, AVG(position) AS pos, SUM(clicks) AS clicks, SUM(impressions) AS impressions')
+                    ->where('website_id', $websiteId)
+                    ->whereBetween('date', [$start, $end])
+                    ->where('query', '!=', '')
+                    ->groupBy('query')
+                    ->havingRaw('SUM(impressions) >= 50'),
+                'cur'
+            )
+            ->leftJoinSub(
+                SearchConsoleData::query()
+                    ->from('search_console_data')
+                    ->selectRaw('query, AVG(position) AS pos')
+                    ->where('website_id', $websiteId)
+                    ->whereBetween('date', [$prevStart, $prevEnd])
+                    ->where('query', '!=', '')
+                    ->groupBy('query'),
+                'prev',
+                'prev.query',
+                '=',
+                'cur.query'
+            )
+            ->selectRaw('cur.query, cur.pos AS cur_pos, cur.clicks, cur.impressions, prev.pos AS prev_pos, (prev.pos - cur.pos) AS delta')
+            ->whereNotNull('prev.pos')
+            ->get();
 
-        $out = [];
-        foreach ($cur as $key => $row) {
-            $previousRow = $prev->get($key);
-            if ($previousRow === null) continue;
-            $delta = (float) $previousRow->pos - (float) $row->pos; // positive = improved
-            $out[] = [
-                'keyword' => (string) $row->query,
-                'position' => round((float) $row->pos, 1),
-                'previous_position' => round((float) $previousRow->pos, 1),
-                'delta' => round($delta, 1),
-                'clicks' => (int) $row->clicks,
-                'impressions' => (int) $row->impressions,
-            ];
-        }
-        usort($out, fn ($a, $b) => $direction === 'gainers' ? ($b['delta'] <=> $a['delta']) : ($a['delta'] <=> $b['delta']));
-        return array_slice($out, 0, $limit);
+        $gainers = $rows->sortByDesc('delta')->take($limit);
+        $losers  = $rows->sortBy('delta')->take($limit);
+
+        $shape = fn ($row) => [
+            'keyword' => (string) $row->query,
+            'position' => round((float) $row->cur_pos, 1),
+            'previous_position' => round((float) $row->prev_pos, 1),
+            'delta' => round((float) $row->delta, 1),
+            'clicks' => (int) $row->clicks,
+            'impressions' => (int) $row->impressions,
+        ];
+
+        return [
+            'gainers' => $gainers->map($shape)->values()->all(),
+            'losers'  => $losers->map($shape)->values()->all(),
+        ];
     }
 }

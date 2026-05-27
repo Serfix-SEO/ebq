@@ -6,6 +6,7 @@ use App\Models\KeywordMetric;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Google\SearchConsoleService;
+use App\Services\ReportCache;
 use App\Support\UrlNormalizer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -61,6 +62,10 @@ class SyncSearchConsoleData implements ShouldQueue
         }
 
         Website::whereKey($this->websiteId)->update(['last_search_console_sync_at' => now()]);
+
+        // Fresh GSC rows landed: bump the per-website data version so HQ
+        // Overview + Dashboard caches refresh on the next read.
+        ReportCache::flushWebsite($this->websiteId);
 
         $this->queueKeywordMetricsRefresh();
     }

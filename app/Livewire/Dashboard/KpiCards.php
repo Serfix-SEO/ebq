@@ -7,12 +7,38 @@ use App\Models\SearchConsoleData;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
+#[Lazy]
 class KpiCards extends Component
 {
     public int $websiteId = 0;
+
+    public function placeholder(): string
+    {
+        return <<<'HTML'
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="h-2.5 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+                <div class="mt-3 h-6 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="h-2.5 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+                <div class="mt-3 h-6 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="h-2.5 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+                <div class="mt-3 h-6 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="h-2.5 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+                <div class="mt-3 h-6 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+            </div>
+        </div>
+        HTML;
+    }
 
     public function mount(): void
     {

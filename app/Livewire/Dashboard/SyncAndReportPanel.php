@@ -6,15 +6,28 @@ use App\Models\Website;
 use App\Services\ReportDataService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Throwable;
 
+#[Lazy]
 class SyncAndReportPanel extends Component
 {
     public int $websiteId = 0;
 
     public ?string $sendError = null;
+
+    public function placeholder(): string
+    {
+        return <<<'HTML'
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="h-3 w-1/4 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+            <div class="mt-4 h-10 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/60"></div>
+            <div class="mt-2 h-10 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/60"></div>
+        </div>
+        HTML;
+    }
 
     public ?string $sendSuccess = null;
 

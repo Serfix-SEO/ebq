@@ -8,9 +8,11 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
+#[Lazy]
 class TrafficChart extends Component
 {
     public int $websiteId = 0;
@@ -18,6 +20,16 @@ class TrafficChart extends Component
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
+    }
+
+    public function placeholder(): string
+    {
+        return <<<'HTML'
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="h-3 w-1/4 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
+            <div class="mt-4 h-56 w-full animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800/60"></div>
+        </div>
+        HTML;
     }
 
     #[On('website-changed')]
