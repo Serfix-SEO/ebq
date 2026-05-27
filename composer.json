@@ -17,6 +17,7 @@
         "livewire/livewire": "^3.6.4",
         "livewire/volt": "^1.7.0",
         "patrickschur/language-detection": "^5.3",
+        "resend/resend-laravel": "^0.21",
         "sentry/sentry-laravel": "^4.10",
         "socialiteproviders/microsoft": "^4.6"
     },
