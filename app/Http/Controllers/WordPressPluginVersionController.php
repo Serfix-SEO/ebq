@@ -61,7 +61,44 @@ class WordPressPluginVersionController extends Controller
             // global FALSE always wins. Anonymous: no install identifier
             // is captured server-side from this endpoint.
             'global_features' => Website::globalFeatureFlags(),
+            // Small promo banner shown on the plugin's EBQ HQ pages.
+            // Configured from EBQ Admin → Settings; null when disabled.
+            'banner' => $this->bannerPayload(),
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    /**
+     * Banner config broadcast to the plugin. Returns null when disabled or
+     * when no usable media is set, so the plugin renders nothing.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function bannerPayload(): ?array
+    {
+        if (((string) Setting::get('plugin.banner.enabled', '0')) !== '1') {
+            return null;
+        }
+
+        $type = (string) Setting::get('plugin.banner.type', 'image');
+        $type = in_array($type, ['image', 'youtube'], true) ? $type : 'image';
+        $imageUrl = trim((string) Setting::get('plugin.banner.image_url', ''));
+        $youtubeUrl = trim((string) Setting::get('plugin.banner.youtube_url', ''));
+
+        // Require the media for the selected type, otherwise broadcast nothing.
+        if ($type === 'image' && $imageUrl === '') {
+            return null;
+        }
+        if ($type === 'youtube' && $youtubeUrl === '') {
+            return null;
+        }
+
+        return [
+            'type' => $type,
+            'title' => trim((string) Setting::get('plugin.banner.title', '')),
+            'image_url' => $imageUrl,
+            'link_url' => trim((string) Setting::get('plugin.banner.link_url', '')),
+            'youtube_url' => $youtubeUrl,
+        ];
     }
 
     private function parseVersion(string $file): string

@@ -84,6 +84,53 @@
                 </label>
             </section>
 
+            {{-- ── WordPress HQ banner ──────────────────────────────── --}}
+            <section x-data="{ type: '{{ old('banner_type', $banner['type']) }}' }"
+                class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">WordPress HQ banner</h2>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    A small promo banner shown on the bottom-right of the plugin's EBQ HQ pages. Users can close it; it reappears on the next page load. Updates reach installs within a few hours.
+                </p>
+
+                <label class="mt-4 flex items-center gap-2.5 text-sm text-slate-700 dark:text-slate-200">
+                    <input type="hidden" name="banner_enabled" value="0" />
+                    <input type="checkbox" name="banner_enabled" value="1"
+                        class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        @checked(old('banner_enabled', $banner['enabled'])) />
+                    <span class="font-medium">Show the banner</span>
+                </label>
+
+                <div class="mt-4">
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Banner type</label>
+                    <select name="banner_type" x-model="type"
+                        class="mt-1 w-48 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                        <option value="image">Image</option>
+                        <option value="youtube">YouTube video</option>
+                    </select>
+                </div>
+
+                <div class="mt-4">
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Title <span class="font-normal text-slate-400">(optional)</span></label>
+                    <input type="text" name="banner_title" maxlength="120" value="{{ old('banner_title', $banner['title']) }}"
+                        class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                </div>
+
+                <div class="mt-4" x-show="type === 'image'" x-cloak>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Image URL</label>
+                    <input type="url" name="banner_image_url" placeholder="https://…/banner.png" value="{{ old('banner_image_url', $banner['image_url']) }}"
+                        class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                    <label class="mt-3 block text-xs font-semibold text-slate-700 dark:text-slate-300">Link URL <span class="font-normal text-slate-400">(optional — image click target)</span></label>
+                    <input type="url" name="banner_link_url" placeholder="https://ebq.io/…" value="{{ old('banner_link_url', $banner['link_url']) }}"
+                        class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                </div>
+
+                <div class="mt-4" x-show="type === 'youtube'" x-cloak>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">YouTube URL</label>
+                    <input type="url" name="banner_youtube_url" placeholder="https://www.youtube.com/watch?v=…" value="{{ old('banner_youtube_url', $banner['youtube_url']) }}"
+                        class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                </div>
+            </section>
+
             <div class="flex items-center justify-end">
                 <button class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700">
                     Save settings
