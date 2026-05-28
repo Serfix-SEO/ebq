@@ -446,7 +446,9 @@ class DemoDataSeeder
                     'snippet' => null,
                     'total_results' => $this->rand($entry['q'].'tr'.$d, 1_000_000, 90_000_000),
                     'search_time' => round($this->rand($entry['q'].'st'.$d, 20, 90) / 100, 3),
-                    'serp_features' => $d % 5 === 0 ? ['featured_snippet', 'people_also_ask'] : ['people_also_ask'],
+                    // Raw query-builder insert bypasses Eloquent casts, so JSON
+                    // columns must be encoded by hand.
+                    'serp_features' => json_encode($d % 5 === 0 ? ['featured_snippet', 'people_also_ask'] : ['people_also_ask']),
                     'competitor_positions' => null,
                     'top_results' => null,
                     'related_searches' => null,
