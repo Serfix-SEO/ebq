@@ -362,7 +362,7 @@ class DemoDataSeeder
         foreach (self::QUERIES as $entry) {
             KeywordMetric::create([
                 'keyword' => $entry['q'],
-                'keyword_hash' => hash('sha256', mb_strtolower($entry['q']).'|global'),
+                'keyword_hash' => KeywordMetric::hashKeyword($entry['q']),
                 'country' => 'global',
                 'data_source' => self::DEMO_KW_SOURCE,
                 'search_volume' => $entry['vol'],
@@ -676,7 +676,8 @@ class DemoDataSeeder
                     'speed_index_ms' => $this->rand('dsi'.$page, 800, 1400),
                 ],
             ],
-            'keywords' => ['available' => false],
+            'keywords' => $this->keywordStrategy($primary),
+            'benchmark' => $this->serpBenchmark($page, $primary),
             'recommendations' => [
                 ['severity' => 'good', 'section' => 'Metadata',    'title' => 'Title and meta description are well optimised', 'why' => 'Both sit inside the ideal length and lead with the focus keyword.', 'fix' => 'No action needed — keep the focus keyword near the front.'],
                 ['severity' => 'good', 'section' => 'Performance', 'title' => 'Core Web Vitals pass on mobile and desktop',      'why' => 'LCP, CLS and TBT are all inside Google\'s "good" thresholds.', 'fix' => 'No action needed — monitor after large template changes.'],
@@ -761,6 +762,168 @@ class DemoDataSeeder
             ['level' => 2, 'text' => 'How EBQ helps'],
             ['level' => 3, 'text' => 'Step-by-step workflow'],
             ['level' => 2, 'text' => 'Frequently asked questions'],
+        ];
+    }
+
+    /**
+     * Fully-populated, healthy Keyword Strategy block for the audit view:
+     * a primary keyword present in title/H1/meta, 100% topical coverage,
+     * clear intent, and a target-keyword table tied to Search Console.
+     *
+     * @return array<string, mixed>
+     */
+    private function keywordStrategy(string $primary): array
+    {
+        $variations = array_values(array_unique([
+            $primary,
+            $primary.' tool',
+            'best '.$primary,
+            $primary.' software',
+            $primary.' for seo',
+        ]));
+
+        $targets = [];
+        foreach ($variations as $q) {
+            $pos = round($this->rand('ks-p-'.$q, 12, 70) / 10, 1); // 1.2–7.0
+            $impr = $this->rand('ks-i-'.$q, 600, 9000);
+            $clicks = (int) round($impr * (0.04 + $this->rand('ks-c-'.$q, 0, 18) / 100));
+            $targets[] = [
+                'query' => $q,
+                'clicks' => $clicks,
+                'impressions' => $impr,
+                'position' => $pos,
+            ];
+        }
+
+        $total = count($targets);
+        $primaryRow = $targets[0];
+
+        return [
+            'available' => true,
+            'gsc_lookback_days' => 28,
+            'primary' => [
+                'query' => $primaryRow['query'],
+                'clicks' => $primaryRow['clicks'],
+                'impressions' => $primaryRow['impressions'],
+                'position' => $primaryRow['position'],
+            ],
+            'primary_source' => 'gsc',
+            // Focus keyword present in all three power placements → all green.
+            'power_placement' => [
+                'in_title' => true,
+                'in_h1' => true,
+                'in_meta_description' => true,
+            ],
+            // Full coverage: every ranking query appears in the body.
+            'coverage' => [
+                'total' => $total,
+                'found_count' => $total,
+                'missing_count' => 0,
+                'score' => 100,
+                'missing' => [],
+            ],
+            'intent' => [
+                'dominant' => 'commercial_utility',
+                'informational_count' => 1,
+                'utility_count' => 2,
+                'commercial_count' => 2,
+                'transactional_count' => 0,
+                'navigational_count' => 0,
+                'local_count' => 0,
+                'support_count' => 0,
+                'intent_scores' => ['commercial' => 6, 'utility' => 5, 'informational' => 2],
+            ],
+            'accidental' => [],
+            'target_keywords' => $targets,
+        ];
+    }
+
+    /**
+     * SERP benchmark: ebq.io versus ebqcompetitor1.io and ebqcompetitor2.io.
+     * ebq.io ranks ahead and reads easier (higher Flesch) than both, with a
+     * you-vs-market gap table that shows EBQ in the lead.
+     *
+     * @return array<string, mixed>
+     */
+    private function serpBenchmark(string $page, string $primary): array
+    {
+        $url = 'https://'.self::DEMO_DOMAIN.$page;
+        $title = $this->pageTitle($page);
+        $desc = $this->pageDescription($page);
+        $yourPos = $this->rand('serp-pos'.$page, 2, 4);
+        $yourFlesch = $this->rand('flesch'.$page, 62, 74);
+        $yourWords = $this->rand('wc'.$page, 1100, 2200);
+        $yourImages = $this->rand('imgt'.$page, 4, 9);
+
+        $c1Flesch = $this->rand('c1f'.$page, 46, 58);
+        $c2Flesch = $this->rand('c2f'.$page, 38, 52);
+        $c1Words = $this->rand('c1w'.$page, 700, 1200);
+        $c2Words = $this->rand('c2w'.$page, 600, 1100);
+        $c1Images = $this->rand('c1i'.$page, 2, 5);
+        $c2Images = $this->rand('c2i'.$page, 1, 4);
+
+        $avgFlesch = round(($c1Flesch + $c2Flesch) / 2, 1);
+        $avgWords = (int) round(($c1Words + $c2Words) / 2);
+        $avgImages = round(($c1Images + $c2Images) / 2, 1);
+
+        $title2 = Str::title($primary);
+
+        return [
+            'keyword' => $primary,
+            'keyword_source' => 'gsc_primary',
+            'your_flesch' => $yourFlesch,
+            'your_serp' => [
+                'found' => true,
+                'position' => $yourPos,
+                'on_first_page' => true,
+                'organic_sample_size' => 10,
+                'matched_listing_url' => $url,
+                'matched_listing_title' => $title,
+                'matched_listing_display' => self::DEMO_DOMAIN.$page,
+                'matched_listing_snippet' => $desc,
+                'audited_page_url' => $url,
+                'audited_page_title' => $title,
+                'audited_page_display' => self::DEMO_DOMAIN.$page,
+                'audited_page_snippet' => $desc,
+            ],
+            'competitors' => [
+                [
+                    'url' => 'https://ebqcompetitor1.io'.$page,
+                    'title' => 'EBQ Competitor 1 — '.$title2,
+                    'position' => $yourPos + 2,
+                    'flesch' => $c1Flesch,
+                    'grade' => 'Grade 9 — Fairly difficult',
+                ],
+                [
+                    'url' => 'https://ebqcompetitor2.io'.$page,
+                    'title' => 'EBQ Competitor 2 — '.$title2,
+                    'position' => $yourPos + 4,
+                    'flesch' => $c2Flesch,
+                    'grade' => 'Grade 11 — Difficult',
+                ],
+            ],
+            'gap_table' => [
+                'rows' => [
+                    [
+                        'key' => 'word_count', 'metric' => 'Word count',
+                        'yours' => $yourWords, 'market_avg' => $avgWords,
+                        'delta' => $yourWords - $avgWords,
+                        'status' => $yourWords >= $avgWords ? 'Ahead' : 'Behind',
+                    ],
+                    [
+                        'key' => 'flesch', 'metric' => 'Readability (Flesch)',
+                        'yours' => $yourFlesch, 'market_avg' => $avgFlesch,
+                        'delta' => round($yourFlesch - $avgFlesch, 1),
+                        'status' => $yourFlesch >= $avgFlesch ? 'More readable' : 'Less readable',
+                    ],
+                    [
+                        'key' => 'images', 'metric' => 'Images',
+                        'yours' => $yourImages, 'market_avg' => $avgImages,
+                        'delta' => round($yourImages - $avgImages, 1),
+                        'status' => $yourImages >= $avgImages ? 'Ahead' : 'Behind',
+                    ],
+                ],
+            ],
         ];
     }
 
