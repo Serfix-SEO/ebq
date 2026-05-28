@@ -1,7 +1,25 @@
 <x-marketing.page
-    title="EBQ — The SEO command center for teams that ship"
-    description="EBQ unifies Search Console, Analytics, ranking, audits, and backlinks into one workspace that surfaces what to fix this week."
+    title="#1 Free SEO Analysis Tool With Detailed Audits"
+    description="Analyze your website with the #1 free SEO audit tool. Get detailed tech insights, live GSC data, and actionable fixes to scale your search traffic."
 >
+    {{-- Page-specific structured data: the product itself. --}}
+    <x-slot:schema>
+        <script type="application/ld+json">@json([
+            '@context' => 'https://schema.org',
+            '@type' => 'SoftwareApplication',
+            'name' => 'EBQ',
+            'applicationCategory' => 'BusinessApplication',
+            'operatingSystem' => 'Web, WordPress',
+            'url' => route('landing'),
+            'description' => 'Free SEO analysis and audit tool: detailed technical insights, live Google Search Console data, rank tracking, backlinks, and actionable fixes.',
+            'offers' => [
+                '@type' => 'Offer',
+                'price' => '0',
+                'priceCurrency' => 'USD',
+            ],
+        ], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)</script>
+    </x-slot:schema>
+
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="relative">
         <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_60%)]"></div>

@@ -84,7 +84,29 @@
         };
     };
 
-    $plans = $planRows->map(function (\App\Models\Plan $p) use ($ctaForPlan, $salesMailto, $registerUrl, $featureCopy, $apiLimitCopy, $planStyleFor) {
+    // Free + Pro are single-site personal plans — they should read "Personal"
+    // for the connected-websites entitlement, not "unlimited", regardless of
+    // the stored max_websites value.
+    $personalSlugs = ['free', 'pro'];
+    $websitesCell = function (\App\Models\Plan $p) use ($personalSlugs) {
+        if (in_array($p->slug, $personalSlugs, true)) {
+            return 'Personal';
+        }
+        return $p->max_websites === null ? '∞' : (string) (int) $p->max_websites;
+    };
+    $websitesBullet = function (\App\Models\Plan $p) use ($personalSlugs) {
+        if (in_array($p->slug, $personalSlugs, true)) {
+            return 'Personal website (single site)';
+        }
+        if ($p->max_websites === null) {
+            return 'Unlimited connected websites';
+        }
+        return $p->max_websites === 1
+            ? '1 connected website'
+            : (int) $p->max_websites . ' connected websites';
+    };
+
+    $plans = $planRows->map(function (\App\Models\Plan $p) use ($ctaForPlan, $salesMailto, $registerUrl, $featureCopy, $apiLimitCopy, $planStyleFor, $websitesBullet) {
         $slug    = (string) $p->slug;
         $monthly = (int) $p->price_monthly_usd;
         $yearly  = (int) $p->price_yearly_usd;
@@ -92,13 +114,7 @@
 
         $featureMap = $p->featureMap();
         $autoBullets = [];
-        if ($p->max_websites === null) {
-            $autoBullets[] = 'Unlimited connected websites';
-        } else {
-            $autoBullets[] = $p->max_websites === 1
-                ? '1 connected website'
-                : (int) $p->max_websites . ' connected websites';
-        }
+        $autoBullets[] = $websitesBullet($p);
         $autoBullets = array_merge($autoBullets, $apiLimitCopy($p->api_limits));
         foreach ($featureCopy as $key => $label) {
             if (($featureMap[$key] ?? false) === true) {
@@ -140,7 +156,7 @@
     // Auto-build the comparison matrix from the same DB rows so a new
     // tier added in /admin/plans appears here without a deploy.
     $compareRows = [];
-    $compareRows[] = array_merge(['Connected websites'], $planRows->map(fn ($p) => $p->max_websites === null ? '∞' : (string) (int) $p->max_websites)->all());
+    $compareRows[] = array_merge(['Connected websites'], $planRows->map(fn ($p) => $websitesCell($p))->all());
     $compareRows[] = array_merge(['Tracked keywords'], $planRows->map(fn ($p) => isset($p->api_limits['rank_tracker']['max_active_keywords']) ? number_format((int) $p->api_limits['rank_tracker']['max_active_keywords']) : '—')->all());
     $compareRows[] = array_merge(['SERP fetches / month'], $planRows->map(fn ($p) => isset($p->api_limits['serper']['monthly_calls']) ? number_format((int) $p->api_limits['serper']['monthly_calls']) : '—')->all());
     foreach ($featureCopy as $key => $label) {
@@ -219,31 +235,19 @@
     </section>
 
     @if ($free)
-        {{-- ── Free promo ───────────────────────────────────────── --}}
-        <section class="bg-white py-16 sm:py-20">
-            <div class="mx-auto max-w-4xl px-6 lg:px-8">
-                <div class="rounded-3xl border border-emerald-200 bg-emerald-50/60 px-8 py-14 text-center">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Limited-time offer</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-                        Full Pro usage at no cost — then just $5/month.
-                    </h2>
-                    <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">
-                        Create your account and use every Pro feature now, free. When the promotion ends, plans start at just $5/month — and we will notify you well in advance before any charge.
-                    </p>
-                    <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                        <a href="{{ $registerUrl }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">Start free</a>
-                        <a href="{{ $featuresUrl }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">See all features</a>
-                    </div>
-                </div>
-
-                <p class="mt-6 text-center text-xs text-slate-500">
-                    Pricing starts at $5/month once the promotion ends. Existing accounts will receive at least 30 days’ notice before any change.
+        {{-- ── Free promo strip (compact, keeps the table high) ──── --}}
+        <section class="border-b border-emerald-200 bg-emerald-50/60">
+            <div class="mx-auto max-w-4xl px-6 py-5 text-center lg:px-8">
+                <p class="text-sm font-semibold text-emerald-800">
+                    Free for a limited time — then just&nbsp;$5/month.
+                    <span class="font-normal text-emerald-700">Every paid feature is unlocked now at no cost; we’ll give 30 days’ notice before pricing starts.</span>
                 </p>
             </div>
         </section>
-    @else
+    @endif
+
         {{-- ── Plan cards ───────────────────────────────────────── --}}
-        <section id="plans" class="bg-white py-16 sm:py-20">
+        <section id="plans" class="bg-white pt-10 pb-16 sm:pt-12">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($plans as $plan)
@@ -436,7 +440,6 @@
                 </p>
             </div>
         </section>
-    @endif
 
     {{-- ── CTA ──────────────────────────────────────────────── --}}
     <section class="bg-white py-20 sm:py-24">

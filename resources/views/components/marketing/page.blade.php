@@ -3,7 +3,33 @@
     'description' => 'EBQ — clear SEO operations with rankings, backlinks, audits, and AI-powered content tools.',
     'canonical' => null,
     'active' => null,
+    'ogImage' => null,
+    'robots' => 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
 ])
+@php
+    $canonicalUrl = $canonical ?? url()->current();
+    $ogImageUrl = $ogImage ?? asset('ebq-logo.png');
+    $homeUrl = route('landing');
+
+    // Site-wide structured data — Organization + WebSite. Page-specific
+    // schema (SoftwareApplication, FAQPage, etc.) comes in via the
+    // optional `schema` slot.
+    $orgSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'Organization',
+        'name' => 'EBQ',
+        'url' => $homeUrl,
+        'logo' => asset('ebq-logo.png'),
+        'description' => 'Connected SEO suite: rankings, backlinks, audits, live Search Console data, and AI content tools.',
+    ];
+    $siteSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'WebSite',
+        'name' => 'EBQ',
+        'url' => $homeUrl,
+    ];
+    $jsonFlags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full scroll-smooth">
 <head>
@@ -16,13 +42,34 @@
 
     <title>{{ $title }}</title>
     <meta name="description" content="{{ $description }}">
-    <link rel="canonical" href="{{ $canonical ?? url()->current() }}">
+    <meta name="robots" content="{{ $robots }}">
+    <meta name="author" content="EBQ">
+    <link rel="canonical" href="{{ $canonicalUrl }}">
 
+    {{-- Open Graph --}}
     <meta property="og:type" content="website">
     <meta property="og:title" content="{{ $title }}">
     <meta property="og:description" content="{{ $description }}">
-    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:url" content="{{ $canonicalUrl }}">
     <meta property="og:site_name" content="EBQ">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ $ogImageUrl }}">
+    <meta property="og:image:secure_url" content="{{ $ogImageUrl }}">
+    <meta property="og:image:alt" content="{{ $title }}">
+
+    {{-- Twitter card --}}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $title }}">
+    <meta name="twitter:description" content="{{ $description }}">
+    <meta name="twitter:image" content="{{ $ogImageUrl }}">
+    <meta name="twitter:image:alt" content="{{ $title }}">
+
+    {{-- Structured data --}}
+    <script type="application/ld+json">{!! json_encode($orgSchema, $jsonFlags) !!}</script>
+    <script type="application/ld+json">{!! json_encode($siteSchema, $jsonFlags) !!}</script>
+    @isset($schema)
+        {{ $schema }}
+    @endisset
 
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet">
