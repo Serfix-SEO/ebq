@@ -44,55 +44,60 @@ class DemoDataSeeder
 
     private const TARGET_DOMAIN = 'ebq.io';
 
-    /** Pages on the demo site, keyed by path. */
+    /** Pages on the demo site (an SEO-tool product site). */
     private const PAGES = [
         '/',
         '/features',
         '/pricing',
-        '/blog/cat-grooming-guide',
-        '/blog/best-cat-brushes',
-        '/blog/deshedding-tools',
-        '/blog/cat-nail-trimming',
-        '/blog/litter-box-tips',
-        '/blog/automatic-cat-feeders',
+        '/features/rank-tracking',
+        '/features/keyword-research',
+        '/features/site-audit',
+        '/features/backlinks',
+        '/blog/seo-audit-checklist',
+        '/blog/keyword-research-guide',
         '/guide',
     ];
+
+    /** Page that cannibalization queries also rank on (competes with the primary). */
+    private const CANNIBAL_SECOND_PAGE = '/';
 
     /**
      * Demo queries with an explicit role so the insight engines light up.
      * role: normal | cannibal | striking | decay | quickwin
-     * page: primary page path; cannibal queries also seed a second page.
+     * page: primary page path; cannibal queries also seed CANNIBAL_SECOND_PAGE.
+     *
+     * All keywords are SEO-tool / SaaS terms — ebq.io is a connected SEO suite.
      *
      * @var list<array{q:string, page:string, role:string, vol:int, comp:float, cpc:float}>
      */
     private const QUERIES = [
-        ['q' => 'ebq seo',                    'page' => '/',                          'role' => 'normal',   'vol' => 1300, 'comp' => 0.42, 'cpc' => 3.10],
-        ['q' => 'ebq seo plugin',             'page' => '/features',                  'role' => 'normal',   'vol' => 880,  'comp' => 0.38, 'cpc' => 2.80],
-        ['q' => 'connected seo suite',        'page' => '/features',                  'role' => 'normal',   'vol' => 590,  'comp' => 0.33, 'cpc' => 4.20],
-        ['q' => 'wordpress seo dashboard',    'page' => '/',                          'role' => 'normal',   'vol' => 2400, 'comp' => 0.55, 'cpc' => 5.10],
-        ['q' => 'seo reporting tool',         'page' => '/pricing',                   'role' => 'normal',   'vol' => 3600, 'comp' => 0.61, 'cpc' => 6.40],
-        ['q' => 'rank tracking software',     'page' => '/features',                  'role' => 'normal',   'vol' => 4800, 'comp' => 0.58, 'cpc' => 7.20],
-        ['q' => 'best cat brush',             'page' => '/blog/best-cat-brushes',     'role' => 'normal',   'vol' => 9900, 'comp' => 0.35, 'cpc' => 0.70],
-        ['q' => 'cat deshedding tool',        'page' => '/blog/deshedding-tools',     'role' => 'normal',   'vol' => 6600, 'comp' => 0.29, 'cpc' => 0.55],
-        ['q' => 'how to trim cat nails',      'page' => '/blog/cat-nail-trimming',    'role' => 'normal',   'vol' => 8100, 'comp' => 0.22, 'cpc' => 0.40],
+        ['q' => 'ebq seo',                       'page' => '/',                          'role' => 'normal',   'vol' => 1300, 'comp' => 0.42, 'cpc' => 6.50],
+        ['q' => 'ebq seo plugin',                'page' => '/features',                  'role' => 'normal',   'vol' => 880,  'comp' => 0.38, 'cpc' => 5.80],
+        ['q' => 'connected seo suite',           'page' => '/features',                  'role' => 'normal',   'vol' => 590,  'comp' => 0.33, 'cpc' => 7.20],
+        ['q' => 'wordpress seo dashboard',       'page' => '/',                          'role' => 'normal',   'vol' => 2400, 'comp' => 0.55, 'cpc' => 8.10],
+        ['q' => 'seo reporting tool',            'page' => '/pricing',                   'role' => 'normal',   'vol' => 3600, 'comp' => 0.61, 'cpc' => 9.40],
+        ['q' => 'rank tracking software',        'page' => '/features/rank-tracking',    'role' => 'normal',   'vol' => 4800, 'comp' => 0.58, 'cpc' => 11.20],
+        ['q' => 'keyword research tool',         'page' => '/features/keyword-research', 'role' => 'normal',   'vol' => 9900, 'comp' => 0.65, 'cpc' => 7.70],
+        ['q' => 'backlink checker',              'page' => '/features/backlinks',        'role' => 'normal',   'vol' => 6600, 'comp' => 0.49, 'cpc' => 6.55],
+        ['q' => 'seo audit tool',                'page' => '/features/site-audit',       'role' => 'normal',   'vol' => 8100, 'comp' => 0.52, 'cpc' => 8.40],
 
-        // Cannibalization: same query split across two pages.
-        ['q' => 'cat grooming guide',         'page' => '/blog/cat-grooming-guide',   'role' => 'cannibal', 'vol' => 5400, 'comp' => 0.31, 'cpc' => 0.60],
-        ['q' => 'cat grooming tips',          'page' => '/blog/cat-grooming-guide',   'role' => 'cannibal', 'vol' => 4100, 'comp' => 0.27, 'cpc' => 0.50],
+        // Cannibalization: same query splits clicks between a blog post and the homepage.
+        ['q' => 'seo audit checklist',           'page' => '/blog/seo-audit-checklist',  'role' => 'cannibal', 'vol' => 5400, 'comp' => 0.31, 'cpc' => 3.50],
+        ['q' => 'keyword research guide',        'page' => '/blog/keyword-research-guide','role' => 'cannibal', 'vol' => 3300, 'comp' => 0.29, 'cpc' => 4.10],
 
         // Striking distance: position 11-20 with strong impressions.
-        ['q' => 'long haired cat brush',      'page' => '/blog/best-cat-brushes',     'role' => 'striking', 'vol' => 2900, 'comp' => 0.30, 'cpc' => 0.65],
-        ['q' => 'deshedding tool for cats',   'page' => '/blog/deshedding-tools',     'role' => 'striking', 'vol' => 3300, 'comp' => 0.28, 'cpc' => 0.58],
-        ['q' => 'cat nail clippers guide',    'page' => '/blog/cat-nail-trimming',    'role' => 'striking', 'vol' => 1900, 'comp' => 0.24, 'cpc' => 0.45],
+        ['q' => 'technical seo audit',           'page' => '/features/site-audit',       'role' => 'striking', 'vol' => 2900, 'comp' => 0.40, 'cpc' => 9.10],
+        ['q' => 'serp position tracker',         'page' => '/features/rank-tracking',    'role' => 'striking', 'vol' => 1700, 'comp' => 0.35, 'cpc' => 8.20],
+        ['q' => 'content optimization tool',     'page' => '/features/keyword-research', 'role' => 'striking', 'vol' => 2200, 'comp' => 0.44, 'cpc' => 7.50],
 
         // Content decay: was strong, declining the last 28 days.
-        ['q' => 'litter box tips',            'page' => '/blog/litter-box-tips',      'role' => 'decay',    'vol' => 7200, 'comp' => 0.26, 'cpc' => 0.48],
-        ['q' => 'best cat litter',            'page' => '/blog/litter-box-tips',      'role' => 'decay',    'vol' => 12000,'comp' => 0.34, 'cpc' => 0.62],
+        ['q' => 'google search console alternative','page' => '/features',               'role' => 'decay',    'vol' => 1900, 'comp' => 0.38, 'cpc' => 6.40],
+        ['q' => 'best seo software',             'page' => '/pricing',                   'role' => 'decay',    'vol' => 14000,'comp' => 0.70, 'cpc' => 12.00],
 
         // Quick wins: high volume, low competition, ranking deep (>10).
-        ['q' => 'automatic cat feeder reviews','page' => '/blog/automatic-cat-feeders','role' => 'quickwin','vol' => 2400, 'comp' => 0.30, 'cpc' => 0.90],
-        ['q' => 'cat water fountain',         'page' => '/blog/automatic-cat-feeders','role' => 'quickwin', 'vol' => 5000, 'comp' => 0.25, 'cpc' => 0.80],
-        ['q' => 'wet vs dry cat food',        'page' => '/guide',                     'role' => 'quickwin', 'vol' => 6300, 'comp' => 0.33, 'cpc' => 0.52],
+        ['q' => 'free keyword research tool',    'page' => '/features/keyword-research', 'role' => 'quickwin', 'vol' => 8800, 'comp' => 0.33, 'cpc' => 5.20],
+        ['q' => 'ai content writer for seo',     'page' => '/blog/keyword-research-guide','role' => 'quickwin', 'vol' => 2600, 'comp' => 0.31, 'cpc' => 6.10],
+        ['q' => 'local rank tracker',            'page' => '/features/rank-tracking',    'role' => 'quickwin', 'vol' => 1400, 'comp' => 0.28, 'cpc' => 7.80],
     ];
 
     private const COUNTRIES = ['USA', 'GBR'];
@@ -187,7 +192,7 @@ class DemoDataSeeder
             $pages = [$entry['page']];
             // Cannibalization queries also rank on a competing page.
             if ($entry['role'] === 'cannibal') {
-                $pages[] = '/blog/best-cat-brushes';
+                $pages[] = self::CANNIBAL_SECOND_PAGE;
             }
 
             foreach ($pages as $pi => $page) {
@@ -472,7 +477,7 @@ class DemoDataSeeder
         foreach (self::PAGES as $i => $page) {
             // 2 failures on pages that DO get traffic (blog posts) so the
             // "indexing fails with traffic" insight fires.
-            $fail = in_array($page, ['/blog/litter-box-tips', '/blog/automatic-cat-feeders'], true);
+            $fail = in_array($page, ['/blog/seo-audit-checklist', '/blog/keyword-research-guide'], true);
             PageIndexingStatus::create([
                 'website_id' => $websiteId,
                 'page' => 'https://'.self::DEMO_DOMAIN.$page,
@@ -494,7 +499,7 @@ class DemoDataSeeder
             'wpbeginner.com', 'kinsta.com', 'cloudways.com', 'reddit.com',
             'producthunt.com', 'medium.com', 'dev.to', 'hackernews.com',
         ];
-        $anchors = ['EBQ SEO', 'connected SEO suite', 'this SEO tool', 'read more', 'rank tracking', 'click here', 'EBQ', 'SEO dashboard'];
+        $anchors = ['EBQ SEO', 'connected SEO suite', 'this SEO tool', 'keyword research tool', 'rank tracking software', 'backlink checker', 'EBQ', 'SEO dashboard'];
 
         for ($i = 0; $i < 40; $i++) {
             $ref = $referrers[$i % count($referrers)];
@@ -576,7 +581,7 @@ class DemoDataSeeder
             'content' => [
                 'word_count' => $this->rand('wc'.$page, 420, 2600),
                 'reading_grade' => round($this->rand('rg'.$page, 60, 110) / 10, 1),
-                'top_keywords' => ['cat grooming', 'cat brush', 'deshedding'],
+                'top_keywords' => ['seo audit', 'keyword research', 'rank tracking'],
             ],
             'issues' => [
                 ['severity' => 'warning', 'label' => 'Meta description slightly long', 'detail' => '162 characters (sweet spot 120–158).'],
@@ -589,9 +594,9 @@ class DemoDataSeeder
     private function seedWriterProjects(int $websiteId): void
     {
         $specs = [
-            ['title' => 'The Complete Cat Grooming Guide for 2026', 'kw' => 'cat grooming guide', 'step' => 'completed'],
-            ['title' => 'Best Cat Brushes for Long-Haired Breeds', 'kw' => 'long haired cat brush', 'step' => 'brief'],
-            ['title' => 'How Often Should You Trim Cat Nails?', 'kw' => 'how to trim cat nails', 'step' => 'topic'],
+            ['title' => 'The Complete SEO Audit Checklist for 2026', 'kw' => 'seo audit checklist', 'step' => 'completed'],
+            ['title' => 'How to Do Keyword Research That Actually Ranks', 'kw' => 'keyword research guide', 'step' => 'brief'],
+            ['title' => 'Rank Tracking 101: The Metrics That Matter', 'kw' => 'serp position tracker', 'step' => 'topic'],
         ];
         foreach ($specs as $spec) {
             WriterProject::create([
@@ -600,16 +605,16 @@ class DemoDataSeeder
                 'user_id' => self::DEMO_USER_ID,
                 'title' => $spec['title'],
                 'focus_keyword' => $spec['kw'],
-                'additional_keywords' => ['cat care', 'pet grooming'],
-                'lsi_keywords' => ['undercoat', 'shedding season', 'grooming tools'],
+                'additional_keywords' => ['technical seo', 'on-page seo'],
+                'lsi_keywords' => ['search intent', 'serp features', 'core web vitals'],
                 'country' => 'us',
                 'language' => 'en',
-                'tone' => 'friendly',
-                'audience' => 'cat owners',
+                'tone' => 'professional',
+                'audience' => 'marketers and SEOs',
                 'step' => $spec['step'],
-                'brief' => $spec['step'] !== 'topic' ? ['outline' => ['Intro', 'Tools you need', 'Step by step', 'FAQ']] : null,
+                'brief' => $spec['step'] !== 'topic' ? ['outline' => ['Intro', 'What to check', 'Step by step', 'FAQ']] : null,
                 'generated_html' => $spec['step'] === 'completed'
-                    ? '<h2>Introduction</h2><p>Grooming your cat regularly keeps its coat healthy...</p>'
+                    ? '<h2>Introduction</h2><p>A regular SEO audit keeps your site healthy and surfaces quick wins before rankings slip...</p>'
                     : null,
                 'credits_used' => $spec['step'] === 'completed' ? 38 : 0,
             ]);
@@ -622,14 +627,14 @@ class DemoDataSeeder
             'website_id' => $websiteId,
             'samples_count' => 3,
             'fingerprint' => [
-                'summary' => 'Warm, practical, expert pet-care voice that favours short actionable sentences.',
-                'tone' => 'Friendly',
+                'summary' => 'Clear, practical, expert SEO voice that favours short actionable sentences and data-backed claims.',
+                'tone' => 'Professional',
                 'person' => 'Second person',
-                'avg_sentence_words' => 14,
-                'formality_score' => 42,
+                'avg_sentence_words' => 16,
+                'formality_score' => 55,
                 'vocabulary_band' => 'Plain English',
             ],
-            'sample_excerpt' => 'Brushing your cat is not just about looks. It keeps their skin healthy and cuts down on hairballs.',
+            'sample_excerpt' => 'Run an audit before every content refresh. It surfaces the quick wins that move rankings without new pages.',
             'last_extracted_at' => Carbon::now()->subDays(2),
         ]);
     }
@@ -663,11 +668,11 @@ class DemoDataSeeder
     private function seedRedirectSuggestions(int $websiteId): void
     {
         $pairs = [
-            ['/old-grooming-post', '/blog/cat-grooming-guide'],
-            ['/cat-brushes-2024', '/blog/best-cat-brushes'],
-            ['/deshed', '/blog/deshedding-tools'],
-            ['/nails', '/blog/cat-nail-trimming'],
-            ['/feeders', '/blog/automatic-cat-feeders'],
+            ['/old-seo-audit-post', '/blog/seo-audit-checklist'],
+            ['/keyword-tool-2024', '/features/keyword-research'],
+            ['/rank-tracker', '/features/rank-tracking'],
+            ['/backlinks-checker', '/features/backlinks'],
+            ['/seo-guide', '/blog/keyword-research-guide'],
         ];
         foreach ($pairs as $i => [$from, $to]) {
             RedirectSuggestion::create([
@@ -694,7 +699,7 @@ class DemoDataSeeder
                 'date' => Carbon::now()->subDays($this->rand('aid'.$page, 0, 14))->toDateString(),
                 'page' => 'https://'.self::DEMO_DOMAIN.$page,
                 'payload' => [
-                    'headline' => 'Add an FAQ section targeting "'.(self::QUERIES[$i]['q'] ?? 'cat care').'"',
+                    'headline' => 'Add an FAQ section targeting "'.(self::QUERIES[$i]['q'] ?? 'seo audit').'"',
                     'impact' => 'medium',
                     'detail' => 'This page ranks on the fold but misses the PAA box.',
                 ],
