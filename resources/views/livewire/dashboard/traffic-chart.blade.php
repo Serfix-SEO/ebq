@@ -22,25 +22,71 @@
                 {{ implode(' ', $anomalies) }}
             </div>
         @endif
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        <th class="px-6 py-3">Date</th>
-                        <th class="px-6 py-3 text-right">Clicks</th>
-                        <th class="px-6 py-3 text-right">Users</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                    @foreach ($days as $day)
-                        <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                            <td class="whitespace-nowrap px-6 py-3 text-slate-600 dark:text-slate-300">{{ $day['date'] }}</td>
-                            <td class="whitespace-nowrap px-6 py-3 text-right font-medium text-slate-900 dark:text-slate-100">{{ number_format($day['clicks']) }}</td>
-                            <td class="whitespace-nowrap px-6 py-3 text-right font-medium text-slate-900 dark:text-slate-100">{{ number_format($day['users']) }}</td>
+        @php $perPage = 10; $total = $days->count(); @endphp
+        <div
+            x-data="{
+                page: 0,
+                perPage: {{ $perPage }},
+                total: {{ $total }},
+                get pageCount() { return Math.max(1, Math.ceil(this.total / this.perPage)); },
+                get from() { return this.total === 0 ? 0 : this.page * this.perPage + 1; },
+                get to() { return Math.min(this.total, (this.page + 1) * this.perPage); },
+                next() { if (this.page < this.pageCount - 1) this.page++; },
+                prev() { if (this.page > 0) this.page--; },
+            }"
+        >
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            <th class="px-6 py-3">Date</th>
+                            <th class="px-6 py-3 text-right">Clicks</th>
+                            <th class="px-6 py-3 text-right">Users</th>
                         </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                        @foreach ($days as $day)
+                            <tr
+                                x-show="{{ $loop->index }} >= page * perPage && {{ $loop->index }} < (page + 1) * perPage"
+                                class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                            >
+                                <td class="whitespace-nowrap px-6 py-3 text-slate-600 dark:text-slate-300">{{ $day['date'] }}</td>
+                                <td class="whitespace-nowrap px-6 py-3 text-right font-medium text-slate-900 dark:text-slate-100">{{ number_format($day['clicks']) }}</td>
+                                <td class="whitespace-nowrap px-6 py-3 text-right font-medium text-slate-900 dark:text-slate-100">{{ number_format($day['users']) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            @if ($total > $perPage)
+                <div class="flex items-center justify-between border-t border-slate-200 px-6 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                    <span>
+                        Showing <span class="font-medium text-slate-700 dark:text-slate-200" x-text="from"></span>–<span class="font-medium text-slate-700 dark:text-slate-200" x-text="to"></span> of <span class="font-medium text-slate-700 dark:text-slate-200">{{ $total }}</span>
+                    </span>
+                    <div class="flex items-center gap-1">
+                        <button
+                            type="button"
+                            @click="prev()"
+                            :disabled="page === 0"
+                            class="rounded-md border border-slate-200 px-2.5 py-1 font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                            Prev
+                        </button>
+                        <span class="px-2 tabular-nums">
+                            <span x-text="page + 1"></span> / <span x-text="pageCount"></span>
+                        </span>
+                        <button
+                            type="button"
+                            @click="next()"
+                            :disabled="page >= pageCount - 1"
+                            class="rounded-md border border-slate-200 px-2.5 py-1 font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+            @endif
         </div>
     @endif
 </div>
