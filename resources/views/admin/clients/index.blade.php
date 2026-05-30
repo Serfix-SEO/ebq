@@ -247,7 +247,18 @@
                                             <span class="truncate">{{ $client->name }}</span>
                                             <span class="text-[10px] font-normal tabular-nums text-slate-400">#{{ $client->id }}</span>
                                         </div>
-                                        <div class="truncate text-xs text-slate-500">{{ $client->email }}</div>
+                                        <div class="flex items-center gap-1.5 truncate text-xs text-slate-500">
+                                            <span class="truncate">{{ $client->email }}</span>
+                                            @php $planSlug = $client->current_plan_slug ?: 'free'; @endphp
+                                            <span @class([
+                                                'inline-flex flex-shrink-0 items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+                                                'border border-slate-200 bg-slate-50 text-slate-500' => $planSlug === 'free',
+                                                'border border-emerald-200 bg-emerald-50 text-emerald-700' => $planSlug !== 'free',
+                                            ])
+                                                  title="Current plan ({{ $planSlug === 'free' ? 'free / no comp' : 'comped or paid' }})">
+                                                {{ $planSlug }}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -349,6 +360,31 @@
                                                 <span class="font-medium">Disabled</span>
                                                 <span class="text-slate-400">Blocks login until reactivated.</span>
                                             </label>
+                                        </div>
+
+                                        {{-- Force-apply plan (comp) — sets current_plan_slug with no Stripe
+                                             charge. Takes effect on the client's next request. --}}
+                                        @php $currentPlanSlug = $client->current_plan_slug ?: 'free'; @endphp
+                                        <div class="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2.5">
+                                            <div class="flex flex-wrap items-end gap-3">
+                                                <label class="flex flex-col gap-1 text-xs text-slate-700">
+                                                    <span class="font-medium">Force-apply plan <span class="font-normal text-amber-700">(comp — no payment)</span></span>
+                                                    <select name="plan_slug"
+                                                            class="min-w-[200px] rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                                                        @foreach ($plans as $plan)
+                                                            <option value="{{ $plan->slug }}" @selected($currentPlanSlug === $plan->slug)>
+                                                                {{ $plan->name }} ({{ $plan->slug }})@if (! $plan->is_active) — inactive @endif
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </label>
+                                                <p class="flex-1 text-[11px] leading-relaxed text-amber-800">
+                                                    Grants this plan's website limit and plugin features for free.
+                                                    Takes effect on the client's next request. <strong>Note:</strong> an
+                                                    active paid Stripe subscription still takes precedence over a comp.
+                                                </p>
+                                            </div>
+                                            @error('plan_slug') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                         </div>
 
                                         <div class="flex items-center justify-between">

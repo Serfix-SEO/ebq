@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClientActivity;
+use App\Models\Plan;
 use App\Models\User;
 use App\Services\ClientActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ClientController extends Controller
@@ -78,8 +80,17 @@ class ClientController extends Controller
             ->paginate(25)
             ->withQueryString();
 
+        // Plans available to force-apply (comp) from the inline editor.
+        // Ordered for display; the dropdown shows every plan so an operator
+        // can also drop a client back to Free. `current_plan_slug` itself is
+        // already loaded on each $client row (index selects users.*).
+        $plans = Plan::query()
+            ->orderBy('display_order')
+            ->get(['slug', 'name', 'price_yearly_usd', 'is_active']);
+
         return view('admin.clients.index', [
             'clients' => $clients,
+            'plans' => $plans,
             'q' => $q,
             'status' => $status,
             'sort' => $sort,
@@ -175,13 +186,25 @@ class ClientController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'is_admin' => ['nullable', 'boolean'],
             'is_disabled' => ['nullable', 'boolean'],
+            // Force-applied (comped) plan slug. Must be a real plan row.
+            'plan_slug' => ['required', 'string', Rule::in(Plan::query()->pluck('slug')->all())],
         ]);
+
+        // Snapshot the comped plan onto current_plan_slug — the same column
+        // the Stripe webhook writes and that User::effectivePlan() reads at
+        // step 3. For a client with no active paid subscription this moves
+        // them onto the plan immediately, no payment involved. We store null
+        // for the Free tier so the row matches a never-paid user.
+        $newPlanSlug = $data['plan_slug'] === User::TIER_FREE ? null : $data['plan_slug'];
+        $oldPlanSlug = $user->current_plan_slug;
+        $planChanged = $oldPlanSlug !== $newPlanSlug;
 
         $user->forceFill([
             'name' => $data['name'],
             'email' => $data['email'],
             'is_admin' => (bool) ($data['is_admin'] ?? false),
             'is_disabled' => (bool) ($data['is_disabled'] ?? false),
+            'current_plan_slug' => $newPlanSlug,
         ])->save();
 
         $logger->log('admin.client_updated', userId: $user->id, meta: [
@@ -189,6 +212,20 @@ class ClientController extends Controller
             'is_disabled' => $user->is_disabled,
         ]);
 
-        return redirect()->route('admin.clients.index')->with('status', "Client {$user->email} updated.");
+        // Separate, auditable trail for comped plan changes — these grant
+        // paid entitlements without a Stripe charge, so log them distinctly.
+        if ($planChanged) {
+            $logger->log('admin.client_plan_forced', userId: $user->id, meta: [
+                'from' => $oldPlanSlug ?? User::TIER_FREE,
+                'to' => $newPlanSlug ?? User::TIER_FREE,
+            ]);
+        }
+
+        $msg = "Client {$user->email} updated.";
+        if ($planChanged) {
+            $msg = "Client {$user->email} updated — plan set to ".($newPlanSlug ?? User::TIER_FREE).' (no payment).';
+        }
+
+        return redirect()->route('admin.clients.index')->with('status', $msg);
     }
 }
