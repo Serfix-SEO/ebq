@@ -10,10 +10,13 @@ use Barryvdh\DomPDF\Facade\Pdf;
 /**
  * Builds the branded PDF attachment for a growth report email.
  *
- * Uses the {@see Pdf} facade (barryvdh/laravel-dompdf wrapper around
- * DomPDF, which is already on the autoloader via Cashier). The print
- * template at `emails/growth-report-pdf.blade.php` mirrors the HTML
- * email's content but with print-friendly CSS (no flex, no @media).
+ * Uses the {@see Pdf} facade from barryvdh/laravel-dompdf — a required
+ * dependency in composer.json. Note: Cashier only pulls in the core
+ * dompdf/dompdf lib (for invoices); the Laravel facade wrapper is NOT
+ * transitive, so barryvdh/laravel-dompdf must be present in composer.lock
+ * and installed, or this class throws "Class ...Facade\Pdf not found".
+ * The print template at `emails/growth-report-pdf.blade.php` mirrors the
+ * HTML email's content but with print-friendly CSS (no flex, no @media).
  *
  * Output is raw PDF bytes — the caller attaches via
  * `Attachment::fromData(fn () => $pdfBytes, $filename)`.
