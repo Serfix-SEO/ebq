@@ -65,9 +65,14 @@ class AppServiceProvider extends ServiceProvider
         // Register the Microsoft Socialite provider's event subscriber so
         // Socialite::driver('microsoft') resolves. The package ships the
         // subscriber separately to keep core Socialite lean.
-        Event::listen(\SocialiteProviders\Manager\SocialiteWasCalled::class, [
+        // Listener must be the plain "Class@method" string. Wrapping it in
+        // an array makes the dispatcher read it as [class, method] and the
+        // single element leaves method undefined → "Undefined array key 1"
+        // the moment SocialiteWasCalled fires (e.g. during package:discover).
+        Event::listen(
+            \SocialiteProviders\Manager\SocialiteWasCalled::class,
             \SocialiteProviders\Microsoft\MicrosoftExtendSocialite::class.'@handle',
-        ]);
+        );
 
         RateLimiter::for('oauth', function (Request $request) {
             return Limit::perMinute(20)->by($request->user()?->id ?: $request->ip());
