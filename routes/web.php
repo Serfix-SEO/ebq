@@ -141,6 +141,44 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
             ->name('ai-studio.brand-voice.update');
         Route::delete('/ai-studio/brand-voice', [\App\Http\Controllers\AiStudioController::class, 'brandVoiceDestroy'])
             ->name('ai-studio.brand-voice.destroy');
+
+        // Blog Post Wizard — the dashboard re-implementation of the WP
+        // plugin's multi-step AI Writer. The marker tool's launcher card
+        // links here instead of running the generic tool form. All state
+        // mutations delegate to WriterProjectService via
+        // AiStudioWriterController (session-resolved website).
+        Route::get('/ai-studio/blog-post-wizard', [\App\Http\Controllers\AiStudioWriterController::class, 'page'])
+            ->name('ai-studio.wizard');
+
+        Route::prefix('ai-studio/writer-projects')->name('ai-studio.writer-projects.')->group(function (): void {
+            Route::get('/', [\App\Http\Controllers\AiStudioWriterController::class, 'index'])->name('index');
+            Route::post('/', [\App\Http\Controllers\AiStudioWriterController::class, 'store'])->name('store');
+            Route::get('/{externalId}', [\App\Http\Controllers\AiStudioWriterController::class, 'show'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('show');
+            Route::patch('/{externalId}', [\App\Http\Controllers\AiStudioWriterController::class, 'update'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('update');
+            Route::delete('/{externalId}', [\App\Http\Controllers\AiStudioWriterController::class, 'destroy'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('destroy');
+            Route::post('/{externalId}/brief', [\App\Http\Controllers\AiStudioWriterController::class, 'generateBrief'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('brief');
+            Route::post('/{externalId}/brief/chat', [\App\Http\Controllers\AiStudioWriterController::class, 'briefChat'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('brief.chat');
+            Route::post('/{externalId}/images/search', [\App\Http\Controllers\AiStudioWriterController::class, 'searchImages'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('images.search');
+            Route::post('/{externalId}/strategy', [\App\Http\Controllers\AiStudioWriterController::class, 'strategy'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('strategy');
+            Route::post('/{externalId}/generate', [\App\Http\Controllers\AiStudioWriterController::class, 'generate'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('generate');
+            Route::get('/{externalId}/credits', [\App\Http\Controllers\AiStudioWriterController::class, 'credits'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('credits');
+        });
+
+        Route::get('/ai-studio/ai-writer-prompts', [\App\Http\Controllers\AiStudioWriterController::class, 'promptsIndex'])
+            ->name('ai-studio.prompts.index');
+        Route::post('/ai-studio/ai-writer-prompts', [\App\Http\Controllers\AiStudioWriterController::class, 'promptsStore'])
+            ->middleware('throttle:20,1')->name('ai-studio.prompts.store');
+        Route::delete('/ai-studio/ai-writer-prompts/{externalId}', [\App\Http\Controllers\AiStudioWriterController::class, 'promptsDestroy'])
+            ->where('externalId', '[A-Za-z0-9\-]+')->name('ai-studio.prompts.destroy');
     });
 });
 

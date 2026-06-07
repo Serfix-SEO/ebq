@@ -174,7 +174,12 @@
       "Bash(ps -o pid,lstart,cmd -C php-fpm8.3)",
       "Bash(sudo systemctl restart php8.3-fpm)",
       "Bash(systemctl is-active *)",
-      "Bash(systemctl show *)"
+      "Bash(systemctl show *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(git fetch *)",
+      "Bash(python3 -m json.tool .claude/settings.local.json)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   },
   "enableAllProjectMcpServers": true,

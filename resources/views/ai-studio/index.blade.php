@@ -42,6 +42,7 @@
             runUrlTemplate: opts.runUrlTemplate,
             brandVoiceUpdateUrl: opts.brandVoiceUpdateUrl,
             brandVoiceDestroyUrl: opts.brandVoiceDestroyUrl,
+            wizardUrl: opts.wizardUrl,
 
             view: 'launcher',
             activeCat: 'all',
@@ -89,6 +90,14 @@
             openTool(toolId) {
                 const tool = (this.catalog.tools || []).find(t => t.id === toolId);
                 if (!tool) return;
+                // The Blog Post Wizard is a marker tool: running it just
+                // returns a redirect directive. Its real surface is the
+                // multi-step wizard page — open that instead of the
+                // generic tool form (which would dump the directive JSON).
+                if (toolId === 'blog-post-wizard' && this.wizardUrl) {
+                    window.location.href = this.wizardUrl;
+                    return;
+                }
                 this.activeTool = tool;
                 this.formValues = {};
                 this.formValuesRaw = {};
@@ -296,6 +305,7 @@
             runUrlTemplate: @js($runUrlTemplate),
             brandVoiceUpdateUrl: @js($brandVoiceUpdateUrl),
             brandVoiceDestroyUrl: @js($brandVoiceDestroyUrl),
+            wizardUrl: @js(route('ai-studio.wizard')),
             csrf: @js(csrf_token()),
         })"
         x-cloak
