@@ -9,13 +9,9 @@
                 </svg>
             </div>
             @php
+                // $crawled / $total / $remainingCap are computed in CrawlBanner::render
+                // (from the live page inventory, not the per-pass run counters).
                 $finalizing = $crawl->status === \App\Models\CrawlRun::STATUS_FINALIZING;
-                // Progress within THIS user's allowance: crawled = pages fetched,
-                // total = pages discovered to crawl, both bounded by the plan cap.
-                // Shown as "crawled / total" with plan allowance remaining separately.
-                $crawled = $cap > 0 ? min((int) $crawl->pages_fetched, $cap) : (int) $crawl->pages_fetched;
-                $total = $cap > 0 ? min((int) $crawl->pages_seen, $cap) : (int) $crawl->pages_seen;
-                $remainingCap = $cap > 0 ? max(0, $cap - $crawled) : null;
             @endphp
             <div class="min-w-0 flex-1">
                 <h3 class="text-sm font-semibold text-slate-900 dark:text-white">

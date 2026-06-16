@@ -141,6 +141,33 @@ class CrawlAndDashboardFixesTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    // ---- Banner display: total = live inventory, not the per-pass run counter ----
+
+    public function test_crawl_banner_total_reflects_inventory_not_per_pass_counter(): void
+    {
+        $owner = User::factory()->create();
+        $w = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'banner.com']);
+        $w->refresh();
+        $cs = (int) $w->crawl_site_id;
+        // Per-pass counter (pages_seen) sits at 1000 after one fairness-capped pass...
+        CrawlRun::create(['crawl_site_id' => $cs, 'trigger' => 'manual', 'status' => 'running',
+            'started_at' => now()->subMinute(), 'pages_seen' => 1000, 'pages_fetched' => 1000]);
+        // ...but the live inventory is 25 pages, 10 crawled this run.
+        for ($i = 0; $i < 25; $i++) {
+            WebsitePage::create([
+                'crawl_site_id' => $cs, 'url' => "https://banner.com/p{$i}", 'url_hash' => WebsitePage::hashUrl("https://banner.com/p{$i}"),
+                'last_crawled_at' => $i < 10 ? now() : null,
+            ]);
+        }
+
+        $this->actingAs($owner);
+        session(['current_website_id' => $w->id]);
+
+        Livewire::test(\App\Livewire\CrawlBanner::class)
+            ->assertSee('10 / 25 pages crawled') // inventory denominator, NOT pages_seen=1000
+            ->assertDontSee('1,000 / 1,000');
+    }
+
     // ---- Bug #1: IDOR — competitive components must gate on access ----
 
     public function test_competitor_discovery_rejects_an_inaccessible_session_website(): void

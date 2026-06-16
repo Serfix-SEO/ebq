@@ -59,15 +59,34 @@ class CrawlBanner extends Component
             $this->dispatch('crawl-state-changed');
         }
 
+        $cap = $website?->crawlPageCap() ?? 0;
+        $crawled = 0;
+        $total = 0;
+        if ($crawl) {
+            // "Total to crawl" = pages discovered for this site so far (the live
+            // inventory); "crawled" = pages fetched THIS run. Both bounded by the user's
+            // cap. We count the inventory rather than the run's pages_seen, because the
+            // fairness per-pass cap makes pages_seen grow ~1k at a time — so pages_seen
+            // would read a misleading "1,000 / 1,000" after pass 1 instead of the true
+            // discovered total.
+            $counts = \App\Models\WebsitePage::where('crawl_site_id', $crawl->crawl_site_id)
+                ->whereNull('removed_at')
+                ->selectRaw('COUNT(*) as total, COUNT(CASE WHEN last_crawled_at >= ? THEN 1 END) as crawled', [optional($crawl->started_at)->toDateTimeString()])
+                ->first();
+            $total = $cap > 0 ? min((int) $counts->total, $cap) : (int) $counts->total;
+            $crawled = $cap > 0 ? min((int) $counts->crawled, $cap) : (int) $counts->crawled;
+        }
+
         return view('livewire.crawl-banner', [
             'crawl' => $crawl,
-            // Progress is shown relative to THIS user's plan cap (a domain crawled
-            // once is shared; a cap-1000 user sees up to 1,000 of the same run).
-            'cap' => $website?->crawlPageCap() ?? 0,
-            // Poll fast (10s) while a crawl is in flight; slow (30s) when idle. We
-            // still poll when idle so the banner appears when a crawl starts, but the
-            // old unconditional 10s poll hammered every page for every user even when
-            // nothing was running.
+            'cap' => $cap,
+            'crawled' => $crawled,
+            'total' => $total,
+            // Plan allowance left = cap minus what this run has crawled into the window.
+            'remainingCap' => $cap > 0 ? max(0, $cap - $crawled) : null,
+            // Poll fast (10s) while a crawl is in flight; slow (30s) when idle. We still
+            // poll when idle so the banner appears when a crawl starts, but the old
+            // unconditional 10s poll hammered every page for every user even when idle.
             'pollInterval' => $crawl ? 10 : 30,
         ]);
     }

@@ -74,13 +74,21 @@ web box never crawls.
    # from the web box
    rsync -az --exclude='.env' --exclude='.git/' --exclude='storage/' \
      --exclude='node_modules/' --exclude='vendor/' --exclude='public/build/' \
-     --exclude='bootstrap/cache/' \
+     --exclude='bootstrap/cache/' --exclude='ebq-wordpress-plugin/' --exclude='ebq-seo-wp/' \
      -e "ssh -i /root/.ssh/id_ed25519_worker" /var/www/ebq/ root@10.0.0.3:/var/www/ebq/
-   # on the worker box (note: docker compose -f wants an absolute path or a cd)
+   # on the worker box: restart so queue:work reloads the new classes
    ssh -i /root/.ssh/id_ed25519_worker root@10.0.0.3 \
      'rm -f /var/www/ebq/bootstrap/cache/*.php; \
       docker compose -f /var/www/ebq/docker-compose.worker.yml up -d'
+   # if `up -d` doesn't recreate (config unchanged), force the code reload:
+   #   docker restart $(docker ps -q --filter name=ebq)
    ```
+   > ⛔ **NEVER add `--delete` to this rsync.** `docker-compose.worker.yml` and
+   > `docker/worker/Dockerfile` live **only on the worker box** (not in the repo), so
+   > `--delete` wipes them — the containers keep running but you lose the ability to
+   > manage/rebuild them. (This happened 2026-06-16; recovered by recreating both from
+   > the running image's `docker history`.) Also exclude `ebq-wordpress-plugin/` (its own
+   > 581M repo) or every deploy copies it across.
    Verify the code actually landed:
    `grep -c crawl_site_id /var/www/ebq/app/Jobs/CrawlWebsitePagesJob.php` (> 0), and
    confirm at runtime by dispatching a crawl and checking the new `crawl_runs` row is
