@@ -75,6 +75,11 @@
                         'match_routes' => ['admin.crawler.'],
                     ],
                     [
+                        'route' => 'admin.fleet.index',
+                        'label' => 'Fleet',
+                        'match_routes' => ['admin.fleet.'],
+                    ],
+                    [
                         'route' => 'admin.marketing.index',
                         'label' => 'Marketing',
                         'match_routes' => ['admin.marketing.'],

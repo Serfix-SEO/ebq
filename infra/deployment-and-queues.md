@@ -52,8 +52,9 @@
 |-------|---------|---------|-------|
 | `interactive` | web box | supervisor `ebq-queue-interactive` (×2) | user-facing, low latency |
 | `default` | web box | supervisor `ebq-queue-general` | mail, misc; mailables (`ShouldQueue`) land here |
-| `crawl` | **worker box** | docker `queue:work --queue=crawl` | the whole crawl pipeline (`->onQueue(Queues::CRAWL)`) |
-| `sync` | **worker box** | docker `queue:work --queue=sync` | GA/GSC sync, large imports |
+| `crawl` | **worker box(es)** | docker `queue:work --queue=crawl` (×5/box) | the page-fetch pipeline (≤300s jobs) — runs on the pinned box **and every autoscaled ephemeral box** ([crawler/autoscaling.md](./crawler/autoscaling.md)) |
+| `crawl-finalize` | **pinned box only** | docker `queue:work --queue=crawl-finalize` (×1) | the long `AnalyzeSiteJob` (≤1200s) — kept off ephemeral boxes so a scale-down drain can't interrupt a finalize |
+| `sync` | **pinned box** | docker `queue:work --queue=sync` | GA/GSC sync, large imports |
 
 Because crawl jobs go to the `crawl` queue, **they only run on the worker box.** The
 web box never crawls.

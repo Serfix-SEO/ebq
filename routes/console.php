@@ -28,6 +28,11 @@ Schedule::command('ebq:crawl-websites --sitemap-deltas')->dailyAt('04:30');
 // dropped the Bus::batch callback). withoutOverlapping so a slow tick can't stack.
 Schedule::command('ebq:crawl-supervisor')->everyFiveMinutes()->withoutOverlapping();
 
+// Crawl-worker fleet autoscaler — scale boxes up/down to match crawl backlog (no-op
+// until autoscaler.enabled). + a 5-min Hetzner health refresh for the fleet.
+Schedule::command('ebq:fleet-autoscale')->everyTwoMinutes()->withoutOverlapping();
+Schedule::command('ebq:check-worker-nodes')->everyFiveMinutes()->withoutOverlapping();
+
 // Keep the self-hosted keyword API fleet's health/queue snapshot warm so the
 // load balancer routes to live, least-busy servers.
 Schedule::command('ebq:check-keyword-servers')->everyFiveMinutes();

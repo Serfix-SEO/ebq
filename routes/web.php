@@ -277,6 +277,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/crawler', [\App\Http\Controllers\Admin\CrawlerController::class, 'index'])->name('crawler.index');
 
+    Route::get('/fleet', [\App\Http\Controllers\Admin\FleetController::class, 'index'])->name('fleet.index');
+    Route::post('/fleet/settings', [\App\Http\Controllers\Admin\FleetController::class, 'settings'])->name('fleet.settings');
+    Route::post('/fleet/provision', [\App\Http\Controllers\Admin\FleetController::class, 'provision'])->name('fleet.provision');
+    Route::post('/fleet/reconcile', [\App\Http\Controllers\Admin\FleetController::class, 'reconcile'])->name('fleet.reconcile');
+    Route::post('/fleet/{node}/drain', [\App\Http\Controllers\Admin\FleetController::class, 'drain'])->name('fleet.drain');
+    Route::post('/fleet/{node}/destroy', [\App\Http\Controllers\Admin\FleetController::class, 'destroy'])->name('fleet.destroy');
+
     Route::get('/marketing', [AdminMarketingController::class, 'index'])->name('marketing.index');
     Route::get('/marketing/sends', [AdminMarketingController::class, 'sends'])->name('marketing.sends');
     Route::post('/marketing/{website}/send', [AdminMarketingController::class, 'send'])->name('marketing.send');

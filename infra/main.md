@@ -230,6 +230,15 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-16 (fleet autoscaling P1–P4)** — Built elastic crawl-worker scaling on Hetzner
+  ([crawler/autoscaling.md](./crawler/autoscaling.md)): `worker_nodes` fleet model +
+  `HetznerClient`/`WorkerFleetService`, the `ebq:fleet-worker` manual command, the
+  `ebq:fleet-autoscale` control loop (queue-depth driven, hysteresis) + `ebq:check-worker-nodes`
+  health loop, a `/admin/fleet` panel (live status, cost, editable settings), the
+  **`crawl-finalize` queue split** (long `AnalyzeSiteJob` on the pinned box only, so scale-down
+  can't kill a finalize), and a **distributed per-domain rate limiter** (`DomainRateLimiter`).
+  Autoscaler ships **disabled** — gated on the operator's Hetzner setup (token/snapshot/network).
+  9 tests pass. Key property: the queue is central Redis, so new boxes just pull — no rebalance.
 - **2026-06-16 (dashboard + crawl fixes)** — Fixed & deployed: IDOR gate on the Competitive
   components (Livewire actions skip route middleware), `summary()` stale-health (use last
   *completed* run), `KpiCards`/`TrafficChart` cache-version, and the `CrawlBanner` poll

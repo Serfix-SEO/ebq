@@ -78,7 +78,7 @@ All tries=1 (paid external calls; never auto-retry), all `ShouldBeUnique`.
 | `CrawlWebsitePagesJob.php:23` | 600 | 1 | **U** `crawl-site-{crawlSiteId\|wID}`, `uniqueFor=6h` | `CrawlSiteBootstrapper`, `SitemapPrompt`, `SiteHealthStats`, `ClientController`, `ebq:crawl-websites`, `CrawlSitemapDeltaJob` | Entry point: resolve crawl_site, create run, seed frontier, dispatch pass 1. |
 | `CrawlPassJob.php:28` | 600 | 1 | — | `CrawlWebsitePagesJob` (and self, pass+1), `CrawlSupervisor` | Multi-pass loop driver; selects ≤`crawler.pages_per_pass` (1000) due pages for **fairness** and **`Bus::batch(CrawlPageBatchJob…)`** with `.finally → CrawlPassJob(pass+1)`; stops → `AnalyzeSiteJob`. (A lost `.finally` = wedge → recovered by `ebq:crawl-supervisor`.) |
 | `CrawlPageBatchJob.php:18` | 300 | 2 | — | `CrawlPassJob` (batched) | Crawl one page batch (conditional GET, classify, SimHash, adaptive next_crawl_at). No-ops if `batch()?->cancelled()`. |
-| `AnalyzeSiteJob.php:25` | **1200** | 1 | — | `CrawlPassJob` (terminal) | Post-crawl site analysis/scoring; dispatches `MatchRedirectFor404Job` per impactful 404. **Longest timeout — sets the retry_after floor.** |
+| `AnalyzeSiteJob.php:25` | **1200** | 1 | — | `CrawlPassJob`/`CrawlSupervisor` (terminal) | Post-crawl analysis/scoring; runs on the **`crawl-finalize`** queue (pinned box only, so a scale-down can't kill it); dispatches `MatchRedirectFor404Job` per impactful 404. **Longest timeout — sets the retry_after floor.** |
 | `CrawlSitemapDeltaJob.php:22` | 180 | 2 | **U** `sitemap-delta-{crawlSiteId\|wID}`, `uniqueFor=3h` | `ebq:crawl-websites --sitemap-deltas` | Daily: detect brand-new sitemap URLs and dispatch a crawl for just those. |
 | `SyncSitemaps.php:18` | 120 | 2 | — | `CrawlSiteBootstrapper`, `SitemapsManager` Livewire | Read-only pull of GSC-known sitemaps into local store (source=gsc); manual sitemaps untouched. |
 
@@ -97,6 +97,9 @@ All tries=1 (paid external calls; never auto-retry), all `ShouldBeUnique`.
 | `ebq:publish-scheduled-plugin-releases` (`PublishScheduledPluginReleases.php`) | Publish WP plugin releases whose scheduled time has passed | **every minute** | no |
 | `ebq:crawl-websites {--website=} {--force} {--backfill} {--sitemap-deltas} {--reanalyze}` (`CrawlWebsites.php`) | Dispatch crawls (full / backfill / sitemap-delta) | **weekly Mon 02:00** + **daily 04:30** (`--sitemap-deltas`) | no (`--reanalyze` only clears conditional-GET validators, not data) |
 | `ebq:crawl-supervisor` (`CrawlSupervisor.php`) | Watchdog: resume/finalize crawl runs whose multi-pass `Bus::batch` chain died (worker recycle). Time-based on `crawler.stall_minutes` (10) / `max_run_hours` (6) | **every 5 min** (`withoutOverlapping`) | no (dispatches `CrawlPassJob`/`AnalyzeSiteJob`) |
+| `ebq:fleet-autoscale {--dry-run}` (`FleetAutoscale.php`) | Scale worker boxes up/down to match crawl backlog (Hetzner API). No-op until `autoscaler.enabled`; `--dry-run` logs the decision only | **every 2 min** (`withoutOverlapping`) | no (provisions/drains boxes when enabled) |
+| `ebq:check-worker-nodes` (`CheckWorkerNodes.php`) | Refresh fleet health from the Hetzner API | **every 5 min** | no |
+| `ebq:fleet-worker {action}` (`FleetWorker.php`) | Manual fleet control: `list/provision/bootstrap/drain/destroy/reconcile/register-pinned` | manual | provision/destroy = creates/deletes Hetzner servers |
 | `ebq:check-keyword-servers {--id=}` (`CheckKeywordServers.php`) | Refresh health/queue snapshot for self-hosted keyword API fleet | **every 5 min** | no |
 | `ebq:fetch-keyword-metrics {--website=}{--country=}{--min-impressions=100}{--days=28}{--limit=500}{--force}{--sync}{--dry-run}` (`FetchKeywordMetrics.php`) | Queue KE lookups for GSC queries above an impression threshold | manual | no |
 | `ebq:import-historical {--days=480}{--website=}` (`ImportHistoricalData.php`) | Dispatch full GA4+GSC history import (upsert) | manual | no (additive upsert) |
@@ -138,6 +141,8 @@ scheduled commands are destructive.
 | every minute | `ebq:publish-scheduled-plugin-releases` |
 | every 5 min | `ebq:check-keyword-servers` |
 | every 5 min | `ebq:crawl-supervisor` (`withoutOverlapping`) — crawl watchdog |
+| every 2 min | `ebq:fleet-autoscale` (`withoutOverlapping`) — worker-fleet autoscaler (no-op until `autoscaler.enabled`) |
+| every 5 min | `ebq:check-worker-nodes` (`withoutOverlapping`) — fleet health from Hetzner |
 | hourly | `ebq:track-rankings` |
 | daily (midnight) | `ebq:sync-daily-data` |
 | daily 03:30 | `ebq:auto-discover-prospects` |

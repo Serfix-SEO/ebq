@@ -63,18 +63,23 @@ These are infra one-time setup, not code:
 Until these exist, `ebq:fleet-worker provision` returns a clear "HCLOUD_TOKEN not configured"
 error — the code is in place; provisioning activates once the token/snapshot are set.
 
-## Status & roadmap
+## Status — all phases shipped (code); autoscaler disabled until the Hetzner setup is done
 
-- **Phase 1 ✅ (shipped):** fleet model, Hetzner client, fleet service, `ebq:fleet-worker`
-  command, config, the pinned 10.0.0.3 row. Unit-tested (`tests/Feature/WorkerFleetTest.php`).
-- **Phase 2 (next):** the snapshot/bootstrap runbook; `stop_grace_period: 360s` in the worker
-  compose; **split `AnalyzeSiteJob` (1200s) onto a `crawl-finalize` queue that runs only on the
-  pinned box** so scale-down can never interrupt a long finalize.
-- **Phase 3:** `DomainRateLimiter` (Redis token bucket per normalized domain) in
-  `PageCrawlProcessor::fetchWithPolicy()` — today politeness is local-per-worker, so more
-  workers ⇒ block risk.
-- **Phase 4:** `ebq:fleet-autoscale` control loop (every 2 min, hysteresis, one-box-per-tick) +
-  `ebq:check-worker-nodes` health loop + `/admin/fleet` panel (status + cost + editable settings).
+- **Phase 1 ✅** fleet model, Hetzner client, fleet service, `ebq:fleet-worker`, config, pinned box.
+- **Phase 2 ✅** `crawl-finalize` queue split — `AnalyzeSiteJob` (1200s) now runs ONLY on the
+  pinned box (`Queues::CRAWL_FINALIZE`; the box's compose gained an `ebq-finalize-1` worker +
+  `stop_grace_period: 360s`). Ephemeral boxes run `--queue=crawl` only, so a drain can never
+  interrupt a finalize.
+- **Phase 3 ✅** `DomainRateLimiter` (Redis token bucket per normalized domain) in
+  `PageCrawlProcessor::fetchWithPolicy()` — fleet-wide per-domain politeness, fail-open.
+- **Phase 4 ✅** `ebq:fleet-autoscale` (every 2 min, `withoutOverlapping`, hysteresis,
+  one-box-per-tick) + `ebq:check-worker-nodes` (5-min health) + **`/admin/fleet`** panel (live
+  status + est. hourly cost + editable autoscaler settings + provision/drain/reconcile buttons).
+
+**To turn it on:** complete the operator prerequisites above, then set `autoscaler.enabled`
+(and `min/max_boxes`, `target_backlog_per_box`, `server_type`, `snapshot_id`) at `/admin/fleet`.
+Until enabled, `ebq:fleet-autoscale` is a no-op and the scheduled tick logs nothing. Validate
+manually first with `ebq:fleet-worker provision` (one box) and `ebq:fleet-autoscale --dry-run`.
 
 ## Cross-cutting risks
 
