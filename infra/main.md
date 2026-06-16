@@ -100,9 +100,12 @@ is synchronous/in-request.
 live-score-and-language · topical-authority — external Lighthouse service; SSRF-guarded fetches.
 
 ### WordPress plugin & HQ API ✅
-[wordpress-plugin/](./wordpress-plugin/README.md) → hq-api · releases
-— auth is a **Sanctum token per Website**; the HQ API reads GSC/`ReportDataService` only,
-**no raw crawl tables**.
+[wordpress-plugin/](./wordpress-plugin/README.md) → **server side:** hq-api · releases —
+auth is a **Sanctum token per Website**; the HQ API reads GSC/`ReportDataService` only,
+**no raw crawl tables**. **Client side:** plugin-source · plugin-features — the EBQ SEO
+plugin codebase (42 PHP classes + React build) is a **separate git repo** checked out at
+`/var/www/ebq/ebq-wordpress-plugin/` (gitignored; **never commit it here**), calling the HQ
+API via an `EBQ_Rest_Proxy`; core on-page output works offline.
 
 ### Guest (public, lead-gen) tools ✅
 [guest-tools/](./guest-tools/README.md) — rank / pagespeed / volume / audit; shared
@@ -223,6 +226,11 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-16 (wp plugin source)** — Documented the **client-side WordPress plugin** (the
+  EBQ SEO plugin, a separate git repo at `/var/www/ebq/ebq-wordpress-plugin/`) in
+  `wordpress-plugin/plugin-source.md` + `plugin-features.md`. Added `/ebq-wordpress-plugin`
+  to the main repo's `.gitignore` (it's a 581M nested repo — must never be committed here;
+  its old folder name `ebq-seo-wp` was already ignored but the rename left it exposed).
 - **2026-06-16 (cross-cutting sweep)** — Added the **horizontal reference layer**
   (`infra/reference/`): database (83 tables / 49 models), routing (endpoint map),
   http-and-auth (middleware/guards/authz), jobs-and-scheduler (25 jobs + 17 commands +

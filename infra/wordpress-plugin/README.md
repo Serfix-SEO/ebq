@@ -1,18 +1,30 @@
 # WordPress plugin & HQ API
 
-The EBQ SEO WordPress plugin (`ebq-seo-wp/`) is a companion that runs **inside a
-customer's WP-admin** and talks back to EBQ.io. EBQ is the source of truth: the
-plugin holds **no SEO data of its own** — it renders what the HQ API returns. This
-subsystem covers four concerns: connecting an install to a Website, the per-website
-**HQ API** the plugin reads, the **release/adoption** machinery that ships new plugin
-builds, and the **feature-flag / freeze** signals broadcast on every response.
+The EBQ SEO WordPress plugin is a companion that runs **inside a customer's WP-admin**
+and talks back to EBQ.io. The **core on-page SEO output** (meta, schema, sitemap,
+breadcrumbs, redirects, offline scoring) works standalone; **live insights + AI** unlock
+once the install is linked to an EBQ workspace, which is the source of truth for them.
+This subsystem has **two halves**:
+- **Server side (this Laravel repo):** the connect handshake, the per-website **HQ API**,
+  and the **release/adoption** machinery that ships plugin builds.
+- **Client side (the plugin codebase):** the WordPress plugin itself — a **separate git
+  repo** checked out at `/var/www/ebq/ebq-wordpress-plugin/` (`github.com/.../ebq-wordpress-plugin`,
+  v1.0.5). It is **gitignored here and must never be committed into this repo**; it has its
+  own release cycle.
 
 ## Read in this order
 
+**Server side (this repo):**
 | Doc | What it covers |
 |---|---|
 | [hq-api.md](./hq-api.md) | The `PluginHqController` endpoint catalog — path → reads → auth → cache. The Sanctum auth model. What it does NOT read (no crawl tables). |
 | [releases.md](./releases.md) | Versioning, packaging, the publish/schedule/rollback lifecycle, the global update + feature kill-switches, adoption tracking. |
+
+**Client side (the plugin source — separate repo):**
+| Doc | What it covers |
+|---|---|
+| [plugin-source.md](./plugin-source.md) | Plugin architecture: bootstrap, the 42-class map, the connect handshake + Sanctum token, the `EBQ_Rest_Proxy` pattern, caching, feature flags, updater, the React build. |
+| [plugin-features.md](./plugin-features.md) | The feature surface: on-page (meta/title/social/canonical/robots), schema (JSON-LD), sitemap, breadcrumbs, redirects + 404 tracking, Yoast/RankMath migration, the AI surfaces. |
 
 Infra-wide topology lives one level up ([../main.md](../main.md)); the crawler — which
 the HQ API deliberately does **not** read — is in [../crawler/](../crawler/) (see
