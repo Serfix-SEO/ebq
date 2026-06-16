@@ -24,6 +24,25 @@ overrode the `phpunit.xml` sqlite setting. Never again.
    plain `migrate --force` (additive). Prefer those.
 4. When in doubt about whether a command can lose data, **stop and ask first.**
 
+## 📚 Knowledge base — read & maintain `infra/main.md`
+
+**`infra/main.md` is the engineering knowledge entry point for this whole application.**
+Before exploring code or starting any non-trivial task, **read `infra/main.md`** and the
+linked subsystem doc(s) under `infra/<area>/` — it maps every subsystem, the invariants, and
+the deployment.
+
+**You must keep it current.** This is a hard rule, not a nicety:
+- When you **change code / schema / config / architecture**, update the affected
+  `infra/<area>/…` doc *in the same change*.
+- When you **learn something non-obvious** (a gotcha, a runtime fact, a *why*, an incident),
+  write it into the right doc.
+- When you **add a subsystem**, create its `infra/<area>/` docs and add it to the System Map
+  in `infra/main.md`, plus a Knowledge Changelog line.
+- Keep docs **code-grounded** (cite `file:line`), concise, deduplicated. A stale doc is worse
+  than no doc. If a task leaves the docs wrong or incomplete, the task is not done.
+
+See the full protocol at the top of `infra/main.md`.
+
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
 

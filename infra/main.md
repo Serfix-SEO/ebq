@@ -1,0 +1,215 @@
+# EBQ — Engineering Knowledge Base (entry point)
+
+> **This is the map of the entire application.** If you (Claude or a human) need to
+> understand any part of EBQ, **start here** and follow the links. This file is the *spine*:
+> it links to every knowledge doc, states the rules that must never break, and defines the
+> discipline for keeping all of it true. Depth lives in the linked docs — this file stays a
+> map, never a dump.
+
+EBQ is a self-hosted **SEO platform**: it crawls a client's website, pulls their Google
+(Search Console + Analytics) data, and turns both into findings, growth reports, keyword &
+rank tracking, backlink/competitive intelligence, an AI content suite, and a WordPress-plugin
+API. Laravel 11, PHP 8.3, MariaDB + Redis, two-box deploy (see the topology docs).
+
+---
+
+## ⛔ The maintenance protocol — the whole point of this file
+
+This knowledge base is only useful if it stays true. **Whenever you work on EBQ you are
+responsible for keeping it current.** Treat documentation as part of the task, not an extra.
+
+**WHEN to update (triggers):**
+1. **You changed code / schema / config / architecture** → update the affected subsystem doc
+   to match the new reality, *in the same change*. A stale doc is worse than no doc.
+2. **You learned something non-obvious** — a gotcha, a runtime fact, *why* it's built this
+   way, a production incident, a tuning value → write it in the relevant doc.
+3. **You built a new subsystem / feature** → create `infra/<area>/…` docs for it and add a row
+   to the System Map below.
+4. **You found the docs wrong or outdated** → fix them now and note the correction.
+
+**HOW to update (rules):**
+- **Code-grounded.** Verify against the actual code before writing; cite `file:line` /
+  class / method. Never document from memory or assumption alone.
+- **One fact, one place.** Link, don't copy. Never paste subsystem detail into this file.
+- **Date the time-sensitive.** Incidents, "as of", tuning numbers → absolute dates.
+- **Edit, don't pile up.** Correct the existing line rather than stacking contradictions.
+- **Keep the index honest.** Update the System Map + the "Where docs are thin" list whenever a
+  doc/subsystem is added, renamed, removed, or changes coverage.
+- **Add a Knowledge Changelog line** (bottom of this file) for any architectural change or new
+  doc.
+- **Mirror durable, session-spanning facts** into project memory (`MEMORY.md`) too — that
+  layer survives even when the repo isn't open.
+
+**If a task is finished but the docs would now be wrong or incomplete, the task is not done.**
+
+---
+
+## How to navigate
+
+- **Starting any task:** read this file, then open the doc(s) for the subsystem you're
+  touching. Together they are the full picture.
+- **"Read main.md"** = read this + follow the links relevant to the task.
+- **Authority order:** repo `infra/` docs (code-grounded) > project memory (`MEMORY.md`,
+  operational/session facts) > the code itself (ground truth — when in doubt, read it).
+
+---
+
+## System map — every subsystem
+
+**Status:** ✅ documented · 🟡 partial · ⬜ code-only. As of **2026-06-16 the whole
+application is documented** — keep it that way (see the protocol). Each area links its
+`README.md`; sub-docs are listed after the arrow.
+
+### Platform & infrastructure ✅
+- **Conceptual topology, queues, deploy procedure, rollout postmortem** →
+  [deployment-and-queues.md](./deployment-and-queues.md)
+- **Live server inventory** (both boxes: hardware, OS, Apache/FPM, MariaDB, Redis, ports,
+  integrations, risks) → [server-deployment.md](./server-deployment.md)
+- **DB safety rules** (prod, no backups) → repo-root `CLAUDE.md`; memory `never-destructive-db-data`
+
+### Crawler — the heaviest subsystem ✅
+[crawler/](./crawler/README.md) → architecture · data-model · pipeline · read-path ·
+findings-and-scoring · adjacent-systems · operations · known-issues
+
+### Data sources — Google & Microsoft ✅
+[data-sources/](./data-sources/README.md) → google-oauth · sync-jobs · data-model
+— GSC is the **only** search-data source; Microsoft = Outlook mail only (no Bing ingestion).
+The GSC/GA degradation rule covers all 4 presence combos.
+
+### Keywords & rank tracking ✅
+[keywords/](./keywords/README.md) → keyword-finder (self-hosted Google-Keyword-Planner fleet) ·
+keyword-research · rank-tracking
+
+### Backlinks, competitive & SERP ✅
+[competitive/](./competitive/README.md) → backlinks · serp
+— `serp_cache` is **cross-tenant** (keyed by query+gl); cross-network aggregates fail closed
+below a 5-site cohort.
+
+### Reports, action queue & anomaly ✅
+[reports/](./reports/README.md) → insights · action-queue · growth-reports
+— `ActionQueueService` merges crawl findings + GSC reports + rank drops + audits into one
+ranked queue. (`GenerateAiInsights` is still a stub.)
+
+### AI suite ✅
+[ai/](./ai/README.md) → tools · writer · llm
+— LLM is **Mistral only** today (`LlmClient` multi-provider is aspirational). Writer pipeline
+is synchronous/in-request.
+
+### Audits & performance ✅
+[audits/](./audits/README.md) → page-audit · lighthouse-and-performance ·
+live-score-and-language · topical-authority — external Lighthouse service; SSRF-guarded fetches.
+
+### WordPress plugin & HQ API ✅
+[wordpress-plugin/](./wordpress-plugin/README.md) → hq-api · releases
+— auth is a **Sanctum token per Website**; the HQ API reads GSC/`ReportDataService` only,
+**no raw crawl tables**.
+
+### Guest (public, lead-gen) tools ✅
+[guest-tools/](./guest-tools/README.md) — rank / pagespeed / volume / audit; shared
+request→queued-job→email-link→results pattern, reCAPTCHA + rate limits + lead capture.
+
+### Billing, plans & usage ✅
+[billing/](./billing/README.md) → plans-and-gating · usage
+— billing is **per-USER** (not per-website), **yearly only**; caps + feature flags gate
+features; `client_activities` + `UsageMeter` track spend.
+
+### Accounts, onboarding, teams ✅
+[accounts/](./accounts/README.md) — auth (login errors as banner), Google SSO + source connect,
+website selection, teams via `website_user` + `TeamPermissions` (null = full access).
+
+### Admin panel ✅
+[admin/](./admin/README.md) — `is_admin` gating + per-Livewire-action re-check, impersonation,
+marketing crawl-report sends, proxies, keyword servers, platform settings. (Crawler panel →
+crawler/operations; Plugin/Plan/Billing panels → their own subsystem docs.)
+
+> Co-located non-EBQ apps share Box A: **Postal** (mail), **Jitsi/Prosody** (meet.ebq.io
+> video; booking app in `/var/www/marketing` — memory `meet-video-bookings`). Detail in
+> server-deployment.md.
+
+---
+
+## Cross-cutting invariants & safety (never break these)
+
+1. **Production DB, no backups, binary logging off — data loss is permanent.** No
+   `migrate:fresh/refresh/rollback`, `db:wipe`, `ebq:demo-data` destructive modes, or raw
+   `DROP/TRUNCATE` without explicit per-command confirmation. Tests must resolve to sqlite
+   `:memory:` (the `TestCase` guard — do not weaken it). See `CLAUDE.md`. (Engine is
+   **MariaDB 10.11** via Laravel's `mysql` driver.)
+2. **Two-box deploy in lockstep.** A shared-schema migration hits both boxes instantly; the
+   worker box runs bind-mounted code pushed by **rsync** (not git) and must be restarted.
+   Changing a queued job's identity (`uniqueId`/constructor) requires both boxes to match or
+   locks leak. [deployment-and-queues.md](./deployment-and-queues.md) · live state in
+   [server-deployment.md](./server-deployment.md).
+3. **FPM opcache `validate_timestamps=0`** → a code change needs a *full* `php8.3-fpm`
+   restart, not a reload; long-running `queue:work` needs `queue:restart` / container restart.
+4. **Crawler per-user scoping** — shared crawl data is exposed only through `CrawlReportService`
+   (cap window + ignore/resolve overlay + read-time GSC impact). Shared findings store
+   `impact = 0`. [crawler/read-path.md](./crawler/read-path.md).
+5. **PHP must be 8.3** on both boxes (8.5 breaks queued-closure serialization).
+6. **Redis is the single store for cache + all queues** (`noeviction` policy — eviction would
+   drop jobs). **Don't purge the shared `sync` queue** — it carries unrelated GA/GSC jobs.
+7. **Use `/root/.ssh/id_ed25519_worker`** for the worker box — never repurpose other
+   services' credentials.
+8. **Use the code-review-graph MCP tools first** for exploration (per `CLAUDE.md`).
+
+---
+
+## Glossary (key entities & terms)
+
+- **crawl_site** — one row per normalized domain; owns the shared crawl. Many `websites` link
+  to it via `crawl_site_id`.
+- **value_rank / cap window** — dense page rank in the shared value ordering; reads filter
+  `value_rank <= the owner's plan cap`.
+- **effective_cap** — max page cap among a crawl_site's subscribers; the crawl runs to this.
+- **website_finding_states** — per-user open/ignored/resolved overlay on shared findings.
+- **client_activities / UsageMeter** — usage log + monthly spend windows (provider, units,
+  billed to the website owner). The crawl `crawl_reuse` charge lives here.
+- **sync / crawl / interactive / default** — the four Redis queues (`Support/Queues`).
+  crawl + sync run on the worker box; interactive + default + schedule on the web box.
+- **Postal** — self-hosted SMTP relay all mail goes through (`MAIL_MAILER=postal`).
+- **Mistral** — the only live LLM provider (`MISTRAL_API_KEY`).
+
+---
+
+## Project memory layer
+
+Session-spanning operational facts also live in **project memory**
+(`~/.claude/projects/-var-www-ebq/memory/`, indexed by `MEMORY.md`) — e.g. GSC/GA
+degradation, keyword-finder limits, email-via-Postal, FPM 504 tuning. Where a memory note and
+a repo doc overlap, **the repo doc is authoritative**; migrate durable architecture facts from
+memory into the right `infra/` doc over time and leave the memory note as a pointer.
+
+---
+
+## Where the docs are still thin (deepen as you touch these)
+
+The whole app is mapped, but some areas are summarized rather than exhaustive — and a few
+known gaps were flagged during the sweep:
+
+- **Admin panel** — `admin/README.md` summarizes the panels; individual screens aren't each
+  fully detailed. Expand the one you touch.
+- **Stubs / partial features** — `GenerateAiInsights` is a placeholder; `research_limits` is
+  declared but not enforced (billing); `LlmClient` multi-provider is aspirational.
+- **Known correctness caveats** captured in subsystem docs (read before changing them):
+  crawler `known-issues.md` (cap-window leak), billing `usage.md` (non-atomic `assertCanSpend`),
+  guest-tools (cookie friction bypass; PageSpeed leads mis-tagged), audits (no content-hash
+  re-audit gate), data-sources (null-vs-empty `gsc_site_url`).
+- **Config reference** — `config/*.php` + `.env` knobs are referenced per-subsystem, not in one
+  table; add a consolidated one if it becomes painful.
+
+---
+
+## Knowledge changelog
+
+- **2026-06-16 (later)** — **Full-application documentation sweep.** Documented every
+  subsystem under `infra/<area>/` (data-sources, keywords, competitive, reports, ai, audits,
+  wordpress-plugin, guest-tools, billing, accounts, admin) and added
+  **[server-deployment.md](./server-deployment.md)** — a live, read-only inventory of both
+  production boxes (Apache+FPM web box `host.ebq.io`/`10.0.0.2`; Docker worker box
+  `10.0.0.3`; **MariaDB** not MySQL; Mistral LLM; co-located Postal/Jitsi). 46 docs total.
+  Flagged prod risks: `APP_ENV=local` + `APP_DEBUG=true`, stale `MAIL_HOST`, un-versioned
+  worker compose file.
+- **2026-06-16** — Created this knowledge entry point (`infra/main.md`) + the maintenance
+  protocol. Renamed `arch/` → `infra/`. Crawler subsystem fully documented under
+  `infra/crawler/` (8 docs) following the shared single-crawl-store re-architecture; added
+  `infra/deployment-and-queues.md`. Shared-crawl + tooling shipped to `main` (commit `3a041b5`).

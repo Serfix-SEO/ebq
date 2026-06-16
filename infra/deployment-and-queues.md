@@ -1,5 +1,9 @@
 # Deployment & queues
 
+> Conceptual topology + the deploy procedure. For the **live inventory** of each box
+> (hardware, OS, exact configs, ports, integrations, risks) see
+> [server-deployment.md](./server-deployment.md).
+
 ## Topology — two boxes, one database, one Redis
 
 ```
@@ -12,12 +16,13 @@
         │      interactive, default │        │      crawl, sync          │
         │  • schedule:work (cron)   │        │    (heavy/long jobs)      │
         └─────────────┬────────────┘        └─────────────┬────────────┘
-                      │   shared MySQL `ebq` + shared Redis │
+                      │   shared MariaDB `ebq` + shared Redis │
                       └──────────────────────────────────────┘
 ```
 
-- **MySQL `ebq`** and **Redis** are shared by both boxes. (No DB backups; binary
-  logging off — data loss is permanent. See the top of `CLAUDE.md`.)
+- **MariaDB 10.11 `ebq`** and **Redis** are shared by both boxes (the DB engine is
+  MariaDB, used via Laravel's `mysql` driver). No DB backups; binary logging off — data
+  loss is permanent. See the top of `CLAUDE.md`.
 - The web box's `.env` has `REDIS_HOST=127.0.0.1`; the worker box points its
   `REDIS_HOST` at the web box (`10.0.0.2`) so both use the **same** Redis
   (queues + cache).
