@@ -83,8 +83,10 @@ user sees 3.
 ## Write path (one crawl per domain)
 
 `CrawlWebsitePagesJob(websiteId)` resolves the website's crawl_site, **bails if a
-crawl is already running** for it, creates a `crawl_runs` row keyed by
-`crawl_site_id`, builds the frontier, and hands off to the multi-pass loop. Cap =
+crawl is already running** for it (the `isCrawling()` check + run creation are
+wrapped in a short atomic `Cache::lock('crawl-site-start-{id}')` so two
+near-simultaneous dispatches can't both create a run), creates a `crawl_runs` row
+keyed by `crawl_site_id`, builds the frontier, and hands off to the multi-pass loop. Cap =
 `crawlSite->effective_cap` (re-read each pass, so a higher-cap subscriber joining
 mid-crawl extends the in-flight crawl). See [crawl-pipeline.md](./crawl-pipeline.md).
 

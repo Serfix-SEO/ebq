@@ -67,20 +67,32 @@ class CrawlWebsitePagesJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
-        // Already crawling this shared site (another subscriber triggered it)? Don't
-        // start a second run — the in-flight crawl covers everyone (and extends to a
-        // higher cap automatically since CrawlPassJob reads effective_cap each pass).
-        if ($crawlSite->isCrawling()) {
-            return;
+        // Start-of-crawl is serialized with a short atomic lock per crawl_site so two
+        // near-simultaneous dispatches can't both pass the isCrawling() check and
+        // create duplicate runs. ShouldBeUnique only de-dupes *queued* jobs; once two
+        // are already processing (e.g. a rapid re-dispatch, or a leaked unique lock)
+        // the queue lock is gone, so we need this DB-state guard too. The lock has a
+        // short TTL so a dead worker can't hold it permanently. Once the run exists,
+        // isCrawling() is true for everyone else, so the lock only needs to cover the
+        // check + create — the frontier build + pass dispatch happen outside it.
+        $startLock = \Illuminate\Support\Facades\Cache::lock('crawl-site-start-'.$crawlSite->id, 30);
+        if (! $startLock->get()) {
+            return; // another worker is already starting a run for this crawl_site
         }
-
-        $run = CrawlRun::create([
-            'crawl_site_id' => $crawlSite->id,
-            'trigger' => $this->trigger,
-            'status' => CrawlRun::STATUS_RUNNING,
-            'started_at' => now(),
-        ]);
-        $crawlSite->forceFill(['status' => 'crawling', 'last_crawl_started_at' => now()])->save();
+        try {
+            if ($crawlSite->isCrawling()) {
+                return;
+            }
+            $run = CrawlRun::create([
+                'crawl_site_id' => $crawlSite->id,
+                'trigger' => $this->trigger,
+                'status' => CrawlRun::STATUS_RUNNING,
+                'started_at' => now(),
+            ]);
+            $crawlSite->forceFill(['status' => 'crawling', 'last_crawl_started_at' => now()])->save();
+        } finally {
+            $startLock->release();
+        }
 
         try {
             $frontier->build($crawlSite);
