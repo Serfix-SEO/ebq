@@ -284,6 +284,17 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/fleet/{node}/drain', [\App\Http\Controllers\Admin\FleetController::class, 'drain'])->name('fleet.drain');
     Route::post('/fleet/{node}/destroy', [\App\Http\Controllers\Admin\FleetController::class, 'destroy'])->name('fleet.destroy');
 
+    // Database-shard node fleet (App\Http\Controllers\Admin\DbFleetController)
+    Route::get('/db-fleet', [\App\Http\Controllers\Admin\DbFleetController::class, 'index'])->name('db-fleet.index');
+    Route::post('/db-fleet/settings', [\App\Http\Controllers\Admin\DbFleetController::class, 'settings'])->name('db-fleet.settings');
+    Route::post('/db-fleet/register-primary', [\App\Http\Controllers\Admin\DbFleetController::class, 'registerPrimary'])->name('db-fleet.register-primary');
+    Route::post('/db-fleet/provision', [\App\Http\Controllers\Admin\DbFleetController::class, 'provision'])->name('db-fleet.provision');
+    Route::post('/db-fleet/move', [\App\Http\Controllers\Admin\DbFleetController::class, 'move'])->name('db-fleet.move');
+    Route::post('/db-fleet/{node}/bootstrap', [\App\Http\Controllers\Admin\DbFleetController::class, 'bootstrap'])->name('db-fleet.bootstrap');
+    Route::post('/db-fleet/{node}/migrate', [\App\Http\Controllers\Admin\DbFleetController::class, 'migrate'])->name('db-fleet.migrate');
+    Route::post('/db-fleet/{node}/drain', [\App\Http\Controllers\Admin\DbFleetController::class, 'drain'])->name('db-fleet.drain');
+    Route::post('/db-fleet/{node}/destroy', [\App\Http\Controllers\Admin\DbFleetController::class, 'destroy'])->name('db-fleet.destroy');
+
     Route::get('/marketing', [AdminMarketingController::class, 'index'])->name('marketing.index');
     Route::get('/marketing/sends', [AdminMarketingController::class, 'sends'])->name('marketing.sends');
     Route::post('/marketing/{website}/send', [AdminMarketingController::class, 'send'])->name('marketing.send');
