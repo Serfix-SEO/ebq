@@ -80,7 +80,7 @@ class KeywordFixPlaybook extends Component
 
             return;
         }
-        if ($this->websiteId <= 0 || ! $user?->canViewWebsiteId($this->websiteId)) {
+        if (($this->websiteId === null || $this->websiteId === '') || ! $user?->canViewWebsiteId($this->websiteId)) {
             $this->fail('You don\'t have access to this website.');
 
             return;

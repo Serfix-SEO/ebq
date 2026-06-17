@@ -58,7 +58,7 @@ class InsightsPanel extends Component
     public function render()
     {
         $user = Auth::user();
-        $hasAccess = $this->websiteId > 0 && $user?->canViewWebsiteId($this->websiteId);
+        $hasAccess = ($this->websiteId !== null && $this->websiteId !== '') && $user?->canViewWebsiteId($this->websiteId);
 
         $service = app(ReportDataService::class);
         $country = $this->country !== '' ? $this->country : null;

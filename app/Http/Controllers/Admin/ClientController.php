@@ -100,7 +100,7 @@ class ClientController extends Controller
                 'keywords_everywhere' => $costPerKeyword,
                 'serp_api' => $costPerCall,
             ],
-            'editId' => (int) $request->query('edit', 0),
+            'editId' => (string) $request->query('edit', ''),
             'showCreate' => (bool) $request->query('new', 0) || $request->old('_create_open'),
         ]);
     }
@@ -140,18 +140,18 @@ class ClientController extends Controller
         $data = $request->validate([
             'action' => ['required', 'string', 'in:disable,enable'],
             'ids' => ['required', 'array', 'min:1', 'max:500'],
-            'ids.*' => ['integer', 'min:1'],
+            'ids.*' => ['string'],
         ]);
 
-        $selfId = (int) ($request->user()?->id ?? 0);
+        $selfId = (string) ($request->user()?->id ?? '');
         $ids = collect($data['ids'])
             ->map(fn ($id) => $id)
-            ->filter(fn (string $id) => $id > 0 && $id !== $selfId)
+            ->filter(fn (string $id) => ($id !== null && $id !== '') && $id !== $selfId)
             ->unique()
             ->values()
             ->all();
 
-        $skippedSelf = in_array($selfId, array_map('intval', $data['ids']), true);
+        $skippedSelf = in_array($selfId, $data['ids'], true);
 
         if ($ids === []) {
             return redirect()

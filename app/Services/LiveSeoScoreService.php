@@ -526,7 +526,7 @@ class LiveSeoScoreService
 
         // No audit, no in-flight — queue one now.
         $ownerUserId = (int) ($website->user_id ?? 0);
-        if ($ownerUserId <= 0) {
+        if (($ownerUserId === null || $ownerUserId === '')) {
             return [
                 'status' => 'unavailable',
                 'message' => 'Cannot enqueue audit: website has no owner user.',

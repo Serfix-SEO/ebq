@@ -368,7 +368,7 @@ final class MistralClient implements LlmClient
     private function resolveBilledUser(array $options): ?User
     {
         $userId = isset($options['__user_id']) ? (string) $options['__user_id'] : Auth::id();
-        if ($userId <= 0) {
+        if (($userId === null || $userId === '')) {
             return null;
         }
         return User::find($userId);

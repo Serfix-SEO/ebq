@@ -51,7 +51,7 @@ class SiteIssues extends Component
         $this->websiteId = session('current_website_id');
 
         abort_unless($this->isAllowedKey($issueKey), 404);
-        abort_unless($this->websiteId > 0 && Auth::user()?->canViewWebsiteId($this->websiteId), 403);
+        abort_unless(($this->websiteId !== null && $this->websiteId !== '') && Auth::user()?->canViewWebsiteId($this->websiteId), 403);
     }
 
     public function updated(string $name): void

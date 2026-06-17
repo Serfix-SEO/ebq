@@ -53,7 +53,7 @@ class PurgeSyncData extends Command
         $websiteId = null;
         if ($websiteOption !== null && $websiteOption !== '') {
             $websiteId = (int) $websiteOption;
-            if ($websiteId <= 0) {
+            if (($websiteId === null || $websiteId === '')) {
                 $this->error("Invalid --website value: {$websiteOption}");
 
                 return self::FAILURE;

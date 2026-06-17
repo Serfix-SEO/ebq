@@ -271,7 +271,7 @@ class CustomAudit extends Component
         $website = null;
         $hasPending = false;
 
-        if ($this->websiteId > 0 && Auth::check() && Auth::user()->canViewWebsiteId($this->websiteId)) {
+        if (($this->websiteId !== null && $this->websiteId !== '') && Auth::check() && Auth::user()->canViewWebsiteId($this->websiteId)) {
             $website = Website::query()->find($this->websiteId);
             $recentAudits = CustomPageAudit::query()
                 ->where('website_id', $this->websiteId)

@@ -39,7 +39,7 @@ class CrawlBanner extends Component
 
     private function website(): ?Website
     {
-        if ($this->websiteId <= 0 || ! Auth::user()?->canViewWebsiteId($this->websiteId)) {
+        if (($this->websiteId === null || $this->websiteId === '') || ! Auth::user()?->canViewWebsiteId($this->websiteId)) {
             return null;
         }
 

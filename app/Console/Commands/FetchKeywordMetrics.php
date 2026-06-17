@@ -40,7 +40,7 @@ class FetchKeywordMetrics extends Command
         $websiteId = null;
         if ($websiteOption !== null && $websiteOption !== '') {
             $websiteId = (int) $websiteOption;
-            if ($websiteId <= 0 || ! Website::query()->whereKey($websiteId)->exists()) {
+            if (($websiteId === null || $websiteId === '') || ! Website::query()->whereKey($websiteId)->exists()) {
                 $this->error("Website #{$websiteOption} not found.");
 
                 return self::FAILURE;

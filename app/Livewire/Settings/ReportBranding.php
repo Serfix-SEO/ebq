@@ -149,7 +149,7 @@ class ReportBranding extends Component
     private function findRow(): ?ReportBrandingModel
     {
         $userId = Auth::id();
-        if ($this->scope === 'website' && $this->websiteId > 0) {
+        if ($this->scope === 'website' && ($this->websiteId !== null && $this->websiteId !== '')) {
             return ReportBrandingModel::query()
                 ->where('website_id', $this->websiteId)
                 ->first();
@@ -167,7 +167,7 @@ class ReportBranding extends Component
             return $row;
         }
         $userId = Auth::id();
-        if ($this->scope === 'website' && $this->websiteId > 0) {
+        if ($this->scope === 'website' && ($this->websiteId !== null && $this->websiteId !== '')) {
             return new ReportBrandingModel(['website_id' => $this->websiteId]);
         }
         return new ReportBrandingModel(['user_id' => $userId]);
@@ -175,7 +175,7 @@ class ReportBranding extends Component
 
     private function getWebsite(): ?Website
     {
-        if ($this->websiteId <= 0) {
+        if (($this->websiteId === null || $this->websiteId === '')) {
             return null;
         }
         $user = Auth::user();

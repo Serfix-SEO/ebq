@@ -145,7 +145,7 @@ class WebsitesList extends Component
 
         $accountId = substr($selection, 0, $pos);
 
-        return [$accountId > 0 ? $accountId : null, substr($selection, $pos + 1)];
+        return [($accountId !== null && $accountId !== '') ? $accountId : null, substr($selection, $pos + 1)];
     }
 
     private function extractDomain(string $siteUrl): string

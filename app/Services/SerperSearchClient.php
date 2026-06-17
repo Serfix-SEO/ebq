@@ -199,7 +199,7 @@ class SerperSearchClient
 
     private function resolveBilledUser(?string $websiteId, ?string $ownerUserId): ?User
     {
-        if ($websiteId !== null && $websiteId > 0) {
+        if ($websiteId !== null && ($websiteId !== null && $websiteId !== '')) {
             $ownerId = DB::table('website_user')
                 ->where('website_id', $websiteId)
                 ->where('role', \App\Support\TeamPermissions::ROLE_OWNER)

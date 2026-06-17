@@ -54,7 +54,7 @@ class SiteHealthStats extends Component
 
     public function render(CrawlReportService $report)
     {
-        $website = $this->websiteId > 0 && Auth::user()?->canViewWebsiteId($this->websiteId)
+        $website = ($this->websiteId !== null && $this->websiteId !== '') && Auth::user()?->canViewWebsiteId($this->websiteId)
             ? Website::find($this->websiteId)
             : null;
 

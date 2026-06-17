@@ -456,7 +456,7 @@ class AiStudioWriterController extends Controller
             return null;
         }
         $id = session('current_website_id');
-        if ($id <= 0) {
+        if (($id === null || $id === '')) {
             return null;
         }
         if (! $user->canViewWebsiteId($id)) {

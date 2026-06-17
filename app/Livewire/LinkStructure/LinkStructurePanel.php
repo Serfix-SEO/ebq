@@ -45,7 +45,7 @@ class LinkStructurePanel extends Component
 
     private function currentWebsite(): ?Website
     {
-        if ($this->websiteId <= 0 || ! Auth::user()?->canViewWebsiteId($this->websiteId)) {
+        if (($this->websiteId === null || $this->websiteId === '') || ! Auth::user()?->canViewWebsiteId($this->websiteId)) {
             return null;
         }
 

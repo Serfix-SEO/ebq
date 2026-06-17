@@ -37,7 +37,7 @@ class ClientImpersonationController extends Controller
     public function stop(Request $request, ClientActivityLogger $logger): RedirectResponse
     {
         $impersonatorId = session('impersonator_id');
-        if ($impersonatorId <= 0) {
+        if (($impersonatorId === null || $impersonatorId === '')) {
             return redirect()->route('dashboard');
         }
 

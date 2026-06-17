@@ -76,7 +76,7 @@ class RankTrackingManager extends Component
 
     private function prefillTargetDomain(): void
     {
-        if ($this->websiteId <= 0) {
+        if (($this->websiteId === null || $this->websiteId === '')) {
             return;
         }
         $website = Website::find($this->websiteId);
@@ -100,7 +100,7 @@ class RankTrackingManager extends Component
         $this->showBulkAdd = ! $this->showBulkAdd;
         $this->bulkStatus = '';
 
-        if ($this->showBulkAdd && $this->websiteId > 0) {
+        if ($this->showBulkAdd && ($this->websiteId !== null && $this->websiteId !== '')) {
             $top = SearchConsoleData::query()
                 ->where('website_id', $this->websiteId)
                 ->where('country', '!=', '')
@@ -143,7 +143,7 @@ class RankTrackingManager extends Component
      */
     public function bulkCandidates(): array
     {
-        if ($this->websiteId <= 0 || ! Auth::user()?->canViewWebsiteId($this->websiteId)) {
+        if (($this->websiteId === null || $this->websiteId === '') || ! Auth::user()?->canViewWebsiteId($this->websiteId)) {
             return [];
         }
 
@@ -208,7 +208,7 @@ class RankTrackingManager extends Component
     public function bulkAddSelected(): void
     {
         $user = Auth::user();
-        if (! $user || $this->websiteId <= 0 || ! $user->canViewWebsiteId($this->websiteId)) {
+        if (! $user || ($this->websiteId === null || $this->websiteId === '') || ! $user->canViewWebsiteId($this->websiteId)) {
             $this->bulkStatus = 'Pick a website first.';
 
             return;
@@ -356,7 +356,7 @@ class RankTrackingManager extends Component
         ]);
 
         $user = Auth::user();
-        if (! $user || $this->websiteId <= 0 || ! $user->canViewWebsiteId($this->websiteId)) {
+        if (! $user || ($this->websiteId === null || $this->websiteId === '') || ! $user->canViewWebsiteId($this->websiteId)) {
             $this->addError('newKeyword', 'Select a website first.');
 
             return;

@@ -51,7 +51,7 @@ class KeywordDetail extends Component
     public function addToRankTracker(): void
     {
         $user = Auth::user();
-        if (! $user || $this->websiteId <= 0 || ! $user->canViewWebsiteId($this->websiteId)) {
+        if (! $user || ($this->websiteId === null || $this->websiteId === '') || ! $user->canViewWebsiteId($this->websiteId)) {
             session()->flash('keyword_detail_status', 'Permission denied.');
 
             return;
@@ -103,7 +103,7 @@ class KeywordDetail extends Component
     public function render()
     {
         $user = Auth::user();
-        $hasAccess = $this->websiteId > 0 && $user?->canViewWebsiteId($this->websiteId);
+        $hasAccess = ($this->websiteId !== null && $this->websiteId !== '') && $user?->canViewWebsiteId($this->websiteId);
 
         $data = [
             'has_access' => $hasAccess,

@@ -94,7 +94,7 @@ class GoogleOAuthController extends Controller
         $logger->log($isNewUser ? 'auth.register_google' : 'auth.login_google', userId: $user->id, meta: ['ip' => $request->ip()]);
 
         $websiteId = session('current_website_id');
-        if ($websiteId <= 0) {
+        if (($websiteId === null || $websiteId === '')) {
             $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
             if ($first) {
                 $websiteId = (string) $first->id;

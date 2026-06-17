@@ -47,7 +47,7 @@ class WordPressPlugin extends Component
         $website = null;
         $tokens = collect();
 
-        if ($this->websiteId > 0 && Auth::user()?->canViewWebsiteId($this->websiteId)) {
+        if (($this->websiteId !== null && $this->websiteId !== '') && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $website = Website::find($this->websiteId);
             $tokens = PersonalAccessToken::query()
                 ->where('tokenable_type', Website::class)

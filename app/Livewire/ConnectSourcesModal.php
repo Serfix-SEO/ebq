@@ -140,7 +140,7 @@ class ConnectSourcesModal extends Component
 
     private function editableWebsite(): ?Website
     {
-        if ($this->websiteId <= 0) {
+        if (($this->websiteId === null || $this->websiteId === '')) {
             return null;
         }
 
@@ -168,6 +168,6 @@ class ConnectSourcesModal extends Component
 
         $accountId = substr($selection, 0, $pos);
 
-        return [$accountId > 0 ? $accountId : null, substr($selection, $pos + 1)];
+        return [($accountId !== null && $accountId !== '') ? $accountId : null, substr($selection, $pos + 1)];
     }
 }

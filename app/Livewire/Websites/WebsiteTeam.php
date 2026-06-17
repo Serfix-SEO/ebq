@@ -93,7 +93,7 @@ class WebsiteTeam extends Component
 
     public function inviteMember(): void
     {
-        if ($this->readonly || $this->websiteId <= 0) {
+        if ($this->readonly || ($this->websiteId === null || $this->websiteId === '')) {
             return;
         }
 
@@ -165,7 +165,7 @@ class WebsiteTeam extends Component
 
     public function revokeMember(string $userId): void
     {
-        if ($this->readonly || $this->websiteId <= 0) {
+        if ($this->readonly || ($this->websiteId === null || $this->websiteId === '')) {
             return;
         }
 
@@ -183,7 +183,7 @@ class WebsiteTeam extends Component
 
     public function resendInvitation(string $invitationId): void
     {
-        if ($this->readonly || $this->websiteId <= 0) {
+        if ($this->readonly || ($this->websiteId === null || $this->websiteId === '')) {
             return;
         }
 
@@ -221,7 +221,7 @@ class WebsiteTeam extends Component
 
     public function cancelInvitation(string $invitationId): void
     {
-        if ($this->readonly || $this->websiteId <= 0) {
+        if ($this->readonly || ($this->websiteId === null || $this->websiteId === '')) {
             return;
         }
 
@@ -239,7 +239,7 @@ class WebsiteTeam extends Component
 
     public function startEditMember(string $userId): void
     {
-        if ($this->readonly || $this->websiteId <= 0) {
+        if ($this->readonly || ($this->websiteId === null || $this->websiteId === '')) {
             return;
         }
 
@@ -269,7 +269,7 @@ class WebsiteTeam extends Component
 
     public function startEditInvitation(string $invitationId): void
     {
-        if ($this->readonly || $this->websiteId <= 0) {
+        if ($this->readonly || ($this->websiteId === null || $this->websiteId === '')) {
             return;
         }
 
@@ -296,7 +296,7 @@ class WebsiteTeam extends Component
 
     public function saveEdit(): void
     {
-        if ($this->readonly || $this->websiteId <= 0 || $this->editTargetId === null) {
+        if ($this->readonly || ($this->websiteId === null || $this->websiteId === '') || $this->editTargetId === null) {
             return;
         }
 
@@ -364,7 +364,7 @@ class WebsiteTeam extends Component
         $website = null;
 
         if ($this->useSessionWebsite) {
-            if ($this->websiteId <= 0) {
+            if (($this->websiteId === null || $this->websiteId === '')) {
                 $emptyReason = 'select_website';
             } else {
                 $website = Website::query()
@@ -392,7 +392,7 @@ class WebsiteTeam extends Component
 
     private function applySessionModeFlags(): void
     {
-        if ($this->websiteId <= 0) {
+        if (($this->websiteId === null || $this->websiteId === '')) {
             $this->readonly = true;
 
             return;

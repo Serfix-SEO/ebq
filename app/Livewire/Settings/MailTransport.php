@@ -196,7 +196,7 @@ class MailTransport extends Component
     private function findRow(): ?MailTransportModel
     {
         $userId = Auth::id();
-        if ($this->scope === 'website' && $this->websiteId > 0) {
+        if ($this->scope === 'website' && ($this->websiteId !== null && $this->websiteId !== '')) {
             return MailTransportModel::query()
                 ->where('user_id', $userId)
                 ->where('website_id', $this->websiteId)
@@ -217,13 +217,13 @@ class MailTransport extends Component
         $userId = Auth::id();
         return new MailTransportModel([
             'user_id' => $userId,
-            'website_id' => $this->scope === 'website' && $this->websiteId > 0 ? $this->websiteId : null,
+            'website_id' => $this->scope === 'website' && ($this->websiteId !== null && $this->websiteId !== '') ? $this->websiteId : null,
         ]);
     }
 
     private function getWebsite(): ?Website
     {
-        if ($this->websiteId <= 0) {
+        if (($this->websiteId === null || $this->websiteId === '')) {
             return null;
         }
         return Auth::user()?->canViewWebsiteId($this->websiteId) ? Website::find($this->websiteId) : null;

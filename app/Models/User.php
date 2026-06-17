@@ -151,7 +151,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function roleForWebsite(string $websiteId): ?string
     {
-        if ($websiteId <= 0) {
+        if (($websiteId === null || $websiteId === '')) {
             return null;
         }
 
@@ -213,9 +213,9 @@ class User extends Authenticatable implements MustVerifyEmail
      * Route name of the first feature this user can access on the given website.
      * Falls back to websites.index (accessible to anyone with ≥1 website).
      */
-    public function firstAccessibleRoute(string $websiteId): string
+    public function firstAccessibleRoute(?string $websiteId): string
     {
-        if ($websiteId > 0) {
+        if ($websiteId !== null && $websiteId !== '') {
             foreach (TeamPermissions::FEATURES as $key => $meta) {
                 if ($this->hasFeatureAccess($key, $websiteId)) {
                     return $meta['route'];

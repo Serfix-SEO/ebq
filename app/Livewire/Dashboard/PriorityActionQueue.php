@@ -82,7 +82,7 @@ class PriorityActionQueue extends Component
 
     private function hasAccess(): bool
     {
-        return $this->websiteId > 0 && Auth::user()?->canViewWebsiteId($this->websiteId);
+        return ($this->websiteId !== null && $this->websiteId !== '') && Auth::user()?->canViewWebsiteId($this->websiteId);
     }
 
     /**

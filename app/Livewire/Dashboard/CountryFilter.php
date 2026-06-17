@@ -48,7 +48,7 @@ class CountryFilter extends Component
     public function render()
     {
         $options = [];
-        if ($this->websiteId > 0 && Auth::user()?->canViewWebsiteId($this->websiteId)) {
+        if (($this->websiteId !== null && $this->websiteId !== '') && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $options = Cache::remember(
                 "country_filter:{$this->websiteId}",
                 600,

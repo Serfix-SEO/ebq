@@ -24,18 +24,18 @@ class EnsureFeatureAccess
         }
 
         $websiteId = session('current_website_id');
-        $accessible = $websiteId > 0
+        $accessible = ($websiteId !== null && $websiteId !== '')
             ? $user->accessibleWebsitesQuery()->whereKey($websiteId)->exists()
             : false;
         if (! $accessible) {
             $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
             $websiteId = $first ? (string) $first->id : 0;
-            if ($websiteId > 0) {
+            if (($websiteId !== null && $websiteId !== '')) {
                 session(['current_website_id' => $websiteId]);
             }
         }
 
-        if ($websiteId > 0 && $user->hasFeatureAccess($feature, $websiteId)) {
+        if (($websiteId !== null && $websiteId !== '') && $user->hasFeatureAccess($feature, $websiteId)) {
             return $next($request);
         }
 

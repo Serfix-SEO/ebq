@@ -38,7 +38,7 @@ class DeleteWebsiteData extends Command
 
     private function handleOne(string $websiteId): int
     {
-        if ($websiteId <= 0) {
+        if (($websiteId === null || $websiteId === '')) {
             $this->error('Website ID must be a positive integer.');
 
             return self::FAILURE;
