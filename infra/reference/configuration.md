@@ -29,7 +29,7 @@ and non-secret defaults only.**
 | `session.php` | Session driver/cookie | `SESSION_DRIVER` (DB), `SESSION_SECURE_COOKIE`, `SESSION_DOMAIN` |
 | `sanctum.php` | API token / SPA auth | `SANCTUM_STATEFUL_DOMAINS`; guard `web`; expiration `null` (no TTL) |
 | `sentry.php` | Error/perf reporting | `SENTRY_LARAVEL_DSN`, sample rates, ignore lists |
-| `services.php` | **All external integrations** | google / serper / lighthouse / keywords_everywhere / keyword_finder / mistral / stripe / recaptcha / microsoft |
+| `services.php` | **All external integrations** | google / serper / lighthouse / keywords_everywhere / keyword_finder / mistral / stripe / recaptcha / microsoft / **hetzner** (fleet autoscaler: `HCLOUD_TOKEN` + network/ssh/firewall/snapshot ids — web box only) |
 | `crawler.php` | Self-hosted crawler tuning | batch/passes/recrawl/simhash/proxy — see [crawler/](../crawler/) |
 | `audit.php` | Page-audit GSC window | `gsc_keyword_lookback_days_*`, competitor-KE default |
 | `reports.php` | Growth-report freshness | `REPORT_GSC_LAG_DAYS` (default 3) |
@@ -132,7 +132,8 @@ knobs:
 | `CRAWLER_MAX_PASSES` | 6 | **deprecated** — superseded by `pages_per_pass`; `CrawlPassJob` derives its own runaway ceiling |
 | `CRAWLER_MAX_PAGES_PER_RUN` | 200000 | per-run page budget (fallback when `effective_cap` is 0) |
 | `CRAWLER_STALL_MINUTES` / `CRAWLER_MAX_RUN_HOURS` | 10 / 6 | `ebq:crawl-supervisor` watchdog: resume a run idle this long; force-finalize past this age |
-| `CRAWLER_DELAY_MS` / `CRAWLER_TIMEOUT` | 250 / 20 | politeness delay / per-page fetch timeout (s) |
+| `CRAWLER_DELAY_MS` / `CRAWLER_TIMEOUT` | 250 / 20 | local per-batch politeness delay / per-page fetch timeout (s) |
+| `CRAWLER_RATE_MAX_WAIT_MS` | 5000 | `DomainRateLimiter` max wait for a domain token before fail-open (fleet-wide per-domain rate = the `autoscaler.per_domain_rate` setting) |
 | `CRAWLER_RECRAWL_MIN/BASE/MAX_DAYS` | 3 / 7 / 30 | adaptive recrawl backoff window |
 | `CRAWLER_SIMHASH_THRESHOLD` | 3 | Hamming distance = "significant change" (memory `incremental-crawling`) |
 | `CRAWLER_SITEMAP_TRUST_MIN_SAMPLE` / `_RATIO` | 20 / 0.3 | when to trust sitemap `<lastmod>` |

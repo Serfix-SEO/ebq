@@ -69,12 +69,16 @@ Points `DB_HOST`/`REDIS_HOST` at `10.0.0.2`.
 
 | Service | replicas | Command |
 |---|---|---|
-| `crawl` | **5** | `php -d memory_limit=2048M artisan queue:work redis --queue=crawl --sleep=3 --tries=3 --max-time=3600 --timeout=1200` |
+| `crawl` | **5** | `php -d memory_limit=2048M artisan queue:work redis --queue=crawl … --timeout=1200` (page-fetch pipeline) |
+| `finalize` | **1** | `php -d memory_limit=2048M artisan queue:work redis --queue=crawl-finalize … --timeout=1300` (the long `AnalyzeSiteJob`; pinned box only — `stop_grace_period: 360s`) |
 | `sync` | **1** | `php -d memory_limit=512M artisan queue:work redis --queue=sync … --timeout=600` |
 
-So the whole crawl pipeline (`->onQueue('crawl')`) and GA/GSC sync run **here**; Box A never
-crawls. `--timeout=1200` matches `AnalyzeSiteJob`; `REDIS_QUEUE_RETRY_AFTER=1320` must stay
-above it. Containers run with `network_mode: host`, so a code change = rsync `/var/www/ebq` +
+So the crawl pipeline + finalize + GA/GSC sync run **here**; Box A never crawls.
+`REDIS_QUEUE_RETRY_AFTER=1320` must stay above the longest job timeout. **Autoscaled ephemeral
+boxes** (see [crawler/autoscaling.md](./crawler/autoscaling.md)) run only the `crawl` service
+(via `docker-compose.ephemeral.yml`, `--timeout=300`) — never finalize/sync — so a scale-down
+drain can't interrupt a finalize. They reach Redis/MariaDB because Box A's `ufw` allows the
+private subnet (`10.0.0.0/24 → 6379 + 3306`), not just the one pinned worker IP. Containers run with `network_mode: host`, so a code change = rsync `/var/www/ebq` +
 `docker compose … up -d` (bind-mounted code; **no image rebuild needed** unless system deps
 change). Code last synced 2026-06-16 18:16 — on current `crawl_site_id` code.
 
