@@ -30,6 +30,13 @@ class User extends Authenticatable implements MustVerifyEmail
         static::created(function (User $user): void {
             Lead::markConvertedFor($user);
         });
+
+        // Delete owned websites through the model so the per-website app-level
+        // shard cascade runs (cross-tier FKs are app-enforced, so a DB cascade on
+        // users→websites would otherwise orphan the websites' tenant-node data).
+        static::deleting(function (User $user): void {
+            $user->websites()->get()->each(fn (Website $w) => $w->delete());
+        });
     }
 
     /**

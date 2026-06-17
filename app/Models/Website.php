@@ -58,6 +58,16 @@ class Website extends Model
         // website never touches the shared crawl while others still subscribe — the
         // website_id cascade FK was dropped for exactly this reason).
         static::deleted(function (Website $website): void {
+            // App-level cascade: cross-tier FKs are app-enforced (a tenant node has
+            // no central tables to cascade from), so delete this website's tenant
+            // rows explicitly on its node. Resolved from the row's own anchors
+            // (the websites row is already gone). Idempotent w.r.t. any DB cascade.
+            $cleanup = app(\App\Services\Sharding\ShardCleanup::class);
+            $cleanup->purgeWebsiteTenantData(
+                (string) $website->id,
+                \App\Services\Sharding\ShardCleanup::connectionFor($website->db_node_id),
+            );
+
             if (! $website->crawl_site_id) {
                 return;
             }
@@ -66,9 +76,12 @@ class Website extends Model
                 return;
             }
             if ($site->websites()->count() === 0) {
-                foreach (['crawl_findings', 'website_internal_links', 'crawl_runs', 'website_pages'] as $t) {
-                    \Illuminate\Support\Facades\DB::table($t)->where('crawl_site_id', $site->id)->delete();
-                }
+                // Last subscriber gone → GC the shared crawl on its crawl node
+                // (also clears website_finding_states, which the old loop missed).
+                $cleanup->purgeCrawlSiteData(
+                    (string) $site->id,
+                    \App\Services\Sharding\ShardCleanup::connectionFor($site->crawl_node_id),
+                );
                 $site->delete();
             } else {
                 $site->recomputeEffectiveCap();
