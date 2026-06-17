@@ -26,6 +26,7 @@ class SyncAnalyticsData implements ShouldQueue
 
     public function handle(GoogleAnalyticsService $service): void
     {
+        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::findOrFail($this->websiteId);
         // Plan-limit freeze: when the website is past the owning user's
         // plan limit, skip the GA fetch. Avoids burning Google quota on

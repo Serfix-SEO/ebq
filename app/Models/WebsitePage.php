@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesCrawlConnection;
 
 /**
  * One row per crawled URL on a website (distinct from page_audit_reports,
@@ -40,6 +41,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class WebsitePage extends Model
 {
     use HasUlids;
+    use UsesCrawlConnection;
     protected $fillable = [
         'website_id', 'crawl_site_id', 'value_rank',
         'url', 'url_hash', 'title', 'http_status', 'meta_description',

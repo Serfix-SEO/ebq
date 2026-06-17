@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 /**
  * One row per crawl-issue summary report emailed from the admin Marketing panel.
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class CrawlReportSend extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     protected $fillable = [
         'website_id', 'recipient_user_id', 'sent_by_user_id',
         'to_email', 'subject', 'summary', 'status',

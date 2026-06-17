@@ -53,6 +53,7 @@ class SyncOwnBacklinksFromKeywordsEverywhere implements ShouldBeUnique, ShouldQu
 
     public function handle(OwnBacklinkSyncService $service): void
     {
+        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::query()->find($this->websiteId);
         if (! $website instanceof Website) {
             return;

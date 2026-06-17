@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesCrawlConnection;
 
 /**
  * A single SEO issue surfaced by the crawler. See CrawlFinding catalog in
@@ -26,6 +27,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class CrawlFinding extends Model
 {
     use HasUlids;
+    use UsesCrawlConnection;
     public const SEVERITY_CRITICAL = 'critical';
     public const SEVERITY_HIGH = 'high';
     public const SEVERITY_MEDIUM = 'medium';

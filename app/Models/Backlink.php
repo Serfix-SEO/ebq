@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 class Backlink extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     /** @use HasFactory<\Database\Factories\BacklinkFactory> */
     use HasFactory;
 

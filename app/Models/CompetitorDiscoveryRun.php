@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 /**
  * Lifecycle + cost ledger for one competitor auto-discovery run.
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class CompetitorDiscoveryRun extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     public const STATUS_QUEUED = 'queued';
     public const STATUS_RUNNING = 'running';
     public const STATUS_COMPLETED = 'completed';

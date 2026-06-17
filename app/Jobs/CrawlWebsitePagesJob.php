@@ -50,6 +50,7 @@ class CrawlWebsitePagesJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(CrawlFrontierBuilder $frontier): void
     {
+        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::find($this->websiteId);
         if (! $website) {
             return;

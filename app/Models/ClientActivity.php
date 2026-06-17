@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 class ClientActivity extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     use HasFactory;
 
     protected $fillable = [

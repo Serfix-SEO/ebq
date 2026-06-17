@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 class WebsiteSitemap extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     public const SOURCE_GSC = 'gsc';
     public const SOURCE_MANUAL = 'manual';
 

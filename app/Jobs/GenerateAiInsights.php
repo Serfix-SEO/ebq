@@ -19,6 +19,7 @@ class GenerateAiInsights implements ShouldQueue
 
     public function handle(): void
     {
+        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::findOrFail($this->websiteId);
 
         AiInsight::create([

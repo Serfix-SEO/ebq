@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 /**
  * Header for one Keyword Gap Analysis run. See the migration for the lifecycle.
@@ -27,6 +28,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class KeywordGapAnalysis extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     public const STATUS_QUEUED = 'queued';
     public const STATUS_COLLECTING = 'collecting';
     public const STATUS_COMPLETED = 'completed';

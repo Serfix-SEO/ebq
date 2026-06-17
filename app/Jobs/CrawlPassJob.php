@@ -43,6 +43,7 @@ class CrawlPassJob implements ShouldQueue
 
     public function handle(): void
     {
+        app(\App\Support\ShardContext::class)->forCrawlSite((string) $this->crawlSiteId);
         $run = CrawlRun::find($this->crawlRunId);
         if (! $run || $run->status !== CrawlRun::STATUS_RUNNING) {
             return; // run vanished or already finalized (e.g. blocked) — stop the loop.

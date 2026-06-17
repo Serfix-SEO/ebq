@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 class CustomPageAudit extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     public const SOURCE_CUSTOM = 'custom';
 
     public const SOURCE_PAGE_DETAIL = 'page_detail';

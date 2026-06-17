@@ -38,6 +38,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
             'research.rollout' => \App\Http\Middleware\EnsureResearchRolloutAccess::class,
         ]);
+
+        // Sharding: after the session is up, route the request to the node(s)
+        // hosting the active website's tenant/crawl data. No-op (default
+        // connection) until a website carries a node anchor.
+        $middleware->web(append: [
+            \App\Http\Middleware\ResolveShardContext::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Forward unhandled exceptions to Sentry. The SDK respects the

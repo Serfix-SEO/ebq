@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 /**
  * @property string $id
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class RedirectSuggestion extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPLIED = 'applied';
     public const STATUS_REJECTED = 'rejected';

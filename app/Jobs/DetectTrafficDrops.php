@@ -22,6 +22,7 @@ class DetectTrafficDrops implements ShouldQueue
 
     public function handle(TrafficAnomalyDetector $detector): void
     {
+        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::with('user')->find($this->websiteId);
         if (! $website) {
             return;

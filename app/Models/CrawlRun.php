@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesCrawlConnection;
 
 /**
  * @property string $id
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class CrawlRun extends Model
 {
     use HasUlids;
+    use UsesCrawlConnection;
     public const STATUS_RUNNING = 'running';
     // Crawl fetching is done; AnalyzeSiteJob is computing the graph/findings/score.
     public const STATUS_FINALIZING = 'finalizing';

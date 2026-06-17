@@ -30,6 +30,7 @@ class SyncSitemaps implements ShouldQueue
 
     public function handle(SearchConsoleService $service): void
     {
+        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::findOrFail($this->websiteId);
 
         if ($website->isFrozen()) {

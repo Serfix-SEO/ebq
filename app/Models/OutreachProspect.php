@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 /**
  * @property string $id
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class OutreachProspect extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     /**
      * Workflow states. The full kanban: new → drafted → contacted →
      * replied → converted (success) OR declined (no thanks) OR snoozed

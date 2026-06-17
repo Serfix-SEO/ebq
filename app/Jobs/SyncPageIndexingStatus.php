@@ -28,6 +28,7 @@ class SyncPageIndexingStatus implements ShouldQueue
 
     public function handle(GoogleClientFactory $googleClientFactory): void
     {
+        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::query()->find($this->websiteId);
         if (! $website || $website->gsc_site_url === null || $website->gsc_site_url === '') {
             return;

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesCrawlConnection;
 
 /**
  * Per-user (per-website) overlay on a SHARED crawl_finding: each subscriber can
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class WebsiteFindingState extends Model
 {
     use HasUlids;
+    use UsesCrawlConnection;
     public const STATUS_OPEN = 'open';
     public const STATUS_IGNORED = 'ignored';
     public const STATUS_RESOLVED = 'resolved';

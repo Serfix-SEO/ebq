@@ -30,6 +30,7 @@ class SyncSearchConsoleData implements ShouldQueue
 
     public function handle(SearchConsoleService $service): void
     {
+        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::findOrFail($this->websiteId);
         // Plan-limit freeze: when the website is past the owning user's
         // plan limit, skip the GSC fetch. Avoids burning Google quota

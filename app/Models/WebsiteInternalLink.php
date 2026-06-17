@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesCrawlConnection;
 
 /**
  * A directed internal-link edge for a website's link graph.
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class WebsiteInternalLink extends Model
 {
     use HasUlids;
+    use UsesCrawlConnection;
     public const STATUS_DISCOVERED = 'discovered';
     public const STATUS_SUGGESTED = 'suggested';
 

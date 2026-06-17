@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Models\Concerns\UsesTenantConnection;
 
 /**
  * @property string $id
@@ -28,6 +29,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class WriterProject extends Model
 {
     use HasUlids;
+    use UsesTenantConnection;
     use HasFactory;
     use SoftDeletes;
 

@@ -49,6 +49,10 @@ class WebsiteApiAuth
 
         $request->attributes->set('api_website', $tokenable);
         $request->attributes->set('api_token', $accessToken);
+
+        // Sharding: route this API request to the node(s) hosting the token's
+        // website data (no-op until the website carries a node anchor).
+        app(\App\Support\ShardContext::class)->forWebsite((string) $tokenable->id);
         app(ClientActivityLogger::class)->log(
             'plugin.api_request',
             userId: (string) $tokenable->user_id,

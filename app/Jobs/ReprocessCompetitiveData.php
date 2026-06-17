@@ -40,6 +40,7 @@ class ReprocessCompetitiveData implements ShouldBeUnique, ShouldQueue
 
     public function handle(CompetitiveReprocessService $service): void
     {
+        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $service->reprocess($this->websiteId);
     }
 }
