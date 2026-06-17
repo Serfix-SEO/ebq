@@ -30,6 +30,7 @@ class CrawlSite extends Model
 {
     use HasUlids;
     protected $fillable = [
+        'crawl_node_id',
         'normalized_domain', 'effective_cap', 'health_score', 'status',
         'crawl_protection', 'crawl_protection_at',
         'sitemap_lastmod_true', 'sitemap_lastmod_false', 'subscriber_count',

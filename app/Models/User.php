@@ -76,6 +76,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $fillable = [
         'name',
         'email',
+        'db_node_id',
         'timezone',
         'is_admin',
         'is_disabled',

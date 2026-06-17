@@ -130,6 +130,7 @@ class Website extends Model
 
     protected $fillable = [
         'user_id',
+        'db_node_id',
         'crawl_site_id',
         'domain',
         'normalized_domain',
