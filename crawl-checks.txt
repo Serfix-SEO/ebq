@@ -1,0 +1,3 @@
+checks if a website is under an active crawl a new crawl should not be started for the same site
+If User A add the website and the crawler starts and meanwhile user B adds the same website it should not duplicate the crawl and show the same progress but with related caps for example for user a it can say 500/100000 and for b 500/1000 untill the results are finalize (scoring and counts) it should show user that we are computing the results.
+If possible show user partial results in Action queue with notice these are partial and may change on finalization

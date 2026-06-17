@@ -1,0 +1,125 @@
+we are going to use a new keyword volume api it is our own service we have created using keword planner.
+Process
+We will have multiple api servers
+Each server will have an ip address, api key and webhook secret.
+We will add it from admin panel. 
+We should also be able to test every server and keep on checking health and do a test keword and website keyword check
+The web hook url it will use is https://ebq.io/webhooks/keyword-finder
+we will be having a queue api which gives total requests in queue to do load balancing if multiple servers
+In case there is an error in one api endpoint try other
+in case there is an permanent error in response and it is on client side so a friendly error not showing details
+
+
+API Details (note this is raw so keep in mind the above)
+
+BASE=[added from admin panel]
+API_KEY=<your-api-key>      # the value of API_KEY in the server's .env
+Authentication
+
+x-api-key: <your-api-key>
+Conventions
+Requests/responses are JSON; send Content-Type: application/json on POSTs.
+One query at a time. A single browser drives Keyword Planner, so requests are serialized through an internal queue (GET /queue shows depth). Concurrent callers simply wait their turn; a full query typically takes ~20–60s.
+location — country name exactly as Keyword Planner lists it (e.g. "United States", "Spain"). Targeting is replace mode: the account's default location is cleared and only this country is used. Pass "All" (also "Global" / "Worldwide") to remove all country targeting and get worldwide volume. Defaults to DEFAULT_LOCATION from .env.
+language — language name (e.g. "English", "Spanish"). Defaults to DEFAULT_LANGUAGE.
+Volumes are bucketed (e.g. 500000, 50000, 5000) — that is Google's ranged avgMonthlySearches for accounts without active ad spend, not a parsing artefact.
+GET /health
+Liveness check. No API key required (so external monitors don't need the key).
+
+curl $BASE/health
+{ "ok": true, "service": "keywordfetcher" }
+GET /status
+Reports whether the underlying browser session is still logged into Google Ads. Launches the browser, so it takes a few seconds.
+
+curl $BASE/status -H "x-api-key: $API_KEY"
+{ "loggedIn": true }
+{ "loggedIn": false, "reason": "Not logged in. Run `npm run setup` to sign in." }
+GET /queue
+Current queue depth. running is 0 or 1 (single browser); waiting is how many requests are queued behind it.
+
+curl $BASE/queue -H "x-api-key: $API_KEY"
+{ "waiting": 2, "running": 1 }
+POST /keywords/ideas
+Discover keyword ideas — either from seed keywords or from a website.
+
+Body (keywords mode):
+
+Field	Type	Required	Description
+seeds	string[]	yes*	Seed terms to expand into ideas.
+location	string	no	Country name (see conventions).
+language	string	no	Language name.
+Body (website mode):
+
+Field	Type	Required	Description
+url	string	yes*	Site to derive keywords from.
+scope	string	no	"site" (entire site, default) or "page".
+location	string	no	Country name.
+language	string	no	Language name.
+* Provide either a non-empty seeds array or a url.
+
+# Keywords mode
+curl -X POST $BASE/keywords/ideas \
+  -H "x-api-key: $API_KEY" -H 'content-type: application/json' \
+  -d '{"seeds":["running shoes"],"location":"United States","language":"English"}'
+
+# Website mode
+curl -X POST $BASE/keywords/ideas \
+  -H "x-api-key: $API_KEY" -H 'content-type: application/json' \
+  -d '{"url":"nike.com","scope":"site","location":"United States"}'
+Response:
+
+{
+  "count": 2764,
+  "totalAvgMonthlySearches": 26198150,
+  "mode": "keywords",
+  "seeds": ["running shoes"],
+  "location": "United States",
+  "language": "English",
+  "results": [
+    { "keyword": "running shoes", "avgMonthlySearches": 500000,
+      "competition": "High", "competitionIndex": 100,
+      "lowTopOfPageBid": 1.68, "highTopOfPageBid": 7.38 }
+  ]
+}
+In website mode the echo block is "mode": "website" with "url" and "scope" instead of "seeds".
+
+POST /keywords/volume
+Get search-volume metrics for a known list of keywords.
+
+Field	Type	Required	Description
+keywords	string[]	yes	Keywords to look up.
+location	string	no	Country name.
+language	string	no	Language name.
+curl -X POST $BASE/keywords/volume \
+  -H "x-api-key: $API_KEY" -H 'content-type: application/json' \
+  -d '{"keywords":["nike","adidas"],"location":"United States"}'
+Response shape matches /keywords/ideas (without the mode/seeds/url echo).
+
+Result row shape
+Every row in results[]:
+
+Field	Type	Description
+keyword	string	The keyword.
+avgMonthlySearches	number | null	Bucketed average monthly searches.
+competition	string | null	"Low" / "Medium" / "High".
+competitionIndex	number | null	0–100.
+lowTopOfPageBid	number | null	Low range top-of-page bid (account currency).
+highTopOfPageBid	number | null	High range top-of-page bid.
+count is the number of rows; totalAvgMonthlySearches is their summed avgMonthlySearches.
+
+Errors
+Status	Body	Meaning
+400	{ "error": "…" }	Invalid body (e.g. no seeds/url, bad scope).
+401	{ "error": "unauthorized" }	Missing/incorrect x-api-key.
+409	{ "error": "…", "needsLogin": true }	Browser session expired — re-run npm run setup & redeploy the profile.
+500	{ "error": "…" }	A step failed (often a Google UI change — see "Tuning selectors").
+Supported locations & languages
+Pass location / language as the exact names Google Ads uses (the values below). The location picker autocompletes, so the standard English country name works; cities and regions are also accepted (e.g. "California", "London"). Use "All" / "Global" / "Worldwide" for no geo targeting.
+
+Languages
+Arabic, Bengali, Bulgarian, Catalan, Chinese (simplified), Chinese (traditional), Croatian, Czech, Danish, Dutch, English, Estonian, Filipino, Finnish, French, German, Greek, Gujarati, Hebrew, Hindi, Hungarian, Icelandic, Indonesian, Italian, Japanese, Kannada, Korean, Latvian, Lithuanian, Malay, Malayalam, Marathi, Norwegian, Persian, Polish, Portuguese, Punjabi, Romanian, Russian, Serbian, Slovak, Slovenian, Spanish, Swedish, Tamil, Telugu, Thai, Turkish, Ukrainian, Urdu, Vietnamese
+
+Locations (countries)
+Google Ads supports country and sub-country (region/city) targeting; the full country list is below. (Sanctioned locations — e.g. Cuba, Iran, North Korea, Syria — can't be targeted.)
+
+All countries (alphabetical)

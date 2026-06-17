@@ -1,0 +1,308 @@
+==============================================================================
+ PLAN: Crawl each domain once -- single shared crawl store
+==============================================================================
+
+------------------------------------------------------------------------------
+CONTEXT
+------------------------------------------------------------------------------
+Today every Website row gets its own independent crawl, so a domain added by 10
+users is fetched 10 times (and re-fetched on 10 schedules forever). We want each
+DOMAIN CRAWLED ONCE: one canonical crawl per normalized domain, run at the MAX
+page cap among everyone who added it, with every user reading that single shared
+crawl through a CAP-LIMITED VIEW (cap 500 -> top 500 pages; cap 100k -> up to
+100k). Adding a domain "charges" the user their cap (logged usage) but triggers
+no new crawl when a fresh shared crawl already exists.
+
+CHOSEN MODEL: single shared store (no duplication). The crawl data lives in a
+canonical entity keyed by normalized domain -- true single source of truth. This
+is a substantial re-architecture (re-keying the crawl tables off website_id,
+repointing every read path, and a small per-user overlay). Acceptable now because
+THERE ARE NO REAL CLIENTS YET, so we can rebuild crawl data rather than do a
+delicate production migration.
+
+------------------------------------------------------------------------------
+ARCHITECTURE
+------------------------------------------------------------------------------
+* New crawl_sites entity: one row per normalized_domain. The 4 crawl tables
+  (website_pages, website_internal_links, crawl_runs, crawl_findings) are re-keyed
+  from website_id -> crawl_site_id. websites.crawl_site_id links many users'
+  websites to one shared crawl.
+* The crawler runs ONCE per crawl_site at effective_cap = max(subscriber caps).
+  The scheduler iterates crawl_sites, not websites.
+* PER-USER CAP WINDOW via a precomputed value_rank integer on shared pages (rank
+  in the value ordering, mirroring CrawlPassJob: source_gsc desc -> source_sitemap
+  desc -> CHAR_LENGTH(url) asc -> id). Every read filters value_rank <= user_cap.
+* CHARGE on add: log a client_activities row (provider='crawl_reuse',
+  units_consumed = min(shared page count, user cap)). Logging only; no enforced
+  budget (future phase).
+
+------------------------------------------------------------------------------
+LIVE CRAWL: single run, per-cap progress, partial results  (crawl-checks.txt)
+------------------------------------------------------------------------------
+1. ONE ACTIVE CRAWL PER DOMAIN -- NEVER DUPLICATE. CrawlWebsitePagesJob is
+   ShouldBeUnique('crawl-site-{id}'), so a second dispatch no-ops. CrawlSiteBootstrapper
+   also checks crawlSite->runningCrawl(): if a crawl is in flight it does NOT start
+   another -- it just bumps effective_cap when the new subscriber's cap is higher.
+   Because CrawlPassJob reads crawlSite->effective_cap fresh EACH PASS, raising it
+   mid-crawl makes the in-flight crawl extend deeper -- no second crawl. Lower/equal
+   cap -> the running crawl already covers them.
+
+2. SHARED PROGRESS, SHOWN RELATIVE TO EACH USER'S CAP. One crawl_run per crawl_site
+   with shared pages_seen/pages_fetched. Each user's banner shows
+   min(pages_seen, user_cap) / user_cap: A (cap 100k) sees 500/100000, B (cap 1000)
+   sees 500/1000 for the SAME crawl; once pages_seen passes B's cap, B reads 1000/1000
+   while A keeps climbing. Until the crawl FINALIZES (scoring + counts), show "we're
+   computing your results." Represent finalize with a crawl_run state:
+   running (fetching) -> finalizing (AnalyzeSiteJob) -> completed. CrawlBanner +
+   Website::runningCrawl() become crawl_site-aware and compute the cap-relative fraction.
+
+3. PARTIAL RESULTS IN THE ACTION QUEUE (best-effort). Instead of fully hiding crawl
+   widgets during the first crawl (today's behavior), render a PARTIAL view while
+   running/finalizing: live counts within the user's window -- pages crawled so far,
+   broken pages (http_status >= 400 AND value_rank <= cap), error count
+   (crawl_run.pages_error) -- with a clear "Partial -- these may change once the crawl
+   finalizes" notice. Full findings-based Action Queue replaces it once status=completed.
+
+------------------------------------------------------------------------------
+SHARED vs PER-USER SPLIT  (the crux -- verified against the code)
+------------------------------------------------------------------------------
+SHARED (on crawl_site_id, computed once at max cap):
+  Full page inventory (url/status/content/hashes/etag, inbound_link_count,
+  click_depth, source_sitemap, page_score, new value_rank); the internal-link
+  graph INCLUDING suggestions (InternalLinkSuggester uses only content_terms +
+  inbound_link_count -- no per-user input, so suggestions are a pure function of
+  the shared crawl); crawl_runs; the finding catalog (category, type, affected_url,
+  detail, page_id) with a CLICK-INDEPENDENT BASE SEVERITY; health_score.
+
+PER-USER (must not leak):
+  * crawl_findings.impact (GSC clicks-at-risk) -- compute READ-TIME from the
+    requesting website's own SearchConsoleData (the SiteIssueDetector::loadClicks
+    query, lifted into the report service). Never stored shared.
+  * Click-dependent severity escalation (e.g. broken_page critical-if-traffic) --
+    store base severity on the shared finding; escalate read-time when the user's
+    GSC has clicks for that URL.
+  * Finding status (open/ignored/resolved) -- new overlay table
+    website_finding_states (website_id, finding_id, status, resolved_at). (No user
+    ignore/resolve action exists today -- net-new, not a migration.)
+  * source_gsc -- on the shared page becomes an AGGREGATE ("any subscriber's GSC
+    has this URL", used only for value ordering, no per-user leak); the per-user
+    "do I have traffic here" signal is derived read-time from the user's own GSC.
+  * SearchConsoleData, analytics, keywords, rank tracking stay per-website (untouched).
+
+------------------------------------------------------------------------------
+FILES TO ADD
+------------------------------------------------------------------------------
+* app/Models/CrawlSite.php -- normalized_domain, effective_cap, health/status,
+  crawl_protection, lastmod-trust counters (moved off websites); relations
+  pages/internalLinks/crawlRuns/crawlFindings/websites; static normalizeDomain()
+  (lowercase, strip scheme + www, rtrim '/'); recomputeEffectiveCap().
+* app/Services/Crawler/CrawlSiteBootstrapper.php -- subscribeWebsite(Website):
+  firstOrCreate crawl_site by normalized domain, set crawl_site_id, recompute
+  effective_cap, log charge, and dispatch a crawl ONLY IF no run exists or the new
+  user's cap exceeds effective_cap (deeper crawl). Shared by both add entry points.
+* app/Support/Crawler/CrawlValueRank.php -- single source of the value-ordering SQL,
+  reused by CrawlPassJob (crawl order) and value_rank assignment so they can't drift.
+* Migrations: create_crawl_sites_table; add_crawl_site_id_to_crawl_tables (4 tables
+  + websites) + value_rank + new (crawl_site_id, ...) indexes;
+  create_website_finding_states_table (unique (website_id, finding_id)); re-key step.
+* app/Console/Commands/BackfillCrawlSites.php (idempotent) if not done in-migration.
+* tests/Feature/SharedCrawlTest.php.
+
+------------------------------------------------------------------------------
+FILES TO CHANGE  (pattern: replace website_id keying with crawl_site_id)
+------------------------------------------------------------------------------
+WRITE PATH -> resolve/accept a CrawlSite, where('crawl_site_id',...),
+cap = crawlSite->effective_cap:
+  app/Jobs/CrawlWebsitePagesJob.php (uniqueId 'crawl-site-{id}'),
+  app/Jobs/CrawlPassJob.php (effective_cap ~line 57; value select),
+  app/Services/Crawler/CrawlFrontierBuilder.php (union GSC ∪ sitemaps across ALL
+    subscribers; aggregate source_gsc; canonicalize frontier to https://{normalized_domain}),
+  app/Services/Crawler/PageCrawlProcessor.php (edges/stubs on crawl_site; lastmod-trust),
+  app/Services/Crawler/SiteGraphAnalyzer.php (+ assignValueRank()),
+  app/Services/Crawler/SiteIssueDetector.php (upsert key -> (crawl_site_id,type,
+    affected_url_hash); store base severity, drop stored per-user impact),
+  app/Services/Crawler/InternalLinkSuggester.php,
+  app/Jobs/AnalyzeSiteJob.php (crawl_protection + cache flush at crawl_site -> flush
+    all subscribers; call assignValueRank).
+
+SCHEDULER: app/Console/Commands/CrawlWebsites.php and app/Jobs/CrawlSitemapDeltaJob.php
+  iterate crawl_sites, not websites.
+
+READ PATHS -> resolve website -> crawl_site_id + cap + per-user clicks map; apply
+value_rank <= cap window; LEFT JOIN website_finding_states (default open); compute
+impact + escalated severity read-time:
+  app/Services/Crawler/CrawlReportService.php (ALL methods: summary, actionGroups,
+    issuesQuery/issueRows, categoryFindings, typeCounts, pageLinkStructure, linkGraph,
+    pageIntel, reportBreakdown, mapFinding; cache keys -> crawl_site; action-queue
+    cache must include cap). Add private resolveContext() + inWindowPageQuery() helpers.
+  Callers to verify: ActionQueueService, ReportDataService,
+    Livewire/LinkStructure/LinkStructurePanel, Livewire/Dashboard/SiteHealthStats,
+    Livewire/SiteIssues, Http/Controllers/Admin/MarketingController (its
+    whereHas('crawlRuns'/'crawlFindings') on Website -> go through crawl_site_id),
+    Services/Ai/ContextBuilder.
+
+ADD FLOW: app/Livewire/Onboarding/ConnectGoogle.php (saveWebsite/skipForNow) and
+  app/Livewire/Websites/WebsitesList.php (addWebsite) -> call
+  CrawlSiteBootstrapper::subscribeWebsite() instead of the inline Bus::chain.
+
+LIVE-CRAWL UX: app/Livewire/CrawlBanner.php + its view -- resolve via
+  crawlSite->runningCrawl(), show min(pages_seen, cap)/cap and the finalizing state.
+  app/Models/CrawlRun.php -- add STATUS_FINALIZING; AnalyzeSiteJob sets it on start,
+  STATUS_COMPLETED on finish. Website::runningCrawl() -> crawl_site-aware. The
+  action-queue widgets (Livewire/Dashboard/SiteHealthStats, PriorityActionQueue,
+  ActionQueueService) render a PARTIAL variant (live counters within the cap window +
+  "partial" notice) while running/finalizing, instead of hiding.
+
+MODELS: app/Models/Website.php (+crawl_site_id, normalized_domain sync, subscriber
+  relations), CrawlRun/WebsitePage/WebsiteInternalLink/CrawlFinding (+crawl_site_id,
+  crawlSite() relation), new WebsiteFindingState model.
+
+DELETION: WebsitesList::removeWebsite + a Website 'deleting' observer -- delete the
+  user's website_finding_states, detach crawl_site_id, recompute effective_cap; the 4
+  crawl tables must NO LONGER cascade from websites (drop those FKs in the re-key step,
+  else deleting one subscriber wipes the shared crawl). GC crawl_sites with 0 subscribers.
+  app/Console/Commands/DeleteWebsiteData.php stops deleting crawl tables by website_id.
+
+------------------------------------------------------------------------------
+COMPLETE TOUCH-POINT INVENTORY & DECISIONS  (gap review)
+------------------------------------------------------------------------------
+Beyond the 4 core tables, a full codebase sweep found these adjacent systems --
+each with an explicit decision so nothing is missed:
+
+* SITEMAPS (website_sitemaps, SyncSitemaps, CrawlSitemapDeltaJob) -- website_sitemaps
+  stays PER-WEBSITE (each subscriber discovers via own GSC/robots); SyncSitemaps
+  unchanged. Frontier UNIONS sitemap paths across subscribers; source_sitemap on a
+  shared page = "in ANY subscriber's sitemap" (aggregate). CrawlSitemapDeltaJob
+  becomes crawl_site-driven. The sitemap_lastmod_true/false trust counters move
+  websites -> crawl_sites; Website::sitemapLastmodTrusted()/...ConfirmedUntrusted()
+  delegate to crawl_site. Per-page sitemap_lastmod/content_simhash/consecutive_unchanged
+  stay on the shared page.
+
+* REDIRECTS / 404 BRIDGING -- STAYS PER-USER. redirect_suggestions +
+  AiRedirectMatcherService are tied to the user's GSC traffic + own redirects -> keep
+  keyed by website_id. AnalyzeSiteJob::bridge404s reads broken findings with impact>0,
+  and impact is now per-user -> run bridge404s PER SUBSCRIBER website after a shared
+  crawl finalizes. AiRedirectMatcherService::candidateInventory reads pages -> repoint
+  to the crawl_site's pages within that website's cap window.
+
+* CRAWL PROTECTION -- move crawl_protection + crawl_protection_at websites -> crawl_sites
+  (domain-level block state). Website::isCrawlProtected() delegates to crawl_site;
+  AnalyzeSiteJob block rollup sets it on the crawl_site; ProxyPool::preemptiveFor reads
+  crawlSite->crawl_protection. The proxies table STAYS GLOBAL (no change).
+
+* ON-DEMAND CRAWL TRIGGER -- SiteHealthStats (~line 70) dispatches
+  CrawlWebsitePagesJob(TRIGGER_BACKFILL) for the website -> route through the
+  bootstrapper for the website's crawl_site (single-active-crawl + effective_cap aware).
+
+* REPORTCACHE -- stays PER-WEBSITE (views differ by cap + GSC). The shared link-graph
+  cache (bfsParents key ls-parents:{websiteId}) re-keys to ls-parents:{crawlSiteId} +
+  a crawl_site graph version. On crawl finalize, AnalyzeSiteJob flushes
+  ReportCache::flushWebsite for ALL subscriber websites + bumps the graph version.
+
+* AUTHORIZATION -- UNCHANGED BY DESIGN. Users still own/access their WEBSITE
+  (WebsitePolicy, accessibleWebsitesQuery, canViewWebsiteId); never reference a
+  crawl_site directly. Every read resolves website -> cap-windowed view + per-user
+  overlay, so a user only sees their own window + own GSC/ignore state. Shared page
+  inventory is public web data (no private leak). Plugin API (PluginHqController,
+  per-website Sanctum token) inherits the same scoping via CrawlReportService; its
+  pages endpoint reads SearchConsoleData (not crawl tables) -> unaffected. Verify no
+  endpoint queries website_pages/crawl_findings raw.
+
+* WEBSITES -> CRAWL_SITES COLUMN MOVES (in the schema migration): crawl_protection,
+  crawl_protection_at, sitemap_lastmod_true, sitemap_lastmod_false. Update Website
+  fillable/casts + delegate the 3 helper methods.
+
+* RE-CREATE EVERY website_id composite index/unique on crawl_site_id:
+  website_pages unique (crawl_site_id,url_hash) + indexes on last_crawled_at/
+  next_crawl_at/is_indexable/inbound_link_count; website_internal_links
+  (crawl_site_id,status); crawl_runs (crawl_site_id,started_at) & (crawl_site_id,status);
+  crawl_findings unique (crawl_site_id,type,affected_url_hash) + the two
+  (crawl_site_id,category,status,[type,]impact) indexes.
+
+* EXISTING CRAWL TESTS MUST BE MIGRATED, not just augmented: CrawlerPipelineTest,
+  SiteIssueDetectorTest, CrawlSchedulingTest, InternalLinkSuggesterTest,
+  LinkStructureTest, CrawlParamAndExternalTest, AdminMarketingTest all seed/assert by
+  website_id. Add a shared seed helper + factories (CrawlSiteFactory, a WebsitePage
+  seed helper keyed on crawl_site) to cut churn, then update each.
+
+* VERIFIED UNAFFECTED (read GSC/indexing, not crawl tables -- re-verify during impl):
+  DetectTrafficDrops, GenerateAiInsights, SyncPageIndexingStatus, Pages/PagesTable,
+  Pages/PageDetail.
+
+------------------------------------------------------------------------------
+MIGRATION STRATEGY
+------------------------------------------------------------------------------
+CHOSEN: REBUILD -- the user approved removing previous crawl data. No backfill/dedupe
+of old rows needed. Steps: create crawl_sites; add crawl_site_id to the 4 tables +
+websites; move the crawl columns off websites -> crawl_sites; TRUNCATE ONLY the 4 crawl
+tables (website_pages, website_internal_links, crawl_runs, crawl_findings); drop the old
+website_id FKs/uniques and add the (crawl_site_id, ...) keys; then re-crawl each
+crawl_site once at effective_cap via `CrawlWebsites --backfill`. The only crawl data
+today (basepaws) regenerates on re-crawl.
+
+  !! SCOPE GUARD: the truncate targets those 4 crawl tables EXCLUSIVELY -- never the
+     whole DB (CLAUDE.md). website_sitemaps and redirect_suggestions are per-website and
+     are NOT truncated. Run as scoped DELETE/table-recreate inside the migration, not db:wipe.
+
+------------------------------------------------------------------------------
+PHASED ROLLOUT  (each independently testable)
+------------------------------------------------------------------------------
+0. NORMALIZE -- CrawlSite::normalizeDomain + unit tests. No behavior change.
+1. SCHEMA + REBUILD -- crawl_sites, crawl_site_id, move crawl columns off websites,
+   truncate the 4 crawl tables, re-key on crawl_site_id; re-crawl repopulates. Suite green.
+2. WRITE PATH -> crawl_site -- repoint crawler + value_rank. Crawl yields
+   crawl_site-keyed rows in correct rank order.
+3. READ PATHS + cap window -- repoint CrawlReportService + 7 consumers; value_rank<=cap.
+   Big-cap user sees N, cap-500 sees 500.
+4. PER-USER OVERLAY -- website_finding_states, read-time impact/severity, ignore/
+   resolve action. Per-user ignore + per-user impact.
+5. ADD FLOW -- CrawlSiteBootstrapper, wire both entry points, charge,
+   crawl-only-if-needed; single-active-crawl guard + effective_cap bump mid-crawl.
+   Two users -> one crawl_site, one run; B joining mid-crawl doesn't start a 2nd run.
+6. DELETION/GC + re-key swap -- detach on delete, drop old website_id FKs, GC orphans.
+7. LIVE-CRAWL UX -- CrawlRun::STATUS_FINALIZING; cap-relative progress banner; partial
+   Action Queue with notice while running/finalizing. A sees 500/100000, B 500/1000;
+   partial results show, then finalize to full findings.
+
+------------------------------------------------------------------------------
+EDGE CASES
+------------------------------------------------------------------------------
+* www/scheme: normalizeDomain collapses them; but WebsitePage::hashUrl does NOT strip
+  scheme/www -- so the crawler must canonicalize the frontier/homepage to one
+  https://{normalized_domain} per crawl_site to avoid duplicate page rows.
+* Higher-cap subscriber joins -> deeper recrawl; value_rank recomputed next analyze;
+  smaller windows unaffected.
+* Blocked source (crawl_protection) -> on crawl_site; crawl_blocked finding (page_id
+  null) always in-window.
+* Concurrent adds -> firstOrCreate on unique normalized_domain + CrawlWebsitePagesJob
+  ShouldBeUnique('crawl-site-{id}'); wrap subscribe+cap recompute in a transaction.
+* Findings with page_id IS NULL (crawl_blocked, broken_external) -> crawl_blocked
+  always shown; external inherits its source page's value_rank.
+* Zero-subscriber crawl_site -> mark orphaned, GC after grace.
+* bridge404s/redirect matches are per-website -> dispatch per subscriber or read-time.
+
+------------------------------------------------------------------------------
+VERIFICATION
+------------------------------------------------------------------------------
+tests/Feature/SharedCrawlTest.php (sqlite :memory:, RefreshDatabase), seeding a
+crawl_site + pages with value_rank (extend LinkStructureTest::seedCrawl):
+  * two users add same domain (one www.) -> ONE crawl_site, ONE crawl_run;
+  * cap window: 600 ranked pages -> cap-500 user sees 500, big-cap sees 600;
+  * ignore is per-user (A ignores -> absent for A, present for B);
+  * impact/severity computed from each user's own SearchConsoleData (differ per user);
+  * deleting subscriber A keeps shared crawl + B's reads; effective_cap recomputed;
+    A's overlay gone;
+  * charge logged (provider=crawl_reuse, units_consumed=min(pages,cap), owner-attributed);
+  * higher-cap subscriber triggers deeper crawl; same/lower-cap reuses existing;
+  * CONCURRENCY: B adds the domain while A's crawl is running -> no second crawl_run;
+    if B's cap is higher, effective_cap bumps and the in-flight crawl extends;
+  * PER-CAP PROGRESS: with pages_seen=500, A (cap 100k) reads 500/100000, B (cap 1000)
+    reads 500/1000; finalizing state shows "computing results";
+  * PARTIAL ACTION QUEUE: while running/finalizing, partial counts render within each
+    user's cap window with the "partial" notice; full findings after completed.
+
+Per phase: php artisan config:clear, confirm test connection is sqlite :memory:
+(CLAUDE.md), run the suite. The rebuild truncates ONLY the 4 crawl tables
+(user-approved); data regenerates on re-crawl. After deploy, restart php8.3-fpm +
+queue:restart (opcache + long-running workers).
+==============================================================================

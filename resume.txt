@@ -1,0 +1,40 @@
+HOW TO RESUME THIS CLAUDE CODE SESSION
+=======================================
+
+Run from the project root (/var/www/ebq):
+
+  # Resume THIS exact conversation by its session id:
+  claude --resume 894c8b8d-379a-4c1e-ab82-12a5180e7332
+
+  # ...or pick it from an interactive list of past sessions:
+  claude --resume          # then arrow to this one
+
+  # ...or jump back into the most recent session in this directory:
+  claude --continue
+
+Full history is persisted on disk at:
+  /root/.claude/projects/-var-www-ebq/894c8b8d-379a-4c1e-ab82-12a5180e7332.jsonl
+So the conversation context comes back intact.
+
+
+CAVEATS FOR THIS SESSION
+------------------------
+1. The in-session background watcher (basepaws completion poller) dies when the
+   shell closes. That's fine — the CRAWLS run on the WORKER BOX, independent of
+   your shell, so closing the shell does NOT stop or affect any crawl. You just
+   lose the auto-report.
+
+2. Resuming restores the CONVERSATION, not the running processes. Crawls will
+   have continued on their own; just ask to re-check their live state.
+
+3. Watch crawl progress any time at:  /admin/crawler
+
+
+WHERE THINGS STAND (2026-06-16)
+-------------------------------
+- Shared-crawl re-architecture is deployed on both boxes (web + worker).
+- New admin "Crawler" panel (/admin/crawler) is live (web box). NOT committed yet.
+- basepaws (crawl_site 8) crawl is STARVED behind the backfill flood (~3,475 jobs
+  in the crawl queue from 7 other domains); it was parked at seen=3108/fetched=2966.
+  Option on the table: focused reset (abort the other 7 crawls + clear the crawl
+  queue, NOT sync; re-dispatch basepaws alone) so it finishes fast.
