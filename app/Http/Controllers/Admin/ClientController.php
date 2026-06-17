@@ -242,8 +242,8 @@ class ClientController extends Controller
                 ->with('status', "Client {$user->email} has no websites to crawl.");
         }
 
-        $websiteId = (int) $request->input('website_id', 0);
-        $website = $websiteId > 0
+        $websiteId = (string) $request->input('website_id', '');
+        $website = $websiteId !== ''
             ? $websites->firstWhere('id', $websiteId)
             : ($websites->count() === 1 ? $websites->first() : null);
 

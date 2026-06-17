@@ -55,7 +55,7 @@ class ConnectSourcesModal extends Component
     public function open(?string $websiteId = null): void
     {
         $this->reset(['saved', 'fetchError', 'gaSelection', 'gscSelection', 'gaOptions', 'gscOptions', 'accounts', 'loaded']);
-        $this->websiteId = $websiteId > 0 ? $websiteId : session('current_website_id');
+        $this->websiteId = ($websiteId !== null && $websiteId !== '') ? $websiteId : session('current_website_id');
         $this->loadPool();
         $this->loadCurrentSelections();
     }

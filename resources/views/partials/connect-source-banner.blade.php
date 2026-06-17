@@ -4,8 +4,8 @@
      have a one-click path to the full report. Dismissible per page load. --}}
 @php
     $bannerWebsite = null;
-    $bannerWebsiteId = (int) session('current_website_id', 0);
-    if ($bannerWebsiteId > 0 && auth()->check()) {
+    $bannerWebsiteId = (string) session('current_website_id', '');
+    if ($bannerWebsiteId !== '' && auth()->check()) {
         $candidate = \App\Models\Website::find($bannerWebsiteId);
         // Only nudge the owner — shared members can't reconfigure sources.
         if ($candidate && $candidate->user_id === auth()->id()) {

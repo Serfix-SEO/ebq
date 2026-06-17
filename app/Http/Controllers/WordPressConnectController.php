@@ -59,7 +59,7 @@ class WordPressConnectController extends Controller
     public function approve(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'website_id' => ['required', 'integer'],
+            'website_id' => ['required', 'string'],
             'site_url' => ['required', 'url'],
             'redirect' => ['required', 'url'],
             'state' => ['required', 'string'],

@@ -51,7 +51,7 @@ class UsageController extends Controller
         }
 
         $providerFilter = (string) $request->query('provider', '');
-        $userFilter = (int) $request->query('user_id', 0);
+        $userFilter = (string) $request->query('user_id', '');
 
         $rates = $this->rates();
 
@@ -65,7 +65,7 @@ class UsageController extends Controller
                 COALESCE(SUM(units_consumed), 0) AS units')
             ->whereIn('provider', array_keys(self::PROVIDERS))
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->when($userFilter > 0, fn ($q) => $q->where('user_id', $userFilter))
+            ->when($userFilter !== '', fn ($q) => $q->where('user_id', $userFilter))
             ->when($providerFilter !== '', fn ($q) => $q->where('provider', $providerFilter))
             ->whereNotNull('user_id')
             ->groupBy('user_id', 'provider')
@@ -104,7 +104,7 @@ class UsageController extends Controller
                 COALESCE(SUM(units_consumed), 0) AS units')
             ->whereIn('provider', array_keys(self::PROVIDERS))
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->when($userFilter > 0, fn ($q) => $q->where('user_id', $userFilter))
+            ->when($userFilter !== '', fn ($q) => $q->where('user_id', $userFilter))
             ->when($providerFilter !== '', fn ($q) => $q->where('provider', $providerFilter))
             ->whereNotNull('website_id')
             ->groupBy('website_id', 'provider')
@@ -138,7 +138,7 @@ class UsageController extends Controller
             ->selectRaw('DATE(created_at) AS d, provider, COALESCE(SUM(units_consumed), 0) AS units')
             ->whereIn('provider', array_keys(self::PROVIDERS))
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->when($userFilter > 0, fn ($q) => $q->where('user_id', $userFilter))
+            ->when($userFilter !== '', fn ($q) => $q->where('user_id', $userFilter))
             ->when($providerFilter !== '', fn ($q) => $q->where('provider', $providerFilter))
             ->groupBy('d', 'provider')
             ->orderBy('d')
@@ -157,7 +157,7 @@ class UsageController extends Controller
             ->with(['user:id,name,email', 'website:id,domain'])
             ->whereIn('provider', array_keys(self::PROVIDERS))
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->when($userFilter > 0, fn ($q) => $q->where('user_id', $userFilter))
+            ->when($userFilter !== '', fn ($q) => $q->where('user_id', $userFilter))
             ->when($providerFilter !== '', fn ($q) => $q->where('provider', $providerFilter))
             ->latest('id')
             ->limit(50)

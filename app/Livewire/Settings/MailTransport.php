@@ -84,7 +84,7 @@ class MailTransport extends Component
             'smtp_username'   => ['nullable', 'string', 'max:191'],
             'smtp_password'   => ['nullable', 'string', 'max:191'],
             'smtp_encryption' => ['required', 'in:tls,ssl,none'],
-            'oauth_account_id' => ['nullable', 'integer'],
+            'oauth_account_id' => ['nullable', 'string'],
         ]);
 
         if ($this->provider === '') {

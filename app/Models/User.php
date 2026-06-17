@@ -261,7 +261,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function canViewWebsiteId(string $websiteId): bool
     {
-        if ($websiteId <= 0) {
+        if ($websiteId === '') {
             return false;
         }
 

@@ -15,9 +15,9 @@ class RecordGrowthReportSent
         }
 
         $header = $headers->get('X-EBQ-Growth-Report-User-Id');
-        $userId = (int) trim($header->getBodyAsString());
+        $userId = trim($header->getBodyAsString());
 
-        if ($userId < 1) {
+        if ($userId === '') {
             return;
         }
 

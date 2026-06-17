@@ -12,13 +12,13 @@ class ActivityController extends Controller
 {
     public function index(Request $request): View
     {
-        $userId = (int) $request->query('user_id', 0);
+        $userId = (string) $request->query('user_id', '');
         $type = trim((string) $request->query('type', ''));
         $provider = trim((string) $request->query('provider', ''));
 
         $activities = ClientActivity::query()
             ->with(['user:id,name,email', 'actor:id,name,email', 'website:id,domain'])
-            ->when($userId > 0, fn ($q) => $q->where('user_id', $userId))
+            ->when($userId !== '', fn ($q) => $q->where('user_id', $userId))
             ->when($type !== '', fn ($q) => $q->where('type', $type))
             ->when($provider !== '', fn ($q) => $q->where('provider', $provider))
             ->latest('id')

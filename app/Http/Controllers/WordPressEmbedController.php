@@ -15,8 +15,8 @@ class WordPressEmbedController extends Controller
 {
     public function reports(Request $request): RedirectResponse
     {
-        $websiteId = (int) $request->query('website');
-        abort_unless($websiteId > 0, 404);
+        $websiteId = (string) $request->query('website', '');
+        abort_unless($websiteId !== '', 404);
 
         $website = Website::query()->with('user')->findOrFail($websiteId);
         $user = $website->user;
@@ -45,9 +45,9 @@ class WordPressEmbedController extends Controller
      */
     public function pageAudit(Request $request): RedirectResponse
     {
-        $websiteId = (int) $request->query('website');
-        $reportId = (int) $request->query('report');
-        abort_unless($websiteId > 0 && $reportId > 0, 404);
+        $websiteId = (string) $request->query('website', '');
+        $reportId = (string) $request->query('report', '');
+        abort_unless($websiteId !== '' && $reportId !== '', 404);
 
         $website = Website::query()->with('user')->findOrFail($websiteId);
         $user = $website->user;
