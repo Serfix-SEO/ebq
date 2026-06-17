@@ -30,3 +30,8 @@ Thumbs.db
 # Added by code-review-graph
 .code-review-graph/
 proxylist.txt
+
+# Worker env template (secrets) + editor swap files — never commit
+.env.worker
+*.swp
+.*.swp
