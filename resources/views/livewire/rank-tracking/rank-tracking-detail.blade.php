@@ -336,7 +336,7 @@
                         <ul class="divide-y divide-slate-100 dark:divide-slate-800">
                             @foreach ($snapshots as $snap)
                                 <li wire:key="snap-{{ $snap->id }}">
-                                    <button wire:click="selectSnapshot({{ $snap->id }})" type="button"
+                                    <button wire:click="selectSnapshot('{{ $snap->id }}')" type="button"
                                         @class([
                                             'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-xs transition',
                                             'bg-indigo-50/60 dark:bg-indigo-500/10' => $selected && $selected->id === $snap->id,

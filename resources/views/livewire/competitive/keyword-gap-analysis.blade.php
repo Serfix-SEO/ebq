@@ -143,8 +143,8 @@
                                 <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
                                     {{ $row->keyword }}
                                     <div class="mt-0.5 inline-flex items-center gap-2 text-[11px]">
-                                        <button type="button" wire:click="sendToVolume({{ $row->id }})" class="text-indigo-600 hover:underline dark:text-indigo-400">Volume</button>
-                                        <button type="button" wire:click="sendToIdeas({{ $row->id }})" class="text-indigo-600 hover:underline dark:text-indigo-400">Ideas</button>
+                                        <button type="button" wire:click="sendToVolume('{{ $row->id }}')" class="text-indigo-600 hover:underline dark:text-indigo-400">Volume</button>
+                                        <button type="button" wire:click="sendToIdeas('{{ $row->id }}')" class="text-indigo-600 hover:underline dark:text-indigo-400">Ideas</button>
                                         <button type="button" wire:click="track(@js($row->keyword))" class="text-slate-500 hover:underline dark:text-slate-400">Track</button>
                                     </div>
                                 </td>
@@ -158,9 +158,9 @@
                                     @if (isset($refinedRows[$row->id]))
                                         <span class="ml-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">refined ✓</span>
                                     @else
-                                        <button type="button" wire:click="computeLive({{ $row->id }})" wire:target="computeLive({{ $row->id }})" wire:loading.attr="disabled" class="ml-1 text-[11px] text-indigo-500 hover:underline">
-                                            <span wire:loading.remove wire:target="computeLive({{ $row->id }})">refine</span>
-                                            <span wire:loading wire:target="computeLive({{ $row->id }})">…</span>
+                                        <button type="button" wire:click="computeLive('{{ $row->id }}')" wire:target="computeLive('{{ $row->id }}')" wire:loading.attr="disabled" class="ml-1 text-[11px] text-indigo-500 hover:underline">
+                                            <span wire:loading.remove wire:target="computeLive('{{ $row->id }}')">refine</span>
+                                            <span wire:loading wire:target="computeLive('{{ $row->id }}')">…</span>
                                         </button>
                                     @endif
                                 </td>

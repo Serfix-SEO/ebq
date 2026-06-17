@@ -36,7 +36,7 @@
                             <p class="truncate font-medium text-slate-800 dark:text-slate-100">{{ $token->name }}</p>
                             <p class="text-[10px] text-slate-500 dark:text-slate-400">Connected {{ $token->created_at?->diffForHumans() }} · Last used {{ $token->last_used_at?->diffForHumans() ?? 'never' }}</p>
                         </div>
-                        <button type="button" wire:click="revokeToken({{ $token->id }})"
+                        <button type="button" wire:click="revokeToken('{{ $token->id }}')"
                             wire:confirm="Revoke this connection? The plugin on that site will immediately lose access."
                             class="inline-flex h-7 items-center rounded-md border border-red-200 bg-white px-2.5 text-[11px] font-semibold text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-900/20">Revoke</button>
                     </li>

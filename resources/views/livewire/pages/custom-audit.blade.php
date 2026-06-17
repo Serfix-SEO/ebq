@@ -307,9 +307,9 @@
                                         @elseif ($row->isFailed())
                                             <button
                                                 type="button"
-                                                wire:click="retryAudit({{ $row->id }})"
+                                                wire:click="retryAudit('{{ $row->id }}')"
                                                 wire:loading.attr="disabled"
-                                                wire:target="retryAudit({{ $row->id }})"
+                                                wire:target="retryAudit('{{ $row->id }}')"
                                                 class="inline-flex h-7 items-center rounded-md border border-rose-200 bg-white px-2.5 text-[11px] font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:opacity-60 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-500/10"
                                             >Retry</button>
                                         @else

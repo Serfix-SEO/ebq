@@ -168,12 +168,12 @@
                                 </div>
                                 @if (! $readonly)
                                     <div class="flex shrink-0 items-center gap-1">
-                                        <button type="button" wire:click="startEditMember({{ $member->id }})"
+                                        <button type="button" wire:click="startEditMember('{{ $member->id }}')"
                                             class="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                                             <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 8.25l-3.75-3.75" /></svg>
                                             Edit access
                                         </button>
-                                        <button type="button" wire:click="revokeMember({{ $member->id }})" wire:confirm="Remove this member from the site?"
+                                        <button type="button" wire:click="revokeMember('{{ $member->id }}')" wire:confirm="Remove this member from the site?"
                                             class="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">
                                             Remove
                                         </button>
@@ -239,22 +239,22 @@
                                     </div>
                                     @if (! $readonly)
                                         <div class="flex shrink-0 flex-wrap items-center gap-1">
-                                            <button type="button" wire:click="startEditInvitation({{ $inv->id }})"
+                                            <button type="button" wire:click="startEditInvitation('{{ $inv->id }}')"
                                                 class="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                                                 <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 8.25l-3.75-3.75" /></svg>
                                                 Edit access
                                             </button>
                                             <button type="button"
-                                                wire:click="resendInvitation({{ $inv->id }})"
+                                                wire:click="resendInvitation('{{ $inv->id }}')"
                                                 wire:loading.attr="disabled"
-                                                wire:target="resendInvitation({{ $inv->id }})"
+                                                wire:target="resendInvitation('{{ $inv->id }}')"
                                                 class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
-                                                <svg wire:loading.remove wire:target="resendInvitation({{ $inv->id }})" class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v.906a2.25 2.25 0 0 1-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 0 0 1.183 1.981l6.478 3.488m8.839 2.51-4.66-2.51m0 0-1.023-.55a2.25 2.25 0 0 0-2.134 0l-1.022.55m0 0-4.661 2.51m16.5 1.615a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V8.844a2.25 2.25 0 0 1 1.183-1.98l7.5-4.04a2.25 2.25 0 0 1 2.134 0l7.5 4.04a2.25 2.25 0 0 1 1.183 1.98V19.5Z" /></svg>
-                                                <svg wire:loading wire:target="resendInvitation({{ $inv->id }})" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
-                                                <span wire:loading.remove wire:target="resendInvitation({{ $inv->id }})">Resend</span>
-                                                <span wire:loading wire:target="resendInvitation({{ $inv->id }})">Sending…</span>
+                                                <svg wire:loading.remove wire:target="resendInvitation('{{ $inv->id }}')" class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v.906a2.25 2.25 0 0 1-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 0 0 1.183 1.981l6.478 3.488m8.839 2.51-4.66-2.51m0 0-1.023-.55a2.25 2.25 0 0 0-2.134 0l-1.022.55m0 0-4.661 2.51m16.5 1.615a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V8.844a2.25 2.25 0 0 1 1.183-1.98l7.5-4.04a2.25 2.25 0 0 1 2.134 0l7.5 4.04a2.25 2.25 0 0 1 1.183 1.98V19.5Z" /></svg>
+                                                <svg wire:loading wire:target="resendInvitation('{{ $inv->id }}')" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
+                                                <span wire:loading.remove wire:target="resendInvitation('{{ $inv->id }}')">Resend</span>
+                                                <span wire:loading wire:target="resendInvitation('{{ $inv->id }}')">Sending…</span>
                                             </button>
-                                            <button type="button" wire:click="cancelInvitation({{ $inv->id }})" wire:confirm="Cancel this invitation?"
+                                            <button type="button" wire:click="cancelInvitation('{{ $inv->id }}')" wire:confirm="Cancel this invitation?"
                                                 class="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
                                                 Cancel
                                             </button>

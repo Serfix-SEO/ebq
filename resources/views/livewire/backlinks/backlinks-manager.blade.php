@@ -344,17 +344,17 @@
                                             <div class="flex flex-col items-start gap-0.5">
                                                 <span class="inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold {{ $badgeClass }}">{{ $badgeLabel }}</span>
                                                 @if ($b->audit_checked_at)
-                                                    <button type="button" wire:click="toggleAuditDetails({{ $b->id }})" class="text-[10px] text-slate-500 underline-offset-2 hover:underline dark:text-slate-400">{{ $b->audit_checked_at->diffForHumans() }}</button>
+                                                    <button type="button" wire:click="toggleAuditDetails('{{ $b->id }}')" class="text-[10px] text-slate-500 underline-offset-2 hover:underline dark:text-slate-400">{{ $b->audit_checked_at->diffForHumans() }}</button>
                                                 @endif
                                             </div>
                                         </td>
                                         <td class="whitespace-nowrap px-2 py-1.5 text-right">
-                                            <button type="button" wire:click="auditBacklink({{ $b->id }})" wire:loading.attr="disabled" wire:target="auditBacklink({{ $b->id }})" class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10">
-                                                <span wire:loading.remove wire:target="auditBacklink({{ $b->id }})">{{ $b->audit_checked_at ? 'Re-audit' : 'Audit' }}</span>
-                                                <span wire:loading wire:target="auditBacklink({{ $b->id }})">…</span>
+                                            <button type="button" wire:click="auditBacklink('{{ $b->id }}')" wire:loading.attr="disabled" wire:target="auditBacklink('{{ $b->id }}')" class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10">
+                                                <span wire:loading.remove wire:target="auditBacklink('{{ $b->id }}')">{{ $b->audit_checked_at ? 'Re-audit' : 'Audit' }}</span>
+                                                <span wire:loading wire:target="auditBacklink('{{ $b->id }}')">…</span>
                                             </button>
                                             <button type="button" wire:click="openSheetForDate('{{ $b->tracked_date->format('Y-m-d') }}')" class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-500/10">Sheet</button>
-                                            <button type="button" wire:click="deleteBacklink({{ $b->id }})" wire:confirm="Delete this backlink?" class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Delete</button>
+                                            <button type="button" wire:click="deleteBacklink('{{ $b->id }}')" wire:confirm="Delete this backlink?" class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Delete</button>
                                         </td>
                                     </tr>
                                     @if ($isExpanded && $auditResult !== null)
