@@ -89,7 +89,7 @@
                     <select name="user_id" class="block rounded border border-slate-300 px-2 py-1 text-xs">
                         <option value="0">All</option>
                         @foreach ($users as $u)
-                            <option value="{{ $u->id }}" @selected((int) $filters['user_id'] === $u->id)>{{ $u->email }}</option>
+                            <option value="{{ $u->id }}" @selected((string) $filters['user_id'] === $u->id)>{{ $u->email }}</option>
                         @endforeach
                     </select>
                 </label>

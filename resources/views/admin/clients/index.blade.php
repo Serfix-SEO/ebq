@@ -160,7 +160,7 @@
 
         {{-- Clients table --}}
         @php
-            $selfId = (int) (auth()->id() ?? 0);
+            $selfId = (string) (auth()->id() ?? '');
             $selectableIds = $clients->getCollection()
                 ->pluck('id')
                 ->map(fn ($id) => (int) $id)
