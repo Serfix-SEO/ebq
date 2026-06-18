@@ -91,6 +91,12 @@ class AnalyzeSiteJob implements ShouldQueue
 
     public function handle(SiteGraphAnalyzer $graph, SiteIssueDetector $detector, BlockDetector $blockDetector, InternalLinkSuggester $suggester, \App\Support\Crawler\TermExtractor $terms): void
     {
+        // Horizon workers inherit PHP's CLI default memory_limit (128M); the pre-Horizon
+        // raw finalize worker ran `php -d memory_limit=2048M`, dropped in the migration.
+        // The link-graph analysis on a large site (xplate: ~1.5M edges) needs more than
+        // 128M and OOM'd. Raise the ceiling for this job. See config/crawler.php.
+        ini_set('memory_limit', (string) config('crawler.analyze_memory_limit', '1024M'));
+
         $run = CrawlRun::find($this->crawlRunId);
         if (! $run) {
             return;

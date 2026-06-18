@@ -239,6 +239,13 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-18 (worker memory ceiling — Horizon 128M regression)** — Horizon workers inherit PHP's
+  CLI-default `memory_limit=128M`; the pre-Horizon raw workers ran `-d memory_limit=2048M` (lost in the
+  migration), so `HtmlAuditor` (large pages) and the link-graph finalize OOM'd at 128M. Fix: the heavy
+  jobs `ini_set` their own ceiling — `CrawlPageBatchJob` (`crawler.batch_memory_limit`, 512M) +
+  `AnalyzeSiteJob` (`crawler.analyze_memory_limit`, 1024M) — so it travels with the code to **every box
+  incl. autoscaled ephemeral** (via `bootstrap()`'s full-app rsync), no snapshot/php.ini dependency.
+  Docs: server-deployment.md, crawler/autoscaling.md.
 - **2026-06-18 (autoscaler — snapshot-existence preflight)** — Before provisioning a crawl box
   the autoscaler now verifies the configured worker **snapshot still exists in Hetzner**
   (`HetznerClient::imageExists`, tri-state; `FleetAutoscale::snapshotExists` gate +

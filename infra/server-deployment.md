@@ -76,6 +76,15 @@ the old per-service raw `queue:work` replicas:
 | `worker-crawl` (`$crawlPool`) | `CRAWLER_MAX_PROCESSES`=**16** | `crawl` | **300s** | page-fetch pipeline (`CrawlPassJob`/`CrawlPageBatchJob`) |
 | `worker-heavy` (`$heavyPool`) | **4** | `sync`, `crawl-finalize` | **1200s** | the long `AnalyzeSiteJob` (pinned box only) + GA/GSC sync |
 
+> **⚠️ Worker memory ceiling (2026-06-18):** Horizon spawns its workers from `php artisan
+> horizon`, which inherits PHP's **CLI default `memory_limit = 128M`** — the pre-Horizon raw
+> workers ran `php -d memory_limit=2048M`, and the migration dropped it (Horizon's per-pool
+> `memory` key is only the *restart threshold*, not the PHP limit). Large pages (`HtmlAuditor`)
+> and the link-graph finalize OOM'd at 128M. Fix: the heavy jobs `ini_set` their own ceiling at
+> the top of `handle()` — `CrawlPageBatchJob` (`crawler.batch_memory_limit`, 512M) and
+> `AnalyzeSiteJob` (`crawler.analyze_memory_limit`, 1024M) — so it travels with the code to every
+> box (pinned + ephemeral) regardless of the snapshot/php.ini. Ceilings, not reservations.
+
 So the crawl pipeline + finalize + GA/GSC sync run **here**; Box A never crawls.
 `REDIS_QUEUE_RETRY_AFTER=1320` must stay above the longest job timeout. **Autoscaled ephemeral
 boxes** (see [crawler/autoscaling.md](./crawler/autoscaling.md)) run only the `crawl` service

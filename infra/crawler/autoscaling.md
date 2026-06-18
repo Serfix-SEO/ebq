@@ -111,6 +111,14 @@ top, so the snapshot only needs refreshing occasionally.
 - HEAD-based drift fits the workflow: uncommitted edits don't move HEAD (no rebuild while hacking on the
   box); a commit (a real deploy) does → one background rebuild.
 
+**Worker memory ceiling on ephemeral boxes (2026-06-18):** ephemeral boxes run crawl-only, and their
+crawl workers parse large HTML (`HtmlAuditor`) — which OOM'd at PHP's CLI-default 128M after the Horizon
+migration dropped the old `-d memory_limit=2048M` (see server-deployment.md). The fix is a per-job
+`ini_set` (`CrawlPageBatchJob` → `crawler.batch_memory_limit`, default 512M) that **travels to every box
+via `bootstrap()`'s full-app rsync** — so a new autoscaled box is covered without a snapshot rebuild and
+without any `.env.worker` change (the knob defaults in `config/crawler.php`). `AnalyzeSiteJob` does the
+same (1024M) but only ever runs on the pinned box.
+
 ## Operator prerequisites (must be set up before real provisioning)
 
 These are infra one-time setup, not code:

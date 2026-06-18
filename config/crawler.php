@@ -46,6 +46,17 @@ return [
     // Per-page fetch timeout (seconds).
     'timeout' => (int) env('CRAWLER_TIMEOUT', 20),
 
+    // Per-job PHP memory ceiling (ini_set), applied at the top of the heavy crawl
+    // jobs. Horizon workers inherit PHP's CLI default (128M); the pre-Horizon raw
+    // workers ran `php -d memory_limit=2048M`, which the Horizon migration dropped —
+    // so HtmlAuditor (large pages) and the link-graph analysis OOM'd at 128M. Setting
+    // it in code makes the ceiling travel with the deploy to EVERY box (the pinned
+    // box AND every autoscaled ephemeral crawl box, whose crawl workers also parse
+    // large HTML) without depending on the worker snapshot / container php.ini.
+    // Ceilings, not reservations — keep within the worker box RAM (~3.7GB).
+    'batch_memory_limit' => env('CRAWLER_BATCH_MEMORY_LIMIT', '512M'),     // CrawlPageBatchJob (crawl pool, incl. ephemeral boxes)
+    'analyze_memory_limit' => env('CRAWLER_ANALYZE_MEMORY_LIMIT', '1024M'), // AnalyzeSiteJob (finalize, pinned box only)
+
     // Proxy policy (PageCrawlProcessor). When true (default) the crawler uses a pool
     // proxy FIRST whenever one is available — so the worker box's own public IP is never
     // exposed (a blocked server IP makes the box useless; pool IPs are disposable). It

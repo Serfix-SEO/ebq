@@ -32,6 +32,13 @@ class CrawlPageBatchJob implements ShouldQueue
 
     public function handle(PageCrawlProcessor $processor): void
     {
+        // Horizon workers inherit PHP's CLI default memory_limit (128M); the pre-Horizon
+        // raw crawl worker ran `php -d memory_limit=2048M`, dropped in the migration, so
+        // HtmlAuditor OOM'd at 128M on large pages. Set the ceiling in code so it applies
+        // on EVERY box — the pinned box AND every autoscaled ephemeral crawl box (which
+        // run this same job). See config/crawler.php.
+        ini_set('memory_limit', (string) config('crawler.batch_memory_limit', '512M'));
+
         if ($this->batch()?->cancelled()) {
             return;
         }
