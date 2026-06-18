@@ -62,15 +62,19 @@ class SiteGraphAnalyzerTest extends TestCase
             'status' => 'suggested',
         ]);
 
-        // Invoke just the two graph passes we chunked. analyze() also calls
-        // CrawlValueRank::assign(), which uses MySQL CHAR_LENGTH() and can't run on the
-        // sqlite test DB — orthogonal to the chunking under test here.
+        // Drive the graph passes directly. analyze() also calls CrawlValueRank::assign(),
+        // which uses MySQL CHAR_LENGTH() and can't run on the sqlite test DB — orthogonal
+        // to the inbound/click-depth computation under test here.
         $analyzer = app(SiteGraphAnalyzer::class);
-        foreach (['recomputeInboundCounts', 'recomputeClickDepth'] as $method) {
+        $invoke = function (string $method, ...$args) use ($analyzer) {
             $ref = new \ReflectionMethod($analyzer, $method);
             $ref->setAccessible(true);
-            $ref->invoke($analyzer, $method === 'recomputeClickDepth' ? $crawlSite : $crawlSite->id);
-        }
+
+            return $ref->invoke($analyzer, ...$args);
+        };
+        $graph = $invoke('buildGraph', $crawlSite->id);
+        $invoke('writeInboundCounts', $crawlSite->id, $graph);
+        $invoke('writeClickDepth', $crawlSite, $graph);
 
         $this->assertSame(0, (int) $homePage->fresh()->inbound_link_count);
         $this->assertSame(2, (int) $about->fresh()->inbound_link_count);

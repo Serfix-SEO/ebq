@@ -59,7 +59,10 @@ If `AnalyzeSiteJob` throws partway, its `failed()` handler still marks the run `
 ## Large-site pressure points
 
 - **In-memory graph BFS** — `SiteGraphAnalyzer` loads the adjacency list into memory for
-  inbound-count + click-depth BFS (O(V+E)). Assumes the link graph fits in RAM.
+  inbound-count + click-depth BFS (O(V+E)). Assumes the link graph fits in RAM. As of
+  2026-06-18 the adjacency is **integer-indexed** (dense int ids, not 26-char ULIDs) and built
+  in a **single edge pass**, and the BFS uses a **pointer queue** (not `array_shift`, which is
+  O(n²)) — this is what lets a ~1.5M-edge / ~168k-page site (xplate) finalize in budget.
 - **`AnalyzeSiteJob` 1200s timeout** — repeated analyze timeouts on very large sites are the
   known "crawls not finishing" failure mode. `retry_after` (1320s) sits just above it.
   `tries=2` (since 2026-06-18) so one transient failure no longer strands the run.

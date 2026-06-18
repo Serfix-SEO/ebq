@@ -12,6 +12,14 @@ use Illuminate\Support\Facades\DB;
  * discovered edges: inbound-link counts (→ orphan detection), click-depth from
  * the homepage via in-memory BFS (O(V+E), no SQL recursion), and the persisted
  * value_rank used for per-user cap windows.
+ *
+ * Scale note (2026-06-18): a single finalize must handle sites with ~1.5M edges
+ * over ~168k pages (xplate). To stay inside the finalize budget the graph is built
+ * ONCE into an INTEGER-INDEXED adjacency list — ULID strings (26 bytes each) as
+ * array keys/values blew memory and slowed every hash — the BFS uses a pointer
+ * queue (array_shift is O(n²)), and every write goes out in bounded id-keyset
+ * chunks (a table-wide UPDATE trips innodb_lock_wait_timeout / 1205 while the crawl
+ * is still writing the same rows). See infra/crawler/known-issues.md.
  */
 class SiteGraphAnalyzer
 {
@@ -19,39 +27,111 @@ class SiteGraphAnalyzer
     {
         $crawlSiteId = $crawlSite->id;
 
-        $this->recomputeInboundCounts($crawlSiteId);
-        $this->recomputeClickDepth($crawlSite);
+        // One pass over the edges → inbound counts + integer-indexed adjacency.
+        $graph = $this->buildGraph($crawlSiteId);
+
+        $this->writeInboundCounts($crawlSiteId, $graph);
+        $this->writeClickDepth($crawlSite, $graph);
         // Persist the value ordering so reads can window pages by value_rank <= cap.
         CrawlValueRank::assign($crawlSiteId);
     }
 
-    private function recomputeInboundCounts(string $crawlSiteId): void
+    /**
+     * Build an integer-indexed view of the link graph in a single streamed pass.
+     * Indices (not ULIDs) keep the adjacency list small enough to fit in RAM on
+     * large sites and make the BFS cache-friendly.
+     *
+     * @return array{ids:list<string>, inbound:list<int>, adj:array<int,list<int>>, index:array<string,int>}
+     */
+    private function buildGraph(string $crawlSiteId): array
     {
-        // Aggregate inbound edges per target page in PHP by streaming the discovered
-        // edges (keyset pagination, bounded memory: one int per linked page). The
-        // result is written in bounded id-keyset chunks below.
-        //
-        // This replaces a whole-site `UPDATE ... JOIN` (and a whole-site reset). On
-        // large sites (40k–168k pages) those single statements held InnoDB row locks
-        // long enough to trip `innodb_lock_wait_timeout` (SQLSTATE 1205) — fatal here
-        // because the finalize contends with live CrawlPageBatchJob writes to the same
-        // website_pages rows. See infra/crawler/known-issues.md (2026-06-18 incident).
-        $counts = [];
+        // page id (ULID) ↔ dense integer index over the site's LIVE pages.
+        $ids = [];
+        $index = [];
+        foreach (
+            DB::table('website_pages')
+                ->where('crawl_site_id', $crawlSiteId)
+                ->whereNull('removed_at')
+                ->select('id')
+                ->orderBy('id')
+                ->lazyById(5000, 'id') as $p
+        ) {
+            $index[$p->id] = count($ids);
+            $ids[] = $p->id;
+        }
+
+        $inbound = array_fill(0, count($ids), 0);
+        $adj = [];
         foreach (
             DB::table('website_internal_links')
                 ->where('crawl_site_id', $crawlSiteId)
                 ->where('status', 'discovered')
-                ->whereNotNull('to_page_id')
-                ->select('id', 'to_page_id')
-                ->lazyById(5000, 'id') as $r
+                ->select('id', 'from_page_id', 'to_page_id')
+                ->lazyById(5000, 'id') as $e
         ) {
-            $counts[$r->to_page_id] = ($counts[$r->to_page_id] ?? 0) + 1;
+            $to = $index[$e->to_page_id] ?? null;
+            if ($to === null) {
+                continue; // edge points at a removed/unknown page — ignore
+            }
+            $inbound[$to]++;
+            $from = $index[$e->from_page_id] ?? null;
+            if ($from !== null) {
+                $adj[$from][] = $to;
+            }
         }
 
-        // Reset every page to 0 in bounded chunks, then write the non-zero counts
-        // grouped by value — a handful of small UPDATEs instead of two table-wide ones.
+        return ['ids' => $ids, 'inbound' => $inbound, 'adj' => $adj, 'index' => $index];
+    }
+
+    /**
+     * @param  array{ids:list<string>, inbound:list<int>, adj:array<int,list<int>>, index:array<string,int>}  $graph
+     */
+    private function writeInboundCounts(string $crawlSiteId, array $graph): void
+    {
+        $byPage = [];
+        foreach ($graph['inbound'] as $i => $count) {
+            if ($count > 0) {
+                $byPage[$graph['ids'][$i]] = $count;
+            }
+        }
+        // Reset every page to 0, then write the non-zero counts grouped by value.
         $this->resetColumnChunked($crawlSiteId, 'inbound_link_count', 0);
-        $this->writeGroupedChunked($crawlSiteId, 'inbound_link_count', $counts);
+        $this->writeGroupedChunked($crawlSiteId, 'inbound_link_count', $byPage);
+    }
+
+    /**
+     * Click-depth = shortest hop count from the homepage via BFS over the in-memory
+     * adjacency. Unreachable pages stay null. Depth 0 (homepage) is a real value.
+     *
+     * @param  array{ids:list<string>, inbound:list<int>, adj:array<int,list<int>>, index:array<string,int>}  $graph
+     */
+    private function writeClickDepth(CrawlSite $crawlSite, array $graph): void
+    {
+        $depthByPage = [];
+
+        $startId = $this->homepageId($crawlSite);
+        $start = $startId !== null ? ($graph['index'][$startId] ?? null) : null;
+        if ($start !== null) {
+            $depth = [$start => 0];
+            // Pointer-based queue: array_shift would make the BFS O(n²) on 168k nodes.
+            $queue = [$start];
+            for ($head = 0; $head < count($queue); $head++) {
+                $node = $queue[$head];
+                $d = $depth[$node] + 1;
+                foreach ($graph['adj'][$node] ?? [] as $next) {
+                    if (! isset($depth[$next])) { // values are ints ≥ 0, never null → isset is safe
+                        $depth[$next] = $d;
+                        $queue[] = $next;
+                    }
+                }
+            }
+            foreach ($depth as $i => $d) {
+                $depthByPage[$graph['ids'][$i]] = $d;
+            }
+        }
+
+        $this->resetColumnChunked($crawlSite->id, 'click_depth', null);
+        $this->writeGroupedChunked($crawlSite->id, 'click_depth', $depthByPage);
     }
 
     /**
@@ -92,47 +172,6 @@ class SiteGraphAnalyzer
                     ->update([$column => $v]);
             }
         }
-    }
-
-    private function recomputeClickDepth(CrawlSite $crawlSite): void
-    {
-        $crawlSiteId = $crawlSite->id;
-
-        // Adjacency list (from_page_id => [to_page_id, ...]) for discovered edges.
-        // Stream with keyset pagination (lazyById = WHERE id > X), NOT chunk().
-        $adjacency = [];
-        foreach (
-            DB::table('website_internal_links')
-                ->where('crawl_site_id', $crawlSiteId)
-                ->where('status', 'discovered')
-                ->select('id', 'from_page_id', 'to_page_id')
-                ->lazyById(5000, 'id') as $r
-        ) {
-            $adjacency[$r->from_page_id][] = $r->to_page_id;
-        }
-
-        $start = $this->homepageId($crawlSite);
-        $depth = [];
-        if ($start !== null) {
-            $depth[$start] = 0;
-            $queue = [$start];
-            while ($queue !== []) {
-                $node = array_shift($queue);
-                foreach ($adjacency[$node] ?? [] as $next) {
-                    if (! array_key_exists($next, $depth)) {
-                        $depth[$next] = $depth[$node] + 1;
-                        $queue[] = $next;
-                    }
-                }
-            }
-        }
-
-        // Reset all to null (unreachable), then write computed depths grouped by depth
-        // value — both in bounded chunks (table-wide UPDATEs trip 1205 mid-crawl, same
-        // as the inbound-count pass above). Depth 0 (homepage) is a real value here, so
-        // it is written by the grouped pass; only unreachable pages stay null.
-        $this->resetColumnChunked($crawlSiteId, 'click_depth', null);
-        $this->writeGroupedChunked($crawlSiteId, 'click_depth', $depth);
     }
 
     private function homepageId(CrawlSite $crawlSite): ?string
