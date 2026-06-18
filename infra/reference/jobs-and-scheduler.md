@@ -23,15 +23,18 @@ flags / framework defaults (effectively `tries=1` the way these workers are run)
 | `SYNC` | `sync` | **worker box** (docker) | scheduled/bulk GA·GSC·keyword syncs |
 | `CRAWL` | `crawl` | **worker box** (docker ×5) | site-crawl pipeline (high volume, ≤1200s/job) |
 
-`REDIS_QUEUE_RETRY_AFTER=1320` must stay above the longest timeout (`AnalyzeSiteJob`
-1200s) on **both** boxes — see deployment doc.
+**retry_after vs timeout:** the `redis` connection's `REDIS_QUEUE_RETRY_AFTER=1320` covers the
+≤300s crawl/sync jobs. The long `AnalyzeSiteJob` (3600s) runs on a **separate `redis-long`
+connection** whose `retry_after=3900` is a **code default** in `config/queue.php` (env-overridable
+via `REDIS_LONG_QUEUE_RETRY_AFTER`) — deliberately NOT a per-box `.env` knob, so the ceiling
+travels with the deploy and never needs a manual edit on either box.
 
 ### Horizon (queue observability) — LIVE
 
 All queues (except `fleet`) now run under **Laravel Horizon**. Dashboard at **`/horizon`**.
 Topology in `config/horizon.php`:
 - Supervisors `web` (interactive+default, 300s), `worker-crawl` (crawl, 300s), `worker-heavy`
-  (sync+crawl-finalize, 1200s). The **`fleet` queue is NOT under Horizon** — it runs as **root**
+  (sync+crawl-finalize, **3600s**, `redis-long` connection). The **`fleet` queue is NOT under Horizon** — it runs as **root**
   (SSH keys), so it stays a standalone root `queue:work` (supervisor `ebq-queue-fleet`).
 - **Per-box scoping is via the `environments` map keyed by APP_ENV.** ⚠️ Horizon merges
   `defaults` into EVERY environment (`array_replace_recursive`), so `defaults` is kept **empty**
@@ -107,7 +110,7 @@ All tries=1 (paid external calls; never auto-retry), all `ShouldBeUnique`.
 | `CrawlWebsitePagesJob.php:23` | 600 | 1 | **U** `crawl-site-{crawlSiteId\|wID}`, `uniqueFor=6h` | `CrawlSiteBootstrapper`, `SitemapPrompt`, `SiteHealthStats`, `ClientController`, `ebq:crawl-websites`, `CrawlSitemapDeltaJob` | Entry point: resolve crawl_site, create run, seed frontier, dispatch pass 1. |
 | `CrawlPassJob.php:28` | 600 | 1 | — | `CrawlWebsitePagesJob` (and self, pass+1), `CrawlSupervisor` | Multi-pass loop driver; selects ≤`crawler.pages_per_pass` (1000) due pages for **fairness** and **`Bus::batch(CrawlPageBatchJob…)`** with `.finally → CrawlPassJob(pass+1)`; stops → `AnalyzeSiteJob`. (A lost `.finally` = wedge → recovered by `ebq:crawl-supervisor`.) |
 | `CrawlPageBatchJob.php:18` | 300 | 2 | — | `CrawlPassJob` (batched) | Crawl one page batch (conditional GET, classify, SimHash, adaptive next_crawl_at). No-ops if `batch()?->cancelled()`. |
-| `AnalyzeSiteJob.php:25` | **1200** | 1 | — | `CrawlPassJob`/`CrawlSupervisor` (terminal) | Post-crawl analysis/scoring; runs on the **`crawl-finalize`** queue (pinned box only, so a scale-down can't kill it); dispatches `MatchRedirectFor404Job` per impactful 404. **Longest timeout — sets the retry_after floor.** |
+| `AnalyzeSiteJob.php` | **3600** | 2 | — | `CrawlPassJob`/`CrawlSupervisor` (terminal) | Post-crawl analysis/scoring; **`crawl-finalize`** queue (pinned box only) on the dedicated **`redis-long`** connection (retry_after **3900**, code-default in `config/queue.php` — NOT the `redis` env knob, so it travels with the deploy). 3600s because a ~168k-page/~1.5M-edge site runs many minutes; `WithoutOverlapping` + `tries=2` + per-job 1024M `ini_set`. Dispatches `MatchRedirectFor404Job` per impactful 404. |
 | `CrawlSitemapDeltaJob.php:22` | 180 | 2 | **U** `sitemap-delta-{crawlSiteId\|wID}`, `uniqueFor=3h` | `ebq:crawl-websites --sitemap-deltas` | Daily: detect brand-new sitemap URLs and dispatch a crawl for just those. |
 | `SyncSitemaps.php:18` | 120 | 2 | — | `CrawlSiteBootstrapper`, `SitemapsManager` Livewire | Read-only pull of GSC-known sitemaps into local store (source=gsc); manual sitemaps untouched. |
 

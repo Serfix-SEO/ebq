@@ -27,12 +27,19 @@ class AnalyzeSiteJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 1200;
+    // Long finalize: a very large site (~168k pages / ~1.5M edges) takes many minutes
+    // through graph → value_rank → issue-detection → suggestions → scoring. 1200s
+    // timed out mid-detection. Runs on the dedicated `redis-long` connection whose
+    // retry_after (3900s) stays safely above this, so a still-running finalize is never
+    // re-reserved underneath us. See config/queue.php + horizon $heavyPool.
+    public int $timeout = 3600;
+
+    /** Long finalize runs on a connection with retry_after > $timeout (see config/queue.php). */
+    public $connection = 'redis-long';
 
     // tries=2: a single transient failure (e.g. a lock-wait timeout, or a worker
     // recycle) used to permanently fail finalization and strand the run. One retry
-    // recovers it. retry_after (1320s) stays above $timeout so a still-running attempt
-    // is never re-reserved underneath us (see infra/crawler/known-issues.md).
+    // recovers it.
     public int $tries = 2;
 
     // Wait between attempts so a contended DB or a slow site has time to settle.

@@ -239,6 +239,15 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-18 (finalize timeout for extreme sites — code-based, no env edit)** — A ~168k-page/~1.5M-edge
+  site (xplate) finalized past the 1200s timeout even after the graph + memory fixes (it's just slow:
+  graph → value_rank → `detect` → suggester → scores, all chunked/bounded so no OOM, but minutes of work).
+  Raised `AnalyzeSiteJob` timeout to **3600s** and moved it onto a dedicated **`redis-long`** queue
+  connection (`config/queue.php`, retry_after **3900** as a *code default*, not the `REDIS_QUEUE_RETRY_AFTER`
+  env) so the ceiling travels with the deploy — no per-box `.env` change. `$heavyPool` repinned to
+  `redis-long` (timeout 3600, maxTime 4200, memory 1536). Permanence is the theme: all crawler fixes live in
+  code, so `bootstrap()` + the snapshot build bake them onto every (incl. autoscaled) box automatically —
+  see [crawler/autoscaling.md](./crawler/autoscaling.md) §"How fixes reach new boxes & snapshots".
 - **2026-06-18 (worker memory ceiling — Horizon 128M regression)** — Horizon workers inherit PHP's
   CLI-default `memory_limit=128M`; the pre-Horizon raw workers ran `-d memory_limit=2048M` (lost in the
   migration), so `HtmlAuditor` (large pages) and the link-graph finalize OOM'd at 128M. Fix: the heavy

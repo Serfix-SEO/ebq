@@ -73,6 +73,23 @@ return [
             'after_commit' => false,
         ],
 
+        // Dedicated connection for the LONG post-crawl finalize (AnalyzeSiteJob) on the
+        // crawl-finalize queue. Same physical Redis as `redis` (so queue keys match), but
+        // a much larger retry_after — a finalize on a very large site (e.g. ~168k pages /
+        // ~1.5M edges) legitimately runs many minutes, and retry_after MUST stay above the
+        // job's timeout or Redis re-reserves a still-running job (double-run / MaxAttempts).
+        // Kept in code (NOT the REDIS_QUEUE_RETRY_AFTER env) so the higher ceiling travels
+        // with the deploy to every box — no per-box .env edit. See AnalyzeSiteJob + horizon
+        // $heavyPool (both pinned to this connection, timeout 3600 < retry_after 3900).
+        'redis-long' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => env('REDIS_QUEUE', 'default'),
+            'retry_after' => (int) env('REDIS_LONG_QUEUE_RETRY_AFTER', 3900),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],

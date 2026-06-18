@@ -42,18 +42,20 @@ $crawlPool = [
     'nice' => 0,
 ];
 $heavyPool = [
-    'connection' => 'redis',
+    // redis-long: retry_after 3900 > the 3600 finalize timeout below, so a long
+    // AnalyzeSiteJob is never re-reserved mid-run (see config/queue.php).
+    'connection' => 'redis-long',
     'queue' => ['sync', 'crawl-finalize'],
     'balance' => 'auto',
     'autoScalingStrategy' => 'size',
     'maxProcesses' => 4,
     'balanceMaxShift' => 1,
     'balanceCooldown' => 5,
-    'maxTime' => 3600,
+    'maxTime' => 4200,   // > timeout so a worker never recycles mid-finalize
     'maxJobs' => 0,
-    'memory' => 1024,
+    'memory' => 1536,    // finalize ini_set ceiling is 1024M; headroom so no post-job restart churn
     'tries' => 3,
-    'timeout' => 1200,
+    'timeout' => 3600,   // a ~168k-page / ~1.5M-edge finalize runs many minutes
     'nice' => 0,
 ];
 
@@ -155,8 +157,9 @@ return [
         'redis:interactive' => 30,
         'redis:default' => 60,
         'redis:crawl' => 300,
-        'redis:sync' => 600,
-        'redis:crawl-finalize' => 900,
+        // sync + crawl-finalize run on the redis-long connection ($heavyPool).
+        'redis-long:sync' => 600,
+        'redis-long:crawl-finalize' => 1800,
     ],
 
     /*
@@ -260,8 +263,9 @@ return [
     'defaults' => [],
 
     // Which supervisors run on which box, keyed by that box's APP_ENV. A supervisor
-    // runs ONLY in the environment(s) that list it. Timeouts are split so crawl (≤300s)
-    // and crawl-finalize/sync (≤1200s; retry_after=1320 stays above) never share a pool.
+    // runs ONLY in the environment(s) that list it. Pools are split by timeout/connection so
+    // they never share: crawl (redis, ≤300s) vs crawl-finalize/sync (redis-long, ≤3600s;
+    // retry_after=3900 stays above).
     'environments' => [
         // Web box (APP_ENV=local): user-facing + notification queues ONLY.
         'local' => [

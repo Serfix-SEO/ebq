@@ -63,9 +63,12 @@ If `AnalyzeSiteJob` throws partway, its `failed()` handler still marks the run `
   2026-06-18 the adjacency is **integer-indexed** (dense int ids, not 26-char ULIDs) and built
   in a **single edge pass**, and the BFS uses a **pointer queue** (not `array_shift`, which is
   O(n²)) — this is what lets a ~1.5M-edge / ~168k-page site (xplate) finalize in budget.
-- **`AnalyzeSiteJob` 1200s timeout** — repeated analyze timeouts on very large sites are the
-  known "crawls not finishing" failure mode. `retry_after` (1320s) sits just above it.
-  `tries=2` (since 2026-06-18) so one transient failure no longer strands the run.
+- **`AnalyzeSiteJob` timeout** — raised to **3600s** (2026-06-18) after a ~168k-page/~1.5M-edge
+  site (xplate) timed out mid-`SiteIssueDetector::detect` even with the graph optimized. Runs on a
+  dedicated **`redis-long`** queue connection whose `retry_after=3900` is a **code default**
+  (`config/queue.php`), so the ceiling travels with the deploy — no per-box `.env` edit, and a
+  still-running finalize is never re-reserved. `tries=2` so one transient failure no longer strands
+  the run. The heavy steps (`detect`, suggester, value_rank) are all chunked/cursor-bounded → no OOM.
 - **Referrer / external-link sampling** — broken-referrer sampling (5/target, ~50k edge cap)
   and external-link checking (≤25/page, ≤500 total) are bounded, so on pathological fan-in or
   link-heavy pages the coverage is partial by design.

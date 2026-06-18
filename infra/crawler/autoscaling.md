@@ -119,6 +119,33 @@ via `bootstrap()`'s full-app rsync** — so a new autoscaled box is covered with
 without any `.env.worker` change (the knob defaults in `config/crawler.php`). `AnalyzeSiteJob` does the
 same (1024M) but only ever runs on the pinned box.
 
+## How fixes reach new boxes & snapshots (permanence — no manual step)
+
+Crawler-behaviour fixes (memory ceilings, the finalize lock/graph fixes, rate/block logic, etc.) live in
+**application code**, not in the box-local image/compose, so they propagate automatically:
+- **Existing boxes** (pinned + already-running ephemeral): a normal deploy rsyncs current code; restart.
+- **A new ephemeral box at provision time**: `WorkerFleetService::bootstrap()` rsyncs the **full current
+  app** onto it before starting Horizon — so it runs the latest committed code regardless of how old the
+  snapshot is.
+- **The snapshot itself**: `scripts/worker/build-worker-snapshot.sh` **rsyncs current committed code**
+  onto the temp box *before* snapshotting — so every newly-built snapshot bakes the latest fixes. The
+  hourly `ebq:refresh-worker-snapshot` (when `auto_snapshot` is ON) rebuilds it on git-HEAD drift.
+
+Net: **commit + push, and the next snapshot/box has the fixes — no manual edit on any box.** The memory
+ceiling deliberately uses a per-job `ini_set` (not the image's php.ini) precisely so it travels with the
+code and never depends on rebuilding the box-local `docker/worker` image. (Do **not** move
+`docker-compose.worker.yml` into git — pinned and ephemeral composes differ, and a deploy rsync would
+overwrite the pinned box's; it is intentionally box-local.)
+
+> **Recovery if the snapshot AND its base are both deleted** (2026-06-18, during unrelated Hetzner
+> cleanup): `build-worker-snapshot.sh` provisions its temp box *from* `HCLOUD_WORKER_IMAGE`, so if that
+> base image is gone the build can't run and `auto_snapshot` can't self-heal. This is the **only** step
+> needing the operator: seed **one** new worker snapshot (per prerequisite 2 — a box with Docker + the
+> `ebq-worker` image + deploy key), then set `HCLOUD_WORKER_IMAGE`/`autoscaler.snapshot_id` to it. After
+> that, snapshots stay current automatically (the build rsyncs current code). Until then the autoscaler's
+> `snapshotExists` gate keeps the fleet from looping on a missing image, and the **pinned box handles all
+> crawl load** — correctness is unaffected, only elastic scale-up is paused.
+
 ## Operator prerequisites (must be set up before real provisioning)
 
 These are infra one-time setup, not code:

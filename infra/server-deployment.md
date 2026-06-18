@@ -74,7 +74,7 @@ the old per-service raw `queue:work` replicas:
 | Horizon pool | procs | queues | timeout | Notes |
 |---|---|---|---|---|
 | `worker-crawl` (`$crawlPool`) | `CRAWLER_MAX_PROCESSES`=**16** | `crawl` | **300s** | page-fetch pipeline (`CrawlPassJob`/`CrawlPageBatchJob`) |
-| `worker-heavy` (`$heavyPool`) | **4** | `sync`, `crawl-finalize` | **1200s** | the long `AnalyzeSiteJob` (pinned box only) + GA/GSC sync |
+| `worker-heavy` (`$heavyPool`) | **4** | `sync`, `crawl-finalize` | **3600s** | the long `AnalyzeSiteJob` (pinned box only) + GA/GSC sync. Uses the **`redis-long`** connection (retry_after **3900** > 3600 timeout), so a big-site finalize is never re-reserved mid-run |
 
 > **⚠️ Worker memory ceiling (2026-06-18):** Horizon spawns its workers from `php artisan
 > horizon`, which inherits PHP's **CLI default `memory_limit = 128M`** — the pre-Horizon raw
