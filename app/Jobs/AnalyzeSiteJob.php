@@ -34,9 +34,6 @@ class AnalyzeSiteJob implements ShouldQueue
     // re-reserved underneath us. See config/queue.php + horizon $heavyPool.
     public int $timeout = 3600;
 
-    /** Long finalize runs on a connection with retry_after > $timeout (see config/queue.php). */
-    public $connection = 'redis-long';
-
     // tries=2: a single transient failure (e.g. a lock-wait timeout, or a worker
     // recycle) used to permanently fail finalization and strand the run. One retry
     // recovers it.
@@ -52,8 +49,13 @@ class AnalyzeSiteJob implements ShouldQueue
     {
         // The long finalize runs on the dedicated crawl-finalize queue (pinned box
         // only), so an autoscale scale-down draining an ephemeral box can never kill
-        // a 1200s analysis mid-flight. See infra/crawler/autoscaling.md.
+        // a long analysis mid-flight. See infra/crawler/autoscaling.md.
         $this->onQueue(\App\Support\Queues::CRAWL_FINALIZE);
+        // ...on the redis-long connection, whose retry_after (3900) stays above this
+        // job's 3600s timeout so a still-running finalize is never re-reserved. Set via
+        // onConnection() (NOT a $connection property — that clashes with the Queueable
+        // trait's typed property). See config/queue.php.
+        $this->onConnection('redis-long');
     }
 
     /**
