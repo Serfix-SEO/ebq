@@ -228,12 +228,19 @@ class PageCrawlProcessor
         $conditional = ['etag' => $page->etag, 'last_modified' => $page->last_modified_header];
         $timeout = (int) config('crawler.timeout', 20);
 
-        // Fleet-wide per-domain politeness (Redis-backed) before we fetch — the local
-        // delay_ms only paces within one worker's batch; many autoscaled workers could
-        // otherwise hammer one domain. See infra/crawler/autoscaling.md.
-        $this->rateLimiter->throttle($website?->normalized_domain ?: parse_url($page->url, PHP_URL_HOST) ?: '');
+        $domain = $website?->normalized_domain ?: parse_url($page->url, PHP_URL_HOST) ?: '';
 
-        $proxy = $this->pool->preemptiveFor($website?->crawl_protection) ? $this->pool->pick() : null;
+        // Per-SERVER per-domain politeness (Redis) before we fetch. Also eases the rate to
+        // 1/4 if some boxes are already blocked here ("cautious"). See infra/crawler/autoscaling.md.
+        $this->rateLimiter->throttle($domain);
+
+        // Use a proxy FIRST whenever the pool has one — never expose the server's OWN IP if
+        // we can avoid it (a blocked server IP makes the whole box useless; pool IPs are
+        // disposable/rotatable). Fetch DIRECT (own IP) only as a fallback when no proxy is
+        // available — and then the per-SERVER rate limit + block coordination protect that
+        // IP. crawler.use_proxies=false forces direct-only (e.g. if the pool is unhealthy).
+        $useProxies = (bool) config('crawler.use_proxies', true);
+        $proxy = ($useProxies && $this->pool->available()) ? $this->pool->pick() : null;
         $res = $this->fetcher->fetch($page->url, $conditional, $timeout, $proxy);
 
         $blocked = $res['ok'] ? $this->blockDetector->classify([
@@ -248,8 +255,15 @@ class PageCrawlProcessor
             return $res;
         }
 
-        // Blocked. If we went direct and the pool is live, change IP and retry once.
-        if ($proxy === null && $this->pool->available()) {
+        // A block here means this DOMAIN is banning THIS server — record it fleet-wide so
+        // the others go cautious (and, once every box is blocked, switch to proxies). Per
+        // domain, never global.
+        $this->rateLimiter->recordBlock($domain);
+
+        // (Legacy) direct-then-proxy retry — only relevant if proxies are forced on but we
+        // somehow went direct; with the all-blocked logic above the first attempt already
+        // uses a proxy, so this is a harmless fallback.
+        if ($useProxies && $proxy === null && $this->pool->available()) {
             $retryProxy = $this->pool->pick();
             if ($retryProxy !== null) {
                 $res2 = $this->fetcher->fetch($page->url, $conditional, $timeout, $retryProxy);

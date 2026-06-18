@@ -46,6 +46,18 @@ return [
     // Per-page fetch timeout (seconds).
     'timeout' => (int) env('CRAWLER_TIMEOUT', 20),
 
+    // Proxy policy (PageCrawlProcessor). When true (default) the crawler uses a pool
+    // proxy FIRST whenever one is available — so the worker box's own public IP is never
+    // exposed (a blocked server IP makes the box useless; pool IPs are disposable). It
+    // only fetches DIRECT from the box IP when no proxy is available. Set false to force
+    // direct-only (e.g. if the proxy pool is unhealthy).
+    'use_proxies' => (bool) env('CRAWLER_USE_PROXIES', true),
+
+    // Block coordination (DomainRateLimiter): when a box is blocked on a domain it's
+    // recorded fleet-wide for this many seconds. While SOME boxes are blocked the rest go
+    // cautious (1/4 rate); when ALL active boxes are blocked, direct is hopeless.
+    'block_cooldown_s' => (int) env('CRAWLER_BLOCK_COOLDOWN_S', 600),
+
     // Incremental crawling — adaptive recrawl interval (days). A page's interval
     // backs off geometrically from min→max while it keeps coming back unchanged,
     // and snaps back to min the moment it significantly changes.
