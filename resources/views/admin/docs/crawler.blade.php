@@ -57,12 +57,14 @@
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                         <tr><td class="px-3 py-2 font-medium">crawlability</td><td class="px-3 py-2">crawl_blocked (CAPTCHA/403/429)</td><td class="px-3 py-2 text-red-600">critical</td></tr>
                         <tr><td class="px-3 py-2 font-medium">broken_link</td><td class="px-3 py-2">broken_internal, broken_external, broken_page</td><td class="px-3 py-2 text-red-600">critical / high</td></tr>
-                        <tr><td class="px-3 py-2 font-medium">indexability</td><td class="px-3 py-2">noindex_important, canonical_mismatch</td><td class="px-3 py-2 text-amber-600">high</td></tr>
+                        <tr><td class="px-3 py-2 font-medium">indexability</td><td class="px-3 py-2">noindex_important, canonical_mismatch, missing_self_hreflang, hreflang_canonical_conflict</td><td class="px-3 py-2 text-amber-600">high</td></tr>
                         <tr><td class="px-3 py-2 font-medium">internal_links</td><td class="px-3 py-2">orphan_page, deep_page</td><td class="px-3 py-2 text-amber-600">high / medium</td></tr>
-                        <tr><td class="px-3 py-2 font-medium">onpage</td><td class="px-3 py-2">missing/dup title &amp; meta, missing/multiple h1, thin_content, missing_image_alt, missing_open_graph</td><td class="px-3 py-2 text-slate-500">medium / low</td></tr>
-                        <tr><td class="px-3 py-2 font-medium">redirect</td><td class="px-3 py-2">redirecting_url, external_redirect</td><td class="px-3 py-2 text-slate-500">low</td></tr>
-                        <tr><td class="px-3 py-2 font-medium">sitemap</td><td class="px-3 py-2">indexed_not_in_sitemap</td><td class="px-3 py-2 text-slate-500">low</td></tr>
-                        <tr><td class="px-3 py-2 font-medium">schema</td><td class="px-3 py-2">missing_structured_data</td><td class="px-3 py-2 text-slate-500">low</td></tr>
+                        <tr><td class="px-3 py-2 font-medium">onpage</td><td class="px-3 py-2">missing/dup title &amp; meta, duplicate_content, missing/multiple h1, thin_content, missing_image_alt, missing_open_graph, missing_twitter_card</td><td class="px-3 py-2 text-slate-500">medium / low</td></tr>
+                        <tr><td class="px-3 py-2 font-medium">redirect</td><td class="px-3 py-2">redirecting_url, redirect_chain_too_long, external_redirect</td><td class="px-3 py-2 text-slate-500">low</td></tr>
+                        <tr><td class="px-3 py-2 font-medium">sitemap</td><td class="px-3 py-2">indexed_not_in_sitemap, sitemap_broken_url, sitemap_redirect_url, sitemap_noindex_url</td><td class="px-3 py-2 text-slate-500">low / medium</td></tr>
+                        <tr><td class="px-3 py-2 font-medium">schema</td><td class="px-3 py-2">missing_structured_data, invalid_structured_data</td><td class="px-3 py-2 text-slate-500">low</td></tr>
+                        <tr><td class="px-3 py-2 font-medium">performance</td><td class="px-3 py-2">slow_response</td><td class="px-3 py-2 text-slate-500">medium / low</td></tr>
+                        <tr><td class="px-3 py-2 font-medium">security</td><td class="px-3 py-2">mixed_content</td><td class="px-3 py-2 text-amber-600">high / medium</td></tr>
                     </tbody>
                 </table>
             </div>

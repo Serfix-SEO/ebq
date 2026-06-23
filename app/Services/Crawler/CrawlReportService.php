@@ -27,14 +27,16 @@ class CrawlReportService
 {
     /** Display metadata + dashboard severity per finding category. */
     private const CATEGORIES = [
-        CrawlFinding::CATEGORY_CRAWLABILITY => ['title' => 'Crawler blocked', 'desc' => 'Our crawler is being blocked by the site (CAPTCHA / 403 / 429).', 'sev' => 'critical'],
+        CrawlFinding::CATEGORY_CRAWLABILITY => ['title' => 'Crawler blocked', 'desc' => 'Bot-walled by the site (CAPTCHA/403/429) or blocked by robots.txt on a page that earns traffic.', 'sev' => 'critical'],
         CrawlFinding::CATEGORY_BROKEN_LINK => ['title' => 'Broken links', 'desc' => 'Internal or external links returning 4xx/5xx errors.', 'sev' => 'high'],
         CrawlFinding::CATEGORY_INDEXABILITY => ['title' => 'Indexability issues', 'desc' => 'noindex on traffic pages, canonical mismatches and similar.', 'sev' => 'high'],
         CrawlFinding::CATEGORY_INTERNAL_LINKS => ['title' => 'Internal-link issues', 'desc' => 'Orphan pages and pages buried too deep in the site.', 'sev' => 'high'],
         CrawlFinding::CATEGORY_REDIRECT => ['title' => 'Redirects', 'desc' => 'Redirecting URLs and redirect chains.', 'sev' => 'growth'],
         CrawlFinding::CATEGORY_ONPAGE => ['title' => 'On-page SEO issues', 'desc' => 'Missing/duplicate titles, meta, H1s, thin content, alt text.', 'sev' => 'growth'],
         CrawlFinding::CATEGORY_SITEMAP => ['title' => 'Sitemap issues', 'desc' => 'Sitemap coverage gaps and invalid sitemap URLs.', 'sev' => 'growth'],
-        CrawlFinding::CATEGORY_SCHEMA => ['title' => 'Structured data', 'desc' => 'Pages missing schema.org structured data.', 'sev' => 'growth'],
+        CrawlFinding::CATEGORY_SCHEMA => ['title' => 'Structured data', 'desc' => 'Pages missing or with invalid schema.org structured data.', 'sev' => 'growth'],
+        CrawlFinding::CATEGORY_PERFORMANCE => ['title' => 'Slow pages', 'desc' => 'Pages with high fetch latency.', 'sev' => 'growth'],
+        CrawlFinding::CATEGORY_SECURITY => ['title' => 'Mixed content', 'desc' => 'HTTPS pages loading plain-http resources — browsers block or warn on these.', 'sev' => 'high'],
     ];
 
     /** @var array<int,array{cs:?int,cap:int,clicks:array<string,int>}> per-request memo */
@@ -266,6 +268,46 @@ class CrawlReportService
             ->select('type', DB::raw('COUNT(*) as c'))
             ->groupBy('type')->orderByDesc('c')
             ->pluck('c', 'type')->all();
+    }
+
+    /**
+     * Per-type breakdown for the Semrush-style grouped issue list: one row per
+     * issue TYPE (not the coarser category bucket), each with its own count and
+     * worst-seen severity, sorted critical→low then by count. Used by SiteIssues
+     * to render type sections instead of one undifferentiated category list.
+     *
+     * @return list<array{type:string,label:string,count:int,severity:string}>
+     */
+    public function typeBreakdown(string $category, string $websiteId, string $severity = ''): array
+    {
+        $base = $this->findingsBase($websiteId, $category);
+        if ($severity !== '') {
+            $base->where('severity', $severity);
+        }
+        $rows = $base
+            ->select('type', DB::raw('COUNT(*) as c'),
+                DB::raw("SUM(CASE WHEN severity='critical' THEN 1 ELSE 0 END) as crit"),
+                DB::raw("SUM(CASE WHEN severity='high' THEN 1 ELSE 0 END) as high"),
+                DB::raw("SUM(CASE WHEN severity='medium' THEN 1 ELSE 0 END) as med"))
+            ->groupBy('type')->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $sev = 'low';
+            if ((int) $r->crit > 0) {
+                $sev = 'critical';
+            } elseif ((int) $r->high > 0) {
+                $sev = 'high';
+            } elseif ((int) $r->med > 0) {
+                $sev = 'medium';
+            }
+            $out[] = ['type' => $r->type, 'label' => $this->typeLabel($r->type), 'count' => (int) $r->c, 'severity' => $sev];
+        }
+
+        $tier = ['critical' => 0, 'high' => 1, 'medium' => 2, 'low' => 3];
+        usort($out, fn (array $a, array $b): int => ($tier[$a['severity']] <=> $tier[$b['severity']]) ?: ($b['count'] <=> $a['count']));
+
+        return $out;
     }
 
     /** Human label for a finding type, e.g. 'missing_image_alt' → 'Missing image alt'. */
@@ -653,6 +695,20 @@ class CrawlReportService
             'deep_page' => 'Click depth '.($d['click_depth'] ?? '3+').' from homepage',
             'thin_content' => 'Only '.($d['word_count'] ?? 'few').' words',
             'redirecting_url' => 'Redirects to '.$this->shortUrl((string) ($d['redirect_target'] ?? '')),
+            'duplicate_title' => 'Same title used on '.(((int) ($d['duplicate_count'] ?? 1)) - 1).' other page(s)',
+            'duplicate_meta_description' => 'Same meta description used on '.(((int) ($d['duplicate_count'] ?? 1)) - 1).' other page(s)',
+            'duplicate_content' => 'Identical content found on '.(((int) ($d['duplicate_count'] ?? 1)) - 1).' other page(s)',
+            'missing_self_hreflang' => 'Hreflang tags present but none reference this page itself',
+            'hreflang_canonical_conflict' => 'Hreflang declares this page while canonical points elsewhere',
+            'redirect_chain_too_long' => ($d['hops'] ?? '3+').' redirect hops before landing',
+            'slow_response' => 'Fetch took '.number_format(((int) ($d['ttfb_ms'] ?? 0)) / 1000, 1).'s',
+            'missing_twitter_card' => 'No Twitter Card meta tags',
+            'invalid_structured_data' => (($d['invalid_count'] ?? 1)).' malformed JSON-LD block(s)',
+            'robots_blocked_important' => 'Blocked by robots.txt ('.($d['path'] ?? '').') on a page that earns traffic',
+            'mixed_content' => ((int) ($d['count'] ?? 1)).' plain-http resource(s) on an https page',
+            'sitemap_broken_url' => 'Sitemap lists a URL that returns '.($d['http_status'] ?? '4xx'),
+            'sitemap_redirect_url' => 'Sitemap lists a URL that redirects to '.$this->shortUrl((string) ($d['redirect_target'] ?? '')),
+            'sitemap_noindex_url' => 'Sitemap lists a non-indexable URL',
             'crawl_blocked' => 'Crawler blocked ('.($d['reason'] ?? 'unknown').')',
             default => ucfirst(str_replace('_', ' ', $f->type)),
         };

@@ -7,6 +7,7 @@ use App\Models\CrawlRun;
 use App\Models\CrawlSite;
 use App\Models\SearchConsoleData;
 use App\Models\WebsitePage;
+use App\Support\Crawler\RobotsTxtParser;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -23,6 +24,10 @@ class SiteIssueDetector
     /** Hard bound on referrer-edge rows scanned (pathological inbound fan-in). */
     private const REFERRER_SCAN_CAP = 50000;
 
+    /** Click-to-chat/shortlink services that always redirect by design — never an
+     *  external_redirect finding, regardless of how many hops the chain has. */
+    private const KNOWN_REDIRECTOR_HOSTS = ['wa.me', 'api.whatsapp.com', 't.me', 'm.me', 'bit.ly'];
+
     /** @var array<int,array<string,mixed>> rows pending upsert, keyed by type|hash */
     private array $pending = [];
 
@@ -38,7 +43,10 @@ class SiteIssueDetector
      */
     private array $referrers = [];
 
-    public function __construct(private readonly LinkChecker $linkChecker) {}
+    public function __construct(
+        private readonly LinkChecker $linkChecker,
+        private readonly CrawlFetcher $fetcher,
+    ) {}
 
     public function detect(CrawlSite $website, CrawlRun $run): int
     {
@@ -68,8 +76,127 @@ class SiteIssueDetector
 
         $this->detectBrokenInternalLinks($website, $run, $statusByHash);
         $this->detectBrokenExternalLinks($website, $run);
+        $this->detectDuplicateField($website, $importantClicks, 'title', 'duplicate_title');
+        $this->detectDuplicateField($website, $importantClicks, 'meta_description', 'duplicate_meta_description');
+        $this->detectDuplicateContent($website, $importantClicks);
+        $this->detectRobotsBlocked($website);
 
         return $this->flush($website->id, $run->id);
+    }
+
+    /**
+     * Pages robots.txt blocks for our crawler's UA, restricted to pages the SITE
+     * ITSELF treats as real (sitemap-listed or internally linked) — not gated on
+     * GSC traffic like noindex_important, because plenty of subscribers never
+     * connect GSC and would get zero coverage from this check otherwise. Sitemap/
+     * internal-link presence is the crawl-only proxy for "this isn't an
+     * intentionally-excluded utility path like /admin or /cart" (those are
+     * normally neither). Severity bumps to high when traffic data IS available.
+     * One robots.txt fetch per run, not per page — added 2026-06-23, full
+     * Semrush-catalog gap sweep.
+     */
+    private function detectRobotsBlocked(CrawlSite $website): void
+    {
+        $robotsTxt = $this->fetchRobotsTxt($website);
+        if ($robotsTxt === null) {
+            return;
+        }
+
+        WebsitePage::where('crawl_site_id', $website->id)
+            ->whereNull('removed_at')
+            ->where('http_status', 200)
+            ->where(fn ($q) => $q->where('source_sitemap', true)->orWhere('inbound_link_count', '>', 0))
+            ->select('id', 'url', 'url_hash', 'crawl_site_id')
+            ->chunkById(500, function ($pages) use ($robotsTxt): void {
+                foreach ($pages as $page) {
+                    $path = (string) (parse_url($page->url, PHP_URL_PATH) ?: '/');
+                    if (RobotsTxtParser::isBlocked($robotsTxt, $path)) {
+                        $clicks = $this->clicks[$page->url_hash] ?? 0;
+                        $this->add($page, CrawlFinding::CATEGORY_CRAWLABILITY, 'robots_blocked_important', $clicks > 0 ? 'high' : 'medium', $clicks, [
+                            'path' => $path,
+                        ]);
+                    }
+                }
+            });
+    }
+
+    /** Fetches robots.txt from the site's homepage origin. Null on any failure
+     *  (missing/error/non-200) — no robots.txt means nothing is blocked by one. */
+    private function fetchRobotsTxt(CrawlSite $website): ?string
+    {
+        $home = parse_url($website->homepageUrl());
+        if (empty($home['scheme']) || empty($home['host'])) {
+            return null;
+        }
+
+        $res = $this->fetcher->fetch($home['scheme'].'://'.$home['host'].'/robots.txt', [], 10);
+
+        return ($res['ok'] && (int) $res['status'] === 200) ? (string) $res['body'] : null;
+    }
+
+    /** Same title/meta-description reused across 2+ indexable pages — a real gap vs
+     *  Semrush et al, this catalog had missing/too-long/too-short checks but never
+     *  cross-page duplicates (e.g. an i18n site whose /ar//en//fr/ variants never got
+     *  translated copy). Added 2026-06-23 (title), extended to meta_description same day. */
+    private function detectDuplicateField(CrawlSite $website, int $importantClicks, string $column, string $type): void
+    {
+        $groups = WebsitePage::where('crawl_site_id', $website->id)
+            ->whereNull('removed_at')
+            ->where('http_status', 200)
+            ->where('is_indexable', true)
+            ->whereNull('redirect_target')
+            ->where($column, '!=', '')
+            ->whereNotNull($column)
+            ->select($column, 'id', 'url', 'url_hash', 'crawl_site_id')
+            ->get()
+            ->groupBy($column)
+            ->filter(fn ($pages) => $pages->count() > 1);
+
+        foreach ($groups as $value => $pages) {
+            foreach ($pages as $page) {
+                $clicks = $this->clicks[$page->url_hash] ?? 0;
+                $others = $pages->reject(fn ($p) => $p->id === $page->id)->pluck('url')->values()->all();
+                $severity = $clicks >= max(1, $importantClicks) ? 'high' : 'medium';
+                $this->add($page, CrawlFinding::CATEGORY_ONPAGE, $type, $severity, $clicks, [
+                    $column => $value,
+                    'duplicate_count' => $pages->count(),
+                    'other_urls' => array_slice($others, 0, self::REFERRER_SAMPLE_CAP),
+                ]);
+            }
+        }
+    }
+
+    /** Full-page exact-duplicate content (not just title/meta) — `content_hash` (sha1 of
+     *  the analyzed body_text) already exists per-page for change detection but nothing
+     *  grouped it ACROSS pages. `word_count > 0` excludes pages whose body_text came back
+     *  empty (a fetch/parse edge case, not real duplicate content) — sha1('') would
+     *  otherwise group every such page together as a false "duplicate". Added 2026-06-23,
+     *  full Semrush-catalog gap sweep. */
+    private function detectDuplicateContent(CrawlSite $website, int $importantClicks): void
+    {
+        $groups = WebsitePage::where('crawl_site_id', $website->id)
+            ->whereNull('removed_at')
+            ->where('http_status', 200)
+            ->where('is_indexable', true)
+            ->whereNull('redirect_target')
+            ->where('word_count', '>', 0)
+            ->whereNotNull('content_hash')
+            ->select('content_hash', 'id', 'url', 'url_hash', 'crawl_site_id')
+            ->get()
+            ->groupBy('content_hash')
+            ->filter(fn ($pages) => $pages->count() > 1);
+
+        foreach ($groups as $pages) {
+            foreach ($pages as $page) {
+                $clicks = $this->clicks[$page->url_hash] ?? 0;
+                $others = $pages->reject(fn ($p) => $p->id === $page->id)->pluck('url')->values()->all();
+                $severity = $clicks >= max(1, $importantClicks) ? 'high' : 'medium';
+                $this->add($page, CrawlFinding::CATEGORY_ONPAGE, 'duplicate_content', $severity, $clicks, [
+                    'duplicate_count' => $pages->count(),
+                    'other_urls' => array_slice($others, 0, self::REFERRER_SAMPLE_CAP),
+                ]);
+            }
+        }
     }
 
     private function detectForPage(CrawlSite $website, CrawlRun $run, WebsitePage $page, int $deepThreshold, int $importantClicks, string $homepageHash): void
@@ -99,6 +226,14 @@ class SiteIssueDetector
                 $detail['referrers'] = $ref['samples'];
             }
             $this->add($page, CrawlFinding::CATEGORY_BROKEN_LINK, 'broken_page', $sev('critical', 'high'), $clicks, $detail);
+            // The sitemap is a direct signal to search engines "crawl/index this" —
+            // listing a 4xx/5xx URL in it is its own distinct, actionable problem
+            // (regenerate/prune the sitemap) independent of fixing the dead page
+            // itself. Click-independent: a sitemap shouldn't lie regardless of
+            // traffic. Added 2026-06-23, full Semrush-catalog gap sweep.
+            if ($page->source_sitemap) {
+                $this->add($page, CrawlFinding::CATEGORY_SITEMAP, 'sitemap_broken_url', $sev('high', 'medium'), $clicks, ['http_status' => $status]);
+            }
 
             return; // no point checking on-page signals for a dead page
         }
@@ -106,9 +241,41 @@ class SiteIssueDetector
         // Redirecting URL in the frontier.
         if ($page->redirect_target) {
             $this->add($page, CrawlFinding::CATEGORY_REDIRECT, 'redirecting_url', $sev('medium', 'low'), $clicks, ['redirect_target' => $page->redirect_target]);
+            if ($page->source_sitemap) {
+                $this->add($page, CrawlFinding::CATEGORY_SITEMAP, 'sitemap_redirect_url', $sev('medium', 'low'), $clicks, ['redirect_target' => $page->redirect_target]);
+            }
+            // 3+ hops before landing — wastes crawl budget and stacks latency.
+            // Guzzle's redirect-history count, threaded through unused since the
+            // fetcher already computed it. Added 2026-06-23.
+            if ((int) ($signals['redirect_chain'] ?? 0) >= 3) {
+                $this->add($page, CrawlFinding::CATEGORY_REDIRECT, 'redirect_chain_too_long', 'low', $clicks, [
+                    'hops' => (int) $signals['redirect_chain'],
+                    'redirect_target' => $page->redirect_target,
+                ]);
+            }
+        }
+
+        // Slow fetch — $signals['ttfb_ms'] is really total fetch latency (measured
+        // after the full body downloads, not after headers), so this catches a slow
+        // server/page overall rather than strict TTFB. Threshold picked generously
+        // (5s) to avoid flagging normal network jitter.
+        if ((int) ($signals['ttfb_ms'] ?? 0) >= 5000) {
+            $this->add($page, CrawlFinding::CATEGORY_PERFORMANCE, 'slow_response', $sev('medium', 'low'), $clicks, [
+                'ttfb_ms' => (int) $signals['ttfb_ms'],
+            ]);
         }
 
         $indexable = (bool) $page->is_indexable && $status === 200 && ! $page->redirect_target;
+
+        // Sitemap listing a non-indexable URL (noindex meta/header OR canonical
+        // pointing away) is a contradiction — the sitemap says "index this," the
+        // page itself says "don't." Click-independent like the other sitemap-
+        // quality checks above. Not gated on the more specific noindex_important
+        // reason text below since canonical-points-away also makes a page
+        // non-indexable and is just as wrong to list in a sitemap.
+        if ($status === 200 && ! $page->redirect_target && ! $page->is_indexable && $page->source_sitemap) {
+            $this->add($page, CrawlFinding::CATEGORY_SITEMAP, 'sitemap_noindex_url', $sev('medium', 'low'), $clicks);
+        }
 
         // Indexability.
         if ($status === 200 && ! $page->is_indexable && ! $page->redirect_target && str_contains((string) $page->robots_directives, 'noindex')) {
@@ -122,6 +289,23 @@ class SiteIssueDetector
         // ranks a URL you're telling it to drop.
         if (($signals['canonical_points_away'] ?? false) === true && $clicks >= max(1, $importantClicks)) {
             $this->add($page, CrawlFinding::CATEGORY_INDEXABILITY, 'canonical_mismatch', 'high', $clicks, ['canonical' => $page->canonical_url]);
+        }
+
+        // International (hreflang). Checked before the indexable-only gate below
+        // because a locale variant with a self-canonicalizing-elsewhere conflict is
+        // (by definition) non-indexable — that's the bug, not a reason to skip it.
+        if ((int) ($signals['hreflang_count'] ?? 0) > 0) {
+            if (($signals['hreflang_self_ref'] ?? false) === false) {
+                $this->add($page, CrawlFinding::CATEGORY_INDEXABILITY, 'missing_self_hreflang', 'medium', $clicks, [
+                    'hreflangs' => $signals['hreflangs'] ?? [],
+                ]);
+            }
+            if (($signals['canonical_points_away'] ?? false) === true) {
+                $this->add($page, CrawlFinding::CATEGORY_INDEXABILITY, 'hreflang_canonical_conflict', 'medium', $clicks, [
+                    'canonical' => $page->canonical_url,
+                    'hreflangs' => $signals['hreflangs'] ?? [],
+                ]);
+            }
         }
 
         if (! $indexable) {
@@ -166,10 +350,27 @@ class SiteIssueDetector
         if ((int) ($signals['og_tag_count'] ?? 0) === 0) {
             $this->add($page, CrawlFinding::CATEGORY_ONPAGE, 'missing_open_graph', 'low', $clicks);
         }
+        if ((int) ($signals['twitter_tag_count'] ?? 0) === 0) {
+            $this->add($page, CrawlFinding::CATEGORY_ONPAGE, 'missing_twitter_card', 'low', $clicks);
+        }
+        if ((int) ($signals['mixed_content_count'] ?? 0) > 0) {
+            $this->add($page, CrawlFinding::CATEGORY_SECURITY, 'mixed_content', $sev('high', 'medium'), $clicks, [
+                'count' => (int) $signals['mixed_content_count'],
+                'urls' => $signals['mixed_content_urls'] ?? [],
+            ]);
+        }
 
-        // Schema.
+        // Schema. "Missing" and "invalid" are mutually exclusive on purpose: a page
+        // with one malformed JSON-LD block and zero valid ones already gets
+        // missing_structured_data (schema_types is empty); invalid_structured_data
+        // only fires when the page has SOME valid schema alongside a broken block,
+        // which missing_structured_data would otherwise silently swallow.
         if (($signals['schema_types'] ?? []) === []) {
             $this->add($page, CrawlFinding::CATEGORY_SCHEMA, 'missing_structured_data', 'low', $clicks);
+        } elseif ((int) ($signals['invalid_schema_count'] ?? 0) > 0) {
+            $this->add($page, CrawlFinding::CATEGORY_SCHEMA, 'invalid_structured_data', 'low', $clicks, [
+                'invalid_count' => (int) $signals['invalid_schema_count'],
+            ]);
         }
 
         // Internal-link structure. Skip the homepage and skip query-string URLs
@@ -271,7 +472,11 @@ class SiteIssueDetector
         foreach ($problems as $p) {
             $href = (string) $p['href'];
             $fromId = $links[$href]['from'] ?? null;
-            if (! empty($p['redirected'])) {
+            // Click-to-chat/shortlink services 302 by design (e.g. wa.me -> api.whatsapp.com)
+            // — not a site issue, not actionable by the owner. Confirmed 2026-06-23 on a
+            // real site: every wa.me "Order on WhatsApp" link was flagged as external_redirect.
+            $isKnownRedirector = $this->isKnownRedirector($href);
+            if (! empty($p['redirected']) && ! $isKnownRedirector) {
                 $this->pending['ext_redirect|'.CrawlFinding::hashUrl($href)] = $this->row(
                     $website->id, $run->id, $fromId,
                     CrawlFinding::CATEGORY_REDIRECT, 'external_redirect', 'low', 0.0, $href,
@@ -287,6 +492,18 @@ class SiteIssueDetector
                 );
             }
         }
+    }
+
+    private function isKnownRedirector(string $href): bool
+    {
+        $host = strtolower((string) parse_url($href, PHP_URL_HOST));
+        foreach (self::KNOWN_REDIRECTOR_HOSTS as $d) {
+            if ($host === $d || str_ends_with($host, '.'.$d)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function add(WebsitePage $page, string $category, string $type, string $severity, int $clicks, array $detail = []): void

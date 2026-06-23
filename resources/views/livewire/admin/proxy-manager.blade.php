@@ -62,7 +62,12 @@
             failed: 0,
             passed: 0,
             current: null,
-            concurrency: 5,
+            // Sequential, not parallel: many proxy pool entries share one provider
+            // account/credential (rotating-IP gateway with a per-account concurrent-
+            // connection cap). Concurrency>1 here exceeds that cap, the extra connections
+            // get 403'd by the provider, and deleteOnFail wipes proxies that are actually
+            // fine — confirmed 2026-06-23 (single "Test" passed, "Retest all" deleted all).
+            concurrency: 1,
             async retestAll(ids) {
                 if (this.running || ! ids.length) return;
                 if (! confirm(`Retest all ${ids.length} proxies? Any that fail will be removed immediately.`)) return;

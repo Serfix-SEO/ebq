@@ -1,0 +1,36 @@
+Claude Code session ID
+=======================
+0a63f07b-fec9-425c-9050-8814b41dc051
+
+Resume with:  claude --resume 0a63f07b-fec9-425c-9050-8814b41dc051
+
+-----------------------------------------------------------------------
+Context (as of 2026-06-18 ~14:26) — crawl finalization work
+-----------------------------------------------------------------------
+Shipped to main + deployed to worker box (10.0.0.3):
+  579dab7  fix: chunk finalize UPDATEs + WithoutOverlapping (1205 lock fix)
+  b446d20  feat: autoscaler verifies worker snapshot exists before provisioning
+  c4a5dc0  perf: integer-indexed single-pass graph analysis (large sites)
+  c366b2f  fix: per-job memory ceiling (Horizon dropped 128M->2048M)
+           CrawlPageBatchJob=512M, AnalyzeSiteJob=1024M (config/crawler.php);
+           travels to ephemeral autoscale boxes via bootstrap full-app rsync.
+
+Done:
+  - phantom db_node 01kvd81x (deleted shard) removed; no data lost.
+  - autoscaler provision->reap loop fixed (snapshot 398793967 + base 398736889
+    are BOTH deleted in Hetzner -> auto-rebuild can't run; user to rebuild a
+    worker snapshot from a fresh base; auto_snapshot left ON).
+  - stylishnicklab.com re-crawling fine on pinned box.
+
+OPEN / blocker:
+  - xplate.com finalize (run 01kvc3zbkqh8ehgx9pq4wc5mxx,
+    crawl_site 01kvc3z8zeas54vrck6jqsysen, ~168k pages / 1.49M edges) still
+    NOT finalized. PHP OOM (128M) fixed, but worker box is small (3.7GB) and
+    contended: Horizon 16 crawl workers + finalize + a Chrome keywordfetcher
+    service (~1GB free; kernel OOM-killed chrome at 13:37). Finalize attempts
+    run several min without completing (slow streaming 1.5M edges + contention).
+  - Next options: (a) reduce contention / run finalize when box is idle;
+    (b) bigger worker box; (c) raise finalize timeout if it's just slow;
+    (d) move keywordfetcher/chrome off this box.
+
+Branch: feature/db-sharding-ulid (== origin/main tip).

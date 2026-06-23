@@ -461,7 +461,9 @@
       "Bash(redis-cli -a 668523168534af8c52158df720cee60d8404a4d1b735eae7 --no-auth-warning zrange ebq-database-queues:sync:reserved 0 -1 WITHSCORES)",
       "Bash(awk -F'\\\\t' '{print $1,$2,$3,$4,$5,$6,substr\\($7,1,80\\)}')",
       "Bash(redis-cli -a 668523168534af8c52158df720cee60d8404a4d1b735eae7 --no-auth-warning zrange ebq-database-queues:sync:reserved 0 -1)",
-      "Bash(mysql *)"
+      "Bash(mysql *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" https://ebq.io)",
+      "Bash(ps -eo pid,etimes,cmd)"
     ]
   },
   "enableAllProjectMcpServers": true,

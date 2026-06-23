@@ -33,7 +33,11 @@ class CrawlWebsites extends Command
         $query = CrawlSite::query()->whereHas('websites', fn (Builder $w) => $this->hasSource($w));
 
         if ($single !== null) {
-            $csid = Website::where('id', (int) $single)->value('crawl_site_id');
+            // $single is a ULID string, not a numeric id — (int) cast used to truncate
+            // it (every current-era ULID starts "01", so it always collapsed to 1,
+            // matching whichever row happened to satisfy that under MySQL's numeric
+            // string coercion — wrong-site risk). Fixed 2026-06-23.
+            $csid = Website::where('id', (string) $single)->value('crawl_site_id');
             $query->whereKey($csid ?: 0);
         }
 

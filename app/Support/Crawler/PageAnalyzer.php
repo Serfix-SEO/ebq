@@ -30,6 +30,8 @@ class PageAnalyzer
         $links = $auditor->links();
         $images = $auditor->images();
         $schema = $auditor->schema();
+        $locale = $auditor->localeSignals();
+        $mixedContent = $auditor->mixedContentUrls();
 
         // X-Robots-Tag response header can also force noindex.
         $xRobots = strtolower((string) ($responseHeaders['x-robots-tag'] ?? ''));
@@ -44,6 +46,18 @@ class PageAnalyzer
         $canonicalPointsAway = $this->canonicalPointsAway($canonical, $url);
 
         $isIndexable = ! ($robots['noindex'] || $headerNoindex || $canonicalPointsAway);
+
+        $hreflangs = $locale['hreflangs'] ?? [];
+        // A page declaring hreflang alternates should list itself among them (the
+        // "self-referencing hreflang" Google/Semrush both require) — without it,
+        // search engines can't confirm which hreflang entry IS this page.
+        $hreflangSelfRef = false;
+        foreach ($hreflangs as $h) {
+            if ($this->canonicalKey((string) ($h['href'] ?? '')) === $this->canonicalKey($url)) {
+                $hreflangSelfRef = true;
+                break;
+            }
+        }
 
         $bodyText = (string) ($content['body_text'] ?? '');
         if (strlen($bodyText) > self::MAX_BODY_TEXT) {
@@ -65,6 +79,9 @@ class PageAnalyzer
             'meta_description' => $meta['meta_description'] ?? '',
             'canonical_url' => $canonical !== '' ? $canonical : null,
             'canonical_points_away' => $canonicalPointsAway,
+            'hreflangs' => $hreflangs,
+            'hreflang_self_ref' => $hreflangSelfRef,
+            'mixed_content_urls' => $mixedContent,
             'is_indexable' => $isIndexable,
             'robots_directives' => $robotsRaw !== '' ? mb_substr($robotsRaw, 0, 255) : null,
             'h1_count' => $headings['h1_count'] ?? 0,

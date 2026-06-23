@@ -274,6 +274,41 @@ class HtmlAuditor
         ];
     }
 
+    /**
+     * Plain-http:// resource references on an https page (img/script/stylesheet/
+     * iframe/video/audio/source src/href) — browsers block or warn on these.
+     * Only literal `http://` absolute URLs count; protocol-relative (`//host/...`)
+     * and relative URLs inherit the page's own https scheme, so they're never
+     * mixed content regardless of what host they point to.
+     *
+     * @return list<string>
+     */
+    public function mixedContentUrls(): array
+    {
+        if (strtolower((string) parse_url($this->pageUrl, PHP_URL_SCHEME)) !== 'https') {
+            return [];
+        }
+
+        $found = [];
+        foreach ([
+            '//img/@src', '//script/@src', '//iframe/@src', '//source/@src', '//video/@src', '//audio/@src',
+            '//link[translate(@rel, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="stylesheet"]/@href',
+        ] as $expr) {
+            $nodes = $this->xpath->query($expr);
+            if (! $nodes) {
+                continue;
+            }
+            foreach ($nodes as $attr) {
+                $val = trim((string) $attr->nodeValue);
+                if (preg_match('#^http://#i', $val)) {
+                    $found[] = $val;
+                }
+            }
+        }
+
+        return array_values(array_unique($found));
+    }
+
     public function schema(): array
     {
         $nodes = $this->xpath->query('//script[translate(@type, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="application/ld+json"]');

@@ -70,6 +70,13 @@ class SiteIssues extends Component
         $this->resetPage();
     }
 
+    /** Drill into one issue type from the grouped (Semrush-style) breakdown view. */
+    public function selectType(string $type): void
+    {
+        $this->type = $type;
+        $this->resetPage();
+    }
+
     private function isAllowedKey(string $key): bool
     {
         return in_array($key, self::NON_CRAWL, true) || str_starts_with($key, 'crawl_');
@@ -119,6 +126,22 @@ class SiteIssues extends Component
         return $out;
     }
 
+    /**
+     * Default view for a crawl category: a Semrush-style breakdown by issue
+     * TYPE instead of one undifferentiated row list. Drops to the flat row list
+     * (rows()) once a type is picked or a search term overrides grouping.
+     */
+    private function showGroups(): bool
+    {
+        return $this->isCrawl() && $this->type === '' && trim($this->q) === '';
+    }
+
+    /** @return list<array{type:string,label:string,count:int,severity:string}> */
+    private function groups(): array
+    {
+        return app(CrawlReportService::class)->typeBreakdown($this->category(), $this->websiteId, $this->severity);
+    }
+
     /** The paginated, filtered rows for this group, normalized for the view. */
     private function rows(): LengthAwarePaginator
     {
@@ -164,9 +187,13 @@ class SiteIssues extends Component
 
     public function render()
     {
+        $grouped = $this->showGroups();
+
         return view('livewire.site-issues', [
             'meta' => $this->meta(),
-            'rows' => $this->rows(),
+            'grouped' => $grouped,
+            'groups' => $grouped ? $this->groups() : [],
+            'rows' => $grouped ? null : $this->rows(),
             'typeOptions' => $this->typeOptions(),
             'isCrawl' => $this->isCrawl(),
         ]);

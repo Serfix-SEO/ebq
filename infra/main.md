@@ -239,6 +239,114 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-23 (crawler — no hreflang detection at all; added two checks)** — Second
+  Semrush export, this time namesforfreefire.com: 4 i18n pages flagged
+  `No self-referencing hreflang` + `Conflicting hreflang and rel=canonical`. Same
+  gap-class as the duplicate-title miss earlier today — `HtmlAuditor::localeSignals()`
+  already parsed `<link rel=alternate hreflang>` tags but nothing downstream read them.
+  Wired hreflangs through `PageAnalyzer` → `seo_signals` JSON → two new
+  `SiteIssueDetector` checks (`missing_self_hreflang`, `hreflang_canonical_conflict`),
+  both under `CrawlFinding::CATEGORY_INDEXABILITY`. Placed ahead of the `! $indexable`
+  early-return since a conflicting page is non-indexable by definition. Only the two
+  issue types seen in the export were built — Semrush's broader hreflang catalog
+  (reciprocal return-links, x-default, duplicate-language entries) is unaddressed.
+  Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler dashboard — issue list grouped by type, Semrush-style)** — User
+  reported the issue-detail page (`/issues/{key}`) mixed every issue type in a category
+  into one flat list with no separation. Added `CrawlReportService::typeBreakdown()` +
+  reworked `SiteIssues.php`/its blade to default to a grouped-by-type card list (count +
+  worst severity per type), drilling into the existing flat row list only once a type is
+  picked or a search term is typed. Top-level Priority Action Queue (category-level)
+  unchanged. Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — added robots.txt audit, first one ever; deliberately GSC-optional)**
+  — Catalog sweep gap: nothing checked whether Disallow rules accidentally block a real
+  page. Added `RobotsTxtParser` (pure, no I/O) + `SiteIssueDetector::detectRobotsBlocked()`
+  — one fetch per crawl run via the existing `CrawlFetcher`. First version gated on GSC
+  clicks like `noindex_important`; user flagged that many subscribers never connect GSC, so
+  re-did it to use sitemap-listed/internally-linked as the crawl-only "this page is real"
+  signal instead, with GSC clicks only bumping severity when present. **Standing principle
+  going forward: prefer crawl-only signals over GSC-gating wherever possible** — GSC
+  presence can't be assumed. New `robots_blocked_important` finding under
+  `CATEGORY_CRAWLABILITY`. Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — added mixed-content detection)** — Catalog sweep gap: nothing
+  scanned for plain-http resources on https pages. Added `HtmlAuditor::mixedContentUrls()`
+  (img/script/iframe/source/video/audio/stylesheet, literal `http://` only) → `seo_signals`
+  → new `mixed_content` finding, first real use of `CrawlFinding::CATEGORY_SECURITY`.
+  Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — sitemap quality, reverse direction; catalog sweep complete)** —
+  Only `indexed_not_in_sitemap` existed (page missing from sitemap). Added the reverse:
+  `sitemap_broken_url`/`sitemap_redirect_url`/`sitemap_noindex_url` for URLs that ARE in the
+  sitemap despite being 4xx/5xx, redirecting, or non-indexable — click-independent, all
+  under `CATEGORY_SITEMAP`. This closes out the full Semrush-catalog gap sweep started
+  earlier today (hreflang → UI grouping → TTFB/redirect-chain/schema/twitter → robots.txt →
+  duplicate content → mixed content → sitemap quality). Details:
+  [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — full Semrush-catalog gap sweep; 4 "captured but discarded" fixes)**
+  — User asked to cover all gaps Semrush's audit catches, not just export-driven ones. Found
+  `ttfb_ms`/`redirect_chain` (computed in `CrawlFetcher` since this feature was built, never
+  read), JSON-LD block validity (`HtmlAuditor::schema()` already flags malformed blocks,
+  `seoSignals()` discarded it), and `twitter_tag_count` (captured, never checked) — all wired
+  through to 4 new `SiteIssueDetector` checks. First real use of the long-dormant
+  `CrawlFinding::CATEGORY_PERFORMANCE` constant. Remaining catalog gaps need new crawler
+  instrumentation (robots.txt audit, cross-page exact-duplicate-content, mixed content,
+  sitemap-quality checks) — tracked as separate follow-up work, not yet built.
+  Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — no duplicate-title detection existed; added one)** — User caught
+  via a Semrush export that we missed 24 duplicate-title issues on soulfamburger.com (8
+  titles × 3 i18n variants). Confirmed by grep: zero duplicate-title logic anywhere in the
+  codebase, only missing/too-long/too-short checks. Added
+  `SiteIssueDetector::detectDuplicateTitles()`. Hit (and fixed) a partial-hydration bug along
+  the way — the group-by query's `select()` omitted `crawl_site_id`, causing a typed-null
+  error visible only in the **worker box's** log, not the web box's — re-confirms the
+  two-box deploy discipline from earlier today. Verified: 24/24 findings now match Semrush
+  exactly. Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — one host redirect cascaded into a redirecting_url finding on
+  every page)** — User flagged two soulfamburger.com URLs both "redirecting"; turned out
+  all 28/28 of the site's pages were flagged (apex→www). Root cause:
+  `PageCrawlProcessor::process()` resolved relative internal links using the pre-redirect
+  `$page->url` instead of the post-redirect effective URL, so every link discovered on the
+  (actually www-hosted) page got re-anchored back to the apex host — propagating the same
+  redirect to every subsequently discovered page. Fixed by using `$res['redirect_target']`
+  as the analysis base URL when `$res['redirected']`. Did **not** mass-resolve the 28
+  existing findings — unlike the other two crawler fixes today, each is individually a real,
+  true redirect; only the multiplication bug was fixed, going forward. Also noted:
+  `CrawlSite::homepageUrl()` always seeds the apex (www-stripped) host, so any
+  www-canonical site will always get one legitimate homepage-level redirect finding — not a
+  bug. Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — wa.me click-to-chat links flagged as external_redirect)** —
+  User asked to verify a soulfamburger.com finding (`wa.me/.../Soul Beef Meal`). Checked
+  `detail.final_url`: wa.me 302s to `api.whatsapp.com/send/?...` — wa.me's own documented
+  behavior, not fixable by the site owner. `SiteIssueDetector.php` had no allowlist for
+  known 1-hop redirector services. Fixed: `KNOWN_REDIRECTOR_HOSTS` (wa.me, api.whatsapp.com,
+  t.me, m.me, bit.ly) + `isKnownRedirector()` gate before raising `external_redirect`
+  (the separate real-4xx/5xx `broken_external` check is untouched). Resolved 18 matching
+  open findings across 3 sites. Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — image assets ran through on-page SEO checks)** — User-reported
+  false positives on childdaycaretracy.com's crawl report (`missing_title` on a `.jpeg`).
+  Root cause: image sitemap entries / `<a href="...jpg">` targets became ordinary
+  `website_pages` rows with no content-type gate, so `PageCrawlProcessor::process()` ran
+  `PageAnalyzer::analyze()` on raw JPEG bytes — `website_pages` has no `content_type`
+  column even though `CrawlFetcher` already captures the header. Fixed by checking
+  `$res['content_type']` before `analyze()` and marking non-HTML responses
+  `is_indexable=false` (which `SiteIssueDetector` already skips). Swept all sites by URL
+  extension: only 22 pages (all on this one site) were affected; their 33 open false
+  findings were resolved directly. Separately investigated and ruled out: a wa.me/
+  soulfamburger.com finding the user saw "in the dashboard" does not exist anywhere in
+  this site's `crawl_findings` (confirmed via direct DB query AND calling
+  `CrawlReportService::categoryFindings()` exactly as the controller does) — it belongs to
+  soulfamburger.com's own crawl_site. Likely a client-side stale-render artifact (same
+  bleed class as the known `LinkStructurePanel` cap leak), not a data bug — user to confirm
+  with a hard refresh. Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (proxy pool — admin "Retest all" false-positive deletes)** — Single "Test"
+  button passed a proxy; "Retest all" deleted every proxy in the pool. Root cause: the
+  4 active proxies share one provider account/credential (rotating-IP "backconnect"
+  gateway — same auth token + port, IP differs), capped server-side to a small number of
+  concurrent connections. The old `concurrency: 5` Alpine sweep in
+  `proxy-manager.blade.php` opened 5 simultaneous CONNECT tunnels on the same account; the
+  provider 403'd the excess, and `deleteOnFail` nuked otherwise-healthy proxies. Fixed by
+  dropping retest concurrency to 1 (sequential), matching single-Test semantics. Details +
+  generalization (group-by-credential if pool grows multi-account) in
+  [crawler/known-issues.md](./crawler/known-issues.md).
 - **2026-06-23 (GSC sync — high-volume account stale since 2026-04-16, real root cause)** —
   `namesforfreefire.com`'s ~38k-row GSC account (the single biggest in `search_console_data`)
   never synced; `SyncSearchConsoleData` failed nightly with no logged exception. First pass

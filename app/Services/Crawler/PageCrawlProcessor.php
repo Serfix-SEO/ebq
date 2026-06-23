@@ -121,9 +121,36 @@ class PageCrawlProcessor
             return 'changed';
         }
 
-        // 2xx (possibly via redirect). Analyze the HTML.
-        $analysis = $this->analyzer->analyze($page->url, $res['body'], $res['headers']);
+        // Non-HTML response (image/pdf/font/etc, reached via an image sitemap or a
+        // direct <a href> to an asset) — running on-page SEO analysis on it produces
+        // nonsense findings (missing_title/h1/meta/og/structured_data/thin_content on
+        // a JPEG). Mark non-indexable and stop here instead of feeding it to the HTML
+        // analyzer. Fixed 2026-06-23 — see infra/crawler/known-issues.md.
+        $contentType = strtolower(trim(explode(';', (string) $res['content_type'])[0]));
+        if ($contentType !== '' && $contentType !== 'text/html' && $contentType !== 'application/xhtml+xml') {
+            $page->forceFill([
+                'http_status' => $status,
+                'is_indexable' => false,
+                'http_error' => null,
+                'last_crawled_at' => now(),
+                'last_changed_at' => now(),
+                'next_crawl_at' => $baseNext,
+            ])->save();
+
+            return 'asset';
+        }
+
+        // 2xx (possibly via redirect). Analyze the HTML — relative links in the body
+        // must resolve against the EFFECTIVE (post-redirect) URL, not the originally
+        // requested one. Using $page->url here was a bug: on a site that redirects
+        // apex->www (or http->https) for every page, the actual HTML comes from the
+        // www host but every relative href got re-anchored to the apex host, so each
+        // newly discovered link inherited the same redirect — cascading a single
+        // host-level redirect into a "redirecting_url" finding on every single page.
+        // Confirmed 2026-06-23 on a live site: 28/28 pages flagged. See known-issues.md.
         $redirected = (bool) $res['redirected'];
+        $effectiveUrl = $redirected && $res['redirect_target'] ? (string) $res['redirect_target'] : $page->url;
+        $analysis = $this->analyzer->analyze($effectiveUrl, $res['body'], $res['headers']);
 
         // Noise-tolerant change detection: a few rotating ads / timestamps / counters
         // barely move the SimHash, so only a distance beyond the threshold (or the
@@ -152,7 +179,7 @@ class PageCrawlProcessor
             'content_length' => strlen($res['body']),
             'word_count' => $analysis['word_count'],
             'headings_json' => $analysis['headings_json'],
-            'seo_signals' => $this->seoSignals($analysis),
+            'seo_signals' => $this->seoSignals($analysis, $res),
             'body_text' => $analysis['body_text'],
             // Compact language-agnostic term candidates (drives the link suggester;
             // lets body_text be pruned post-analysis).
@@ -370,12 +397,16 @@ class PageCrawlProcessor
      * @param  array<string,mixed>  $analysis
      * @return array<string,mixed>
      */
-    private function seoSignals(array $analysis): array
+    private function seoSignals(array $analysis, array $res = []): array
     {
         $schemaTypes = [];
+        $invalidSchemaCount = 0;
         foreach (($analysis['schema']['blocks'] ?? []) as $b) {
             if (! empty($b['type'])) {
                 $schemaTypes[] = (string) $b['type'];
+            }
+            if (($b['valid'] ?? true) === false) {
+                $invalidSchemaCount++;
             }
         }
 
@@ -390,10 +421,21 @@ class PageCrawlProcessor
             'image_count' => $analysis['images']['total'] ?? 0,
             'missing_alt_count' => $analysis['images']['missing_alt_count'] ?? 0,
             'schema_types' => array_values(array_unique($schemaTypes)),
+            'invalid_schema_count' => $invalidSchemaCount,
             'og_tag_count' => $analysis['og_tag_count'] ?? 0,
             'twitter_tag_count' => $analysis['twitter_tag_count'] ?? 0,
             'canonical_points_away' => $analysis['canonical_points_away'] ?? false,
             'external_links' => $external,
+            'hreflang_count' => count($analysis['hreflangs'] ?? []),
+            'hreflang_self_ref' => $analysis['hreflang_self_ref'] ?? false,
+            'hreflangs' => array_slice($analysis['hreflangs'] ?? [], 0, self::MAX_EXTERNAL_SAMPLE),
+            // ttfb_ms is measured after the full body downloads (CrawlFetcher::fetch()),
+            // so it's really total fetch latency, not true time-to-first-byte — kept
+            // under this name to match the fetcher's existing field.
+            'ttfb_ms' => (int) ($res['ttfb_ms'] ?? 0),
+            'redirect_chain' => (int) ($res['redirect_chain'] ?? 0),
+            'mixed_content_count' => count($analysis['mixed_content_urls'] ?? []),
+            'mixed_content_urls' => array_slice($analysis['mixed_content_urls'] ?? [], 0, self::MAX_EXTERNAL_SAMPLE),
         ];
     }
 
