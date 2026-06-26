@@ -128,7 +128,7 @@
                            class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
                            placeholder="leave blank for unlimited" />
                     <p class="text-[11px] text-slate-500 mt-1">
-                        Leave blank for <strong>unlimited</strong>. The user's website count is enforced when they try to add a website; existing sites past the limit are <strong>frozen</strong> (read-only on EBQ and the WP plugin), not deleted, so a downgrade never destroys data.
+                        Leave blank for <strong>unlimited</strong>. Existing sites past the limit are <strong>frozen</strong> (read-only), not deleted.
                     </p>
                 </div>
                 <div>
@@ -138,8 +138,32 @@
                            class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
                            placeholder="leave blank for unlimited" />
                     <p class="text-[11px] text-slate-500 mt-1">
-                        Pages crawled per run, per site. Leave blank for <strong>unlimited</strong>. When capped, the crawler fetches the highest-value pages first (GSC-trafficked → in sitemap → shallow), so the budget covers what matters most.
+                        Account-wide page budget. Leave blank for <strong>unlimited</strong>.
                     </p>
+                </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Team seats</label>
+                    <input type="number" name="max_seats" value="{{ old('max_seats', $plan->max_seats) }}"
+                           min="0" max="9999"
+                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+                           placeholder="leave blank for unlimited" />
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Leave blank for <strong>unlimited</strong>. Enforced on <strong>new invites only</strong> — existing teammates above the cap are never removed.
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Extra seat price (USD, display only)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-2 flex items-center text-sm text-slate-400">$</span>
+                        <input type="number" name="extra_seat_price_usd" value="{{ old('extra_seat_price_usd', $plan->extra_seat_price_usd) }}"
+                               min="0" max="99999"
+                               class="w-full rounded border border-slate-300 pl-6 pr-3 py-2 text-sm font-mono"
+                               placeholder="leave blank for N/A" />
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-1">Display copy only — no per-seat billing engine exists yet.</p>
                 </div>
             </div>
 
@@ -193,7 +217,8 @@
                     'redirects'        => ['Redirects manager', '"EBQ Redirects" admin page with CSV import/export.'],
                     'dashboard_widget' => ['Dashboard widget', 'WP Dashboard "EBQ summary" widget on the home screen.'],
                     'post_column'      => ['Post list column', '"EBQ score" column in the wp-admin posts list.'],
-                    'report_whitelabel' => ['Report whitelabel', 'Branded report emails + PDF attachment, plus Gmail/Outlook/SMTP send-as. Off = EBQ default branding and mailer.'],
+                    'report_whitelabel'  => ['Report whitelabel', 'Branded report emails + PDF attachment, plus Gmail/Outlook/SMTP send-as. Off = EBQ default branding and mailer.'],
+                    'scheduled_reports'  => ['Scheduled reports (platform, not yet enforced)', 'Reserved for a future Scheduled Reports feature. Seeded per-tier; no enforcement yet.'],
                 ];
             @endphp
             <div class="border-t border-slate-200 pt-4 space-y-3">
@@ -227,18 +252,21 @@
                  Each input maps to a leaf in `plans.api_limits` JSON. --}}
             @php
                 $apiLimits = is_array($plan->api_limits ?? null) ? $plan->api_limits : [];
-                $ke  = (int) ($apiLimits['keywords_everywhere']['monthly_credits'] ?? 0) ?: '';
-                $ser = (int) ($apiLimits['serper']['monthly_calls']                ?? 0) ?: '';
-                $mis = (int) ($apiLimits['mistral']['monthly_tokens']              ?? 0) ?: '';
-                $rt  = (int) ($apiLimits['rank_tracker']['max_active_keywords']    ?? 0) ?: '';
+                $ke   = (int) ($apiLimits['keywords_everywhere']['monthly_credits']          ?? 0) ?: '';
+                $ser  = (int) ($apiLimits['serper']['monthly_calls']                         ?? 0) ?: '';
+                $mis  = (int) ($apiLimits['mistral']['monthly_tokens']                       ?? 0) ?: '';
+                $rt   = (int) ($apiLimits['rank_tracker']['max_active_keywords']             ?? 0) ?: '';
+                $krS  = (int) ($apiLimits['keyword_research']['monthly_searches']            ?? 0) ?: '';
+                $krR  = (int) ($apiLimits['keyword_research']['max_results_per_search']      ?? 0) ?: '';
+                $ast  = (int) ($apiLimits['ai_studio']['monthly_tokens']                     ?? 0) ?: '';
+                $lf   = (int) ($apiLimits['long_form']['monthly_articles']                   ?? 0) ?: '';
+                $qw   = (int) ($apiLimits['quick_win_finder']['results_shown']               ?? 0) ?: '';
             @endphp
             <div class="border-t border-slate-200 pt-4 space-y-3">
                 <div>
                     <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide">API limits</h3>
                     <p class="text-[11px] text-slate-500 mt-1">
-                        Per-user monthly caps. Leave blank for unlimited. Monthly windows reset on each user's
-                        subscription anchor day. Rank tracker is a hard ceiling on active tracked keywords; users
-                        must pause or remove keywords to free slots.
+                        Per-user monthly caps. Leave blank for unlimited. Monthly windows reset on each user's subscription anchor day.
                     </p>
                 </div>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -257,16 +285,51 @@
                                class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
                     </label>
                     <label class="block">
-                        <span class="block text-xs font-medium text-slate-700">Mistral — tokens / month (input + output)</span>
+                        <span class="block text-xs font-medium text-slate-700">Mistral — tokens / month (raw cost cap, enforced)</span>
                         <input type="number" min="0" name="api_limits[mistral][monthly_tokens]"
                                value="{{ old('api_limits.mistral.monthly_tokens', $mis) }}"
                                placeholder="Unlimited"
                                class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
                     </label>
                     <label class="block">
-                        <span class="block text-xs font-medium text-slate-700">Rank tracker — max active keywords</span>
+                        <span class="block text-xs font-medium text-slate-700">Rank tracker — max active keywords (enforced)</span>
                         <input type="number" min="0" name="api_limits[rank_tracker][max_active_keywords]"
                                value="{{ old('api_limits.rank_tracker.max_active_keywords', $rt) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Quick Win Finder — results shown (enforced)</span>
+                        <input type="number" min="0" name="api_limits[quick_win_finder][results_shown]"
+                               value="{{ old('api_limits.quick_win_finder.results_shown', $qw) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Keyword Research — searches / month <span class="text-slate-400 font-normal">(not yet enforced)</span></span>
+                        <input type="number" min="0" name="api_limits[keyword_research][monthly_searches]"
+                               value="{{ old('api_limits.keyword_research.monthly_searches', $krS) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Keyword Research — results / search <span class="text-slate-400 font-normal">(not yet enforced)</span></span>
+                        <input type="number" min="0" name="api_limits[keyword_research][max_results_per_search]"
+                               value="{{ old('api_limits.keyword_research.max_results_per_search', $krR) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">AI Studio — tokens / month <span class="text-slate-400 font-normal">(not yet enforced)</span></span>
+                        <input type="number" min="0" name="api_limits[ai_studio][monthly_tokens]"
+                               value="{{ old('api_limits.ai_studio.monthly_tokens', $ast) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Long Form — articles / month <span class="text-slate-400 font-normal">(not yet enforced)</span></span>
+                        <input type="number" min="0" name="api_limits[long_form][monthly_articles]"
+                               value="{{ old('api_limits.long_form.monthly_articles', $lf) }}"
                                placeholder="Unlimited"
                                class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
                     </label>

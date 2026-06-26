@@ -40,21 +40,27 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Subscription tier constants. After the 2026-05-17 rename:
+     * Subscription tier constants. After the 2026-06-26 5-tier rework:
      *
-     *   free    — unpaid, default
-     *   pro     — entry-level paid (was 'starter')
-     *   startup — growth tier      (was 'pro')
-     *   agency  — top tier         (unchanged)
+     *   trial      — default/no-subscription resting tier (was 'free')
+     *   solo       — entry-level paid
+     *   pro        — mid-tier paid
+     *   agency     — high-volume paid
+     *   enterprise — custom/contact-sales (no self-serve checkout)
      *
-     * `effectiveTier()` returns one of these exact slugs. The constants
-     * also drive the WP plugin's tier comparator (`isAtLeast`) — keep
-     * them ordered the same way in the TIER_ORDER map below.
+     * `effectiveTier()` returns one of these exact slugs. These strings
+     * must stay in sync with the WP plugin's tier comparator — a plugin
+     * update is required in lockstep when deploying this rename.
+     *
+     * Legacy constant TIER_FREE kept as an alias for TIER_TRIAL so any
+     * call site that hasn't been updated yet still compiles correctly.
      */
-    public const TIER_FREE = 'free';
-    public const TIER_PRO = 'pro';
-    public const TIER_STARTUP = 'startup';
-    public const TIER_AGENCY = 'agency';
+    public const TIER_TRIAL      = 'trial';
+    public const TIER_FREE       = self::TIER_TRIAL; // backward-compat alias
+    public const TIER_SOLO       = 'solo';
+    public const TIER_PRO        = 'pro';
+    public const TIER_AGENCY     = 'agency';
+    public const TIER_ENTERPRISE = 'enterprise';
 
     /**
      * Tier ordinal — higher = more capable. Used by the `isAtLeast()`
@@ -62,10 +68,11 @@ class User extends Authenticatable implements MustVerifyEmail
      * hardcoding the full slug list.
      */
     public const TIER_ORDER = [
-        self::TIER_FREE    => 0,
-        self::TIER_PRO     => 1,
-        self::TIER_STARTUP => 2,
-        self::TIER_AGENCY  => 3,
+        self::TIER_TRIAL      => 0,
+        self::TIER_SOLO       => 1,
+        self::TIER_PRO        => 2,
+        self::TIER_AGENCY     => 3,
+        self::TIER_ENTERPRISE => 4,
     ];
 
     /**
@@ -292,8 +299,8 @@ class User extends Authenticatable implements MustVerifyEmail
      *      the next resolution step if the Pro row doesn't exist.
      *   2. Active Cashier subscription → match by stripe_price_id_yearly
      *   3. Snapshotted current_plan_slug (set by webhook + on swap)
-     *   4. The `free` plan row, so admin-edited max_websites etc. on
-     *      Free actually take effect for users without a paid sub
+     *   4. The `trial` plan row, so admin-edited max_websites etc. on
+     *      Trial actually take effect for users without a paid sub
      *
      * Returns null only if the database has no Plan rows at all (fresh
      * install, seeder hasn't run).
@@ -316,7 +323,7 @@ class User extends Authenticatable implements MustVerifyEmail
         if ((bool) config('app.free', false)) {
             $pro = Plan::where('slug', self::TIER_PRO)->first();
             if ($pro) {
-                $currentRank = self::TIER_ORDER[$plan->slug ?? self::TIER_FREE] ?? 0;
+                $currentRank = self::TIER_ORDER[$plan->slug ?? self::TIER_TRIAL] ?? 0;
                 $proRank = self::TIER_ORDER[self::TIER_PRO] ?? 0;
                 if ($plan === null || $currentRank < $proRank) {
                     return $pro;
@@ -330,8 +337,8 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Resolve the user's real plan from subscription state, honouring (in
      * order): an active Cashier subscription matched by yearly price ID, the
-     * snapshotted `current_plan_slug`, then the Free plan row so admin edits
-     * to Free's max_websites / features apply to free-tier users. Returns
+     * snapshotted `current_plan_slug`, then the Trial plan row so admin edits
+     * to Trial's max_websites / features apply to unsubscribed users. Returns
      * null only when the plans table is empty (fresh install pre-seeder).
      */
     private function resolveSubscribedPlan(): ?Plan
@@ -352,25 +359,26 @@ class User extends Authenticatable implements MustVerifyEmail
                 return $plan;
             }
         }
-        return Plan::where('slug', self::TIER_FREE)->first();
+        return Plan::where('slug', self::TIER_TRIAL)->first();
     }
 
     /**
-     * Exact slug of the user's effective plan. Post-rename, one of:
-     * `free`, `pro`, `startup`, `agency`. The WP plugin reads this as
+     * Exact slug of the user's effective plan. Post-5-tier-rework, one of:
+     * `trial`, `solo`, `pro`, `agency`, `enterprise`. The WP plugin reads this as
      * the `tier` field on every authenticated JSON response (injected
      * by `InjectFeatureFlags`).
      *
      * Honours the free-promo short-circuit transparently: when
      * `effectivePlan()` resolves to the Pro row because of FREE=true,
      * this returns `'pro'` and the plugin treats it identically to a
-     * paid Pro user.
+     * paid Pro user. Falls back to TIER_TRIAL (not TIER_FREE — same
+     * string, alias kept for backward compat) when plan is null.
      */
     public function effectiveTier(): string
     {
         $plan = $this->effectivePlan();
         if ($plan === null) {
-            return self::TIER_FREE;
+            return self::TIER_TRIAL;
         }
         return (string) $plan->slug;
     }
@@ -383,7 +391,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isPro(): bool
     {
-        return $this->effectiveTier() !== self::TIER_FREE;
+        return $this->effectiveTier() !== self::TIER_TRIAL;
     }
 
     /**

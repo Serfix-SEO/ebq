@@ -113,6 +113,21 @@ class WebsiteTeam extends Component
             return;
         }
 
+        // Seat cap: block new invites when the owner's plan has a max_seats
+        // limit and the website already has that many members (owner excluded).
+        // Existing teammates above the cap are never removed — only forward
+        // growth is gated (mirrors the non-destructive frozenWebsiteIds() pattern).
+        $owner = $website->user;
+        $maxSeats = $owner?->effectivePlan()?->max_seats;
+        if ($maxSeats !== null) {
+            $currentSeats = $website->members()->count();
+            if ($currentSeats >= $maxSeats) {
+                $this->addError('inviteEmail', "Your plan allows {$maxSeats} team seat(s) per website. Upgrade to add more members.");
+
+                return;
+            }
+        }
+
         $permissions = $this->inviteRole === TeamPermissions::ROLE_ADMIN
             ? null
             : TeamPermissions::normalize(array_keys(array_filter($this->invitePermissions)));

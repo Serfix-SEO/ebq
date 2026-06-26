@@ -102,6 +102,10 @@ class PlanController extends Controller
             'max_websites' => 'nullable|integer|min:0|max:999',
             // null / empty = unlimited (global crawler cap applies).
             'max_crawl_pages' => 'nullable|integer|min:0|max:9999999',
+            // null / empty = unlimited. Enforced on new invites only.
+            'max_seats' => 'nullable|integer|min:0|max:9999',
+            // null / empty = N/A. Display-only, no per-seat billing engine.
+            'extra_seat_price_usd' => 'nullable|integer|min:0|max:99999',
             'features' => 'nullable|string|max:8000',
             'display_order' => 'required|integer|min:0|max:9999',
             'is_active' => 'sometimes|boolean',
@@ -113,6 +117,11 @@ class PlanController extends Controller
             'api_limits.serper.monthly_calls' => 'nullable|integer|min:0|max:10000000',
             'api_limits.mistral.monthly_tokens' => 'nullable|integer|min:0|max:1000000000',
             'api_limits.rank_tracker.max_active_keywords' => 'nullable|integer|min:0|max:100000',
+            'api_limits.keyword_research.monthly_searches' => 'nullable|integer|min:0|max:1000000',
+            'api_limits.keyword_research.max_results_per_search' => 'nullable|integer|min:0|max:1000000',
+            'api_limits.ai_studio.monthly_tokens' => 'nullable|integer|min:0|max:100000000',
+            'api_limits.long_form.monthly_articles' => 'nullable|integer|min:0|max:10000',
+            'api_limits.quick_win_finder.results_shown' => 'nullable|integer|min:0|max:1000',
             // Plugin entitlement matrix. Submitted as a bag of
             // `plan_features[<key>]=on` checkbox fields; unchecked
             // boxes don't POST, so we default-fill below.
@@ -172,7 +181,7 @@ class PlanController extends Controller
         // round-trips cleanly. Empty namespaces are stripped too.
         $apiLimits = $data['api_limits'] ?? [];
         $cleanLimits = [];
-        foreach (['keywords_everywhere', 'serper', 'mistral', 'rank_tracker'] as $ns) {
+        foreach (['keywords_everywhere', 'serper', 'mistral', 'rank_tracker', 'keyword_research', 'ai_studio', 'long_form', 'quick_win_finder'] as $ns) {
             $node = $apiLimits[$ns] ?? [];
             if (! is_array($node)) {
                 continue;

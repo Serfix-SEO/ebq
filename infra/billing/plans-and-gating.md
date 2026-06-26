@@ -3,21 +3,48 @@
 How a `plans` row defines a tier, and how every read-path answers "what plan is this
 user on, what features can they use, and how many sites / crawl pages do they get".
 
-## The four tiers
+## The five tiers (2026-06-26 rework)
 
 Seeded idempotently by `PlanSeeder` (`updateOrCreate` by `slug`). Caps below are the
 *seed defaults* — operators tune them live from `/admin/plans/<id>/edit` with no deploy.
 
-| slug | name | yearly $ | trial | max_websites | max_crawl_pages | KE credits/mo | Serper/mo | Mistral tok/mo | tracker kw |
-|---|---|---|---|---|---|---|---|---|---|
-| `free` | Free | 0 | 0 | 1 | 300 | 100 | 100 | 100k | 10 |
-| `pro` | Pro | 60 | 30 | 2 | 5,000 | 750 | 1,000 | 1M | 50 |
-| `startup` | Startup | 180 | 0 | 10 | 25,000 | 4,000 | 4,000 | 5M | 200 |
-| `agency` | Agency | 420 | 0 | 50 | 50,000 | 8,000 | 6,000 | 12M | 500 |
+| slug | name | monthly $ | yearly $ | max_websites | max_seats | max_crawl_pages | tracker kw | quick_win results |
+|---|---|---|---|---|---|---|---|---|
+| `trial` | Trial | 0 | — | 1 | 1 | 20,000 | 20 | 5 |
+| `solo` | Solo | 19 | 168 | 3 | 1 | 100,000 | 100 | 10 |
+| `pro` | Pro | 49 | 444 | 10 | 3 | 300,000 | 500 | 20 |
+| `agency` | Agency | 99 | 888 | 30 | 10 | 1,000,000 | 2,000 | 30 |
+| `enterprise` | Enterprise | — | — (contact sales) | ∞ | ∞ | ∞ | ∞ | ∞ |
 
-`null` on any cap = **unlimited**. Slug taxonomy was renamed 2026-05-17
-(starter→pro, pro→startup). Tier ordinal ranking lives in `User::TIER_ORDER`
-(`free`=0 < `pro`=1 < `startup`=2 < `agency`=3), used by `User::isAtLeast()`.
+`null` on any cap = **unlimited**. The four old tiers (`free`/`pro`/`startup`/`agency`)
+were renamed to `legacy_*` and deactivated by migration
+`2026_06_26_000100_rename_legacy_plan_slugs` — existing subscribers continue resolving
+via Stripe price ID, entitlements unchanged.
+
+Tier ordinal ranking lives in `User::TIER_ORDER`
+(`trial`=0 < `solo`=1 < `pro`=2 < `agency`=3 < `enterprise`=4), used by `User::isAtLeast()`.
+
+`trial` is the **no-subscription default tier** (was `free`). `resolveSubscribedPlan()` falls
+back to `Plan::where('slug', 'trial')` when no active subscription or snapshot exists.
+No countdown/expiry job exists — a user stays on Trial until they start a paid sub.
+`TIER_FREE` constant kept as a backward-compat alias for `TIER_TRIAL`.
+
+### Unenforced limits (seeded only — matching `research_limits` precedent)
+
+| api_limits path | Enforced? | Notes |
+|---|---|---|
+| `keyword_research.monthly_searches` | ❌ no | no monthly counter today |
+| `keyword_research.max_results_per_search` | ❌ no | no monthly counter today |
+| `ai_studio.monthly_tokens` | ❌ no | distinct from the enforced `mistral.monthly_tokens` raw-cost cap |
+| `long_form.monthly_articles` | ❌ no | no article-count metering |
+| `plan_features.scheduled_reports` | ❌ no | feature doesn't exist yet |
+
+### New enforced limits
+
+| Field | Enforcement point |
+|---|---|
+| `max_seats` | `WebsiteTeam::inviteMember()` — blocks new invites; existing members grandfathered |
+| `api_limits.quick_win_finder.results_shown` | `QuickWinsCard::render()` — replaces the hardcoded `5` |
 
 ## Plan data model (`app/Models/Plan.php`)
 
@@ -29,6 +56,8 @@ Seeded idempotently by `PlanSeeder` (`updateOrCreate` by `slug`). Caps below are
 | `trial_days` | int | Cashier `trialDays()` at checkout. |
 | `max_websites` | int? | Site cap. null=unlimited. → `User::websiteLimit()`. |
 | `max_crawl_pages` | int? | ACCOUNT-WIDE page budget pooled across all of the owner's sites (not per-site). Each site is still hard-capped at `crawler.max_pages_per_site` regardless. null=no pool (hard per-site cap still applies). → `Website::crawlPageCap()`. |
+| `max_seats` | int? | Team member cap per website. null=unlimited. Enforced on new invites only; existing members grandfathered. → `WebsiteTeam::inviteMember()`. |
+| `extra_seat_price_usd` | int? | Display-only per-seat add-on price. No per-seat billing engine exists. |
 | `features` | array | Marketing bullet list (plain strings) for /pricing + WP wizard. |
 | `feature_videos` | array? | Sparse `bulletIndex => YouTube URL` map; kept separate from `features`. |
 | `plan_features` | array | **The 9-key boolean entitlement matrix** (the gating ceiling). |
@@ -43,14 +72,15 @@ Key methods:
 - `isCheckoutReady()` (line 177) — `price_yearly_usd > 0 && stripe_price_id_yearly` set. Free always false.
 - `requiredPlanFor($key)` (line 222) — cheapest active plan (by `display_order`) that enables a feature; powers the plugin's "Upgrade to <tier>" copy.
 
-### `FEATURE_KEYS` (the 9 entitlement flags)
+### `FEATURE_KEYS` (the 10 entitlement flags)
 
 `chatbot, ai_writer, ai_inline, live_audit, hq, redirects, dashboard_widget,
-post_column, report_whitelabel`. Mirrored across three places that **must stay in
-sync**: `Plan::FEATURE_KEYS`, `Website::FEATURE_KEYS` (8 keys — excludes the
-platform-only `report_whitelabel`), and the WP plugin's
-`EBQ_Feature_Flags::KNOWN_FEATURES`. `report_whitelabel` is a *platform* feature
-(branded report emails / per-tenant mail transport), not a plugin flag.
+post_column, report_whitelabel, scheduled_reports`. Mirrored across three places that
+**must stay in sync**: `Plan::FEATURE_KEYS`, `Website::FEATURE_KEYS` (8 keys — excludes
+the two platform-only flags), and the WP plugin's `EBQ_Feature_Flags::KNOWN_FEATURES`.
+`report_whitelabel` and `scheduled_reports` are *platform* features — they must NOT be
+added to `Website::FEATURE_KEYS` or the WP plugin. `scheduled_reports` is seeded but
+not yet enforced (no Scheduled Reports feature exists to gate).
 
 ## Resolving the user's plan (`User::effectivePlan()`, line 291)
 

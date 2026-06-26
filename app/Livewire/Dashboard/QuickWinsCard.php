@@ -49,10 +49,12 @@ class QuickWinsCard extends Component
         $rows = [];
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
+            $user = Auth::user();
+            $limit = $user?->effectivePlan()?->apiLimit('quick_win_finder.results_shown') ?? 5;
             $rows = Cache::remember(
-                'quick_wins_card:'.$this->websiteId,
+                'quick_wins_card:'.$this->websiteId.':'.$limit,
                 600,
-                fn () => app(ReportDataService::class)->quickWins($this->websiteId, 5),
+                fn () => app(ReportDataService::class)->quickWins($this->websiteId, $limit),
             );
         }
 

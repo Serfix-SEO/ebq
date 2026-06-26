@@ -92,6 +92,12 @@ unknown email → `WebsiteInvitation::issue` + `WebsiteTeamInvitationMail`. Memb
 a role (`admin` = full, `member` = checked permission keys). Permission checks run
 through `User::hasFeatureAccess()` → `TeamPermissions::allows()`.
 
+**Seat cap** (`Plan::max_seats`): before sending an invite, `inviteMember()` checks
+`website->members()->count()` against the **site owner's** plan `max_seats`. If at or
+over the cap, the invite is blocked with a friendly message. **Existing teammates above
+the cap are never removed** — only forward growth is gated, mirroring the
+non-destructive `frozenWebsiteIds()` pattern for websites.
+
 ## Gotchas / known issues
 
 - **Login errors are a banner, not a field.** `LoginRequest` keys failures to

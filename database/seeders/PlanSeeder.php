@@ -6,45 +6,41 @@ use App\Models\Plan;
 use Illuminate\Database\Seeder;
 
 /**
- * Seeds the four canonical plan rows. Mirrors the marketing
- * `pricing.blade.php` so the public API endpoint, the WordPress plugin
- * wizard, and the marketing page all show identical plan content.
+ * Seeds the five canonical plan rows for the 2026-06-26 5-tier rework.
  *
- * Slug taxonomy (renamed 2026-05-17):
- *   free    — anonymous / free tier
- *   pro     — entry-level paid (was "starter")
- *   startup — growth tier      (was "pro")
- *   agency  — top tier         (unchanged)
+ * Tiers: trial / solo / pro / agency / enterprise
  *
- * `plan_features` is the authoritative entitlement matrix the WP plugin
- * honours. Treat the seeded values as a sensible starting point —
- * operators tune them live from /admin/plans/<id>/edit without a deploy.
+ * The four old rows (free/pro/startup/agency) were renamed to legacy_*
+ * and deactivated by migration 2026_06_26_000100_rename_legacy_plan_slugs.
+ * Existing subscribers who hold a Stripe price ID on a legacy row are
+ * unaffected — effectivePlan() resolves via stripe_price_id_yearly first.
  *
- * Stripe price IDs are intentionally omitted here — operator must add them
- * via Stripe Dashboard + a follow-up `php artisan tinker` (or migration)
- * once the products exist. `isCheckoutReady()` on the Plan model
- * gracefully refuses checkout sessions until they're populated. Keeping
- * them out of the seeded array means re-running this seeder won't trample
- * the live IDs.
+ * Idempotent: uses updateOrCreate keyed by slug, so re-running won't
+ * duplicate rows or trample manually-set Stripe IDs (those are omitted
+ * from the seed array deliberately).
  *
- * Idempotent: uses `updateOrCreate` keyed by `slug` so re-running this
- * seeder won't duplicate rows or trample manually-set Stripe IDs.
+ * Unenforced limits (seeded for future enforcement):
+ *   api_limits.keyword_research.*  — no monthly counter today
+ *   api_limits.ai_studio.*         — distinct from enforced mistral cap
+ *   api_limits.long_form.*         — no article-count metering today
+ *   plan_features.scheduled_reports — feature doesn't exist yet
+ *
+ * Enforced limits:
+ *   max_websites                            — frozenWebsiteIds()
+ *   max_seats                               — WebsiteTeam::inviteMember()
+ *   max_crawl_pages                         — Website::crawlPageCap()
+ *   api_limits.rank_tracker.max_active_keywords — RankTrackingKeywordObserver
+ *   api_limits.quick_win_finder.results_shown   — QuickWinsCard
+ *   plan_features.report_whitelabel             — ReportBrandingResolver
  */
 class PlanSeeder extends Seeder
 {
-    /**
-     * Tour videos keyed by feature index. Identical across every plan.
-     */
     private const FEATURE_VIDEOS = [
         '4'  => 'https://youtu.be/bfo2ei66Pts',
         '5'  => 'https://youtu.be/MHa027Tq9sQ',
         '16' => 'https://youtu.be/Rzme7QvSbLE',
     ];
 
-    /**
-     * Builds the marketing feature bullet list. Only the leading website
-     * line and the tracked-keywords line differ between tiers.
-     */
     private function features(string $websitesLine, string $keywordsLine): array
     {
         return [
@@ -72,20 +68,22 @@ class PlanSeeder extends Seeder
     {
         $plans = [
             [
-                'slug' => 'free',
-                'name' => 'Free',
-                'tagline' => 'For personal sites and trial runs.',
-                'price_monthly_usd' => 0,
-                'price_yearly_usd' => 0,
-                'trial_days' => 0,
-                'max_websites' => 1,
-                'max_crawl_pages' => 300,
-                'display_order' => 1,
-                'is_highlighted' => false,
-                'is_active' => true,
-                'features' => $this->features('1 personal website', '10 tracked keywords'),
-                'feature_videos' => self::FEATURE_VIDEOS,
-                'plan_features' => [
+                'slug'               => 'trial',
+                'name'               => 'Trial',
+                'tagline'            => 'Get started — no credit card required.',
+                'price_monthly_usd'  => 0,
+                'price_yearly_usd'   => 0,
+                'trial_days'         => 0,
+                'max_websites'       => 1,
+                'max_seats'          => 1,
+                'extra_seat_price_usd' => null,
+                'max_crawl_pages'    => 20000,
+                'display_order'      => 1,
+                'is_highlighted'     => false,
+                'is_active'          => true,
+                'features'           => $this->features('1 website', '20 tracked keywords'),
+                'feature_videos'     => self::FEATURE_VIDEOS,
+                'plan_features'      => [
                     'chatbot'           => false,
                     'ai_writer'         => true,
                     'ai_inline'         => true,
@@ -95,31 +93,69 @@ class PlanSeeder extends Seeder
                     'dashboard_widget'  => true,
                     'post_column'       => true,
                     'report_whitelabel' => false,
+                    'scheduled_reports' => false,
                 ],
-                'api_limits' => [
-                    'keywords_everywhere' => ['monthly_credits' => 100],
-                    'serper'              => ['monthly_calls'   => 100],
-                    'mistral'             => ['monthly_tokens'  => 100_000],
-                    'rank_tracker'        => ['max_active_keywords' => 10],
+                'api_limits'         => [
+                    'rank_tracker'      => ['max_active_keywords'  => 20],
+                    'keyword_research'  => ['monthly_searches'     => 50, 'max_results_per_search' => 1000],
+                    'ai_studio'         => ['monthly_tokens'       => 25000],
+                    'long_form'         => ['monthly_articles'     => 2],
+                    'quick_win_finder'  => ['results_shown'        => 5],
                 ],
             ],
             [
-                // Renamed: starter → pro. This is the new entry-level
-                // paid tier (formerly known as "Starter").
-                'slug' => 'pro',
-                'name' => 'Pro',
-                'tagline' => 'For one site you actively grow.',
-                'price_monthly_usd' => 5,
-                'price_yearly_usd' => 60,
-                'trial_days' => 30,
-                'max_websites' => 2,
-                'max_crawl_pages' => 5000,
-                'display_order' => 2,
-                'is_highlighted' => true,
-                'is_active' => true,
-                'features' => $this->features('2 websites', '50 tracked keywords'),
-                'feature_videos' => self::FEATURE_VIDEOS,
-                'plan_features' => [
+                'slug'               => 'solo',
+                'name'               => 'Solo',
+                'tagline'            => 'For one site you actively grow.',
+                'price_monthly_usd'  => 19,
+                'price_yearly_usd'   => 168,
+                'trial_days'         => 0,
+                'max_websites'       => 3,
+                'max_seats'          => 1,
+                'extra_seat_price_usd' => 10,
+                'max_crawl_pages'    => 100000,
+                'display_order'      => 2,
+                'is_highlighted'     => false,
+                'is_active'          => true,
+                'features'           => $this->features('3 websites', '100 tracked keywords'),
+                'feature_videos'     => self::FEATURE_VIDEOS,
+                'plan_features'      => [
+                    'chatbot'           => false,
+                    'ai_writer'         => true,
+                    'ai_inline'         => true,
+                    'live_audit'        => true,
+                    'hq'                => true,
+                    'redirects'         => true,
+                    'dashboard_widget'  => true,
+                    'post_column'       => true,
+                    'report_whitelabel' => false,
+                    'scheduled_reports' => false,
+                ],
+                'api_limits'         => [
+                    'rank_tracker'      => ['max_active_keywords'  => 100],
+                    'keyword_research'  => ['monthly_searches'     => 250, 'max_results_per_search' => 5000],
+                    'ai_studio'         => ['monthly_tokens'       => 60000],
+                    'long_form'         => ['monthly_articles'     => 5],
+                    'quick_win_finder'  => ['results_shown'        => 10],
+                ],
+            ],
+            [
+                'slug'               => 'pro',
+                'name'               => 'Pro',
+                'tagline'            => 'For growing teams and agencies.',
+                'price_monthly_usd'  => 49,
+                'price_yearly_usd'   => 444,
+                'trial_days'         => 0,
+                'max_websites'       => 10,
+                'max_seats'          => 3,
+                'extra_seat_price_usd' => 10,
+                'max_crawl_pages'    => 300000,
+                'display_order'      => 3,
+                'is_highlighted'     => true,
+                'is_active'          => true,
+                'features'           => $this->features('10 websites', '500 tracked keywords'),
+                'feature_videos'     => self::FEATURE_VIDEOS,
+                'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
                     'ai_inline'         => true,
@@ -129,63 +165,33 @@ class PlanSeeder extends Seeder
                     'dashboard_widget'  => true,
                     'post_column'       => true,
                     'report_whitelabel' => false,
+                    'scheduled_reports' => true,
                 ],
-                'api_limits' => [
-                    'keywords_everywhere' => ['monthly_credits' => 750],
-                    'serper'              => ['monthly_calls'   => 1_000],
-                    'mistral'             => ['monthly_tokens'  => 1_000_000],
-                    'rank_tracker'        => ['max_active_keywords' => 50],
-                ],
-            ],
-            [
-                // Renamed: pro → startup. Relabelled to make room for the
-                // cheaper entry-level "Pro" above.
-                'slug' => 'startup',
-                'name' => 'Startup',
-                'tagline' => 'For agencies and growth teams.',
-                'price_monthly_usd' => 15,
-                'price_yearly_usd' => 180,
-                'trial_days' => 0,
-                'max_websites' => 10,
-                'max_crawl_pages' => 25000,
-                'display_order' => 3,
-                'is_highlighted' => false,
-                'is_active' => true,
-                'features' => $this->features('10 websites', '200 tracked keywords'),
-                'feature_videos' => self::FEATURE_VIDEOS,
-                'plan_features' => [
-                    'chatbot'           => true,
-                    'ai_writer'         => true,
-                    'ai_inline'         => true,
-                    'live_audit'        => true,
-                    'hq'                => true,
-                    'redirects'         => true,
-                    'dashboard_widget'  => true,
-                    'post_column'       => true,
-                    'report_whitelabel' => false,
-                ],
-                'api_limits' => [
-                    'keywords_everywhere' => ['monthly_credits' => 4_000],
-                    'serper'              => ['monthly_calls'   => 4_000],
-                    'mistral'             => ['monthly_tokens'  => 5_000_000],
-                    'rank_tracker'        => ['max_active_keywords' => 200],
+                'api_limits'         => [
+                    'rank_tracker'      => ['max_active_keywords'  => 500],
+                    'keyword_research'  => ['monthly_searches'     => 1000, 'max_results_per_search' => 10000],
+                    'ai_studio'         => ['monthly_tokens'       => 150000],
+                    'long_form'         => ['monthly_articles'     => 15],
+                    'quick_win_finder'  => ['results_shown'        => 20],
                 ],
             ],
             [
-                'slug' => 'agency',
-                'name' => 'Agency',
-                'tagline' => 'For agencies managing many clients.',
-                'price_monthly_usd' => 35,
-                'price_yearly_usd' => 420,
-                'trial_days' => 0,
-                'max_websites' => 50,
-                'max_crawl_pages' => 50000,
-                'display_order' => 4,
-                'is_highlighted' => false,
-                'is_active' => true,
-                'features' => $this->features('50 websites', '500 tracked keywords'),
-                'feature_videos' => self::FEATURE_VIDEOS,
-                'plan_features' => [
+                'slug'               => 'agency',
+                'name'               => 'Agency',
+                'tagline'            => 'For agencies managing many clients.',
+                'price_monthly_usd'  => 99,
+                'price_yearly_usd'   => 888,
+                'trial_days'         => 0,
+                'max_websites'       => 30,
+                'max_seats'          => 10,
+                'extra_seat_price_usd' => 8,
+                'max_crawl_pages'    => 1000000,
+                'display_order'      => 4,
+                'is_highlighted'     => false,
+                'is_active'          => true,
+                'features'           => $this->features('30 websites', '2000 tracked keywords'),
+                'feature_videos'     => self::FEATURE_VIDEOS,
+                'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
                     'ai_inline'         => true,
@@ -195,13 +201,45 @@ class PlanSeeder extends Seeder
                     'dashboard_widget'  => true,
                     'post_column'       => true,
                     'report_whitelabel' => true,
+                    'scheduled_reports' => true,
                 ],
-                'api_limits' => [
-                    'keywords_everywhere' => ['monthly_credits' => 8_000],
-                    'serper'              => ['monthly_calls'   => 6_000],
-                    'mistral'             => ['monthly_tokens'  => 12_000_000],
-                    'rank_tracker'        => ['max_active_keywords' => 500],
+                'api_limits'         => [
+                    'rank_tracker'      => ['max_active_keywords'  => 2000],
+                    'keyword_research'  => ['monthly_searches'     => 4000, 'max_results_per_search' => 30000],
+                    'ai_studio'         => ['monthly_tokens'       => 600000],
+                    'long_form'         => ['monthly_articles'     => 50],
+                    'quick_win_finder'  => ['results_shown'        => 30],
                 ],
+            ],
+            [
+                'slug'               => 'enterprise',
+                'name'               => 'Enterprise',
+                'tagline'            => 'Custom scale. Contact us.',
+                'price_monthly_usd'  => 0,
+                'price_yearly_usd'   => 0,      // no self-serve checkout; isCheckoutReady() = false (price>0 not met)
+                'trial_days'         => 0,
+                'max_websites'       => null,   // unlimited
+                'max_seats'          => null,   // unlimited
+                'extra_seat_price_usd' => null,
+                'max_crawl_pages'    => null,   // unlimited
+                'display_order'      => 5,
+                'is_highlighted'     => false,
+                'is_active'          => true,
+                'features'           => $this->features('Unlimited websites', 'Unlimited tracked keywords'),
+                'feature_videos'     => self::FEATURE_VIDEOS,
+                'plan_features'      => [
+                    'chatbot'           => true,
+                    'ai_writer'         => true,
+                    'ai_inline'         => true,
+                    'live_audit'        => true,
+                    'hq'                => true,
+                    'redirects'         => true,
+                    'dashboard_widget'  => true,
+                    'post_column'       => true,
+                    'report_whitelabel' => true,
+                    'scheduled_reports' => true,
+                ],
+                'api_limits'         => null,   // unlimited everything
             ],
         ];
 

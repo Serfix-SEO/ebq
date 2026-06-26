@@ -45,6 +45,9 @@ class Plan extends Model
         // flag just controls whether the customer's saved branding is
         // applied or the EBQ default is used.
         'report_whitelabel',
+        // Platform feature — not a plugin flag. No Scheduled Reports
+        // feature exists yet; seeded per-tier but not enforced.
+        'scheduled_reports',
     ];
 
     protected $fillable = [
@@ -62,6 +65,12 @@ class Plan extends Model
         // config('crawler.max_pages_per_site') regardless. null = no pool (sites
         // just get the hard per-site cap). See Website::crawlPageCap().
         'max_crawl_pages',
+        // Team seat cap — enforced on new invites only (existing teammates
+        // are never removed). null = unlimited.
+        'max_seats',
+        // Display-only per-seat add-on price. No per-seat billing engine
+        // exists; stored so the admin UI and marketing pages can show it.
+        'extra_seat_price_usd',
         'features',
         // Sparse map of bullet-index => YouTube URL for the optional
         // explainer video shown next to a marketing bullet. Kept separate
@@ -95,6 +104,8 @@ class Plan extends Model
             'trial_days' => 'integer',
             'max_websites' => 'integer',
             'max_crawl_pages' => 'integer',
+            'max_seats' => 'integer',
+            'extra_seat_price_usd' => 'integer',
             'display_order' => 'integer',
             'is_active' => 'boolean',
             'is_highlighted' => 'boolean',
@@ -159,6 +170,17 @@ class Plan extends Model
             return 'Unlimited';
         }
         return $this->max_websites === 1 ? '1 website' : ($this->max_websites.' websites');
+    }
+
+    /**
+     * Human-readable display of the team seat cap. Null = unlimited.
+     */
+    public function maxSeatsLabel(): string
+    {
+        if ($this->max_seats === null) {
+            return 'Unlimited';
+        }
+        return $this->max_seats === 1 ? '1 seat' : ($this->max_seats.' seats');
     }
 
     /**

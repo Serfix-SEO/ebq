@@ -242,6 +242,26 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-26 (billing — 5-tier pricing rework: Trial/Solo/Pro/Agency/Enterprise)** —
+  Replaced the 4-tier model (Free/Pro/Startup/Agency) with 5 tiers. Old rows renamed
+  `legacy_*` + deactivated (`2026_06_26_000100_rename_legacy_plan_slugs` migration,
+  transactional, same pattern as 2026-05-17); existing subscribers unchanged (resolve
+  via Stripe price ID). New `max_seats`/`extra_seat_price_usd` columns added
+  (`2026_06_26_000200_add_seat_fields_to_plans_table`). `Plan::FEATURE_KEYS` grew 9→10
+  (added `scheduled_reports` — platform-only, seeded, not yet enforced). `User` tier
+  constants renamed: `TIER_FREE`→`TIER_TRIAL` (TIER_FREE kept as alias), removed
+  `TIER_STARTUP`, added `TIER_SOLO`/`TIER_ENTERPRISE`; `TIER_ORDER` updated to 5 tiers.
+  `resolveSubscribedPlan()` fallback now hits `trial` row (was `free`). `PlanSeeder`
+  fully rewritten for 5 tiers. `PlanController::validatePlanInput()` extended for 4 new
+  `api_limits` namespaces (`keyword_research`, `ai_studio`, `long_form`,
+  `quick_win_finder`). `QuickWinsCard` reads `quick_win_finder.results_shown` from plan
+  (was hardcoded `5`). `WebsiteTeam::inviteMember()` enforces `max_seats` on new invites
+  only (existing members grandfathered). Admin `/admin/plans/<id>/edit` shows all new
+  fields. **WP plugin coordination required**: plugin must be updated to the new tier
+  vocabulary `{trial,solo,pro,agency,enterprise}` in lockstep.
+  Details: [billing/plans-and-gating.md](./billing/plans-and-gating.md) ·
+  [accounts/README.md](./accounts/README.md).
+
 - **2026-06-23 (keyword finder — admin live-queue panel + monthly shared ideas cache)** —
   User: see which keyword's queued and by which user across the self-hosted keyword API
   fleet; and cache keyword-ideas results for the current calendar month (not rolling days)
