@@ -392,83 +392,96 @@
     </section>
 
     {{-- ── Pricing ──────────────────────────────────────────────── --}}
+    @php
+        $ck = function (string $path): string {
+            static $svgCheck = '<svg class="h-4 w-4 flex-none text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>';
+            return $svgCheck;
+        };
+    @endphp
     <section id="pricing" class="bg-slate-50/60 py-20 sm:py-24 px-6">
-        <div class="mx-auto max-w-5xl">
+        <div class="mx-auto max-w-6xl">
             <div class="text-center mb-10">
                 <h2 class="text-3xl font-bold text-slate-900 mb-3">Transparent Pricing</h2>
-                <p class="text-base text-slate-600 mb-2">Scale your SEO from solo projects to regional agencies.</p>
+                <p class="text-base text-slate-600 mb-2">From free to enterprise — scale your SEO without switching tools.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
 
-                {{-- Solo --}}
-                <div class="bg-white p-8 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
-                    <h3 class="text-base font-semibold text-slate-900 mb-1">Solo</h3>
+                {{-- Trial (free) --}}
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Trial</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-bold text-slate-900">$14</span>
+                        <span class="text-4xl font-bold text-slate-900">$0</span>
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-6">Billed annually ($19 monthly)</p>
-                    <ul class="space-y-2.5 mb-8 flex-grow text-sm text-slate-700">
-                        @foreach (['3 projects', '1 team seat', '100k crawl budget', '100 tracked keywords', '250 keyword research searches/mo', '60k AI tokens/mo', '5 AI long-form articles', 'WordPress plugin', 'GA4 + GSC integration'] as $item)
-                            <li class="flex items-center gap-2.5">
-                                <svg class="h-4 w-4 flex-none text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                                {{ $item }}
+                    <p class="text-xs text-slate-500 mb-5">Free forever. No card required.</p>
+                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
+                        @foreach (['1 website', '1 team seat', '20k crawl budget', '20 tracked keywords', '50 keyword searches/mo', '25k AI tokens/mo', '2 long-form articles', 'WordPress plugin', 'GA4 + GSC integration'] as $item)
+                            <li class="flex items-center gap-2">
+                                {!! $ck('') !!}{{ $item }}
                             </li>
                         @endforeach
-                        <li class="flex items-center gap-2.5 text-slate-400">
-                            <svg class="h-4 w-4 flex-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
-                            Scheduled reports
-                        </li>
                     </ul>
-                    <a href="{{ route('register', ['plan' => 'solo']) }}" class="block w-full py-2.5 text-center rounded-xl border border-indigo-600 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 transition-all">Select Plan</a>
+                    <a href="{{ route('register') }}" class="block w-full py-2.5 text-center rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:border-slate-400 hover:text-slate-900 transition-all">Start free</a>
                 </div>
 
-                {{-- Pro --}}
-                <div class="relative bg-white p-8 rounded-2xl border-2 border-indigo-600 flex flex-col shadow-xl md:-translate-y-4">
-                    <span class="absolute -top-3 left-6 inline-flex items-center rounded-full bg-indigo-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">Most Popular</span>
-                    <h3 class="text-base font-semibold text-slate-900 mb-1">Pro</h3>
+                {{-- Solo --}}
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Solo</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-bold text-slate-900">$37</span>
+                        <span class="text-4xl font-bold text-slate-900">$19</span>
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-6">Billed annually ($49 monthly)</p>
-                    <ul class="space-y-2.5 mb-8 flex-grow text-sm text-slate-700">
-                        @foreach (['All Solo features', '10 projects', '3 team seats', '300k crawl budget', '500 tracked keywords', '1,000 keyword research searches/mo', '150k AI tokens/mo', '15 AI long-form articles', 'Scheduled reports'] as $item)
-                            <li class="flex items-center gap-2.5 {{ $item === 'All Solo features' ? 'font-semibold' : '' }}">
-                                <svg class="h-4 w-4 flex-none text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                                {{ $item }}
+                    <p class="text-xs text-slate-500 mb-5">$168 billed annually</p>
+                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
+                        @foreach (['3 websites', '1 team seat', '100k crawl budget', '100 tracked keywords', '250 keyword searches/mo', '60k AI tokens/mo', '5 long-form articles', 'WordPress plugin', 'GA4 + GSC integration'] as $item)
+                            <li class="flex items-center gap-2">
+                                {!! $ck('') !!}{{ $item }}
                             </li>
                         @endforeach
-                        <li class="flex items-center gap-2.5 text-slate-400">
-                            <svg class="h-4 w-4 flex-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
-                            White-label reports
-                        </li>
                     </ul>
-                    <a href="{{ route('register', ['plan' => 'pro']) }}" class="block w-full py-2.5 text-center rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-500 transition-all">Select Plan</a>
+                    <a href="{{ route('register', ['plan' => 'solo']) }}" class="block w-full py-2.5 text-center rounded-xl border border-indigo-600 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 transition-all">Get started</a>
+                </div>
+
+                {{-- Pro (Most Popular) --}}
+                <div class="relative bg-white p-6 rounded-2xl border-2 border-indigo-600 flex flex-col shadow-xl lg:-translate-y-3">
+                    <span class="absolute -top-3 left-5 inline-flex items-center rounded-full bg-indigo-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">Most Popular</span>
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Pro</p>
+                    <div class="flex items-baseline gap-1 mb-1">
+                        <span class="text-4xl font-bold text-slate-900">$49</span>
+                        <span class="text-slate-500 text-sm">/mo</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-5">$444 billed annually</p>
+                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
+                        @foreach (['All Solo features', '10 websites', '3 team seats', '300k crawl budget', '500 tracked keywords', '1,000 keyword searches/mo', '150k AI tokens/mo', '15 long-form articles', 'Scheduled reports'] as $item)
+                            <li class="flex items-center gap-2 {{ $item === 'All Solo features' ? 'font-semibold' : '' }}">
+                                {!! $ck('') !!}{{ $item }}
+                            </li>
+                        @endforeach
+                    </ul>
+                    <a href="{{ route('register', ['plan' => 'pro']) }}" class="block w-full py-2.5 text-center rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-500 transition-all">Get started</a>
                 </div>
 
                 {{-- Agency --}}
-                <div class="bg-white p-8 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
-                    <h3 class="text-base font-semibold text-slate-900 mb-1">Agency</h3>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Agency</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-bold text-slate-900">$74</span>
+                        <span class="text-4xl font-bold text-slate-900">$99</span>
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-6">Billed annually ($99 monthly)</p>
-                    <ul class="space-y-2.5 mb-8 flex-grow text-sm text-slate-700">
-                        @foreach (['All Pro features', '30 projects', '10 team seats', '1M crawl budget', '2,000 tracked keywords', '4,000 keyword research searches/mo', '600k AI tokens/mo', '50 AI long-form articles', 'White-label reports'] as $item)
-                            <li class="flex items-center gap-2.5 {{ $item === 'All Pro features' ? 'font-semibold' : '' }}">
-                                <svg class="h-4 w-4 flex-none text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                                {{ $item }}
+                    <p class="text-xs text-slate-500 mb-5">$888 billed annually</p>
+                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
+                        @foreach (['All Pro features', '30 websites', '10 team seats', '1M crawl budget', '2,000 tracked keywords', '4,000 keyword searches/mo', '600k AI tokens/mo', '50 long-form articles', 'White-label reports'] as $item)
+                            <li class="flex items-center gap-2 {{ $item === 'All Pro features' ? 'font-semibold' : '' }}">
+                                {!! $ck('') !!}{{ $item }}
                             </li>
                         @endforeach
                     </ul>
-                    <a href="{{ route('register', ['plan' => 'agency']) }}" class="block w-full py-2.5 text-center rounded-xl border border-indigo-600 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 transition-all">Select Plan</a>
+                    <a href="{{ route('register', ['plan' => 'agency']) }}" class="block w-full py-2.5 text-center rounded-xl border border-indigo-600 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 transition-all">Get started</a>
                 </div>
             </div>
             <div class="mt-8 text-center space-y-2">
                 <p class="text-xs font-semibold text-indigo-600">SEMrush starts at $117/mo. Ahrefs at $108/mo. You do the math.</p>
-                <p class="text-xs text-slate-500">All plans include a free 14-day trial. No credit card required. <a href="{{ route('pricing') }}" class="font-semibold text-slate-700 hover:underline">View full pricing →</a></p>
+                <p class="text-xs text-slate-500">Start free — no credit card. Upgrade anytime. <a href="{{ route('pricing') }}" class="font-semibold text-slate-700 hover:underline">View full pricing + Enterprise →</a></p>
             </div>
         </div>
     </section>

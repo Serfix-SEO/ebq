@@ -20,15 +20,15 @@
         ? 'Free for a limited time, then just $5/month.'
         : 'Pay for the sites you manage. Nothing else.';
     $heroSub       = $free
-        ? 'Every account currently gets full Pro capabilities at no cost during this promotional period. When the promotion ends, plans start at just $5/month — and we will let you know well before anything changes.'
-        : 'Every plan includes the EBQ workspace, WordPress plugin, and unlimited team members. Annual subscriptions only — every paid plan starts with a 1-month free trial.';
+        ? 'Every account currently gets full Pro capabilities at no cost during this promotional period. When the promotion ends, plans start at just $14/month — and we will let you know well before anything changes.'
+        : 'Every plan includes the EBQ workspace, WordPress plugin, and team access. Annual billing only — start on the free Trial plan, upgrade when you\'re ready.';
     $heroBadge     = $free
-        ? 'Free now · then from $5/month'
-        : '1-month free trial · Cancel during trial, no charge';
+        ? 'Free now · then from $14/month'
+        : 'Free Trial plan · No card required';
 
     // Pull plans straight from the DB — `Admin\PlanController` keeps
     // pricing, feature toggles, and quotas in sync without a deploy.
-    // The Plan model + seeder ship the canonical 4-tier set; the
+    // The Plan model + seeder ship the canonical 5-tier set; the
     // `Plan::ordered()` scope filters to active plans in display_order.
     $planRows = \App\Models\Plan::ordered()->get();
 
@@ -59,17 +59,21 @@
         if ($rt !== null) {
             $out[] = number_format((int) $rt) . ' tracked keywords';
         }
-        $ke  = $limits['keywords_everywhere']['monthly_credits'] ?? null;
-        if ($ke !== null) {
-            $out[] = number_format((int) $ke) . ' keyword research credits / month';
+        $kr  = $limits['keyword_research']['monthly_searches'] ?? null;
+        if ($kr !== null) {
+            $out[] = number_format((int) $kr) . ' keyword research searches / month';
         }
-        $ser = $limits['serper']['monthly_calls'] ?? null;
-        if ($ser !== null) {
-            $out[] = number_format((int) $ser) . ' SERP fetches / month';
+        $ast = $limits['ai_studio']['monthly_tokens'] ?? null;
+        if ($ast !== null) {
+            $out[] = number_format((int) $ast) . ' AI Studio tokens / month';
         }
-        $mis = $limits['mistral']['monthly_tokens'] ?? null;
-        if ($mis !== null) {
-            $out[] = number_format((int) $mis) . ' AI tokens / month';
+        $lf  = $limits['long_form']['monthly_articles'] ?? null;
+        if ($lf !== null) {
+            $out[] = number_format((int) $lf) . ' long-form articles / month';
+        }
+        $qw  = $limits['quick_win_finder']['results_shown'] ?? null;
+        if ($qw !== null) {
+            $out[] = 'Quick Win Finder: ' . number_format((int) $qw) . ' results';
         }
         return $out;
     };
@@ -89,19 +93,13 @@
     };
     $planStyleFor = function (string $slug, int $trialDays) use ($trialCtaLabel): array {
         return match ($slug) {
-            'free'    => ['cta_label' => 'Start free',                  'cta_style' => 'ghost'],
-            default   => ['cta_label' => $trialCtaLabel($trialDays),    'cta_style' => 'primary'],
+            'trial'      => ['cta_label' => 'Start free',        'cta_style' => 'ghost'],
+            'enterprise' => ['cta_label' => 'Contact us',        'cta_style' => 'ghost'],
+            default      => ['cta_label' => $trialCtaLabel($trialDays), 'cta_style' => 'primary'],
         };
     };
 
-    // Free + Pro are single-site personal plans — they should read "Personal"
-    // for the connected-websites entitlement, not "unlimited", regardless of
-    // the stored max_websites value.
-    $personalSlugs = ['free', 'pro'];
-    $websitesBullet = function (\App\Models\Plan $p) use ($personalSlugs) {
-        if (in_array($p->slug, $personalSlugs, true)) {
-            return 'Personal website (single site)';
-        }
+    $websitesBullet = function (\App\Models\Plan $p): string {
         if ($p->max_websites === null) {
             return 'Unlimited connected websites';
         }
@@ -110,7 +108,7 @@
             : (int) $p->max_websites . ' connected websites';
     };
 
-    $plans = $planRows->map(function (\App\Models\Plan $p) use ($ctaForPlan, $registerUrl, $featureCopy, $apiLimitCopy, $planStyleFor, $websitesBullet) {
+    $plans = $planRows->map(function (\App\Models\Plan $p) use ($ctaForPlan, $registerUrl, $contactUrl, $featureCopy, $apiLimitCopy, $planStyleFor, $websitesBullet) {
         $slug    = (string) $p->slug;
         $monthly = (int) $p->price_monthly_usd;
         $yearly  = (int) $p->price_yearly_usd;
@@ -119,6 +117,11 @@
         $featureMap = $p->featureMap();
         $autoBullets = [];
         $autoBullets[] = $websitesBullet($p);
+        if ($p->max_seats !== null) {
+            $autoBullets[] = $p->max_seats === 1 ? '1 team seat' : $p->max_seats . ' team seats';
+        } else {
+            $autoBullets[] = 'Unlimited team seats';
+        }
         $autoBullets = array_merge($autoBullets, $apiLimitCopy($p->api_limits));
         foreach ($featureCopy as $key => $label) {
             if (($featureMap[$key] ?? false) === true) {
@@ -133,54 +136,66 @@
             }
         }
 
-        // Hand-written marketing bullets, each optionally carrying an
-        // explainer video. `feature_videos` is a sparse index => URL map
-        // aligned with `features`; we resolve each to a bare YouTube ID
-        // so the template only ever embeds the privacy-friendly /embed
-        // form and never trusts a raw URL.
         $rawBullets = is_array($p->features) ? array_values($p->features) : [];
         $bulletVideos = is_array($p->feature_videos ?? null) ? $p->feature_videos : [];
         $featureItems = [];
         foreach ($rawBullets as $i => $bullet) {
             $videoUrl = $bulletVideos[(string) $i] ?? ($bulletVideos[$i] ?? null);
             $featureItems[] = [
-                'text' => $bullet,
+                'text'     => $bullet,
                 'video_id' => \App\Models\Plan::youtubeId($videoUrl),
             ];
         }
 
+        $ctaUrl = match ($slug) {
+            'trial'      => $registerUrl,
+            'enterprise' => $contactUrl,
+            default      => $ctaForPlan($slug),
+        };
+
+        $priceDisplay = match (true) {
+            $slug === 'enterprise'  => 'Custom',
+            $monthly > 0            => '$' . number_format($monthly),
+            default                 => '$0',
+        };
+        $suffix = match (true) {
+            $slug === 'enterprise'  => '',
+            $monthly > 0            => '/mo',
+            default                 => '/mo',
+        };
+        $caption = match (true) {
+            $slug === 'enterprise'  => 'Contact us for pricing.',
+            $slug === 'trial'       => 'Free forever. No card required.',
+            $yearly > 0             => '$' . number_format($yearly) . ' billed yearly',
+            default                 => 'No card required.',
+        };
+
         return [
             'slug'      => $slug,
             'name'      => (string) $p->name,
-            'price'     => $monthly > 0 ? '$' . number_format($monthly) : '$0',
-            'suffix'    => $monthly > 0 ? '/mo' : 'forever',
-            'caption'   => $yearly > 0
-                ? '$' . number_format($yearly) . ' billed yearly'
-                : 'No card required.',
+            'price'     => $priceDisplay,
+            'suffix'    => $suffix,
+            'caption'   => $caption,
             'tagline'   => (string) ($p->tagline ?? ''),
             'features'  => $featureItems,
-            // Auto-generated entitlement bullets driven by plan_features
-            // + api_limits + max_websites. Always shown above the
-            // hand-written marketing bullets.
             'includes'  => $autoBullets,
             'excluded'  => $excluded,
             'cta_label' => $style['cta_label'],
-            'cta_url'   => $slug === 'free'
-                ? $registerUrl
-                : $ctaForPlan($slug),
+            'cta_url'   => $ctaUrl,
             'cta_style' => $style['cta_style'],
             'highlight' => (bool) $p->is_highlighted,
         ];
     })->all();
 
     $faqs = [
-        ['Is there a free trial?',           'Yes — every paid plan starts with a 1-month free trial. Your card is not charged until the trial ends, and you can cancel anytime during the trial without being billed.'],
-        ['Why annual only?',                 'Annual plans let us invest more in your account (deeper history, better caching, dedicated SERP capacity) at a price ~25% lower than monthly equivalents. The 1-month trial gives plenty of room to evaluate.'],
+        ['Is there a free plan?',            'Yes — the Trial plan is free forever with no credit card required. It gives you 1 website, 20 tracked keywords, and up to 20,000 crawled pages. Upgrade to a paid plan whenever you\'re ready.'],
+        ['Why annual only?',                 'Annual plans let us invest more in your account (deeper history, better caching, dedicated SERP capacity) at a price ~25% lower than monthly equivalents.'],
         ['Can I switch plans later?',        'Yes. Upgrades pro-rate immediately for the rest of your annual term. Downgrades take effect at the next renewal so you keep what you paid for.'],
         ['What counts as a website?',        'A unique domain or subdomain you connect to EBQ. Each gets its own GSC sync, audit history, keyword tracker, and dashboard.'],
         ['Do you offer refunds?',            'Yes — see our refund policy for the 30-day money-back terms.'],
         ['Which payment methods do you accept?', 'All major credit and debit cards via our PCI-compliant payment processor. Invoicing is available on the Agency plan.'],
         ['Do prices include tax?',           'Prices shown exclude applicable VAT/GST. Local taxes are calculated at checkout based on your billing country.'],
+        ['What is the Enterprise plan?',     'Enterprise is a custom plan for large organisations with specific requirements (SSO, dedicated support, custom data retention, invoicing). Contact us and we\'ll put together a package that fits.'],
     ];
 
     $trustItems = [
@@ -277,8 +292,8 @@
 
         {{-- ── Plan cards ───────────────────────────────────────── --}}
         <section id="plans" class="bg-white pt-10 pb-16 sm:pt-12">
-            <div class="mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     @foreach ($plans as $plan)
                         <div @class([
                             'relative flex flex-col rounded-2xl border bg-white p-6',
@@ -407,7 +422,7 @@
                 <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">
                     {{ $free
                         ? 'Sign up in under two minutes and get every Pro feature unlocked while the promotion lasts.'
-                        : 'Connect your first website in under two minutes. Free forever on the Free plan.' }}
+                        : 'Connect your first website in under two minutes. Start free on the Trial plan — no card required.' }}
                 </p>
                 <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                     <a href="{{ $registerUrl }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">{{ $free ? 'Start free Pro access' : 'Start free' }}</a>
