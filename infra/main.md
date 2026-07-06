@@ -254,7 +254,30 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
-- **2026-07-06 (latest — DB-shards tab rebuilt as a live panel)** — User: shard page
+- **2026-07-06 (latest — statistics windows were lag-blind; anchored to real data
+  days)** — User: statistics counts look wrong for namesforfreefire.com. Verified the
+  math was exact for its window — the WINDOW was wrong: GSC finalizes ~3 days late,
+  and every statistics aggregate anchored to "yesterday", so the "30-day" windows
+  silently contained 2-3 EMPTY lag days. On namesforfreefire that hid 17.5K clicks
+  (276,359 shown vs 293,853 real for 30 actual data days), biased every
+  previous-period comparison (30 full previous days vs ~27 current — the corrected
+  clicks delta is +24.7%), and drew a fake end-of-chart cliff (trailing zero days,
+  labeled "Last 30 complete days"). **Fix**: windows now anchor to
+  `ReportDataService::lastSafeReportDate()` (last day WITH finalized data, fallback
+  yesterday) via a shared `statsWindowEnd()` — applied to `KpiCards::payload`,
+  `TrafficChart::payload`, and ReportDataService's `buildTopCountriesTrend`,
+  `buildContentDecay`, `buildIndexingFailsWithTraffic`, `quickWins` (90d). Previous
+  windows are equal-length by construction. **Honest UI**: KPI row shows the real
+  window ("Jun 4 – Jul 3 · vs the 30 days before · Search Console data lags ~3
+  days"); the traffic chart label is the actual date range, not "complete days".
+  Note: the Settings → "Search Console window" (28d) is the PAGE-AUDIT keyword
+  window by design, not the statistics window — statistics is fixed 30-data-day.
+  Verified live: 30/30 data days in window, payload == ground-truth sums, chart tail
+  real. Test-suite gotcha fixed along the way: computing expected cache keys AFTER
+  `travel(30)->minutes()` crosses UTC midnight near 00:00 and shifts derived dates —
+  compute keys before travelling. Docs: [reports/README.md](./reports/README.md).
+
+- **2026-07-06 (DB-shards tab rebuilt as a live panel)** — User: shard page
   confusing (who lives where?), wants per-tenant/per-site row counts, the move form
   should disable the subject's current host node, and the tab's 10s
   `window.location.reload` loop replaced with real polling. Built

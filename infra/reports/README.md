@@ -96,6 +96,14 @@ and top-countries caches every hour and triggering 590K-row GROUP BY rescans on 
 (visible as 60s `SELECT … GROUP BY country` in `SHOW PROCESSLIST`). The split keeps GSC
 caches warm for their full 24h TTL.
 
+**Lag-aware windows (2026-07-06):** every statistics aggregate (KPI cards, traffic
+chart, top-countries, content-decay, indexing-fails, quick-wins) anchors its window
+end to `lastSafeReportDate()` via `ReportDataService::statsWindowEnd()` — never
+"yesterday", which silently included 2-3 empty GSC-lag days (deflated totals, biased
+comparisons, fake chart cliff). New date-windowed aggregates MUST use the same anchor.
+The Settings "Search Console window" (`gsc_keyword_lookback_days`, default 28) is the
+page-audit keyword window only — statistics windows are fixed 30-data-day by design.
+
 ## Gotchas (cross-cutting)
 
 - **`keyword_metrics` is shared across all tenants** — `quickWins` and the upside

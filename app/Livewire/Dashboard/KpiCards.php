@@ -55,6 +55,7 @@ class KpiCards extends Component
     public function render()
     {
         $data = [
+            '_window' => null,
             'clicks' => $this->emptyMetric(),
             'impressions' => $this->emptyMetric(),
             'users' => $this->emptyMetric(),
@@ -75,8 +76,15 @@ class KpiCards extends Component
      */
     public static function payload(string $websiteId): array
     {
-        $today = Carbon::today(config('app.timezone'));
-        $currentEnd = $today->copy()->subDay();
+        // Anchor the window to the last day WITH Search Console data, not
+        // "yesterday": GSC finalises ~3 days late, so a yesterday-anchored
+        // window silently contained 2-3 empty lag days — deflating the
+        // current totals and biasing every previous-period comparison
+        // (30 full previous days vs ~27 current). Found 2026-07-06 on
+        // namesforfreefire.com. GA is included in the same window so both
+        // sources stay comparable.
+        $currentEnd = app(\App\Services\ReportDataService::class)->lastSafeReportDate($websiteId)
+            ?? Carbon::today(config('app.timezone'))->subDay();
         $currentStart = $currentEnd->copy()->subDays(29);
         $previousEnd = $currentStart->copy()->subDay();
         $previousStart = $previousEnd->copy()->subDays(29);
@@ -107,6 +115,10 @@ class KpiCards extends Component
                 ->whereBetween('date', [$previousStart->toDateString(), $previousEnd->toDateString()]);
 
             return [
+                '_window' => [
+                    'start' => $currentStart->toDateString(),
+                    'end' => $currentEnd->toDateString(),
+                ],
                 'clicks' => self::buildMetric(
                     (int) (clone $currentSc)->sum('clicks'),
                     (int) (clone $previousSc)->sum('clicks')

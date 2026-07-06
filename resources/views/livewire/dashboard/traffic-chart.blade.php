@@ -2,7 +2,14 @@
     <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
         <div>
             <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Traffic Overview</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Last 30 complete days</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+                @if ($window)
+                    {{ \Illuminate\Support\Carbon::parse($window['start'])->format('M j') }} – {{ \Illuminate\Support\Carbon::parse($window['end'])->format('M j') }}
+                    <span class="text-slate-400">· last 30 days of Search Console data (finalized data lags ~3 days)</span>
+                @else
+                    Last 30 days of data
+                @endif
+            </p>
         </div>
         <div class="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
             <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-orange-500"></span> Clicks</span>

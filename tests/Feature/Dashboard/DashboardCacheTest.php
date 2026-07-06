@@ -87,20 +87,22 @@ class DashboardCacheTest extends TestCase
         Livewire::actingAs($user)
             ->test(KpiCards::class, ['websiteId' => $website->id]);
 
-        // Advance past the old 600s TTL; the cached payload must still be there.
-        $this->travel(30)->minutes();
+        // Compute the expected key BEFORE travelling — near UTC midnight the
+        // +30min hop crosses the date line and shifts the derived window.
+        // Key end-date derives from the lag-aware anchor (lastSafeReportDate,
+        // fallback yesterday) — same logic payload() uses.
         $version = ReportCache::version($website->id);
-        $keys = collect(range(0, 0))->map(fn () => sprintf(
+        $end = app(\App\Services\ReportDataService::class)->lastSafeReportDate((string) $website->id)
+            ?? \Illuminate\Support\Carbon::today(config('app.timezone'))->subDay();
+        $this->travel(30)->minutes();
+        $key = sprintf(
             'kpis:%s:%s:%s:%d',
             $website->id,
-            now()->subDay()->subDays(29)->toDateString(),
-            now()->subDay()->toDateString(),
+            $end->copy()->subDays(29)->toDateString(),
+            $end->toDateString(),
             $version,
-        ));
-        $this->assertTrue(
-            $keys->contains(fn (string $k) => cache()->get($k) !== null),
-            'KPI payload must survive past the old 600s TTL'
         );
+        $this->assertNotNull(cache()->get($key), 'KPI payload must survive past the old 600s TTL');
     }
 
     public function test_analytics_sync_bumps_the_report_cache_version(): void

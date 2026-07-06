@@ -50,6 +50,18 @@ class ReportDataService
     }
 
     /**
+     * End-of-window anchor for the statistics-page aggregates: the last day
+     * WITH finalized GSC data, falling back to yesterday for fresh sites.
+     * Yesterday-anchored windows silently include 2-3 empty GSC-lag days,
+     * deflating totals and biasing period comparisons (found 2026-07-06).
+     */
+    private function statsWindowEnd(string $websiteId): Carbon
+    {
+        return $this->lastSafeReportDate($websiteId)
+            ?? Carbon::yesterday(config('app.timezone'));
+    }
+
+    /**
      * Most recent date with Analytics data for this website. Unlike GSC,
      * GA4 finalises within hours, so there's no multi-day lag floor —
      * the latest stored day is reportable. Returns null when there are
@@ -1025,7 +1037,7 @@ class ReportDataService
     private function buildContentDecay(string $websiteId, int $limit, ?string $country): array
     {
         $tz = config('app.timezone');
-        $end = Carbon::yesterday($tz)->endOfDay();
+        $end = $this->statsWindowEnd($websiteId)->endOfDay();
         $start = $end->copy()->subDays(27)->startOfDay();
         $prevEnd = $start->copy()->subDay()->endOfDay();
         $prevStart = $prevEnd->copy()->subDays(27)->startOfDay();
@@ -1225,7 +1237,7 @@ class ReportDataService
     private function buildIndexingFailsWithTraffic(string $websiteId, int $windowDays, int $limit, ?string $country): array
     {
         $tz = config('app.timezone');
-        $end = Carbon::yesterday($tz)->endOfDay();
+        $end = $this->statsWindowEnd($websiteId)->endOfDay();
         $start = $end->copy()->subDays($windowDays - 1)->startOfDay();
 
         $failing = PageIndexingStatus::query()
@@ -1341,9 +1353,9 @@ class ReportDataService
             return [];
         }
 
-        $tz = config('app.timezone');
-        $end = Carbon::yesterday($tz)->toDateString();
-        $start = Carbon::yesterday($tz)->subDays(89)->toDateString();
+        $endC = $this->statsWindowEnd($websiteId);
+        $end = $endC->toDateString();
+        $start = $endC->copy()->subDays(89)->toDateString();
 
         // Per-query aggregate over 90d: best (min) position + top page by clicks + impressions
         $gsc = SearchConsoleData::query()
@@ -1449,7 +1461,7 @@ class ReportDataService
     private function buildTopCountriesTrend(string $websiteId, int $limit): array
     {
         $tz = config('app.timezone');
-        $end = Carbon::yesterday($tz)->endOfDay();
+        $end = $this->statsWindowEnd($websiteId)->endOfDay();
         $start = $end->copy()->subDays(29)->startOfDay();
         $prevEnd = $start->copy()->subDay()->endOfDay();
         $prevStart = $prevEnd->copy()->subDays(29)->startOfDay();

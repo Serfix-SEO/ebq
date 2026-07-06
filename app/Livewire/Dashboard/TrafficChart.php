@@ -45,6 +45,7 @@ class TrafficChart extends Component
         $anomalies = [];
         $latestClicksPair = null;
         $latestUsersPair = null;
+        $window = null;
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $cached = self::payload($this->websiteId, Auth::user());
@@ -56,6 +57,7 @@ class TrafficChart extends Component
                 $days = collect($cached['days'] ?? []);
                 $latestClicksPair = $cached['clicks_pair'] ?? null;
                 $latestUsersPair = $cached['users_pair'] ?? null;
+                $window = $cached['window'] ?? null;
             }
 
             if (is_array($latestUsersPair) && count($latestUsersPair) === 2) {
@@ -76,6 +78,7 @@ class TrafficChart extends Component
         return view('livewire.dashboard.traffic-chart', [
             'days' => $days,
             'anomalies' => $anomalies,
+            'window' => $window,
         ]);
     }
 
@@ -88,8 +91,10 @@ class TrafficChart extends Component
     public static function payload(string $websiteId, \App\Models\User $user): array|Collection
     {
         $tz = display_timezone($user);
-        $today = Carbon::today($tz);
-        $end = $today->copy()->subDay();
+        // Lag-aware end (see KpiCards::payload) — a yesterday-anchored chart
+        // ended in 2-3 empty GSC-lag days that rendered as a fake cliff.
+        $end = app(\App\Services\ReportDataService::class)->lastSafeReportDate($websiteId, timezone: $tz)
+            ?? Carbon::today($tz)->subDay();
         $start = $end->copy()->subDays(29);
         // Mix in ReportCache::version so a GSC/GA re-sync of the recent partial
         // days inside this fixed window invalidates the cache (date range alone
@@ -122,6 +127,7 @@ class TrafficChart extends Component
             $allDates = $clicks->keys()->merge($users->keys())->unique()->sort()->values();
 
             return [
+                'window' => ['start' => $start->toDateString(), 'end' => $end->toDateString()],
                 'days' => $allDates->map(fn ($d) => [
                     'date' => format_user_date(is_string($d) ? $d : (string) $d, 'M d', $user),
                     'clicks' => (int) ($clicks[$d] ?? 0),

@@ -1,3 +1,10 @@
+<div>
+    @if (!empty($data['_window']))
+        <p class="mb-2 text-right text-[11px] text-slate-400">
+            Window: {{ \Illuminate\Support\Carbon::parse($data['_window']['start'])->format('M j') }} – {{ \Illuminate\Support\Carbon::parse($data['_window']['end'])->format('M j, Y') }}
+            · vs the 30 days before · Search Console data lags ~3 days
+        </p>
+    @endif
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
     @foreach ([
         ['key' => 'clicks', 'label' => 'Clicks (30d)', 'icon' => 'M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59', 'color' => 'text-blue-600 dark:text-blue-400', 'icon-bg' => 'bg-blue-100 dark:bg-blue-500/20'],
@@ -28,4 +35,5 @@
             </p>
         </div>
     @endforeach
+</div>
 </div>
