@@ -41,7 +41,7 @@
                 <template x-for="(s, i) in slides" :key="'t'+i">
                     <button @click="current = i"
                             class="overflow-hidden rounded border-2 transition"
-                            :class="i === current ? 'border-indigo-500' : 'border-transparent opacity-70 hover:opacity-100'">
+                            :class="i === current ? 'border-orange-500' : 'border-transparent opacity-70 hover:opacity-100'">
                         <img :src="s.url" class="h-16 w-28 object-cover object-top" loading="lazy" />
                     </button>
                 </template>
@@ -53,7 +53,7 @@
                 <ol class="space-y-1 text-sm">
                     <template x-for="(s, i) in slides" :key="'l'+i">
                         <li class="flex gap-2">
-                            <button @click="current = i" class="font-mono text-xs text-indigo-600 hover:underline" x-text="(i+1)+'.'"></button>
+                            <button @click="current = i" class="font-mono text-xs text-orange-600 hover:underline" x-text="(i+1)+'.'"></button>
                             <div><span class="font-medium" x-text="s.title"></span> — <span class="text-slate-500" x-text="s.desc"></span></div>
                         </li>
                     </template>

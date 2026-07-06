@@ -8,7 +8,7 @@
             {{ __('Country') }}
         </label>
         <select wire:model.live="country"
-            class="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            class="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
             <option value="">{{ __('All countries') }}</option>
             @foreach ($options as $opt)
                 <option value="{{ $opt['code'] }}">

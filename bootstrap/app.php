@@ -36,7 +36,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'website.api' => \App\Http\Middleware\WebsiteApiAuth::class,
             'website.features' => \App\Http\Middleware\InjectFeatureFlags::class,
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
-            'research.rollout' => \App\Http\Middleware\EnsureResearchRolloutAccess::class,
         ]);
 
         // Sharding: after the session is up, route the request to the node(s)

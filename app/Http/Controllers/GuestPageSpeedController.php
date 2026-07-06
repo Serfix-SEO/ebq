@@ -114,7 +114,7 @@ class GuestPageSpeedController extends Controller
         RunGuestPageSpeedStrategy::dispatch($row->id, 'desktop');
 
         if ($email !== null) {
-            Lead::capture($email, $name, null);
+            Lead::capture($email, $name, null, Lead::SOURCE_GUEST_PAGESPEED);
 
             return response()->json([
                 'token' => $row->token,

@@ -5,21 +5,13 @@ behaviours to be aware of — some are bugs to fix, some are accepted trade-offs
 
 ## Bugs / inconsistencies
 
-### Cap-window leak — `LinkStructurePanel::render` (~lines 68-72)
-The Link Structure panel's "example pages" picker reads the top-8 pages by
-`inbound_link_count` **across the whole crawl_site**, via a raw `WebsitePage` query, with
-**no `value_rank <= cap` filter**:
-
-```php
-\App\Models\WebsitePage::where('crawl_site_id', $website->crawl_site_id)
-    ->whereNotNull('last_crawled_at')->whereNull('removed_at')
-    ->orderByDesc('inbound_link_count')->limit(8)->pluck('url');
-```
-
-Every other read path enforces the cap window; this one doesn't, so a small-cap user can be
-shown example URLs outside their window. **Severity: low** (only suggestion URLs in an input
-helper, not data/metrics). **Fix:** source the examples through `CrawlReportService`
-(cap-filtered) or add `->where('value_rank', '<=', $cap)`.
+### Cap-window leak — `LinkStructurePanel::render` — FIXED 2026-07-06
+The Link Structure panel's "example pages" picker used to read the top-8 pages by
+`inbound_link_count` **across the whole crawl_site** via a raw `WebsitePage` query with no
+`value_rank <= cap` filter, so a small-cap user could be shown example URLs outside their
+window. Fixed: examples now come from `CrawlReportService::topInboundPages()` (windowed via
+the same `windowPages()` every other read path uses). Regression test:
+`tests/Feature/LinkStructureExamplesCapTest.php`.
 
 ## Accepted trade-offs (intentional, documented so they're not "discovered" as bugs)
 
@@ -411,6 +403,17 @@ cached as one unit, so that's still a single query pass per version, not per req
   - **Gotcha hit:** `pageFindings()`'s `$pageId` param was first typed `int` —
     `WebsitePage::id` is a ULID string, not numeric (same landmine class as
     [[ulid-formatting-landmines]]). Fixed to `string` before it shipped.
+- **`broken_internal`/`broken_page` showed no source in the main Site Issues list (fixed
+  2026-07-03).** User flagged for robuststore.com: couldn't see which page links to a
+  broken URL without clicking "Fix" through to Page Health. `mapFinding()` already special-
+  cased `broken_external`/`external_redirect` to prepend `"On {source} · "` to the subtitle
+  (`app/Services/Crawler/CrawlReportService.php`), but the generic branch (everything else,
+  including `broken_internal`/`broken_page`) just showed `describe()` with no source, even
+  though `detail.referrers` (see "Referrer attachment" in
+  [findings-and-scoring.md](./findings-and-scoring.md)) was already populated and rendered
+  fine on the Page Health drill-down. Fix: the generic branch now also prepends
+  `"Linked from {first referrer} (+N more) · "` whenever `detail.referrers` is non-empty —
+  general on the data (any type carrying referrers benefits), not type-special-cased.
 - **`noindex_important`/`canonical_mismatch` required GSC traffic to exist at all (fixed
   2026-06-23).** User flagged: the crawler's OWN findings must stand on crawl data alone —
   GSC can inform severity but must never gate whether a crawler finding exists, and GSC-only

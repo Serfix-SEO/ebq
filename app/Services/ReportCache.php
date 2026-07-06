@@ -14,15 +14,17 @@ use Illuminate\Support\Facades\Cache;
  *
  * Cached payloads use a 24-hour sanity TTL so orphaned versions age out on
  * their own; real freshness comes from `flushWebsite()` being called when
- * new GSC rows or rank-tracker results land.
+ * new GSC rows land.
+ *
+ * Rank-tracker invalidation uses RankCache, not this class, so hourly rank
+ * checks do not orphan the expensive GSC aggregation caches.
  *
  * Callers:
  *   - PluginHqController + ReportDataService read `version()` when building
  *     cache keys.
- *   - SyncDailyData (nightly GSC sync) calls `flushWebsite()` per website
- *     after rows are inserted.
- *   - TrackKeywordRankJob calls `flushWebsite()` after a rank check
- *     updates `current_position` on a tracked keyword.
+ *   - SyncSearchConsoleData (nightly GSC sync) calls `flushWebsite()` per
+ *     website after rows are inserted.
+ *   - AnalyzeSiteJob calls `flushWebsite()` after a site crawl.
  */
 class ReportCache
 {

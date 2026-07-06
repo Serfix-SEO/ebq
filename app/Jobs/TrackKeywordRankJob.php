@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\RankTrackingKeyword;
 use App\Services\RankTrackingService;
-use App\Services\ReportCache;
+use App\Services\RankCache;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
@@ -46,8 +46,8 @@ class TrackKeywordRankJob implements ShouldQueue
             $service->check($keyword, $this->forced);
             // A successful check writes current_position on the keyword,
             // which feeds Overview's tracker_distribution + tracked_keywords.
-            // Bump the website's data version so the next read rebuilds.
-            ReportCache::flushWebsite((string) $keyword->website_id);
+            // Bump rank version only — GSC aggregation caches are unaffected.
+            RankCache::flushWebsite((string) $keyword->website_id);
         } catch (\Throwable $e) {
             Log::error('TrackKeywordRankJob failed: '.$e->getMessage(), [
                 'keyword_id' => $this->keywordId,

@@ -63,7 +63,11 @@ class LinkChecker
             $toCheck[] = $link;
         }
 
+        $batchIndex = 0;
         foreach (array_chunk($toCheck, self::CONCURRENCY) as $batch) {
+            if ($batchIndex++ > 0) {
+                usleep(500_000); // 500ms between concurrent batches — external-link check runs on finalize, not time-critical
+            }
             $responses = Http::pool(function (Pool $pool) use ($batch) {
                 $calls = [];
                 foreach ($batch as $i => $link) {

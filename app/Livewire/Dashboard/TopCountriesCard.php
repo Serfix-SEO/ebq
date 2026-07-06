@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Services\ReportCache;
 use App\Services\ReportDataService;
 use App\Support\Countries;
 use Illuminate\Support\Facades\Auth;
@@ -53,11 +54,7 @@ class TopCountriesCard extends Component
         $max = 1;
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $rows = Cache::remember(
-                'top_countries:'.$this->websiteId,
-                600,
-                fn () => app(ReportDataService::class)->topCountriesTrend($this->websiteId, 10),
-            );
+            $rows = self::payload($this->websiteId);
             $max = max(1, collect($rows)->max('clicks') ?? 1);
         }
 
@@ -70,5 +67,15 @@ class TopCountriesCard extends Component
         return view('livewire.dashboard.top-countries-card', [
             'rows' => $rows,
         ]);
+    }
+
+    /** Cached top-countries payload — shared by render() and WarmDashboardCaches. */
+    public static function payload(string $websiteId): array
+    {
+        return Cache::remember(
+            'top_countries:'.$websiteId.':v'.ReportCache::version($websiteId),
+            86400,
+            fn () => app(ReportDataService::class)->topCountriesTrend($websiteId, 10),
+        );
     }
 }

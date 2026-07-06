@@ -17,7 +17,7 @@ final class SchemaSuggestions extends AbstractAiTool
             id: 'schema-suggestions',
             name: 'Schema Suggestions',
             category: Categories::MEDIA,
-            description: 'Structured-data recommendations grounded in what top pages on the EBQ network are using.',
+            description: 'Structured-data recommendations grounded in what top pages on the Serfix network are using.',
             inputs: [
                 new InputField('focus_keyword', 'Focus keyword', 'text', required: true, maxLength: 200),
                 new InputField('article_text', 'Article body (for grounding)', 'textarea', required: true, maxLength: 12000),
@@ -57,7 +57,7 @@ final class SchemaSuggestions extends AbstractAiTool
         if (is_array($context->networkInsight) && ($context->networkInsight['cohort_size'] ?? 0) >= 5) {
             $top = array_slice((array) ($context->networkInsight['schema_types'] ?? []), 0, 5);
             if ($top !== []) {
-                $network = "\n\nAcross the EBQ network for this keyword (cohort: " . (int) $context->networkInsight['cohort_size'] . " sites), these schema types appear most often on top-3 pages:";
+                $network = "\n\nAcross the Serfix network for this keyword (cohort: " . (int) $context->networkInsight['cohort_size'] . " sites), these schema types appear most often on top-3 pages:";
                 foreach ($top as $t) {
                     $network .= "\n- " . ($t['type'] ?? '') . " ({$t['share_pct']}%)";
                 }

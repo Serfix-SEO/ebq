@@ -1,7 +1,7 @@
 <div wire:poll.{{ $pollInterval }}s>
     @if ($crawl)
-        <div class="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-500/30 dark:bg-indigo-500/10">
-            <div class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+        <div class="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-500/30 dark:bg-orange-500/10">
+            <div class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300">
                 {{-- Spinner: signals work in progress --}}
                 <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -28,7 +28,7 @@
                     @endif
                 </p>
                 @if (! $finalizing && $total > 0)
-                    <p class="mt-2 text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                    <p class="mt-2 text-xs font-medium text-orange-700 dark:text-orange-300">
                         {{ number_format($crawled) }} / {{ number_format($total) }} pages crawled
                     </p>
                 @endif

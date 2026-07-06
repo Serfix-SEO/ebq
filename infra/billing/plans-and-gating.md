@@ -51,8 +51,8 @@ No countdown/expiry job exists — a user stays on Trial until they start a paid
 | Column | Cast | Meaning |
 |---|---|---|
 | `slug` | string | Immutable public identifier (Stripe webhook lookup, WP plugin, in-flight checkout). |
-| `price_monthly_usd` / `price_yearly_usd` | int | Display + checkout. Only yearly is charged. |
-| `stripe_price_id_monthly` / `_yearly` | string? | Stripe price IDs (nullable; `price_*` regex-validated). Checkout uses yearly. |
+| `price_monthly_usd` / `price_yearly_usd` | int | Display + checkout. Both intervals are billable at checkout — see ⛔ below. |
+| `stripe_price_id_monthly` / `_yearly` | string? | Stripe price IDs (nullable; `price_*` regex-validated). New checkout uses whichever interval was requested; subscription resolution afterward matches either via `Plan::findByStripePrice()`. |
 | `trial_days` | int | Cashier `trialDays()` at checkout. |
 | `max_websites` | int? | Site cap. null=unlimited. → `User::websiteLimit()`. |
 | `max_crawl_pages` | int? | ACCOUNT-WIDE page budget pooled across all of the owner's sites (not per-site). Each site is still hard-capped at `crawler.max_pages_per_site` regardless. null=no pool (hard per-site cap still applies). → `Website::crawlPageCap()`. |
@@ -69,7 +69,7 @@ Key methods:
 - `featureMap()` (line 197) — merges stored `plan_features` over an all-false
   `FEATURE_KEYS` skeleton → always a complete 9-key map (zero-fills new flags).
 - `apiLimit('serper.monthly_calls')` (line 127) — dot-path read of `api_limits`; null = unlimited.
-- `isCheckoutReady()` (line 177) — `price_yearly_usd > 0 && stripe_price_id_yearly` set. Free always false.
+- `isCheckoutReady($interval = 'annual')` (line 177) — for `monthly`: `price_monthly_usd > 0 && stripe_price_id_monthly` set; otherwise same check against the yearly columns. Free always false.
 - `requiredPlanFor($key)` (line 222) — cheapest active plan (by `display_order`) that enables a feature; powers the plugin's "Upgrade to <tier>" copy.
 
 ### `FEATURE_KEYS` (the 10 entitlement flags)
@@ -87,7 +87,10 @@ not yet enforced (no Scheduled Reports feature exists to gate).
 Resolution order:
 1. **Free-promo** (`config('app.free')`): upgrade to the **Pro** row, but only if it
    *raises* the tier (never downgrades Startup/Agency). Falls through if Pro row missing.
-2. **Active Cashier subscription** → match `stripe_price` to a Plan by `stripe_price_id_yearly`.
+2. **Active Cashier subscription** → `Plan::findByStripePrice()` matches `stripe_price`
+   against either `stripe_price_id_monthly` or `_yearly` (fixed 2026-07-06 — previously
+   yearly-only, silently dropped monthly subscribers; see
+   [billing/README.md](./README.md#gotchas--known-issues)).
 3. **`current_plan_slug` snapshot** (set by webhook + optimistically on swap/success).
 4. **The `free` Plan row** — so admin edits to Free's `max_websites`/features apply to
    free-tier users.

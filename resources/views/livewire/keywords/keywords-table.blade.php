@@ -4,17 +4,17 @@
             <div class="relative flex-1 sm:max-w-xs">
                 <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
                 <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search keywords…"
-                    class="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
+                    class="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs placeholder-slate-400 shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
             </div>
             <select wire:model.live="device"
-                class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                 <option value="">All devices</option>
                 <option value="DESKTOP">Desktop</option>
                 <option value="MOBILE">Mobile</option>
                 <option value="TABLET">Tablet</option>
             </select>
-            <input wire:model.live="from" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-            <input wire:model.live="to" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+            <input wire:model.live="from" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
+            <input wire:model.live="to" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
             <livewire:dashboard.country-filter />
         </div>
 
@@ -63,14 +63,14 @@
                                     <td class="whitespace-nowrap px-4 py-2.5 text-slate-500 dark:text-slate-400">{{ format_user_date($row->date instanceof \Carbon\CarbonInterface ? $row->date->toDateString() : (is_string($row->date) ? $row->date : ''), 'M d, Y') ?: $row->date }}</td>
                                 @endif
                                 <td class="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">
-                                    <a href="{{ route('keywords.show', ['query' => rawurlencode((string) $row->query)]) }}" wire:navigate class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $row->query }}</a>
+                                    <a href="{{ route('keywords.show', ['query' => rawurlencode((string) $row->query)]) }}" wire:navigate class="text-orange-600 hover:underline dark:text-orange-400">{{ $row->query }}</a>
                                     @php $qKey = mb_strtolower((string) $row->query); @endphp
                                     <x-keyword-language :language="($languages ?? [])[$qKey] ?? null" />
                                     @if (isset($cannibalized[$qKey]))
                                         <span class="ml-1.5 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="Multiple pages rank for this query">cannibalized</span>
                                     @endif
                                     @if (isset($tracked[$qKey]))
-                                        <span class="ml-1 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-px text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400" title="Tracked in Rank Tracking">tracked</span>
+                                        <span class="ml-1 inline-flex items-center rounded-full bg-orange-50 px-1.5 py-px text-[10px] font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-400" title="Tracked in Rank Tracking">tracked</span>
                                     @endif
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->clicks) }}</td>

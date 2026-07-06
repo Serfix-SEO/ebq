@@ -66,10 +66,10 @@ class ReportBranding extends Model
     public static function ebqDefault(): self
     {
         $branding = new self([
-            'company_name'    => 'EBQ',
+            'company_name'    => 'Serfix',
             'logo_path'       => null,
-            'accent_color'    => '#4f46e5',
-            'footer_text'     => 'Sent by EBQ on behalf of your workspace. Manage report settings in EBQ → Settings.',
+            'accent_color'    => '#F26419',
+            'footer_text'     => 'Sent by Serfix on behalf of your workspace. Manage report settings in Serfix → Settings.',
             'contact_email'   => null,
             'contact_phone'   => null,
             'contact_address' => null,

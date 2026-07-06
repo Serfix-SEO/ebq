@@ -2,9 +2,10 @@
 <html lang="en" x-data="{ dark: localStorage.getItem('dark') === 'true', sidebarOpen: false }" x-bind:class="{ 'dark': dark }" x-init="$watch('dark', v => localStorage.setItem('dark', v))">
 <head>
     <meta charset="utf-8">
+    @include('partials.clarity')
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>EBQ</title>
+    <title>Serfix</title>
     @include('partials.favicon-links')
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
@@ -20,7 +21,8 @@
         {{-- Sidebar --}}
         <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:sticky md:top-0 md:h-screen md:translate-x-0 dark:border-slate-800 dark:bg-slate-950">
             <div class="flex h-16 items-center justify-center border-b border-slate-200 px-5 dark:border-slate-800">
-                <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="48" height="48" class="h-12 w-12 object-contain">
+                <img src="{{ asset('serfix-logo.png') }}" alt="Serfix" width="90" height="32" class="h-8 w-auto object-contain dark:hidden">
+                <img src="{{ asset('serfix-logo-dark.png') }}" alt="Serfix" width="90" height="32" class="hidden h-8 w-auto object-contain dark:block">
             </div>
 
             @php
@@ -38,7 +40,6 @@
                     ['route' => 'link-structure.index', 'feature' => 'link_structure', 'label' => 'Link Structure', 'icon' => 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'],
                     ['route' => 'custom-audit.index', 'feature' => 'audits', 'label' => 'Audits', 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z'],
                     ['route' => 'pagespeed.index', 'feature' => 'audits', 'label' => 'PageSpeed Insights', 'icon' => 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z'],
-                    ['route' => 'backlinks.index', 'feature' => 'backlinks', 'label' => 'Backlinks', 'icon' => 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'],
                     ['route' => 'reports.index', 'feature' => 'reports', 'label' => 'Reports', 'icon' => 'M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5'],
                     ['route' => 'ai-studio.index', 'feature' => 'ai_studio', 'label' => 'AI Studio', 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z'],
                     ['route' => 'websites.index', 'feature' => null, 'label' => 'Websites', 'icon' => 'M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'],
@@ -69,6 +70,11 @@
                 $adminItems = [
                     ['route' => 'admin.clients.index', 'label' => 'Clients'],
                     ['route' => 'admin.activities.index', 'label' => 'Activities'],
+                    [
+                        'route' => 'admin.ops.index',
+                        'label' => 'Ops',
+                        'match_routes' => ['admin.ops.'],
+                    ],
                     [
                         'route' => 'admin.crawler.index',
                         'label' => 'Crawler',
@@ -145,7 +151,7 @@
                             'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200' => !$active,
                         ])>
                         @if ($active)
-                            <span aria-hidden="true" class="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-indigo-600 dark:bg-indigo-400"></span>
+                            <span aria-hidden="true" class="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-orange-600 dark:bg-orange-400"></span>
                         @endif
                         <svg @class(['h-[17px] w-[17px] flex-shrink-0', 'text-slate-900 dark:text-slate-100' => $active, 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300' => !$active]) xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}" /></svg>
                         {{ $item['label'] }}
@@ -177,7 +183,7 @@
                                'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200' => !$active,
                            ])>
                             @if ($active)
-                                <span aria-hidden="true" class="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-indigo-600 dark:bg-indigo-400"></span>
+                                <span aria-hidden="true" class="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-orange-600 dark:bg-orange-400"></span>
                             @endif
                             {{ $item['label'] }}
                         </a>
@@ -268,5 +274,49 @@
             </main>
         </div>
     </div>
+
+    {{-- Global Livewire error handler: catch 419 (CSRF/session expired) and 503
+         (server overloaded) instead of crashing the page silently or showing
+         a raw error modal. On 419 we reload so the browser gets a fresh token.
+         On 503 we show a dismissible banner and retry after 10s. --}}
+    <div id="ebq-error-banner" style="display:none"
+         class="fixed bottom-4 left-1/2 z-[9999] -translate-x-1/2 w-full max-w-md px-4">
+        <div class="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg dark:border-amber-500/30 dark:bg-amber-950/80">
+            <p id="ebq-error-msg" class="text-sm font-medium text-amber-900 dark:text-amber-200"></p>
+            <button onclick="document.getElementById('ebq-error-banner').style.display='none'"
+                    class="shrink-0 text-amber-600 hover:text-amber-800 dark:text-amber-400 text-lg leading-none">&times;</button>
+        </div>
+    </div>
+
+    @auth
+    <script>
+    document.addEventListener('livewire:init', () => {
+        Livewire.hook('request', ({ fail }) => {
+            fail(({ status, preventDefault }) => {
+                if (status === 419) {
+                    preventDefault();
+                    // Session expired — reload to get a fresh CSRF token.
+                    const b = document.getElementById('ebq-error-banner');
+                    const m = document.getElementById('ebq-error-msg');
+                    if (b && m) {
+                        m.textContent = 'Your session expired. Reloading…';
+                        b.style.display = 'block';
+                    }
+                    setTimeout(() => window.location.reload(), 1500);
+                } else if (status === 503) {
+                    preventDefault();
+                    const b = document.getElementById('ebq-error-banner');
+                    const m = document.getElementById('ebq-error-msg');
+                    if (b && m) {
+                        m.textContent = 'Server is busy — retrying in 10 seconds…';
+                        b.style.display = 'block';
+                        setTimeout(() => window.location.reload(), 10000);
+                    }
+                }
+            });
+        });
+    });
+    </script>
+    @endauth
 </body>
 </html>

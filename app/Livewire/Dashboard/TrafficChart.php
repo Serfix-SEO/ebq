@@ -47,52 +47,7 @@ class TrafficChart extends Component
         $latestUsersPair = null;
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $user = Auth::user();
-            $tz = display_timezone($user);
-            $today = Carbon::today($tz);
-            $end = $today->copy()->subDay();
-            $start = $end->copy()->subDays(29);
-            // Mix in ReportCache::version so a GSC/GA re-sync of the recent partial
-            // days inside this fixed window invalidates the cache (date range alone
-            // doesn't change after a same-window correction).
-            $cacheKey = sprintf(
-                'traffic_chart:v3:%s:%s:%s:%s:%s:%d',
-                $this->websiteId,
-                (string) $user->id,
-                str_replace('/', '_', $tz),
-                $start->toDateString(),
-                $end->toDateString(),
-                ReportCache::version($this->websiteId)
-            );
-
-            $cached = Cache::remember($cacheKey, 600, function () use ($start, $end, $user) {
-                $clicks = SearchConsoleData::where('website_id', $this->websiteId)
-                    ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-                    ->selectRaw('date, SUM(clicks) as clicks')
-                    ->groupBy('date')
-                    ->orderBy('date')
-                    ->pluck('clicks', 'date');
-
-                $users = AnalyticsData::where('website_id', $this->websiteId)
-                    ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-                    ->selectRaw('date, SUM(users) as users')
-                    ->groupBy('date')
-                    ->orderBy('date')
-                    ->pluck('users', 'date');
-
-                $allDates = $clicks->keys()->merge($users->keys())->unique()->sort()->values();
-
-                return [
-                    'days' => $allDates->map(fn ($d) => [
-                        'date' => format_user_date(is_string($d) ? $d : (string) $d, 'M d', $user),
-                        'clicks' => (int) ($clicks[$d] ?? 0),
-                        'users' => (int) ($users[$d] ?? 0),
-                    ]),
-                    // Keep anomaly comparison on real metric samples only.
-                    'clicks_pair' => $clicks->count() >= 2 ? $clicks->slice(-2, 2, true)->values()->all() : null,
-                    'users_pair' => $users->count() >= 2 ? $users->slice(-2, 2, true)->values()->all() : null,
-                ];
-            });
+            $cached = self::payload($this->websiteId, Auth::user());
 
             // Backward compatibility in case an older cache payload is present.
             if ($cached instanceof Collection) {
@@ -122,5 +77,60 @@ class TrafficChart extends Component
             'days' => $days,
             'anomalies' => $anomalies,
         ]);
+    }
+
+    /**
+     * Cached traffic-chart payload — shared by render() and WarmDashboardCaches
+     * (post-sync warmer). Key is per-user (display timezone + date formatting),
+     * so the warmer warms the website OWNER's view; teammates in other
+     * timezones pay their own (rare) cold path.
+     */
+    public static function payload(string $websiteId, \App\Models\User $user): array|Collection
+    {
+        $tz = display_timezone($user);
+        $today = Carbon::today($tz);
+        $end = $today->copy()->subDay();
+        $start = $end->copy()->subDays(29);
+        // Mix in ReportCache::version so a GSC/GA re-sync of the recent partial
+        // days inside this fixed window invalidates the cache (date range alone
+        // doesn't change after a same-window correction).
+        $cacheKey = sprintf(
+            'traffic_chart:v3:%s:%s:%s:%s:%s:%d',
+            $websiteId,
+            (string) $user->id,
+            str_replace('/', '_', $tz),
+            $start->toDateString(),
+            $end->toDateString(),
+            ReportCache::version($websiteId)
+        );
+
+        return Cache::remember($cacheKey, 86400, function () use ($websiteId, $start, $end, $user) {
+            $clicks = SearchConsoleData::where('website_id', $websiteId)
+                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+                ->selectRaw('date, SUM(clicks) as clicks')
+                ->groupBy('date')
+                ->orderBy('date')
+                ->pluck('clicks', 'date');
+
+            $users = AnalyticsData::where('website_id', $websiteId)
+                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+                ->selectRaw('date, SUM(users) as users')
+                ->groupBy('date')
+                ->orderBy('date')
+                ->pluck('users', 'date');
+
+            $allDates = $clicks->keys()->merge($users->keys())->unique()->sort()->values();
+
+            return [
+                'days' => $allDates->map(fn ($d) => [
+                    'date' => format_user_date(is_string($d) ? $d : (string) $d, 'M d', $user),
+                    'clicks' => (int) ($clicks[$d] ?? 0),
+                    'users' => (int) ($users[$d] ?? 0),
+                ]),
+                // Keep anomaly comparison on real metric samples only.
+                'clicks_pair' => $clicks->count() >= 2 ? $clicks->slice(-2, 2, true)->values()->all() : null,
+                'users_pair' => $users->count() >= 2 ? $users->slice(-2, 2, true)->values()->all() : null,
+            ];
+        });
     }
 }

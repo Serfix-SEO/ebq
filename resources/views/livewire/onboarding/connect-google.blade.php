@@ -18,7 +18,7 @@
         <button wire:click="goToStep(1)" class="flex items-center gap-2">
             <span @class([
                 'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition',
-                'bg-indigo-600 text-white' => $step === 1 && !$googleConnected,
+                'bg-orange-600 text-white' => $step === 1 && !$googleConnected,
                 'bg-emerald-500 text-white' => $googleConnected,
                 'bg-slate-200 text-slate-600' => $step !== 1 && !$googleConnected,
             ])>
@@ -36,7 +36,7 @@
         <button wire:click="goToStep(2)" @disabled(!$googleConnected && $step !== 2) class="flex items-center gap-2">
             <span @class([
                 'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition',
-                'bg-indigo-600 text-white' => $step === 2,
+                'bg-orange-600 text-white' => $step === 2,
                 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400' => $step !== 2,
             ])>2</span>
             <span class="text-xs font-medium {{ $step === 2 ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400' }}">Add Site</span>
@@ -46,8 +46,8 @@
     {{-- Step 1: Connect Google --}}
     @if ($step === 1)
         <div class="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
-                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.06a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.34 8.374" /></svg>
+            <div class="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 dark:bg-orange-500/10">
+                <svg class="h-5 w-5 text-orange-600 dark:text-orange-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.06a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.34 8.374" /></svg>
             </div>
 
             <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Connect your Google account</h2>
@@ -62,7 +62,7 @@
                 </div>
                 <div class="mt-3">
                     <button wire:click="goToStep(2)"
-                        class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+                        class="inline-flex h-8 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700">
                         Continue
                         <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
                     </button>
@@ -85,7 +85,7 @@
                     <div class="mx-auto mt-3 max-w-xs text-left">
                         <label for="skip-domain" class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Domain</label>
                         <input id="skip-domain" wire:model="domain" type="text" placeholder="example.com"
-                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
                         @error('domain') <p class="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                         <button type="button" wire:click="skipForNow"
                             class="mt-2 inline-flex h-8 w-full items-center justify-center gap-1 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100">
@@ -115,7 +115,7 @@
                     <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Google Analytics (GA4) Property</label>
                     @if (count($gaOptions))
                         <select wire:model="gaSelection"
-                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                             <option value="">Skip Analytics for now</option>
                             @foreach ($gaOptions as $opt)
                                 <option value="{{ $opt['account_id'] }}|{{ $opt['id'] }}">{{ $opt['name'] }} ({{ $opt['id'] }}) — {{ $opt['account_label'] }}</option>
@@ -134,7 +134,7 @@
                     <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Search Console Site</label>
                     @if (count($gscOptions))
                         <select wire:model.live="gscSelection"
-                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                             <option value="">Skip Search Console for now</option>
                             @foreach ($gscOptions as $opt)
                                 <option value="{{ $opt['account_id'] }}|{{ $opt['siteUrl'] }}">{{ $opt['siteUrl'] }} — {{ $opt['account_label'] }}</option>
@@ -150,7 +150,7 @@
 
                 {{-- Connect another account --}}
                 <button type="button" wire:click="connectAnotherAccount"
-                    class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 transition hover:text-indigo-700 dark:text-indigo-400">
+                    class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-orange-600 transition hover:text-orange-700 dark:text-orange-400">
                     <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                     Connect another Google account
                 </button>
@@ -159,7 +159,7 @@
                 <div>
                     <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Domain</label>
                     <input wire:model="domain" type="text" placeholder="example.com"
-                        class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                        class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
                     <p class="mt-0.5 text-[11px] text-slate-400">Auto-filled from your Search Console selection.</p>
                     @error('domain') <p class="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
@@ -170,7 +170,7 @@
                         Skip for now
                     </button>
                     <button type="submit"
-                        class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+                        class="inline-flex h-8 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700">
                         Finish Setup
                         <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                     </button>

@@ -10,7 +10,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Sent (from the configured noreply@ebq.io) to a guest who supplied their email
+ * Sent (from the configured noreply@serfix.io) to a guest who supplied their email
  * on their second free audit. Delivers the link to the report + a nudge to sign
  * up for the full GSC/GA-powered audit.
  */

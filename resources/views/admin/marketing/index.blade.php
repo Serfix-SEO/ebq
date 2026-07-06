@@ -43,8 +43,8 @@
         {{-- Search --}}
         <form method="GET" class="flex items-center gap-2">
             <input type="text" name="q" value="{{ $q }}" placeholder="Search by domain…"
-                   class="h-8 w-64 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            <button type="submit" class="h-8 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700">Search</button>
+                   class="h-8 w-64 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
+            <button type="submit" class="h-8 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white hover:bg-orange-700">Search</button>
             @if ($q !== '')<a href="{{ route('admin.marketing.index') }}" class="text-xs text-slate-500 hover:underline">Clear</a>@endif
         </form>
 
@@ -83,10 +83,10 @@
                                 <form method="POST" action="{{ route('admin.marketing.send', $w) }}" class="flex items-center justify-end gap-1.5">
                                     @csrf
                                     <input type="email" name="to_email" value="{{ $w->user?->email }}" placeholder="recipient@email.com"
-                                           class="h-7 w-48 rounded border border-slate-200 px-2 text-xs focus:border-indigo-500 focus:outline-none" />
+                                           class="h-7 w-48 rounded border border-slate-200 px-2 text-xs focus:border-orange-500 focus:outline-none" />
                                     <button type="submit"
                                             onclick="return confirm('Send the crawl report for {{ $w->domain }} to this address?')"
-                                            class="h-7 rounded bg-indigo-600 px-2.5 text-xs font-semibold text-white hover:bg-indigo-700">Send</button>
+                                            class="h-7 rounded bg-orange-600 px-2.5 text-xs font-semibold text-white hover:bg-orange-700">Send</button>
                                 </form>
                             </td>
                         </tr>
@@ -104,7 +104,7 @@
             <div class="rounded-lg border border-slate-200 bg-white">
                 <div class="flex items-center justify-between border-b border-slate-100 px-4 py-2">
                     <h2 class="text-sm font-semibold">Recently sent</h2>
-                    <a href="{{ route('admin.marketing.sends') }}" class="text-xs text-indigo-600 hover:underline">View all →</a>
+                    <a href="{{ route('admin.marketing.sends') }}" class="text-xs text-orange-600 hover:underline">View all →</a>
                 </div>
                 <ul class="divide-y divide-slate-100 text-sm">
                     @foreach ($recentSends as $s)

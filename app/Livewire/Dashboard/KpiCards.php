@@ -62,59 +62,69 @@ class KpiCards extends Component
         ];
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $today = Carbon::today(config('app.timezone'));
-            $currentEnd = $today->copy()->subDay();
-            $currentStart = $currentEnd->copy()->subDays(29);
-            $previousEnd = $currentStart->copy()->subDay();
-            $previousStart = $previousEnd->copy()->subDays(29);
-            // Mix in ReportCache::version so a GSC/GA sync that corrects the most
-            // recent (partial) days inside this fixed window invalidates the cache —
-            // the date range alone doesn't change, so without the version these KPIs
-            // stayed stale for the whole TTL after a re-sync.
-            $cacheKey = sprintf(
-                'kpis:%s:%s:%s:%d',
-                $this->websiteId,
-                $currentStart->toDateString(),
-                $currentEnd->toDateString(),
-                ReportCache::version($this->websiteId)
-            );
-
-            $data = Cache::remember($cacheKey, 600, function () use ($currentStart, $currentEnd, $previousStart, $previousEnd) {
-                $currentSc = SearchConsoleData::query()
-                    ->where('website_id', $this->websiteId)
-                    ->whereBetween('date', [$currentStart->toDateString(), $currentEnd->toDateString()]);
-                $previousSc = SearchConsoleData::query()
-                    ->where('website_id', $this->websiteId)
-                    ->whereBetween('date', [$previousStart->toDateString(), $previousEnd->toDateString()]);
-                $currentGa = AnalyticsData::query()
-                    ->where('website_id', $this->websiteId)
-                    ->whereBetween('date', [$currentStart->toDateString(), $currentEnd->toDateString()]);
-                $previousGa = AnalyticsData::query()
-                    ->where('website_id', $this->websiteId)
-                    ->whereBetween('date', [$previousStart->toDateString(), $previousEnd->toDateString()]);
-
-                return [
-                    'clicks' => $this->buildMetric(
-                        (int) (clone $currentSc)->sum('clicks'),
-                        (int) (clone $previousSc)->sum('clicks')
-                    ),
-                    'impressions' => $this->buildMetric(
-                        (int) (clone $currentSc)->sum('impressions'),
-                        (int) (clone $previousSc)->sum('impressions')
-                    ),
-                    'users' => $this->buildMetric(
-                        (int) (clone $currentGa)->sum('users'),
-                        (int) (clone $previousGa)->sum('users')
-                    ),
-                    'sessions' => $this->buildMetric(
-                        (int) (clone $currentGa)->sum('sessions'),
-                        (int) (clone $previousGa)->sum('sessions')
-                    ),
-                ];
-            });
+            $data = self::payload($this->websiteId);
         }
 
         return view('livewire.dashboard.kpi-cards', compact('data'));
+    }
+
+    /**
+     * Cached KPI payload — shared by render() and WarmDashboardCaches (the
+     * post-sync warmer) so both use the identical key + computation, and the
+     * first dashboard visitor after a sync never pays the cold aggregate.
+     */
+    public static function payload(string $websiteId): array
+    {
+        $today = Carbon::today(config('app.timezone'));
+        $currentEnd = $today->copy()->subDay();
+        $currentStart = $currentEnd->copy()->subDays(29);
+        $previousEnd = $currentStart->copy()->subDay();
+        $previousStart = $previousEnd->copy()->subDays(29);
+        // Mix in ReportCache::version so a GSC/GA sync that corrects the most
+        // recent (partial) days inside this fixed window invalidates the cache —
+        // the date range alone doesn't change, so without the version these KPIs
+        // stayed stale for the whole TTL after a re-sync.
+        $cacheKey = sprintf(
+            'kpis:%s:%s:%s:%d',
+            $websiteId,
+            $currentStart->toDateString(),
+            $currentEnd->toDateString(),
+            ReportCache::version($websiteId)
+        );
+
+        return Cache::remember($cacheKey, 86400, function () use ($websiteId, $currentStart, $currentEnd, $previousStart, $previousEnd) {
+            $currentSc = SearchConsoleData::query()
+                ->where('website_id', $websiteId)
+                ->whereBetween('date', [$currentStart->toDateString(), $currentEnd->toDateString()]);
+            $previousSc = SearchConsoleData::query()
+                ->where('website_id', $websiteId)
+                ->whereBetween('date', [$previousStart->toDateString(), $previousEnd->toDateString()]);
+            $currentGa = AnalyticsData::query()
+                ->where('website_id', $websiteId)
+                ->whereBetween('date', [$currentStart->toDateString(), $currentEnd->toDateString()]);
+            $previousGa = AnalyticsData::query()
+                ->where('website_id', $websiteId)
+                ->whereBetween('date', [$previousStart->toDateString(), $previousEnd->toDateString()]);
+
+            return [
+                'clicks' => self::buildMetric(
+                    (int) (clone $currentSc)->sum('clicks'),
+                    (int) (clone $previousSc)->sum('clicks')
+                ),
+                'impressions' => self::buildMetric(
+                    (int) (clone $currentSc)->sum('impressions'),
+                    (int) (clone $previousSc)->sum('impressions')
+                ),
+                'users' => self::buildMetric(
+                    (int) (clone $currentGa)->sum('users'),
+                    (int) (clone $previousGa)->sum('users')
+                ),
+                'sessions' => self::buildMetric(
+                    (int) (clone $currentGa)->sum('sessions'),
+                    (int) (clone $previousGa)->sum('sessions')
+                ),
+            ];
+        });
     }
 
     private function emptyMetric(): array
@@ -127,7 +137,7 @@ class KpiCards extends Component
         ];
     }
 
-    private function buildMetric(int $current, int $previous): array
+    private static function buildMetric(int $current, int $previous): array
     {
         $change = $current - $previous;
         $changePercent = $previous !== 0

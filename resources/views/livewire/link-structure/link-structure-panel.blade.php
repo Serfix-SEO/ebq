@@ -10,14 +10,14 @@
             <div class="flex-1">
                 <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Page URL</label>
                 <input wire:model="pageUrl" type="url" list="lsp-examples" placeholder="https://example.com/page"
-                    class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                    class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
                 <datalist id="lsp-examples">
                     @foreach ($examples as $ex)
                         <option value="{{ $ex }}"></option>
                     @endforeach
                 </datalist>
             </div>
-            <button type="submit" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+            <button type="submit" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700">
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
                 Show links
             </button>
@@ -62,7 +62,7 @@
                         <li class="px-4 py-3 {{ $isHighlighted ? $tone['bg'].' border-l-4 '.$tone['border'] : '' }}">
                             <div class="flex flex-wrap items-center gap-2">
                                 @if ($isHighlighted)
-                                    <span class="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">You're here</span>
+                                    <span class="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">You're here</span>
                                 @endif
                                 <span class="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $tone['badge'] }}">{{ $issue['severity'] }}</span>
                                 <span class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $issue['label'] }}</span>
@@ -86,7 +86,7 @@
                                 <div class="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                                     Also affected:
                                     @foreach (array_slice($d['other_urls'], 0, 5) as $u)
-                                        <a href="{{ $u }}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $u }}</a>@if (! $loop->last), @endif
+                                        <a href="{{ $u }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline dark:text-orange-400">{{ $u }}</a>@if (! $loop->last), @endif
                                     @endforeach
                                     @if (count($d['other_urls']) > 5) (+{{ count($d['other_urls']) - 5 }} more) @endif
                                 </div>
@@ -120,7 +120,7 @@
                                 <div class="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                                     Linked from:
                                     @foreach (array_slice($d['referrers'], 0, 5) as $r)
-                                        <a href="{{ $r['url'] }}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $r['url'] }}</a>@if (! $loop->last), @endif
+                                        <a href="{{ $r['url'] }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline dark:text-orange-400">{{ $r['url'] }}</a>@if (! $loop->last), @endif
                                     @endforeach
                                 </div>
                             @endif
@@ -131,7 +131,7 @@
         </div>
 
         {{-- Focus page summary --}}
-        <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/5">
+        <div class="rounded-xl border border-orange-200 bg-orange-50/50 p-4 dark:border-orange-500/20 dark:bg-orange-500/5">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="min-w-0">
                     <a href="{{ $pg['url'] }}" target="_blank" rel="noopener" class="block truncate text-sm font-semibold text-slate-900 hover:underline dark:text-slate-100" title="{{ $pg['url'] }}">{{ $pg['title'] ?: $pg['url'] }}</a>
@@ -193,9 +193,9 @@
                             @if ($i > 0)
                                 <span class="mr-1.5 select-none text-slate-300 dark:text-slate-600">└─</span>
                             @endif
-                            <span class="mr-1.5 flex h-5 min-w-[20px] items-center justify-center rounded {{ $step['is_current'] ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300' }} px-1 text-[10px] font-bold">{{ $i }}</span>
+                            <span class="mr-1.5 flex h-5 min-w-[20px] items-center justify-center rounded {{ $step['is_current'] ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300' }} px-1 text-[10px] font-bold">{{ $i }}</span>
                             <a href="{{ $step['url'] }}" target="_blank" rel="noopener"
-                                class="truncate {{ $step['is_current'] ? 'font-semibold text-indigo-700 dark:text-indigo-300' : 'text-slate-700 hover:underline dark:text-slate-200' }}"
+                                class="truncate {{ $step['is_current'] ? 'font-semibold text-orange-700 dark:text-orange-300' : 'text-slate-700 hover:underline dark:text-slate-200' }}"
                                 title="{{ $step['url'] }}">{{ $i === 0 ? '🏠 '.$segLabel($step['url']) : $segLabel($step['url']) }}</a>
                             @if ($step['is_current'])<span class="ml-1.5 whitespace-nowrap text-[10px] text-slate-400">this page · depth {{ $pg['click_depth'] ?? count($structure['path']) - 1 }}</span>@endif
                         </li>
@@ -217,7 +217,7 @@
                 <div class="max-h-80 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
                     @forelse ($structure['inbound'] as $l)
                         <div class="px-4 py-1.5">
-                            <a href="{{ $l['url'] }}" target="_blank" rel="noopener" class="block truncate text-[12px] text-indigo-600 hover:underline dark:text-indigo-400" title="{{ $l['url'] }}">{{ $l['url'] }}</a>
+                            <a href="{{ $l['url'] }}" target="_blank" rel="noopener" class="block truncate text-[12px] text-orange-600 hover:underline dark:text-orange-400" title="{{ $l['url'] }}">{{ $l['url'] }}</a>
                             @if ($l['anchor'])<div class="truncate text-[11px] text-slate-400">anchor: "{{ $l['anchor'] }}"</div>@endif
                         </div>
                     @empty
@@ -233,7 +233,7 @@
                     @forelse ($structure['outbound'] as $l)
                         <div class="flex items-start justify-between gap-2 px-4 py-1.5">
                             <div class="min-w-0">
-                                <a href="{{ $l['url'] }}" target="_blank" rel="noopener" class="block truncate text-[12px] {{ $l['broken'] ? 'text-red-600' : 'text-indigo-600 dark:text-indigo-400' }} hover:underline" title="{{ $l['url'] }}">{{ $l['url'] }}</a>
+                                <a href="{{ $l['url'] }}" target="_blank" rel="noopener" class="block truncate text-[12px] {{ $l['broken'] ? 'text-red-600' : 'text-orange-600 dark:text-orange-400' }} hover:underline" title="{{ $l['url'] }}">{{ $l['url'] }}</a>
                                 @if ($l['anchor'])<div class="truncate text-[11px] text-slate-400">anchor: "{{ $l['anchor'] }}"</div>@endif
                             </div>
                             @if ($l['broken'])<span class="whitespace-nowrap rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">{{ $l['status'] }}</span>@endif
@@ -253,7 +253,7 @@
                     @foreach ($structure['suggested_inbound'] as $l)
                         <div class="px-4 py-1.5">
                             <span class="text-[11px] text-slate-500">Add a link from</span>
-                            <a href="{{ $l['url'] }}" target="_blank" rel="noopener" class="text-[12px] text-indigo-600 hover:underline dark:text-indigo-400">{{ $l['url'] }}</a>
+                            <a href="{{ $l['url'] }}" target="_blank" rel="noopener" class="text-[12px] text-orange-600 hover:underline dark:text-orange-400">{{ $l['url'] }}</a>
                             @if ($l['anchor'])<span class="text-[11px] text-slate-500">with anchor "{{ $l['anchor'] }}"</span>@endif
                         </div>
                     @endforeach

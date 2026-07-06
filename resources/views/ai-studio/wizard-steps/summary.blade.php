@@ -6,19 +6,19 @@
     </div>
 
     <template x-if="hasGeneratedHtml()">
-        <div class="flex flex-col gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm sm:flex-row sm:items-center sm:justify-between dark:border-indigo-500/30 dark:bg-indigo-500/10">
-            <div class="text-indigo-900 dark:text-indigo-200">
+        <div class="flex flex-col gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm sm:flex-row sm:items-center sm:justify-between dark:border-orange-500/30 dark:bg-orange-500/10">
+            <div class="text-orange-900 dark:text-orange-200">
                 <strong class="block">You already generated an article for this project.</strong>
                 <span class="text-xs">Regenerating below will replace it. Open the existing draft to review or save.</span>
             </div>
-            <button type="button" @click="postGenView = 'review'" class="rounded-md border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400/30 dark:bg-slate-900 dark:text-indigo-300">Open existing article →</button>
+            <button type="button" @click="postGenView = 'review'" class="rounded-md border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-50 dark:border-orange-400/30 dark:bg-slate-900 dark:text-orange-300">Open existing article →</button>
         </div>
     </template>
 
     <div class="space-y-3">
         {{-- Topic --}}
         <section class="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-            <div class="mb-2 flex items-center justify-between"><h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Topic</h4><button type="button" @click="goToStep('topic')" class="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400">edit</button></div>
+            <div class="mb-2 flex items-center justify-between"><h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Topic</h4><button type="button" @click="goToStep('topic')" class="text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400">edit</button></div>
             <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                 <div><dt class="text-[11px] text-slate-400">Project title</dt><dd class="font-medium text-slate-800 dark:text-slate-100" x-text="project?.title || 'Untitled'"></dd></div>
                 <div><dt class="text-[11px] text-slate-400">Focused keyword</dt><dd class="font-mono text-xs text-slate-700 dark:text-slate-200" x-text="project?.focus_keyword || '—'"></dd></div>
@@ -33,7 +33,7 @@
 
         {{-- Brief --}}
         <section class="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-            <div class="mb-2 flex items-center justify-between"><h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Content brief</h4><button type="button" @click="goToStep('brief')" class="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400">edit</button></div>
+            <div class="mb-2 flex items-center justify-between"><h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Content brief</h4><button type="button" @click="goToStep('brief')" class="text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400">edit</button></div>
             <div class="flex flex-wrap gap-1.5 text-[11px]">
                 <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"><span x-text="summarySections().length"></span> sections</span>
                 <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"><span x-text="summaryPaa().length"></span> PAA</span>
@@ -47,7 +47,7 @@
 
         {{-- Strategy --}}
         <section class="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-            <div class="mb-2 flex items-center justify-between"><h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Strategy</h4><button type="button" @click="goToStep('strategy')" class="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400">edit</button></div>
+            <div class="mb-2 flex items-center justify-between"><h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Strategy</h4><button type="button" @click="goToStep('strategy')" class="text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400">edit</button></div>
             <dl class="space-y-2 text-sm">
                 <div><dt class="text-[11px] text-slate-400">SEO title</dt><dd class="text-slate-700 dark:text-slate-200" x-text="project?.meta_title || (suggestionsFor('seo_titles')[0] || 'none yet')"></dd></div>
                 <div><dt class="text-[11px] text-slate-400">Meta description</dt><dd class="text-slate-700 dark:text-slate-200" x-text="project?.meta_description || (suggestionsFor('meta_descriptions')[0] || 'none yet')"></dd></div>
@@ -62,7 +62,7 @@
 
         {{-- Images --}}
         <section class="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-            <div class="mb-2 flex items-center justify-between"><h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Images</h4><button type="button" @click="goToStep('images')" class="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400">edit</button></div>
+            <div class="mb-2 flex items-center justify-between"><h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Images</h4><button type="button" @click="goToStep('images')" class="text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400">edit</button></div>
             <p x-show="im.selected.length === 0" class="text-xs italic text-slate-400">No images selected. The article will publish without inline media.</p>
             <div x-show="im.selected.length > 0" class="flex flex-wrap gap-2">
                 <template x-for="(img, i) in im.selected" :key="i">
@@ -73,7 +73,7 @@
     </div>
 
     <div class="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-        Estimated EBQ Content Credits for this generation: <strong x-text="'~' + estCredits()"></strong>
+        Estimated Serfix Content Credits for this generation: <strong x-text="'~' + estCredits()"></strong>
     </div>
 
     <template x-if="error"><div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300" x-text="error"></div></template>
@@ -81,7 +81,7 @@
     <div class="flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
         <button type="button" @click="goToStep('images')" class="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400">← Back</button>
         <button type="button" @click="generateArticle()" :disabled="loading || summarySections().length === 0 || featureLocked"
-            class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
+            class="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
             x-text="loading ? 'Generating article…' : (hasGeneratedHtml() ? 'Regenerate article →' : 'Generate article →')"></button>
     </div>
 </div>

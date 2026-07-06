@@ -37,7 +37,7 @@ class CrawlAuditPdfRenderer
 
     public function filenameFor(Website $website, ReportBranding $branding): string
     {
-        $brand = preg_replace('/[^a-z0-9]+/i', '-', $branding->company_name) ?: 'EBQ';
+        $brand = preg_replace('/[^a-z0-9]+/i', '-', $branding->company_name) ?: 'Serfix';
         $domain = preg_replace('/[^a-z0-9]+/i', '-', $website->domain ?? 'site') ?: 'site';
 
         return strtolower(trim($brand, '-')).'-site-audit-'.$domain.'-'.now()->format('Ymd').'.pdf';

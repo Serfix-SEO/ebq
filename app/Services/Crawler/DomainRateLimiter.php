@@ -5,7 +5,6 @@ namespace App\Services\Crawler;
 use App\Models\CrawlSite;
 use App\Support\AutoscalerConfig;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Redis;
 
 /**
@@ -26,29 +25,72 @@ class DomainRateLimiter
     private const BLOCK_KEY = 'crawl-blocked:';     // set during a domain's block cooldown
     private const LAT_KEY = 'crawl-lat:';           // recent fetch-latency samples (capped list)
     private const BASE_KEY = 'crawl-lat-base:';     // the domain's "healthy" baseline latency
+    private const WAF_KEY = 'crawl-waf:';           // WAF/CDN vendor detected for a domain
 
-    /** Block until a token for this domain is free (or the max wait elapses). */
+    /**
+     * Block until a token for this domain is free (or the max wait elapses).
+     *
+     * Uses Redis INCR on a per-second (or per-2s for WAF) slot key — atomic across
+     * ALL workers on ALL boxes. The previous implementation used Laravel's RateLimiter
+     * facade, which defaults to the `database` cache store on this app, so workers on
+     * different boxes never shared the same window and the per-domain rate was never
+     * actually enforced fleet-wide.
+     */
     public function throttle(?string $domain): void
     {
         $domain = $this->normalize($domain);
         if ($domain === '') {
             return;
         }
-        $rate = $this->currentRate($domain);
-        $key = 'crawl-rate:'.$domain;
+
         $maxWaitMs = max(0, (int) config('crawler.rate_max_wait_ms', 5000));
+
+        if ($this->isWafProtected($domain)) {
+            // WAF: 1 req / 2-second slot
+            $this->acquireToken('crawl-waf-rl:'.$domain, 1, 2, $maxWaitMs);
+        } else {
+            // Normal: $rate req / 1-second slot
+            $this->acquireToken('crawl-rl:'.$domain, $this->currentRate($domain), 1, $maxWaitMs);
+        }
+    }
+
+    /**
+     * Acquire one token using a Redis INCR fixed-window counter.
+     * Atomic across all workers/boxes — no Laravel cache store dependency.
+     *
+     * @param string $key    Redis key prefix (domain-scoped)
+     * @param int    $rate   max requests per window
+     * @param int    $windowS window size in seconds
+     * @param int    $maxWaitMs fail-open after this many ms of waiting
+     */
+    private function acquireToken(string $key, int $rate, int $windowS, int $maxWaitMs): void
+    {
+        $r = Redis::connection();
         $waited = 0;
 
         while (true) {
-            if (! RateLimiter::tooManyAttempts($key, $rate)) {
-                RateLimiter::hit($key, 1); // 1-second decay window → $rate per second
-                return;
+            $slot = (int) floor(microtime(true) / $windowS);
+            $slotKey = $key.':'.$slot;
+            $count = (int) $r->incr($slotKey);
+            $r->expire($slotKey, $windowS + 1);
+
+            if ($count <= $rate) {
+                return; // token acquired
             }
+
+            // Slot full — undo our increment so we don't inflate the count,
+            // then sleep until the next slot opens.
+            $r->decr($slotKey);
+
             if ($waited >= $maxWaitMs) {
-                return; // fail-open: a rare over-rate fetch beats a stuck crawl
+                return; // fail-open: rare, avoids a permanently stuck worker
             }
-            usleep(100_000); // 100ms
-            $waited += 100;
+
+            // Sleep until the next slot boundary — full wait, no premature retry.
+            $msUntilNextSlot = (int) ceil(($windowS - fmod(microtime(true), (float) $windowS)) * 1000);
+            $sleepMs = max(10, $msUntilNextSlot);
+            usleep($sleepMs * 1000);
+            $waited += $sleepMs;
         }
     }
 
@@ -98,6 +140,43 @@ class DomainRateLimiter
         return $domain !== '' && (bool) Redis::connection()->exists(self::BLOCK_KEY.$domain);
     }
 
+    /**
+     * Record that a WAF/CDN was detected on this domain (persisted 48h, refreshed each crawl).
+     * Once flagged, throttle() enforces 1 req/2s instead of the adaptive ramp.
+     */
+    public function recordWaf(?string $domain, string $vendor): void
+    {
+        $domain = $this->normalize($domain);
+        if ($domain === '') {
+            return;
+        }
+        Redis::connection()->setex(self::WAF_KEY.$domain, 172_800, $vendor); // 48h TTL
+        Log::info('DomainRateLimiter: WAF detected → slow mode (1 req/2s)', [
+            'domain' => $domain,
+            'waf' => $vendor,
+        ]);
+    }
+
+    /** Is this domain known to be behind a WAF/CDN? */
+    public function isWafProtected(?string $domain): bool
+    {
+        $domain = $this->normalize($domain);
+
+        return $domain !== '' && (bool) Redis::connection()->exists(self::WAF_KEY.$domain);
+    }
+
+    /** Which WAF vendor was detected (null if none). */
+    public function wafVendor(?string $domain): ?string
+    {
+        $domain = $this->normalize($domain);
+        if ($domain === '') {
+            return null;
+        }
+        $v = Redis::connection()->get(self::WAF_KEY.$domain);
+
+        return $v !== null ? (string) $v : null;
+    }
+
     /** Record a fetch's latency (ms) so the smart policy can spot the site slowing down. */
     public function recordFetch(?string $domain, int $latencyMs): void
     {
@@ -127,6 +206,11 @@ class DomainRateLimiter
         $cur = $this->currentRate($domain);
         if ($domain === '' || $this->inBlockCooldown($domain)) {
             return ['action' => 'cooldown', 'rate' => $cur, 'lat' => null, 'base' => null];
+        }
+
+        // WAF-protected domains stay at 1 req/2s — never ramp them up.
+        if ($this->isWafProtected($domain)) {
+            return ['action' => 'waf_hold', 'rate' => $cur, 'lat' => null, 'base' => null];
         }
 
         $r = Redis::connection();

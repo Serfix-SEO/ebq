@@ -126,7 +126,7 @@ class RankTrackingDetail extends Component
         $since90 = Carbon::now()->subDays(90)->toDateString();
 
         $totals = $keyword->gscQuery()
-            ->whereDate('date', '>=', $since)
+            ->where('date', '>=', $since)
             ->selectRaw('SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position, AVG(ctr) as ctr')
             ->first();
 
@@ -137,7 +137,7 @@ class RankTrackingDetail extends Component
         }
 
         $byDevice = $keyword->gscQuery()
-            ->whereDate('date', '>=', $since)
+            ->where('date', '>=', $since)
             ->selectRaw('device, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')
             ->groupBy('device')
             ->orderByDesc('clicks')
@@ -151,7 +151,7 @@ class RankTrackingDetail extends Component
             ->all();
 
         $topPages = $keyword->gscQuery()
-            ->whereDate('date', '>=', $since)
+            ->where('date', '>=', $since)
             ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')
             ->groupBy('page')
             ->orderByDesc('clicks')
@@ -166,7 +166,7 @@ class RankTrackingDetail extends Component
             ->all();
 
         $series = $keyword->gscQuery()
-            ->whereDate('date', '>=', $since90)
+            ->where('date', '>=', $since90)
             ->selectRaw('date, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')
             ->groupBy('date')
             ->orderBy('date')

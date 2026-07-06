@@ -8,7 +8,7 @@
             @class([
                 'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold shadow-sm transition',
                 'bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600' => $showForm,
-                'bg-indigo-600 text-white hover:bg-indigo-700' => !$showForm,
+                'bg-orange-600 text-white hover:bg-orange-700' => !$showForm,
             ])>
             @if ($showForm)
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -21,7 +21,7 @@
     </div>
 
     @if ($showForm)
-        <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-5 dark:border-indigo-500/20 dark:bg-indigo-500/5">
+        <div class="rounded-xl border border-orange-200 bg-orange-50/50 p-5 dark:border-orange-500/20 dark:bg-orange-500/5">
             <h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">New Website</h3>
 
             @if ($fetchError)
@@ -36,7 +36,7 @@
                     <div>
                         <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">GA4 Property</label>
                         <select wire:model="gaSelection"
-                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                             <option value="">Skip Analytics</option>
                             @foreach ($gaOptions as $opt)
                                 <option value="{{ $opt['account_id'] }}|{{ $opt['id'] }}">{{ $opt['name'] }} ({{ $opt['id'] }}) — {{ $opt['account_label'] }}</option>
@@ -48,7 +48,7 @@
                     <div>
                         <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Search Console Site</label>
                         <select wire:model.live="gscSelection"
-                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                             <option value="">Skip Search Console</option>
                             @foreach ($gscOptions as $opt)
                                 <option value="{{ $opt['account_id'] }}|{{ $opt['siteUrl'] }}">{{ $opt['siteUrl'] }} — {{ $opt['account_label'] }}</option>
@@ -63,13 +63,13 @@
                 <div>
                     <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Domain</label>
                     <input wire:model="domain" type="text" placeholder="example.com"
-                        class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 sm:max-w-xs" />
+                        class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 sm:max-w-xs" />
                     <p class="mt-0.5 text-[11px] text-slate-400">Auto-filled from Search Console selection.</p>
                     @error('domain') <p class="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
-                    <button type="submit" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+                    <button type="submit" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700">
                         <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                         Save Website
                     </button>
@@ -85,7 +85,7 @@
                     <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Your websites</h2>
                     <p class="text-xs text-slate-500 dark:text-slate-400">
                         Team invites for the site selected in the header:
-                        <a href="{{ route('team.index') }}" wire:navigate class="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">Open Team</a>
+                        <a href="{{ route('team.index') }}" wire:navigate class="font-medium text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300">Open Team</a>
                     </p>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -93,7 +93,7 @@
                         <div class="group rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
                             <div class="flex items-start justify-between">
                                 <div class="flex items-center gap-2.5">
-                                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-xs font-bold text-orange-600 dark:bg-orange-500/10 dark:text-orange-400">
                                         {{ strtoupper(substr($site->domain, 0, 1)) }}
                                     </div>
                                     <div>

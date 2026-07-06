@@ -22,7 +22,7 @@
                         {{ $row['flag'] ? $row['flag'].' ' : '' }}{{ $row['name'] }}
                     </span>
                     <div class="col-span-5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div class="h-full rounded-full bg-indigo-500" style="width: {{ $row['width_pct'] }}%"></div>
+                        <div class="h-full rounded-full bg-orange-500" style="width: {{ $row['width_pct'] }}%"></div>
                     </div>
                     <span class="col-span-2 text-right text-xs font-semibold tabular-nums text-slate-800 dark:text-slate-100">
                         {{ number_format($row['clicks']) }}

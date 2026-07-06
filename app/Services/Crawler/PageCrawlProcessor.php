@@ -96,9 +96,14 @@ class PageCrawlProcessor
             'headers' => $res['headers'],
         ]);
         if ($blockReason !== null) {
+            $wafVendor = $this->blockDetector->detectWaf(['headers' => $res['headers']]);
+            $httpError = 'blocked:'.$blockReason.($wafVendor !== null ? '|'.$wafVendor : '');
             $page->forceFill([
-                'http_status' => $status,
-                'http_error' => 'blocked:'.$blockReason,
+                // Keep the previous good http_status — a 429/captcha block means the
+                // page exists but the server refused us temporarily. Overwriting with
+                // the block status would make SiteIssueDetector flag it as broken.
+                'http_status' => $page->http_status,
+                'http_error' => $httpError,
                 'last_crawled_at' => now(),
                 'next_crawl_at' => $retry,
             ])->save();
@@ -280,6 +285,12 @@ class PageCrawlProcessor
         if ($blocked === null) {
             if ($proxy !== null && $res['ok']) {
                 $this->pool->markSuccess($proxy);
+            }
+            // Detect WAF/CDN on successful fetches and engage slow-mode (1 req/2s).
+            if ($res['ok'] && ($wafVendor = $this->blockDetector->detectWaf(['headers' => $res['headers']])) !== null) {
+                if (! $this->rateLimiter->isWafProtected($domain)) {
+                    $this->rateLimiter->recordWaf($domain, $wafVendor);
+                }
             }
 
             return $res;

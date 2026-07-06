@@ -58,7 +58,7 @@
                 href="{{ route($tab['route']) }}"
                 @class([
                     'group relative inline-flex flex-col gap-0.5 px-4 py-3 text-sm font-medium transition border-b-2',
-                    'border-indigo-600 text-slate-900 dark:border-indigo-400 dark:text-slate-100' => $active,
+                    'border-orange-600 text-slate-900 dark:border-orange-400 dark:text-slate-100' => $active,
                     'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 dark:hover:text-slate-200 dark:hover:border-slate-700' => ! $active,
                 ])
                 @if ($active) aria-current="page" @endif

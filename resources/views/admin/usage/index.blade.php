@@ -19,7 +19,7 @@
         $fmtN = fn ($n) => number_format((int) $n);
         $providerColor = [
             'keywords_everywhere' => 'bg-amber-50 text-amber-700 border-amber-200',
-            'serp_api' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
+            'serp_api' => 'bg-orange-50 text-orange-700 border-orange-200',
             'mistral'  => 'bg-purple-50 text-purple-700 border-purple-200',
         ];
 
@@ -58,7 +58,7 @@
                     <a href="{{ route('admin.usage.index', ['range' => $val, 'provider' => $filters['provider'] ?: null, 'user_id' => $filters['user_id'] ?: null]) }}"
                        @class([
                            'rounded border px-3 py-1.5 text-xs font-semibold',
-                           'border-indigo-500 bg-indigo-50 text-indigo-700' => $preset === $val,
+                           'border-orange-500 bg-orange-50 text-orange-700' => $preset === $val,
                            'border-slate-200 text-slate-600 hover:bg-slate-50' => $preset !== $val,
                        ])>{{ $label }}</a>
                 @endforeach
@@ -116,7 +116,7 @@
                             @php $p = $card['data']['providers'][$key] ?? ['units' => 0, 'cost' => 0]; @endphp
                             <div class="flex items-center justify-between">
                                 <span class="inline-flex items-center gap-1.5">
-                                    <span @class(['h-2 w-2 rounded-full', 'bg-amber-500' => $key === 'keywords_everywhere', 'bg-indigo-500' => $key === 'serp_api'])></span>
+                                    <span @class(['h-2 w-2 rounded-full', 'bg-amber-500' => $key === 'keywords_everywhere', 'bg-orange-500' => $key === 'serp_api'])></span>
                                     <span class="text-slate-600">{{ $meta['label'] }}</span>
                                 </span>
                                 <span class="tabular-nums text-slate-500">
@@ -147,7 +147,7 @@
                             <svg viewBox="0 0 240 36" class="mt-2 block h-9 w-full" preserveAspectRatio="none" aria-hidden="true">
                                 <path d="{{ $sparkPath($vals) }}"
                                       fill="none"
-                                      stroke="{{ $key === 'keywords_everywhere' ? '#d97706' : '#4f46e5' }}"
+                                      stroke="{{ $key === 'keywords_everywhere' ? '#d97706' : '#F26419' }}"
                                       stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
                             </svg>
                         </div>

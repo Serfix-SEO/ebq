@@ -6,13 +6,13 @@
 @endphp
 <x-marketing.page
     title="PageSpeed report — {{ \Illuminate\Support\Str::limit($host, 60) }}"
-    description="Free PageSpeed & Core Web Vitals report by EBQ."
+    description="Free PageSpeed & Core Web Vitals report by Serfix."
     robots="noindex, follow"
 >
     <section class="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:py-14">
         <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Free PageSpeed report</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Free PageSpeed report</p>
                 <h1 class="mt-1 truncate text-2xl font-bold tracking-tight text-slate-900">{{ $host }}</h1>
             </div>
             <a href="{{ route('tools.pagespeed') }}" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
@@ -24,7 +24,7 @@
         @if ($isPending)
             <div class="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm"
                  id="ps-status" data-status-url="{{ route('guest-pagespeed.status', $report) }}">
-                <svg class="h-8 w-8 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                <svg class="h-8 w-8 animate-spin text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 <h2 class="mt-4 text-lg font-semibold text-slate-900">Running your PageSpeed test…</h2>
                 <p class="mt-2 max-w-sm text-sm text-slate-600">We’re auditing the page on mobile and desktop — performance, accessibility, best practices and SEO. This usually takes up to a minute.</p>
             </div>
@@ -57,13 +57,13 @@
             @include('partials.page-speed-report', ['result' => $report->result ?? [], 'testedUrl' => $report->url])
 
             {{-- Signup CTA --}}
-            <div class="mt-8 overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50 p-6 sm:p-8">
+            <div class="mt-8 overflow-hidden rounded-2xl border border-orange-200 bg-orange-50 p-6 sm:p-8">
                 <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h2 class="text-lg font-bold tracking-tight text-slate-900">Track this — and fix it — continuously</h2>
                         <p class="mt-1.5 max-w-xl text-sm leading-6 text-slate-600">Create a free account to monitor Core Web Vitals over time, run full SEO audits, and connect Search Console &amp; Analytics for live keyword and traffic data.</p>
                     </div>
-                    <a href="{{ route('register') }}" class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:from-indigo-500 hover:to-violet-500">
+                    <a href="{{ route('register') }}" class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700">
                         Start free →
                     </a>
                 </div>

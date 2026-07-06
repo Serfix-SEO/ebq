@@ -233,8 +233,18 @@ Until the token/snapshot/network are set, `ebq:fleet-worker provision` returns a
   pinned box (`Queues::CRAWL_FINALIZE`; the box's compose gained an `ebq-finalize-1` worker +
   `stop_grace_period: 360s`). Ephemeral boxes run `--queue=crawl` only, so a drain can never
   interrupt a finalize.
-- **Phase 3 ✅** `DomainRateLimiter` (Redis token bucket per normalized domain) in
+- **Phase 3 ✅** `DomainRateLimiter` (Redis fixed-window counter per normalized domain) in
   `PageCrawlProcessor::fetchWithPolicy()` — fleet-wide per-domain politeness, fail-open.
+  **Fixed 2026-07-03:** `throttle()` used to call Laravel's `RateLimiter` facade, which
+  resolves to the `database` cache store on this app — each box/worker checked its own DB
+  connection's rows, so the "fleet-wide" limit was never actually shared across boxes.
+  Rewritten on raw `Redis::connection()->incr()` per-second (or per-2s under WAF slow-mode)
+  slot keys, which is genuinely atomic fleet-wide. Also added WAF/CDN auto-detection
+  (`BlockDetector::detectWaf()`, header/server fingerprinting) → domains behind a detected
+  WAF get pinned to 1 req/2s for 48h instead of the adaptive ramp (`config('crawler.rate_step')`
+  10→1 — ramps +1 req/sec/domain per clean minute, much gentler than the old +10; `rate_max`
+  100→3→**15** (2026-07-03) — non-WAF domains ceiling at 15 req/sec/domain, still reached
+  slowly since `rate_step` stayed at 1).
 - **Phase 4 ✅** `ebq:fleet-autoscale` (every 2 min, `withoutOverlapping`, hysteresis,
   one-box-per-tick) + `ebq:check-worker-nodes` (5-min health) + **`/admin/fleet`** panel (live
   status + est. hourly cost + editable autoscaler settings + provision/drain/reconcile buttons).

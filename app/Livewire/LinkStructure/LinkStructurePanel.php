@@ -78,11 +78,12 @@ class LinkStructurePanel extends Component
             }
         }
 
-        // A few suggested pages to make the input discoverable.
+        // A few suggested pages to make the input discoverable. Cap-filtered
+        // via CrawlReportService — the raw WebsitePage query this used to run
+        // had no value_rank <= cap filter, so a small-cap user could be shown
+        // example URLs outside their window (found 2026-07-06).
         $examples = $website?->crawl_site_id
-            ? \App\Models\WebsitePage::where('crawl_site_id', $website->crawl_site_id)
-                ->whereNotNull('last_crawled_at')->whereNull('removed_at')
-                ->orderByDesc('inbound_link_count')->limit(8)->pluck('url')->all()
+            ? $report->topInboundPages($website->id)
             : [];
 
         return view('livewire.link-structure.link-structure-panel', [

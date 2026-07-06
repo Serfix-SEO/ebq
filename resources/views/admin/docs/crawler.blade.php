@@ -76,11 +76,11 @@
             <h2 class="{{ $h2 }}">6. Operations runbook</h2>
             <div class="{{ $box }} space-y-2 font-mono text-[12px]">
                 <div># Crawl one site now (force = ignore recrawl schedule)</div>
-                <div class="text-indigo-600 dark:text-indigo-400">php artisan ebq:crawl-websites --website=&lt;id&gt; --force</div>
+                <div class="text-orange-600 dark:text-orange-400">php artisan ebq:crawl-websites --website=&lt;id&gt; --force</div>
                 <div class="pt-1"># One-off: crawl every existing site that was never crawled (run once after deploy)</div>
-                <div class="text-indigo-600 dark:text-indigo-400">php artisan ebq:crawl-websites --backfill</div>
+                <div class="text-orange-600 dark:text-orange-400">php artisan ebq:crawl-websites --backfill</div>
                 <div class="pt-1"># Daily sitemap-delta check (also scheduled): crawl only brand-new sitemap URLs</div>
-                <div class="text-indigo-600 dark:text-indigo-400">php artisan ebq:crawl-websites --sitemap-deltas</div>
+                <div class="text-orange-600 dark:text-orange-400">php artisan ebq:crawl-websites --sitemap-deltas</div>
             </div>
             <ul class="mt-3 space-y-1.5">
                 <li class="{{ $li }}">• <strong>Schedule</strong>: weekly full recrawl (Mon 02:00) + daily sitemap-delta (04:30). On client add, a chain runs <span class="{{ $code }}">SyncSitemaps → CrawlWebsitePagesJob</span>.</li>

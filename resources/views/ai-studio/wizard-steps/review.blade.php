@@ -15,14 +15,14 @@
 
     <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-semibold dark:border-slate-700 dark:bg-slate-900">
-            <button type="button" @click="rv.mode = 'preview'" class="rounded-md px-3 py-1.5 transition" :class="rv.mode === 'preview' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">Preview</button>
-            <button type="button" @click="rv.mode = 'edit'" class="rounded-md px-3 py-1.5 transition" :class="rv.mode === 'edit' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">Edit HTML</button>
+            <button type="button" @click="rv.mode = 'preview'" class="rounded-md px-3 py-1.5 transition" :class="rv.mode === 'preview' ? 'bg-orange-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">Preview</button>
+            <button type="button" @click="rv.mode = 'edit'" class="rounded-md px-3 py-1.5 transition" :class="rv.mode === 'edit' ? 'bg-orange-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">Edit HTML</button>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <button type="button" @click="reviewRegenerate()" :disabled="rv.regenerating || rv.saving" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" x-text="rv.regenerating ? 'Regenerating…' : 'Regenerate'"></button>
             <button type="button" @click="reviewCopy()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" x-text="rv.copied ? 'Copied ✓' : 'Copy HTML'"></button>
             <button type="button" @click="reviewDownload()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Download .html</button>
-            <button type="button" @click="reviewMarkComplete()" :disabled="rv.saving || !(rv.html || '').trim()" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50" x-text="rv.saving ? 'Saving…' : (project?.step === 'completed' ? 'Completed ✓' : 'Mark complete')"></button>
+            <button type="button" @click="reviewMarkComplete()" :disabled="rv.saving || !(rv.html || '').trim()" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50" x-text="rv.saving ? 'Saving…' : (project?.step === 'completed' ? 'Completed ✓' : 'Mark complete')"></button>
         </div>
     </div>
 
@@ -40,7 +40,7 @@
     <div x-show="rv.mode === 'preview'" class="prose prose-sm max-w-none rounded-xl border border-slate-200 bg-white p-5 dark:prose-invert dark:border-slate-800 dark:bg-slate-900" x-html="previewHtml()"></div>
     <div x-show="rv.mode === 'edit'">
         <textarea x-model="rv.html" rows="22" spellcheck="false" placeholder="Generated content will appear here."
-            class="w-full rounded-xl border border-slate-200 bg-white p-4 font-mono text-xs leading-relaxed text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"></textarea>
+            class="w-full rounded-xl border border-slate-200 bg-white p-4 font-mono text-xs leading-relaxed text-slate-800 focus:border-orange-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"></textarea>
         <p class="mt-1 text-[11px] text-slate-400">Edits stay local to this preview. Use Copy / Download to take the HTML, or Regenerate to rebuild from the brief.</p>
     </div>
 

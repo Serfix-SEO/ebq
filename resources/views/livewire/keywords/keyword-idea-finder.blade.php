@@ -7,13 +7,13 @@
             <button type="button" wire:click="$set('mode', 'seeds')"
                 @class([
                     'rounded-md px-3 py-1.5 transition',
-                    'bg-indigo-600 text-white' => $mode === 'seeds',
+                    'bg-orange-600 text-white' => $mode === 'seeds',
                     'text-slate-600 dark:text-slate-300' => $mode !== 'seeds',
                 ])>From seed keywords</button>
             <button type="button" wire:click="$set('mode', 'website')"
                 @class([
                     'rounded-md px-3 py-1.5 transition',
-                    'bg-indigo-600 text-white' => $mode === 'website',
+                    'bg-orange-600 text-white' => $mode === 'website',
                     'text-slate-600 dark:text-slate-300' => $mode !== 'website',
                 ])>From a website</button>
         </div>
@@ -23,19 +23,19 @@
                 <label class="block">
                     <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Seed keywords (one per line or comma-separated)</span>
                     <textarea wire:model="seedsInput" rows="4" placeholder="running shoes&#10;trail running"
-                        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800"></textarea>
+                        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800"></textarea>
                 </label>
             @else
                 <div class="grid gap-3 sm:grid-cols-3">
                     <label class="block sm:col-span-2">
                         <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Website or page URL</span>
                         <input type="text" wire:model="url" placeholder="nike.com"
-                            class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800" />
+                            class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
                     </label>
                     <label class="block">
                         <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Scope</span>
                         <select wire:model="scope"
-                            class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800">
+                            class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
                             <option value="site">Entire site</option>
                             <option value="page">Single page</option>
                         </select>
@@ -47,7 +47,7 @@
                 <label class="block">
                     <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Location</span>
                     <input type="text" wire:model="location" list="kif-locations" placeholder="Search a country…" autocomplete="off"
-                        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800" />
+                        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
                     <datalist id="kif-locations">
                         @foreach ($locationNames as $name)
                             <option value="{{ $name }}"></option>
@@ -58,7 +58,7 @@
                 <label class="block">
                     <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Language</span>
                     <select wire:model="language"
-                        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800">
+                        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
                         @foreach ($languageOptions as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
@@ -68,7 +68,7 @@
 
             <div class="flex items-center gap-3">
                 <button type="submit" wire:loading.attr="disabled" wire:target="run"
-                    class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
+                    class="inline-flex items-center gap-2 rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
                     <span wire:loading.remove wire:target="run">Find keywords</span>
                     <span wire:loading wire:target="run">Submitting…</span>
                 </button>
@@ -95,7 +95,7 @@
     {{-- Results --}}
     @if ($hasRun && ! $this->isPolling() && ! $errorMessage && $results !== [])
         @if ($fromCache)
-            <p class="mb-2 inline-flex items-center gap-1.5 rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+            <p class="mb-2 inline-flex items-center gap-1.5 rounded-md bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 Instant result — someone already searched this this month, so this came straight from cache.
             </p>
@@ -120,22 +120,22 @@
             <label class="flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
                 <span class="font-medium">Filter keyword</span>
                 <input type="text" wire:model.live.debounce.400ms="filterText" placeholder="contains…"
-                    class="w-44 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800" />
+                    class="w-44 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
             </label>
             <label class="flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
                 <span class="font-medium">Min volume</span>
                 <input type="number" min="0" wire:model.live.debounce.400ms="minVolume" placeholder="0"
-                    class="w-24 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800" />
+                    class="w-24 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
             </label>
             <label class="flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
                 <span class="font-medium">Max volume</span>
                 <input type="number" min="0" wire:model.live.debounce.400ms="maxVolume" placeholder="∞"
-                    class="w-24 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800" />
+                    class="w-24 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
             </label>
             <label class="flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
                 <span class="font-medium">Competition</span>
                 <select wire:model.live="comp"
-                    class="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800">
+                    class="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
                     <option value="all">All</option>
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -168,7 +168,7 @@
                                     <button type="button" wire:click="sortBy('{{ $field }}')" class="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-200">
                                         <span>{{ $meta['label'] }}</span>
                                         @if ($sortField === $field)
-                                            <span class="text-indigo-500">{{ $sortDir === 'asc' ? '▲' : '▼' }}</span>
+                                            <span class="text-orange-500">{{ $sortDir === 'asc' ? '▲' : '▼' }}</span>
                                         @else
                                             <span class="text-slate-300 dark:text-slate-600">↕</span>
                                         @endif
@@ -197,7 +197,7 @@
                                 </td>
                                 <td class="px-4 py-2.5 text-right whitespace-nowrap">
                                     <div class="inline-flex items-center gap-2 text-[11px]">
-                                        <button type="button" wire:click="sendToVolume(@js($row['keyword']))" class="text-indigo-600 hover:underline dark:text-indigo-400">Volume</button>
+                                        <button type="button" wire:click="sendToVolume(@js($row['keyword']))" class="text-orange-600 hover:underline dark:text-orange-400">Volume</button>
                                         <button type="button" wire:click="track(@js($row['keyword']))" class="text-slate-600 hover:underline dark:text-slate-300">Track</button>
                                         @if (auth()->user()?->hasFeatureAccess('audits', (string) session('current_website_id', '')))
                                             <a href="{{ route('keywords.fix', ['keyword' => $row['keyword']]) }}" class="text-slate-600 hover:underline dark:text-slate-300">Brief</a>

@@ -23,6 +23,8 @@ class Lead extends Model
 
     public const SOURCE_GUEST_VOLUME = 'guest_keyword_volume';
 
+    public const SOURCE_GUEST_PAGESPEED = 'guest_pagespeed';
+
     protected $fillable = [
         'email',
         'name',

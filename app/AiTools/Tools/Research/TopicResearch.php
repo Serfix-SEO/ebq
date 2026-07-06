@@ -17,7 +17,7 @@ final class TopicResearch extends AbstractAiTool
             id: 'topic-research',
             name: 'Topic Research',
             category: Categories::RESEARCH,
-            description: 'Map a topic into clusters and sub-topics, ranked by EBQ-network demand and your existing GSC traction.',
+            description: 'Map a topic into clusters and sub-topics, ranked by Serfix-network demand and your existing GSC traction.',
             inputs: [
                 new InputField('topic', 'Topic / niche', 'text', required: true,
                     placeholder: 'e.g. content marketing for SaaS', maxLength: 200),

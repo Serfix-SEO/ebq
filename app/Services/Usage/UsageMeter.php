@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\RankTrackingKeyword;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Per-user accounting for paid external APIs.
@@ -83,9 +84,27 @@ class UsageMeter
     }
 
     /**
+     * Reservation TTL — covers the slowest known external-call chain
+     * (chained Serper+LLM writer calls, up to ~5 min, see ai/writer.md)
+     * with headroom, so a crashed/timed-out request's reservation still
+     * self-expires instead of permanently over-counting a user's window.
+     */
+    private const RESERVATION_TTL = 600;
+
+    /**
      * Throw a 402 QuotaExceededException if spending `$units` more on
      * this provider would push the user past their plan cap. No-op for
      * users without a cap (unlimited).
+     *
+     * Atomically reserves the units (Redis INCRBY, TTL-bounded) once the
+     * check passes, so a burst of concurrent calls can't all read the same
+     * `consumedInWindow()` and all pass (found 2026-07-06 — units_consumed
+     * is only logged to `client_activities` *after* the external call
+     * completes, seconds to minutes later, so the DB sum alone can't see
+     * an in-flight call). `ClientActivityLogger::log()` releases the
+     * reservation once the real row lands. `consumedInWindow()`/`remaining()`
+     * are intentionally left reading pure DB history — only the enforcement
+     * check here accounts for in-flight reservations.
      */
     public function assertCanSpend(User $user, string $provider, int $units = 1): void
     {
@@ -94,7 +113,7 @@ class UsageMeter
             return;
         }
 
-        $used = $this->consumedInWindow($user, $provider);
+        $used = $this->consumedInWindow($user, $provider) + $this->pendingReserved($user->id, $provider);
         if (($used + $units) > $limit) {
             throw new QuotaExceededException(
                 provider: $provider,
@@ -104,6 +123,37 @@ class UsageMeter
                 upgradeUrl: $this->upgradeUrl(),
             );
         }
+
+        $this->reserve($user->id, $provider, $units);
+    }
+
+    /** In-flight units reserved but not yet reflected in `client_activities`. */
+    public function pendingReserved(string $userId, string $provider): int
+    {
+        return max(0, (int) Cache::get($this->reservationKey($userId, $provider), 0));
+    }
+
+    /** Atomically reserve units against the user+provider window. */
+    public function reserve(string $userId, string $provider, int $units): void
+    {
+        $key = $this->reservationKey($userId, $provider);
+        Cache::add($key, 0, self::RESERVATION_TTL);
+        Cache::increment($key, $units);
+    }
+
+    /**
+     * Release a prior reservation — called by ClientActivityLogger::log()
+     * once the real `client_activities` row is written, so the reservation
+     * doesn't double-count alongside the now-persisted row.
+     */
+    public function release(string $userId, string $provider, int $units): void
+    {
+        Cache::decrement($this->reservationKey($userId, $provider), $units);
+    }
+
+    private function reservationKey(string $userId, string $provider): string
+    {
+        return "usage-reserve:{$provider}:{$userId}";
     }
 
     /**

@@ -14,7 +14,7 @@
         : ($position <= 3
             ? ['ring' => 'ring-emerald-200', 'bg' => 'bg-emerald-50', 'text' => 'text-emerald-600', 'label' => 'Top 3 — excellent visibility']
             : ($position <= 10
-                ? ['ring' => 'ring-indigo-200', 'bg' => 'bg-indigo-50', 'text' => 'text-indigo-600', 'label' => 'Page 1 of Google']
+                ? ['ring' => 'ring-orange-200', 'bg' => 'bg-orange-50', 'text' => 'text-orange-600', 'label' => 'Page 1 of Google']
                 : ($position <= 20
                     ? ['ring' => 'ring-amber-200', 'bg' => 'bg-amber-50', 'text' => 'text-amber-600', 'label' => 'Page 2 — close to the first page']
                     : ['ring' => 'ring-slate-200', 'bg' => 'bg-slate-50', 'text' => 'text-slate-600', 'label' => 'Ranking, but deep in the results'])));
@@ -47,7 +47,7 @@
                     <div class="col-span-2">
                         <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ranking URL</dt>
                         <dd class="mt-0.5">
-                            <a href="{{ $foundUrl }}" target="_blank" rel="noopener noreferrer" class="break-all text-indigo-600 hover:underline">{{ $foundUrl }}</a>
+                            <a href="{{ $foundUrl }}" target="_blank" rel="noopener noreferrer" class="break-all text-orange-600 hover:underline">{{ $foundUrl }}</a>
                         </dd>
                     </div>
                 @endif
@@ -68,18 +68,18 @@
                 @forelse ($rows as $row)
                     <li @class([
                         'flex items-start gap-3 p-3.5',
-                        'bg-indigo-50/60' => $row['is_target'] ?? false,
+                        'bg-orange-50/60' => $row['is_target'] ?? false,
                     ])>
                         <span @class([
                             'mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-lg text-xs font-bold tabular-nums',
-                            'bg-indigo-600 text-white' => $row['is_target'] ?? false,
+                            'bg-orange-600 text-white' => $row['is_target'] ?? false,
                             'bg-slate-100 text-slate-600' => ! ($row['is_target'] ?? false),
                         ])>{{ $row['position'] }}</span>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2">
                                 <p class="truncate text-sm font-semibold text-slate-900">{{ $row['title'] ?: $row['domain'] }}</p>
                                 @if ($row['is_target'] ?? false)
-                                    <span class="flex-none rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700">You</span>
+                                    <span class="flex-none rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-700">You</span>
                                 @endif
                             </div>
                             <a href="{{ $row['link'] }}" target="_blank" rel="noopener noreferrer" class="block truncate text-xs text-emerald-700 hover:underline">{{ $row['link'] }}</a>

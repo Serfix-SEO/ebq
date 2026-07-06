@@ -4,7 +4,7 @@
             <svg class="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
             <p class="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-200">Keyword not found</p>
             <p class="mt-1 text-xs text-slate-500">It may have been deleted or belong to another website you don't have access to.</p>
-            <a href="{{ route('rank-tracking.index') }}" wire:navigate class="mt-4 inline-flex h-8 items-center gap-1 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700">
+            <a href="{{ route('rank-tracking.index') }}" wire:navigate class="mt-4 inline-flex h-8 items-center gap-1 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white hover:bg-orange-700">
                 ← Back to Rank Tracking
             </a>
         </div>
@@ -22,7 +22,7 @@
 
         {{-- Breadcrumb + header --}}
         <nav class="mb-3 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            <a href="{{ route('rank-tracking.index') }}" wire:navigate class="font-semibold uppercase tracking-wider hover:text-indigo-600 dark:hover:text-indigo-400">Rank Tracking</a>
+            <a href="{{ route('rank-tracking.index') }}" wire:navigate class="font-semibold uppercase tracking-wider hover:text-orange-600 dark:hover:text-orange-400">Rank Tracking</a>
             <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
             <span class="truncate uppercase tracking-wider">{{ $keyword->keyword }}</span>
         </nav>
@@ -35,20 +35,20 @@
                     <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $keyword->country }}</span>
                     <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $keyword->language }}</span>
                     <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $keyword->device }}</span>
-                    <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">Top {{ $keyword->depth }}</span>
+                    <span class="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">Top {{ $keyword->depth }}</span>
                     <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">Every {{ $keyword->check_interval_hours }}h</span>
                     @if (! $keyword->is_active)<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">Paused</span>@endif
                 </div>
                 <div class="mt-2 text-xs text-slate-500 dark:text-slate-400">
                     Tracking <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $keyword->target_domain }}</span>
-                    @if ($keyword->target_url)<span>· URL-specific: <a href="{{ $keyword->target_url }}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline">{{ \Illuminate\Support\Str::limit($keyword->target_url, 60) }}</a></span>@endif
+                    @if ($keyword->target_url)<span>· URL-specific: <a href="{{ $keyword->target_url }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline">{{ \Illuminate\Support\Str::limit($keyword->target_url, 60) }}</a></span>@endif
                 </div>
             </div>
             <button wire:click="recheck"
                 wire:loading.attr="disabled"
                 wire:target="recheck"
                 type="button"
-                class="inline-flex h-9 items-center gap-1.5 rounded-md bg-indigo-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                class="inline-flex h-9 items-center gap-1.5 rounded-md bg-orange-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
                 <svg wire:loading.remove wire:target="recheck" class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                 <svg wire:loading wire:target="recheck" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
                 <span wire:loading.remove wire:target="recheck">Force re-check</span>
@@ -246,12 +246,12 @@
                         @endforeach
 
                         {{-- Area --}}
-                        <path d="{{ $areaPath }}" class="fill-indigo-500/15" />
+                        <path d="{{ $areaPath }}" class="fill-orange-500/15" />
                         {{-- Line --}}
-                        <path d="{{ $linePath }}" fill="none" stroke="currentColor" stroke-width="1.5" class="text-indigo-500" stroke-linejoin="round" stroke-linecap="round" />
+                        <path d="{{ $linePath }}" fill="none" stroke="currentColor" stroke-width="1.5" class="text-orange-500" stroke-linejoin="round" stroke-linecap="round" />
                         {{-- Points --}}
                         @foreach ($points as $pt)
-                            <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="2.5" class="fill-white stroke-indigo-500" stroke-width="1.5">
+                            <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="2.5" class="fill-white stroke-orange-500" stroke-width="1.5">
                                 <title>#{{ $pt['pos'] }} · {{ \Carbon\Carbon::parse($pt['date'])->format('M j, H:i') }}</title>
                             </circle>
                         @endforeach
@@ -339,7 +339,7 @@
                                     <button wire:click="selectSnapshot('{{ $snap->id }}')" type="button"
                                         @class([
                                             'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-xs transition',
-                                            'bg-indigo-50/60 dark:bg-indigo-500/10' => $selected && $selected->id === $snap->id,
+                                            'bg-orange-50/60 dark:bg-orange-500/10' => $selected && $selected->id === $snap->id,
                                             'hover:bg-slate-50 dark:hover:bg-slate-800/50' => ! $selected || $selected->id !== $snap->id,
                                         ])>
                                         <div class="min-w-0">
@@ -423,8 +423,8 @@
                             @if ($selected->position && $selected->url)
                                 <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
                                     <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Your listing</div>
-                                    <div class="flex items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/5">
-                                        <span class="mt-0.5 inline-flex h-6 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-bold text-white">#{{ $selected->position }}</span>
+                                    <div class="flex items-start gap-3 rounded-lg border border-orange-200 bg-orange-50/50 p-3 dark:border-orange-500/30 dark:bg-orange-500/5">
+                                        <span class="mt-0.5 inline-flex h-6 w-12 shrink-0 items-center justify-center rounded-full bg-orange-600 text-[11px] font-bold text-white">#{{ $selected->position }}</span>
                                         <div class="min-w-0 flex-1">
                                             <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $selected->title ?? '—' }}</div>
                                             <a href="{{ $selected->url }}" target="_blank" rel="noopener" class="truncate text-[11px] text-emerald-700 hover:underline dark:text-emerald-400">{{ $selected->url }}</a>
@@ -466,20 +466,20 @@
                                             @endphp
                                             <li @class([
                                                 'flex items-start gap-3 rounded-lg border px-3 py-2 transition',
-                                                'border-indigo-200 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10' => $isYou,
+                                                'border-orange-200 bg-orange-50 dark:border-orange-500/40 dark:bg-orange-500/10' => $isYou,
                                                 'border-amber-200 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10' => $isCompetitor,
                                                 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/50' => ! $isYou && ! $isCompetitor,
                                             ])>
                                                 <span @class([
                                                     'mt-0.5 inline-flex h-6 w-10 shrink-0 items-center justify-center rounded-full text-[11px] font-bold tabular-nums',
-                                                    'bg-indigo-600 text-white' => $isYou,
+                                                    'bg-orange-600 text-white' => $isYou,
                                                     'bg-amber-500 text-white' => $isCompetitor,
                                                     'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' => ! $isYou && ! $isCompetitor,
                                                 ])>#{{ $row['position'] ?? '—' }}</span>
                                                 <div class="min-w-0 flex-1">
                                                     <div class="flex flex-wrap items-center gap-1.5">
                                                         <span class="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{{ $row['title'] ?? '—' }}</span>
-                                                        @if ($isYou)<span class="rounded bg-indigo-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">You</span>@endif
+                                                        @if ($isYou)<span class="rounded bg-orange-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">You</span>@endif
                                                         @if ($isCompetitor)<span class="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">Competitor</span>@endif
                                                     </div>
                                                     @if ($link)

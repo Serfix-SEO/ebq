@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
  * ContextBuilder already pulled, with the user's anchor preferences
  * applied.
  *
- * This is one of EBQ's strongest moats: RankMath has no view of which
+ * This is one of Serfix's strongest moats: RankMath has no view of which
  * of your pages already get organic clicks for related queries.
  */
 final class InternalLinkSuggestions implements AiTool

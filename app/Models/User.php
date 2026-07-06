@@ -297,7 +297,7 @@ class User extends Authenticatable implements MustVerifyEmail
      *   1. `config('app.free')` (FREE=true env) — every user clones into
      *      the Pro tier regardless of subscription state. Falls back to
      *      the next resolution step if the Pro row doesn't exist.
-     *   2. Active Cashier subscription → match by stripe_price_id_yearly
+     *   2. Active Cashier subscription → match by stripe_price_id_monthly/_yearly
      *   3. Snapshotted current_plan_slug (set by webhook + on swap)
      *   4. The `trial` plan row, so admin-edited max_websites etc. on
      *      Trial actually take effect for users without a paid sub
@@ -336,7 +336,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * Resolve the user's real plan from subscription state, honouring (in
-     * order): an active Cashier subscription matched by yearly price ID, the
+     * order): an active Cashier subscription matched by monthly or yearly price ID, the
      * snapshotted `current_plan_slug`, then the Trial plan row so admin edits
      * to Trial's max_websites / features apply to unsubscribed users. Returns
      * null only when the plans table is empty (fresh install pre-seeder).
@@ -347,7 +347,7 @@ class User extends Authenticatable implements MustVerifyEmail
         if ($subscription && $subscription->valid()) {
             $price = (string) $subscription->stripe_price;
             if ($price !== '') {
-                $plan = Plan::where('stripe_price_id_yearly', $price)->first();
+                $plan = Plan::findByStripePrice($price);
                 if ($plan) {
                     return $plan;
                 }

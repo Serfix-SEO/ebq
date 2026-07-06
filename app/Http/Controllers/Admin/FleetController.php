@@ -70,7 +70,7 @@ class FleetController extends Controller
             'dbCfg' => DbFleetConfig::all(),
             'dbServerTypes' => DbFleetController::SERVER_TYPES,
             'dbSnapshots' => $dbSnapshots,
-            'moveOptions' => DbFleetController::moveOptions(),
+            // moveOptions moved into Livewire\Admin\DbShardPanel (live, host-aware).
         ]);
     }
 

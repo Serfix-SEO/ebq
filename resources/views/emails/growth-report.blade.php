@@ -58,7 +58,7 @@
         .value-up { color: #16a34a; }
         .value-down { color: #dc2626; }
 
-        .btn { display: inline-block; background: {{ $branding->accent_color ?? '#4f46e5' }}; color: #ffffff !important; text-decoration: none; border-radius: 8px; padding: 12px 28px; font-size: 14px; font-weight: 600; }
+        .btn { display: inline-block; background: {{ $branding->accent_color ?? '#F26419' }}; color: #ffffff !important; text-decoration: none; border-radius: 8px; padding: 12px 28px; font-size: 14px; font-weight: 600; }
         .footer { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 24px; }
         .brand-header { text-align: left; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; }
         .brand-header img { max-height: 48px; max-width: 240px; display: block; }
@@ -235,7 +235,7 @@
         </table>
 
         @if (! empty($report['ppc_equivalent']))
-            <p style="margin: 8px 0 0; font-size: 13px; color: #4f46e5;">
+            <p style="margin: 8px 0 0; font-size: 13px; color: #F26419;">
                 Your organic traffic is worth approximately
                 <strong>${{ number_format($report['ppc_equivalent']['value'], 0) }}/month</strong>
                 in PPC equivalent
@@ -344,7 +344,7 @@
                             <td class="right">{{ number_format($opp['impressions']) }}</td>
                             <td class="right">{{ $opp['ctr'] }}%</td>
                             <td class="right">{{ $opp['position'] }}</td>
-                            <td class="right" style="font-weight:700;color:#4f46e5">{{ $opp['score'] }}</td>
+                            <td class="right" style="font-weight:700;color:#F26419">{{ $opp['score'] }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -529,7 +529,7 @@
         @endif
         <p class="footer">{{ $branding->company_name }} &mdash; {{ format_user_now('M d, Y', $user) }}</p>
     @else
-        <p class="footer">Sent by EBQ &mdash; {{ format_user_now('M d, Y', $user) }}</p>
+        <p class="footer">Sent by Serfix &mdash; {{ format_user_now('M d, Y', $user) }}</p>
     @endif
 </div>
 </body>

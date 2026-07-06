@@ -25,8 +25,8 @@ stored row never carries any user's traffic. This is the core privacy invariant
 
 | Category | Types | Severity rule |
 |---|---|---|
-| `broken_link` | `broken_page` (known URL → 4xx/5xx) | critical if trafficked, else high |
-| | `broken_internal` (internal link → 4xx/5xx target) | critical if trafficked, else high |
+| `broken_link` | `broken_page` (known URL → 4xx, excl. 429) | critical if trafficked, else high |
+| | `broken_internal` (internal link → 4xx target, excl. 429) | critical if trafficked, else high |
 | | `broken_external` (external link → 4xx/5xx) | medium — **sampled** ≤25 ext links/page, ≤500 checks total |
 | `redirect` | `redirecting_url` (page itself 3xx) | medium if trafficked, else low |
 | | `external_redirect` (outbound link redirects) | low |
@@ -48,6 +48,17 @@ stored row never carries any user's traffic. This is the core privacy invariant
 
 "Trafficked" = the aggregate 28-day click query crosses the importance threshold for that
 URL. At read time it is re-evaluated against the *individual* user's clicks.
+
+**5xx/429 excluded from `broken_page`/`broken_internal`** (2026-07-03): both are transient
+(rate-limit, bot-protection, temp outage), not proof the page is gone. Only hard 4xx
+client-errors (404/410/400/403/…) mean genuinely dead/forbidden. A block response also no
+longer overwrites `http_status` on the page row (`PageCrawlProcessor`), so a captcha/429 hit
+can't masquerade as the page itself being broken.
+
+**Duplicate-title/meta/content skip if same `canonical_url`** (2026-07-03): pages that all
+canonicalize to one URL are intentional dedup (pagination, filters, print views), not a bug —
+`detectDuplicateField`/`detectDuplicateContent` skip the group when `canonical_url` is
+identical across all members.
 
 ## Referrer attachment (404 provenance)
 

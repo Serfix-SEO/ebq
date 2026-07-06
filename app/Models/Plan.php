@@ -194,16 +194,53 @@ class Plan extends Model
 
     /**
      * True when the plan has a real Stripe price configured and can
-     * support a checkout session. Free tier always returns false.
-     *
-     * EBQ only sells yearly subscriptions — the monthly price column
-     * exists purely so we can show "$X/mo, billed yearly" copy on the
-     * pricing card. Checkout is always gated on the yearly price ID.
+     * support a checkout session for the given interval.
+     * Free/Trial tier always returns false.
      */
-    public function isCheckoutReady(): bool
+    public function isCheckoutReady(string $interval = 'annual'): bool
     {
+        if ($interval === 'monthly') {
+            return $this->price_monthly_usd > 0
+                && ! empty($this->stripe_price_id_monthly);
+        }
+
         return $this->price_yearly_usd > 0
             && ! empty($this->stripe_price_id_yearly);
+    }
+
+    /** Stripe price ID for the given billing interval ('annual'|'monthly'). */
+    public function stripePriceIdFor(string $interval): ?string
+    {
+        return $interval === 'monthly'
+            ? ($this->stripe_price_id_monthly ?: null)
+            : ($this->stripe_price_id_yearly ?: null);
+    }
+
+    /**
+     * Find the Plan matching a Stripe price ID, checking both the monthly and
+     * yearly columns. Checkout supports either interval, so any code resolving
+     * an active subscription back to a Plan must check both — matching only
+     * `stripe_price_id_yearly` silently drops monthly subscribers (found 2026-07-06).
+     */
+    public static function findByStripePrice(?string $priceId): ?self
+    {
+        if (! $priceId) {
+            return null;
+        }
+
+        return static::where('stripe_price_id_monthly', $priceId)
+            ->orWhere('stripe_price_id_yearly', $priceId)
+            ->first();
+    }
+
+    /** Billing interval ('monthly'|'annual') a given Stripe price ID belongs to, if any. */
+    public static function intervalForStripePrice(?string $priceId): ?string
+    {
+        if (! $priceId) {
+            return null;
+        }
+
+        return static::where('stripe_price_id_monthly', $priceId)->exists() ? 'monthly' : 'annual';
     }
 
     /**

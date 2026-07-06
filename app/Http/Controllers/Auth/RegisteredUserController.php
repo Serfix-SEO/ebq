@@ -29,10 +29,10 @@ class RegisteredUserController extends Controller
             }
         }
 
-        // Carry the plan slug from the /pricing CTA (`/register?plan=pro`)
-        // through register → store() → billing checkout. Stored in session
-        // so it survives the form POST without being a hidden field that
-        // an attacker could swap for a different plan slug client-side.
+        // Carry the plan slug + billing interval from the /pricing CTA
+        // (`/register?plan=pro&interval=monthly`) through register →
+        // store() → billing checkout. Stored in session so it survives
+        // the form POST without being a hidden field an attacker could swap.
         $planSlug = $this->capturePendingPlan($request);
 
         return view('auth.register', [
@@ -81,9 +81,13 @@ class RegisteredUserController extends Controller
         // stays linked to the same row. Email verification still happens
         // later via the standard verified-route middleware; we don't gate
         // checkout on it (Stripe collects a verified email of its own).
-        $pendingPlan = (string) $request->session()->pull('pending_plan', '');
-        if ($pendingPlan !== '' && $this->isCheckoutablePlan($pendingPlan)) {
-            return redirect()->route('billing.checkout', ['plan' => $pendingPlan]);
+        $pendingPlan     = (string) $request->session()->pull('pending_plan', '');
+        $pendingInterval = (string) $request->session()->pull('pending_plan_interval', 'annual');
+        if ($pendingPlan !== '' && $this->isCheckoutablePlan($pendingPlan, $pendingInterval)) {
+            return redirect()->route('billing.checkout', array_filter([
+                'plan'     => $pendingPlan,
+                'interval' => $pendingInterval !== 'annual' ? $pendingInterval : null,
+            ]));
         }
 
         return redirect()->route('verification.notice');
@@ -97,30 +101,34 @@ class RegisteredUserController extends Controller
      */
     private function capturePendingPlan(Request $request): string
     {
-        $slug = trim((string) $request->query('plan', ''));
+        $slug     = trim((string) $request->query('plan', ''));
+        $interval = in_array($request->query('interval'), ['monthly', 'annual'], true)
+            ? $request->query('interval')
+            : 'annual';
+
         if ($slug === '') {
             return (string) $request->session()->get('pending_plan', '');
         }
-        if (! $this->isCheckoutablePlan($slug)) {
+        if (! $this->isCheckoutablePlan($slug, $interval)) {
             return '';
         }
         $request->session()->put('pending_plan', $slug);
+        $request->session()->put('pending_plan_interval', $interval);
 
         return $slug;
     }
 
     /**
-     * True when `$slug` matches an active, checkout-ready paid plan. Free
-     * tiers and unknown slugs return false so we never redirect register
-     * through a broken Stripe session.
+     * True when `$slug` matches an active, checkout-ready paid plan for
+     * the given billing interval. Free tiers and unknown slugs return false.
      */
-    private function isCheckoutablePlan(string $slug): bool
+    private function isCheckoutablePlan(string $slug, string $interval = 'annual'): bool
     {
         if ($slug === '' || $slug === 'free') {
             return false;
         }
         $plan = Plan::where('slug', $slug)->where('is_active', true)->first();
 
-        return $plan !== null && $plan->isCheckoutReady();
+        return $plan !== null && $plan->isCheckoutReady($interval);
     }
 }

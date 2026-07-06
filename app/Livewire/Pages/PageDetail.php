@@ -394,7 +394,7 @@ class PageDetail extends Component
                 )
                 ->where('website_id', $this->websiteId)
                 ->where('page', $this->pageUrl)
-                ->when($gscKeywordWindowFrom, fn ($q) => $q->whereDate('date', '>=', $gscKeywordWindowFrom))
+                ->when($gscKeywordWindowFrom, fn ($q) => $q->where('date', '>=', $gscKeywordWindowFrom))
                 ->first();
 
             $keywords = SearchConsoleData::query()
@@ -407,7 +407,7 @@ class PageDetail extends Component
                 )
                 ->where('website_id', $this->websiteId)
                 ->where('page', $this->pageUrl)
-                ->when($gscKeywordWindowFrom, fn ($q) => $q->whereDate('date', '>=', $gscKeywordWindowFrom))
+                ->when($gscKeywordWindowFrom, fn ($q) => $q->where('date', '>=', $gscKeywordWindowFrom))
                 ->groupBy('query')
                 ->orderBy($sortBy, $this->sortDir)
                 ->paginate(20);
@@ -502,7 +502,7 @@ class PageDetail extends Component
         if ($this->websiteId && $gscKeywordWindowFrom) {
             $siteHasGscData = SearchConsoleData::query()
                 ->where('website_id', $this->websiteId)
-                ->whereDate('date', '>=', $gscKeywordWindowFrom)
+                ->where('date', '>=', $gscKeywordWindowFrom)
                 ->exists();
         }
 

@@ -3,7 +3,7 @@
         $tones = [
             'critical' => 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
             'warning'  => 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
-            'serp_gap' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+            'serp_gap' => 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300',
             'info'     => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
             'good'     => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
         ];
@@ -11,11 +11,11 @@
 
     {{-- Header --}}
     <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <p class="text-[11px] font-semibold uppercase tracking-wider text-indigo-500">Fix this keyword</p>
+        <p class="text-[11px] font-semibold uppercase tracking-wider text-orange-500">Fix this keyword</p>
         <h1 class="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">{{ $keyword }}</h1>
         @if ($pageUrl !== '')
             <a href="{{ $pageUrl }}" target="_blank" rel="noopener"
-                class="mt-1 inline-block max-w-full truncate text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+                class="mt-1 inline-block max-w-full truncate text-sm text-orange-600 hover:underline dark:text-orange-400">
                 {{ $pageUrl }}
             </a>
         @endif
@@ -35,7 +35,7 @@
         <div class="mt-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
             wire:poll.3s="pollAudit">
             <div class="flex items-center gap-3">
-                <svg class="h-5 w-5 animate-spin text-indigo-500" viewBox="0 0 24 24" fill="none">
+                <svg class="h-5 w-5 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path>
                 </svg>
@@ -113,7 +113,7 @@
             </div>
 
             @if (! $aiAllowed)
-                <div class="mt-3 rounded-lg border border-dashed border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
+                <div class="mt-3 rounded-lg border border-dashed border-orange-200 bg-orange-50 p-4 text-sm text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
                     AI rewrites are part of a higher plan. Upgrade to generate keyword-optimised titles and meta descriptions.
                 </div>
             @else
@@ -139,7 +139,7 @@
                                 <li class="rounded-lg border border-slate-100 p-3 dark:border-slate-800">
                                     <div class="flex items-start justify-between gap-2">
                                         <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $rw['title'] ?? '' }}</p>
-                                        <button type="button" class="flex-none text-[11px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                                        <button type="button" class="flex-none text-[11px] font-semibold text-orange-600 hover:underline dark:text-orange-400"
                                             x-on:click="navigator.clipboard.writeText(@js(($rw['title'] ?? '')."\n".($rw['meta'] ?? '')))">Copy</button>
                                     </div>
                                     <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ $rw['meta'] ?? '' }}</p>
@@ -161,7 +161,7 @@
             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Subtopics and depth the page needs to climb from page two.</p>
 
             @if (! $aiAllowed)
-                <div class="mt-3 rounded-lg border border-dashed border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
+                <div class="mt-3 rounded-lg border border-dashed border-orange-200 bg-orange-50 p-4 text-sm text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
                     Content briefs are part of a higher plan.
                 </div>
             @else
@@ -188,7 +188,7 @@
                                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Subtopics to cover</p>
                                 <div class="mt-1.5 flex flex-wrap gap-1.5">
                                     @foreach ($b['subtopics'] as $st)
-                                        <span class="rounded-md bg-indigo-50 px-2 py-1 text-xs text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">{{ $st }}</span>
+                                        <span class="rounded-md bg-orange-50 px-2 py-1 text-xs text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">{{ $st }}</span>
                                     @endforeach
                                 </div>
                             </div>
@@ -207,7 +207,7 @@
                         <div class="mt-3">
                             <p class="text-sm text-slate-500 dark:text-slate-400">No brief generated yet for this keyword.</p>
                             <button type="button" wire:click="generateBrief"
-                                class="mt-2 inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500">
+                                class="mt-2 inline-flex items-center gap-1 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-500">
                                 Generate brief
                             </button>
                         </div>
@@ -225,7 +225,7 @@
             <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Internal links to add</h2>
             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 Add a link <span class="font-semibold">to</span>
-                <a href="{{ $pageUrl }}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline dark:text-indigo-400">your ranking page</a>
+                <a href="{{ $pageUrl }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline dark:text-orange-400">your ranking page</a>
                 <span class="font-semibold">from</span> each page below — these already rank for related queries, so a contextual link (keyword as anchor) passes the most relevance.
             </p>
 
@@ -238,7 +238,7 @@
                         <li class="flex items-center justify-between gap-3 py-2">
                             <div class="min-w-0">
                                 <a href="{{ $link['url'] }}" target="_blank" rel="noopener"
-                                    class="block truncate text-sm text-indigo-600 hover:underline dark:text-indigo-400">{{ $link['url'] }}</a>
+                                    class="block truncate text-sm text-orange-600 hover:underline dark:text-orange-400">{{ $link['url'] }}</a>
                                 <p class="truncate text-[11px] text-slate-400">anchor: “{{ $link['anchor_hint'] ?? $keyword }}”</p>
                             </div>
                             <span class="flex-none text-[11px] font-semibold tabular-nums text-slate-500 dark:text-slate-400">{{ number_format($link['clicks_30d'] ?? 0) }} clicks</span>

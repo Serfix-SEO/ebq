@@ -59,12 +59,12 @@ class ReportPdfRenderer
 
     /**
      * Filename to attach the PDF as. Reads from branding for the
-     * company-name prefix; falls back to "EBQ" when the default
+     * company-name prefix; falls back to "Serfix" when the default
      * branding is in effect.
      */
     public function filenameFor(Website $website, ReportBranding $branding, string $endDate): string
     {
-        $brand = preg_replace('/[^a-z0-9]+/i', '-', $branding->company_name) ?: 'EBQ';
+        $brand = preg_replace('/[^a-z0-9]+/i', '-', $branding->company_name) ?: 'Serfix';
         $domain = preg_replace('/[^a-z0-9]+/i', '-', $website->domain ?? 'site') ?: 'site';
         return strtolower(trim($brand, '-')) . '-report-' . $domain . '-' . $endDate . '.pdf';
     }

@@ -5,6 +5,7 @@ namespace App\Livewire\Dashboard;
 use App\Models\KeywordMetric;
 use App\Models\SearchConsoleData;
 use App\Services\KeywordValueCalculator;
+use App\Services\ReportCache;
 use App\Services\ReportDataService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -80,18 +81,7 @@ class InsightCards extends Component
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $country = $this->country !== '' ? $this->country : null;
-            $cacheKey = 'insights:counts:'.$this->websiteId.':'.($country ?? 'all');
-            $counts = Cache::remember(
-                $cacheKey,
-                600,
-                fn () => app(ReportDataService::class)->insightCounts($this->websiteId, $country),
-            );
-
-            $ppc = Cache::remember(
-                'insights:ppc:'.$this->websiteId.':'.($country ?? 'all'),
-                600,
-                fn () => $this->computePpcEquivalent($country),
-            );
+            [$counts, $ppc] = self::payload($this->websiteId, $country);
             $ppcEquivalent = $ppc['value'];
             $ppcKeywordCount = $ppc['keywords'];
         }
@@ -162,5 +152,30 @@ class InsightCards extends Component
         }
 
         return ['value' => round($sum, 2), 'keywords' => $count];
+    }
+
+    /**
+     * Cached insight counts + PPC-equivalent — shared by render() and
+     * WarmDashboardCaches (warms the default all-countries view).
+     *
+     * @return array{0: array, 1: array}
+     */
+    public static function payload(string $websiteId, ?string $country = null): array
+    {
+        $counts = Cache::remember(
+            'insights:counts:'.$websiteId.':'.($country ?? 'all').':v'.ReportCache::version($websiteId),
+            86400,
+            fn () => app(ReportDataService::class)->insightCounts($websiteId, $country),
+        );
+
+        $self = new self;
+        $self->websiteId = $websiteId;
+        $ppc = Cache::remember(
+            'insights:ppc:'.$websiteId.':'.($country ?? 'all').':v'.ReportCache::version($websiteId),
+            86400,
+            fn () => $self->computePpcEquivalent($country),
+        );
+
+        return [$counts, $ppc];
     }
 }

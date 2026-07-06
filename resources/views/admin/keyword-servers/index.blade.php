@@ -20,7 +20,7 @@
                 <p class="text-sm text-slate-500">Self-hosted Keyword Planner API fleet. The load balancer routes to the least-busy healthy server and fails over on errors.</p>
             </div>
             <a href="{{ route('admin.keyword-servers.index', ['new' => 1]) }}#new-server"
-               class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700">
+               class="inline-flex items-center gap-1.5 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-700">
                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                 New server
             </a>
@@ -43,7 +43,7 @@
         {{-- Test result detail (request + response) --}}
         @if (session('keyword_test'))
             @php $t = session('keyword_test'); $jp = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE; @endphp
-            <div class="rounded-md border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
+            <div class="rounded-md border border-orange-200 bg-orange-50/50 p-4 dark:border-orange-900/50 dark:bg-orange-950/20">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Test: {{ $t['title'] }} <span class="text-slate-400">· {{ $t['server'] }}</span></h2>
                     @if (! empty($t['request_id']))
@@ -86,7 +86,7 @@
             <span class="font-semibold {{ $provider === \App\Support\KeywordProviderConfig::PROVIDER_KEYWORD_FINDER ? 'text-emerald-700' : 'text-slate-800' }}">
                 {{ \App\Support\KeywordProviderConfig::options()[$provider] ?? $provider }}
             </span>
-            · change it on <a href="{{ route('admin.settings') }}" class="text-indigo-600 hover:underline">Settings</a>.
+            · change it on <a href="{{ route('admin.settings') }}" class="text-orange-600 hover:underline">Settings</a>.
             The webhook endpoint is <code class="rounded bg-slate-100 px-1">{{ url(config('services.keyword_finder.webhook_path')) }}</code>.
         </div>
 
@@ -139,7 +139,7 @@
                 @csrf
                 @include('admin.keyword-servers._fields', ['server' => null])
                 <div class="mt-3 flex justify-end">
-                    <button type="submit" class="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">Add server</button>
+                    <button type="submit" class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700">Add server</button>
                 </div>
             </form>
         </details>
@@ -303,7 +303,7 @@
                         @csrf @method('PUT')
                         @include('admin.keyword-servers._fields', ['server' => $server])
                         <div class="mt-3 flex justify-end">
-                            <button type="submit" class="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">Save changes</button>
+                            <button type="submit" class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700">Save changes</button>
                         </div>
                     </form>
                 </details>

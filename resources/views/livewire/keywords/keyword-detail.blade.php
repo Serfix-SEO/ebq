@@ -3,7 +3,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0">
             <a href="{{ route('keywords.index') }}" wire:navigate
-               class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400">
+               class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400">
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
                 Back to keywords
             </a>
@@ -14,7 +14,7 @@
                           title="Detected language">{{ strtoupper($language) }}</span>
                 @endif
                 @if ($flags['striking_distance'])
-                    <span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:ring-indigo-900/40">Striking distance</span>
+                    <span class="inline-flex rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 ring-1 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-900/40">Striking distance</span>
                 @endif
                 @if ($flags['cannibalized'])
                     <span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-900/40">Cannibalized</span>
@@ -36,7 +36,7 @@
                 </a>
             @else
                 <button wire:click="addToRankTracker" wire:loading.attr="disabled" wire:target="addToRankTracker" type="button"
-                        class="inline-flex h-9 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                        class="inline-flex h-9 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
                     <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                     <span wire:loading.remove wire:target="addToRankTracker">Track this keyword</span>
                     <span wire:loading wire:target="addToRankTracker">Adding…</span>
@@ -214,7 +214,7 @@
                         <span class="text-[11px] text-slate-400">peak {{ number_format($maxClicks) }}</span>
                     </div>
                     <svg viewBox="0 0 {{ $width }} {{ $height }}" preserveAspectRatio="none" class="mt-3 h-24 w-full">
-                        <path d="{{ $clicksPath }}" fill="none" stroke="#4f46e5" stroke-width="0.8" vector-effect="non-scaling-stroke" />
+                        <path d="{{ $clicksPath }}" fill="none" stroke="#F26419" stroke-width="0.8" vector-effect="non-scaling-stroke" />
                     </svg>
                     <div class="mt-2 flex justify-between text-[10px] text-slate-400">
                         <span>{{ $gsc_daily[0]['date'] }}</span>
@@ -288,7 +288,7 @@
                                 @foreach ($top_pages as $p)
                                     <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
                                         <td class="max-w-[260px] truncate px-3 py-2">
-                                            <a href="{{ route('pages.show', ['id' => urlencode($p['page'])]) }}" wire:navigate class="text-indigo-600 hover:underline dark:text-indigo-400" title="{{ $p['page'] }}">{{ $p['page'] }}</a>
+                                            <a href="{{ route('pages.show', ['id' => urlencode($p['page'])]) }}" wire:navigate class="text-orange-600 hover:underline dark:text-orange-400" title="{{ $p['page'] }}">{{ $p['page'] }}</a>
                                         </td>
                                         <td class="px-3 py-2 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($p['clicks']) }}</td>
                                         <td class="px-3 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">{{ number_format($p['impressions']) }}</td>
@@ -364,7 +364,7 @@
                         <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Rank tracker</h3>
                         <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Checked every {{ $tracker->check_interval_hours }}h · market {{ strtoupper($tracker->country) }} / {{ $tracker->device }} / {{ $tracker->language }}</p>
                     </div>
-                    <a href="{{ route('rank-tracking.show', $tracker->id) }}" wire:navigate class="text-[11px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400">Open detail →</a>
+                    <a href="{{ route('rank-tracking.show', $tracker->id) }}" wire:navigate class="text-[11px] font-semibold text-orange-600 hover:underline dark:text-orange-400">Open detail →</a>
                 </div>
                 <dl class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>
@@ -428,7 +428,7 @@
                                 @if ($_rq !== '')
                                     <li>
                                         <a href="{{ route('keywords.show', ['query' => rawurlencode($_rq)]) }}" wire:navigate
-                                           class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                           class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-700 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                             {{ $_rq }}
                                         </a>
                                     </li>

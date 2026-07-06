@@ -9,7 +9,7 @@
 
     <div class="flex flex-wrap items-center gap-2">
         <input type="text" x-model="im.query" @keydown.enter.prevent="imageSearch()" placeholder="Search image keywords…"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
         <button type="button" @click="imageSearch()" :disabled="im.searching || im.query.trim().length < 2" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" x-text="im.searching ? 'Searching…' : 'Search'"></button>
         <span class="text-xs text-slate-500 dark:text-slate-400">
             <span x-text="im.selected.length"></span>/<span x-text="MAX_IMAGES"></span> selected
@@ -21,9 +21,9 @@
 
     <div x-show="im.results.length > 0" class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
         <template x-for="img in im.results" :key="img.url">
-            <button type="button" @click="toggleImage(img)" class="relative aspect-square overflow-hidden rounded-lg border-2 transition" :class="imgSelected(img.url) ? 'border-indigo-500' : 'border-transparent hover:border-slate-300'">
+            <button type="button" @click="toggleImage(img)" class="relative aspect-square overflow-hidden rounded-lg border-2 transition" :class="imgSelected(img.url) ? 'border-orange-500' : 'border-transparent hover:border-slate-300'">
                 <img :src="img.thumbnail_url || img.url" :alt="img.title || ''" loading="lazy" class="h-full w-full object-cover">
-                <span x-show="imgSelected(img.url)" class="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-xs text-white">✓</span>
+                <span x-show="imgSelected(img.url)" class="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-xs text-white">✓</span>
             </button>
         </template>
     </div>
@@ -59,7 +59,7 @@
         <button type="button" @click="goToStep('strategy')" class="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400">← Back</button>
         <div class="flex items-center gap-2">
             <button type="button" @click="goToStep('summary')" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Skip</button>
-            <button type="button" @click="goToStep('summary')" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Next: review →</button>
+            <button type="button" @click="goToStep('summary')" class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700">Next: review →</button>
         </div>
     </div>
 </div>

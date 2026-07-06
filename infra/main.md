@@ -225,22 +225,363 @@ known gaps were flagged during the sweep:
   fully detailed. Expand the one you touch.
 - **Stubs / partial features** — `GenerateAiInsights` is a placeholder; `research_limits` is
   declared but not enforced (billing); `LlmClient` multi-provider is aspirational.
-- **Known correctness caveats** captured in subsystem docs (read before changing them):
-  crawler `known-issues.md` (cap-window leak), billing `usage.md` (non-atomic `assertCanSpend`),
-  guest-tools (cookie friction bypass; PageSpeed leads mis-tagged), audits (no content-hash
-  re-audit gate), data-sources (null-vs-empty `gsc_site_url`).
-- **Latent bugs surfaced by the reference sweep (worth fixing):**
-  - `bootstrap/app.php` registers middleware alias **`research.rollout` → a class that doesn't
-    exist** (`EnsureResearchRolloutAccess`) — harmless until a route uses it, then 500. (routing)
-  - **`EnsureFeatureAccess` fails open** on unknown feature keys — a typo in a `feature:` arg
-    silently bypasses gating. (http-and-auth)
-  - **CI (`tests.yml`) triggers on `master`/`*.x`, but the default branch is `main`** — pushes
-    to `main` get no push-event CI (only PR/nightly). (testing)
-  - Orphaned **`content_briefs`** table (no longer referenced); `prod APP_DEBUG=true`. (database / server-deployment)
+- **All items below this line were fixed in one pass, 2026-07-06** (each has its own
+  changelog entry + subsystem-doc detail; kept here only as an index of what to
+  re-check if this area is touched again):
+  - Crawler cap-window leak (`LinkStructurePanel` example-pages picker) — fixed via
+    `CrawlReportService::topInboundPages()`.
+  - Billing `assertCanSpend()` non-atomic race — fixed via a Redis reservation
+    (`UsageMeter::reserve()`/`release()`).
+  - Guest-tools PageSpeed lead mis-tagging — fixed (`Lead::SOURCE_GUEST_PAGESPEED`).
+    The cookie-friction "bypass" flagged alongside it turned out to be intentional
+    design (lead-gen, not a paywall) — left alone on purpose, not a bug.
+  - Audits — content-hash re-audit gate added (`PageAuditReport.content_hash` +
+    `ebq:recheck-audit-content`, hourly).
+  - Data-sources null-vs-empty `gsc_site_url` — audited, no live bug found (every
+    read-path already handles it correctly); confirmed in `data-sources/data-model.md`.
+  - `research.rollout` dangling middleware alias — removed (`bootstrap/app.php`),
+    nothing referenced it.
+  - `EnsureFeatureAccess` fail-open on an unknown feature key — removed the bypass;
+    `TeamPermissions::allows()` already denied safely without it.
+  - CI not running on push to `main` — added `main` to `tests.yml`'s push branches.
+  - Orphaned `content_briefs` table — dropped (confirmed 0 rows, no references,
+    user confirmed before the drop).
+  - Prod `APP_DEBUG=true` — flipped to `false`.
+  - Every fix above has a regression test (`tests/Feature/*`) — this codebase had
+    **zero** test coverage for any of these paths before 2026-07-06.
 
 ---
 
 ## Knowledge changelog
+
+- **2026-07-06 (latest — DB-shards tab rebuilt as a live panel)** — User: shard page
+  confusing (who lives where?), wants per-tenant/per-site row counts, the move form
+  should disable the subject's current host node, and the tab's 10s
+  `window.location.reload` loop replaced with real polling. Built
+  `Livewire\Admin\DbShardPanel` (`wire:poll.5s`) replacing the static tab body in
+  `admin/fleet/index.blade.php`: expandable per-node resident lists (tenants + their
+  websites; crawl sites) with total row counts per resident (all shard-tier tables
+  summed on the hosting node — computed on expand only, cached 1h, per-resident ↻
+  refresh button), host-aware move form (subject options labeled "· on {node}",
+  current host disabled as a target + server-side re-check in `move()`), and the
+  shard-moves progress panel nested inside. Old JS (`OPTS` dropdown + reload
+  interval) and the controller's `moveOptions` removed. The provisioning-defaults
+  settings form stays OUTSIDE the component on purpose — plain inputs inside a
+  polling Livewire component get wiped by morphs. Anchor-NULL tenants/sites display
+  as residents of the pinned primary (matches ShardContext routing). 5 tests
+  (`tests/Feature/Admin/DbShardPanelTest.php`). Docs:
+  [sharding/README.md](./sharding/README.md).
+
+- **2026-07-06 (dashboard cache auto-warming after syncs)** — Closes the
+  cold-path gap left by the earlier caching fix (below): the FIRST visitor after a
+  sync version-bump paid the full cold aggregate (~2min worst case on the biggest
+  account). Now `App\Jobs\WarmDashboardCaches` pre-computes every /dashboard +
+  /statistics card payload right after the bump. **Zero-drift design**: each card's
+  cached payload was refactored into a `public static payload()` on the component
+  itself (identical key + closure); render() and the warmer both call the same
+  static, so the warm key can never diverge from the read key. Warmed: action-queue
+  (both ReportCache+RankCache versions), country-filter, KPIs, insights (counts+PPC,
+  all-countries view), quick-wins (owner's plan limit), seasonality, top-countries,
+  traffic-chart (owner's timezone — teammates in other timezones pay their own rare
+  cold path), and `CrawlReportService::actionGroups`. Dispatched from
+  `SyncSearchConsoleData` (end of run, not per-window), `SyncAnalyticsData`, and
+  `AnalyzeSiteJob::flushSubscribers` (per subscriber); `ShouldBeUnique(5min)`
+  collapses the back-to-back GSC+GA dispatches into one warm. Runs on the SYNC queue
+  (worker box, timeout 900) — cache is shared Redis so the web box reads it warm; a
+  per-card try/catch means one failure can't cold the rest; frozen sites skipped.
+  **Deploy note:** this required the full web→worker rsync + `--force-recreate`
+  (two-box invariant — new job class consumed on the worker), which also shipped the
+  day's earlier job-level fixes (the `SyncAnalyticsData` ReportCache bump had been
+  web-side only until now). 3 new tests (`WarmDashboardCachesTest`) + dashboard/
+  link-structure suites green. Docs: [reports/README.md](./reports/README.md).
+
+- **2026-07-06 (shard-move progress tracking: `shard_moves` + live fleet
+  panel)** — User: no way to see progress while the DB fleet moves tenants/crawl
+  sites between nodes. Correct — `MoveShardJob` was a black box (its own docblock
+  said the UI "polls the anchors to see completion"; the June 18 move timeout was
+  visible only in `failed_jobs`). Added: `shard_moves` table + `ShardMove` model;
+  `ShardMover` now creates a row per move and updates it through `counting →
+  copying → verifying → cutover → purging → completed|failed` — totals pre-counted
+  per table so the percentage is real, `rows_copied` bumped per 1000-row chunk,
+  `current_table`/`tables_done` for position, final per-table counts + error stored.
+  Fleet page Database tab gets a **"Data moves"** panel (`Livewire\Admin\ShardMoves`,
+  `wire:poll.3s`): progress bar for running moves, last-10 history, failure reason
+  with the "source intact until purge / re-run idempotent" reminder.
+  `MoveShardJob::failed()` marks the in-flight row failed on worker-kill/timeout so
+  nothing sticks at "copying" forever. CLI `ebq:shard` moves get tracking free (the
+  mover owns it, not the job). 4 new tests (+ existing sharding scaffold suite still
+  green); sqlite `:memory:` test gotcha: a cloned named connection is a separate
+  empty DB — share the PDO (`setPdo`) to make source/dest the same database.
+  Restarted `ebq-queue-fleet` (runs the mover) + FPM. Docs:
+  [sharding/README.md](./sharding/README.md) §Live progress.
+
+- **2026-07-06 (worker-failure visibility: real-time alerting + admin Ops
+  dashboard; found & fixed a second stuck site)** — Closes the residual gap from the
+  incident below (jobs died silently for 3 days). Three layers, all tested:
+  (1) **Real-time capture** — `Queue::failing()` in `AppServiceProvider` (every box,
+  incl. ephemeral fleet) buffers each permanent failure into a shared-Redis capped list
+  (`App\Support\FailedJobAlertBuffer`, LPUSH+LTRIM 200, never throws). Chose the event
+  over polling `failed_jobs` because it's immediate and — critically — writes only to
+  Redis: the failing box may be exactly the one whose DB/mail is broken (that WAS the
+  incident), while Redis reachability is a given (no Redis → no job to fail).
+  (2) **Delivery from the web box** — `ebq:failed-jobs-alert` (scheduled every 15 min)
+  drains the buffer + flags crawl_sites with subscribers stuck `pending` >24h (the
+  blind spot the crawl supervisor can't see: a job that dies BEFORE creating a
+  CrawlRun), mails a `FailedJobsDigestMail` digest to `is_admin` users through the
+  local Postal. Empty buffer + no stuck sites = no mail, so no spam; `--dry-run` peeks
+  without consuming. Tests: `tests/Feature/FailedJobsAlertTest.php`.
+  (3) **Admin Ops dashboard** — `/admin/ops` (`Admin\OpsController`, "Ops" in the
+  admin nav): failed jobs last-7-days grouped by job+exception with **Retry all /
+  Forget** actions (`queue:retry`/`queue:forget` via Artisan, UUID-validated),
+  stuck-pending sites with a **Start crawl** button (frozen sites labeled, not
+  kickable), live queue depths (pending/delayed/reserved per queue) + undelivered
+  alert-buffer count. Reads `failed_jobs` (persistent) not the Redis buffer (that
+  belongs to the mail digest). Tests: `tests/Feature/AdminOpsDashboardTest.php`.
+  **Validation while building**: the digest's dry-run immediately caught a REAL second
+  victim of the incident below — `pubgnamegenerator.net`, subscribed but never crawled
+  since 2026-06-17. Kicked its first crawl: completed, 12 pages, site `ready`. Also
+  hardened the test suite: `phpunit.xml` now pins `REDIS_DB=13`/`REDIS_CACHE_DB=14`/
+  `REDIS_PREFIX=serfix-testing-` so tests can never touch the production Redis keyspace
+  (same philosophy as the sqlite DB guard — previously tests using the Redis facade hit
+  prod db 0!). Docs: [reference/jobs-and-scheduler.md](./reference/jobs-and-scheduler.md) ·
+  [admin/README.md](./admin/README.md).
+
+- **2026-07-06 (Site Health dead for namesforfreefire: TWO worker-box outages
+  found, both fixed)** — User: site health section not loading. Site had **zero crawl
+  runs ever** — crawl jobs were dying on the worker box for two stacked reasons:
+  (1) **`db_nodes.ebq-db-primary` was registered with `private_ip=127.0.0.1`.** Sharding
+  (merged `b504048`) anchors `crawl_sites.crawl_node_id` to that row, and `ShardManager`
+  builds each node connection from `private_ip` — `127.0.0.1` resolves to MariaDB on the
+  web box but to *nothing* on the worker box (10.0.0.3), so every anchored crawl job
+  failed there with `PDOException: Connection refused` (visible in `failed_jobs`, e.g.
+  the 02:00 weekly crawl this morning; failures date to ~2026-07-03, the anchor era).
+  Fixed: `private_ip` → `10.0.0.2` after verifying the app credentials connect from
+  BOTH boxes; `ShardManager::flush()` + FPM restart + worker recreate. **Rule: a
+  `db_nodes.private_ip` must be reachable from every box that runs jobs — never
+  localhost.**
+  (2) **The EBQ→Serfix rename silently split the Redis keyspace.** The default redis
+  prefix derives from `APP_NAME` (`config/database.php:178`), so when the web box's
+  `.env` changed to `APP_NAME=Serfix` this afternoon, the web box started
+  dispatching/reading under `serfix-database-*` while the worker box (still
+  `APP_NAME=EBQ`) consumed `ebq-database-*` — every job queued from the web after the
+  rename sat invisible to the worker, and the web box's own long-running Horizon
+  (booted pre-rename) equally couldn't see newly-dispatched interactive/default jobs.
+  Fixed: `APP_NAME=Serfix` on the worker, and **`REDIS_PREFIX=serfix-database-` pinned
+  explicitly in `.env` on both boxes AND `.env.worker`** (the ephemeral-fleet template —
+  it still said EBQ, so every autoscaled box would have come up split-brained too), so a
+  future rename can never split the queues again. Worker container recreated via
+  `docker compose --project-directory /var/www/ebq -f /var/www/ebq/docker-compose.worker.yml
+  up -d --force-recreate` (the compose file lives in /var/www/ebq on the worker, not
+  /root); web `supervisorctl restart ebq:*`. Verified end-to-end: dispatched the
+  first-ever crawl for namesforfreefire.com — run `running`, 400+ pages fetched and
+  climbing, all queues draining, `summary()` returns live has_crawl/run_status.
+  Checked before switching prefixes: no stranded jobs under the old `ebq-database-*`
+  queue keys (only 2 pending jobs total, both already under `serfix-*`). **Recurrence
+  guards added**: `DbFleetService::assertReachableFromAllBoxes()` rejects loopback/
+  link-local/localhost node addresses at registration
+  (`tests/Feature/DbFleetNodeAddressTest.php`), and the pinned `REDIS_PREFIX` makes the
+  keyspace immune to APP_NAME changes. Residual risk that is NOT closed: worker-side job
+  failures are still silent — they land in `failed_jobs` with no alerting, which is why
+  this ran unnoticed for 3 days. Docs:
+  [deployment-and-queues.md](./deployment-and-queues.md) ·
+  [sharding/](./sharding/README.md).
+
+- **2026-07-06 (/dashboard + /statistics slow: caching finally wired to the
+  version system, plus a 20s eager-load bug in `summary()`)** — User: both pages take
+  too long, should be "cached until fresh data is fetched." Three distinct problems
+  found, all fixed with live before/after timings on the biggest GSC account
+  (namesforfreefire.com, 1.33M `search_console_data` rows):
+  (1) **Every dashboard/statistics Livewire card hardcoded a 600s TTL**, so the heavy
+  GSC/GA aggregates re-ran every 10 minutes — and five of the eight cards
+  (`CountryFilter`, `InsightCards` ×2 keys, `QuickWinsCard`, `SeasonalityCard`,
+  `TopCountriesCard`) had **no `ReportCache::version` in their keys at all**, meaning a
+  completed sync did NOT refresh them until TTL expiry either — worst of both worlds
+  (recompute every 10min AND stale up to 10min after a sync). All eight now use the
+  intended design from `ReportCache`'s own docblock: 24h sanity TTL + version-keyed
+  keys. Cold costs these avoid re-paying: country group-by **98s**, KPI aggregates
+  **26s**, traffic chart **17s** on the big site.
+  (2) **`SyncAnalyticsData` never bumped `ReportCache`** (only the GSC sync did), so GA
+  numbers in KPI/traffic cards stayed stale after a GA sync — now bumps after upsert.
+  And `PriorityActionQueue`'s key now includes the **RankCache** version too: it shows
+  rank-drop rows, and since the 2026-06-28 RankCache split, hourly rank syncs no longer
+  bumped ReportCache — its own code comment still claimed they did (stale, corrected).
+  (3) **The genuinely-every-load killer: `CrawlReportService::context()` eagerly built
+  the 28d per-user GSC click map** (full GROUP BY page, chunked) for every consumer —
+  including `summary()`, which is deliberately uncached (live crawl banner) and runs on
+  every /dashboard load, yet never reads clicks. On the 1.33M-row site that was
+  **20s per dashboard load, every load**. Click map is now lazy
+  (`userClicks()`, memoized, built only when `impactFor()` needs it): `summary()`
+  **20,065ms → 99ms** (verified live; also verified a crawled site still returns real
+  health/pages/findings values). Tests: `tests/Feature/Dashboard/DashboardCacheTest.php`
+  (version-bump invalidation, TTL survival past 600s, GA-sync bump — note dashboard
+  cards are `#[Lazy]`, tests need `Livewire::withoutLazyLoading()` or render() never
+  runs). Also corrected stale claims in [crawler/read-path.md](./crawler/read-path.md)
+  (said `TrackKeywordRankJob` flushes ReportCache — it's been RankCache since 06-28)
+  and marked the cap-leak entry fixed in known-issues.md (missed in the earlier sweep's
+  doc pass). Docs: [reports/README.md](./reports/README.md) ·
+  [crawler/read-path.md](./crawler/read-path.md).
+
+- **2026-07-06 (cleared every open item in "Where docs are still thin")** —
+  User asked to fix everything flagged there. Ten items, each with a regression test
+  (none of this had any test coverage before today) and doc updates in the same change:
+  crawler cap-window leak (`CrawlReportService::topInboundPages()`,
+  `tests/Feature/LinkStructureExamplesCapTest.php`); dangling `research.rollout`
+  middleware alias (removed, nothing used it); `EnsureFeatureAccess` fail-open on an
+  unknown feature key (removed the bypass — `TeamPermissions::allows()` already denies
+  safely without it, `tests/Feature/EnsureFeatureAccessTest.php`); CI not running on
+  push to `main` (`tests.yml`); billing `assertCanSpend()` non-atomic race
+  (`UsageMeter::reserve()`/`release()`, Redis-backed reservation released by
+  `ClientActivityLogger::log()`, `tests/Feature/UsageMeterReservationTest.php`);
+  guest-tools PageSpeed lead mis-tagging (`Lead::SOURCE_GUEST_PAGESPEED`); audits
+  content-hash re-audit gate (`PageAuditReport.content_hash` +
+  `ebq:recheck-audit-content` hourly, `tests/Feature/RecheckAuditContentTest.php`);
+  orphaned `content_briefs` table (dropped — confirmed 0 rows + zero references,
+  **user confirmed explicitly before the drop**, matching the repo's destructive-DB
+  safety rule); prod `APP_DEBUG=true` → `false`. Two items turned out to be non-issues
+  on closer inspection rather than bugs: guest-tools cookie-friction "bypass" is
+  intentional lead-gen design (left alone); data-sources null-vs-empty `gsc_site_url`
+  — audited every read-path, all already handle it correctly (confirmed in
+  `data-sources/data-model.md`, not a live bug). Also caught and corrected one
+  self-inflicted error mid-sweep: the billing bug-report (previous changelog entry)
+  wrongly included `BillingController::success()` as broken — re-reading it showed an
+  `orWhere` covering both price columns that a grep-based first pass missed; the
+  billing docs were corrected to drop that false claim. Full detail on each item is in
+  its own subsystem doc (linked from the "Where docs are still thin" section, which
+  now serves as an index of what to re-check rather than an open list).
+
+- **2026-07-06 (fixed the monthly-billing plan-resolution bug, same day it
+  was found)** — Fixed the bug from the entry directly below. Added
+  `Plan::findByStripePrice()` (checks `stripe_price_id_monthly` OR `_yearly`, one
+  implementation instead of three copies) and `Plan::intervalForStripePrice()`
+  (`app/Models/Plan.php`). Wired into `StripeWebhookController::
+  syncPlanSlugFromStripeCustomer()` (`:85`) and `User::resolveSubscribedPlan()`
+  (`:350`) — both previously matched yearly-only. `BillingController::success()`
+  (`:129`) turned out to already be correct on closer read (had an `orWhere` the
+  initial grep-based bug report missed) — left untouched. `BillingController::swap()`
+  (`:245`) now detects the subscriber's actual interval via
+  `intervalForStripePrice()` and swaps within that interval instead of always
+  yearly. Verified the fix directly against real Stripe price IDs (monthly → correct
+  slug + `'monthly'`, yearly → correct slug + `'annual'`) — no regression on the
+  yearly path. No automated test coverage exists for this billing path at all;
+  flagged as a gap, not filled. `php -l` clean on all 4 touched files, FPM restarted.
+  Docs: [billing/README.md](./billing/README.md#gotchas--known-issues) ·
+  [billing/plans-and-gating.md](./billing/plans-and-gating.md).
+
+- **2026-07-06 (new Stripe account cutover; found the live monthly-billing bug
+  while verifying docs)** — User created a fresh Stripe business/account; rotated
+  `STRIPE_KEY`/`STRIPE_SECRET`/`STRIPE_WEBHOOK_SECRET` in `.env` to the new account,
+  updated the webhook destination to `https://serfix.io/stripe/webhook`. Confirmed all
+  5 active plans' `stripe_price_id_monthly`/`_yearly` already pointed at valid, active
+  prices in the new account (verified live against `/v1/prices/<id>`, amounts match DB
+  exactly) — no re-seeding needed. Live-tested checkout end-to-end through the real
+  `BillingController`/Cashier/`Plan` code path (disposable test user + Stripe customer,
+  both cleaned up after: expired the Checkout Session, deleted the test customer,
+  deleted the local user row) — minted a real `checkout.stripe.com` session at the
+  correct $19/mo Solo price. **While doing this, auditing the docs for accuracy
+  surfaced a real, currently-live bug, not just a stale doc**: `checkout()` genuinely
+  supports `interval=monthly` (verified above), but two of the three places that
+  resolve an existing subscription back to a `Plan` — the webhook's
+  `syncPlanSlugFromStripeCustomer()` and `User::resolveSubscribedPlan()` — matched
+  only `stripe_price_id_yearly` (`BillingController::success()` turned out to already
+  handle both, on a closer read than the initial grep-based scan), so a real customer
+  who pays via the pricing page's Monthly toggle got charged and then treated as
+  unsubscribed everywhere (`current_plan_slug` → null → Trial-tier limits, frozen
+  extra websites, plugin reports `tier: trial`). `BillingController::swap()` had a
+  related issue: always swapped to the yearly price regardless of the subscriber's
+  actual interval. **Fixed same-day** — see the entry directly above — flagged here
+  rather than fixed inline at the time since it's live billing
+  logic; full detail + all 4 file:line locations in
+  [billing/README.md](./billing/README.md#gotchas--known-issues).
+- **2026-07-06 (even later — ebq.io → serfix.io domain cutover, Google approved)** — Google
+  approved `serfix.io` as an authorized OAuth redirect URI, so the domain migration (see the
+  rebrand entry below) was completed same-day. `.env` `APP_URL` and `GOOGLE_REDIRECT_URI` now
+  point at `serfix.io` (`.env.example` placeholders updated too). Apache `ebq.io.conf` (port
+  80) and `ebq.io-le-ssl.conf` (port 443) now **permanently redirect everything to
+  `serfix.io`** (`RewriteRule ^ https://serfix.io%{REQUEST_URI}`, path+query preserved)
+  instead of serving the app — `serfix.io.conf`/`serfix.io-le-ssl.conf` are now the ones with
+  `DocumentRoot /var/www/ebq/public`. No app-code changes needed: `SANCTUM_STATEFUL_DOMAINS`
+  derives from `APP_URL` (`Sanctum::currentApplicationUrlWithPort()`), and the app was already
+  domain-agnostic (no `URL::forceRootUrl`, `SESSION_DOMAIN=null`). **This supersedes the "APP_URL
+  stays ebq.io" note in the rebrand entry directly below** — that was correct at the time,
+  now resolved. Verified live: `http://ebq.io/*` and `https://ebq.io/*` both 301 to
+  `https://serfix.io/*` with path preserved; `https://serfix.io/` serves the app (200).
+  Details: memory `serfix-io-domain-migration` (rewritten to reflect completion, not appended).
+
+- **2026-07-06 (later — brand guidelines implemented: logo fix + full orange sweep)** —
+  Follow-up to the rebrand below, once `serfix-branding/SERFIX Brand Guidelines.pdf` (Palm
+  Advertising, vol. 01) arrived. Two problems: (1) `public/serfix-logo.png`/`-dark.png` had
+  the wordmark centered in a ~22%-height band on a 1000×1000 canvas, and every usage forced
+  it into a **square** `h-N w-N` box — squeezed to a sliver. Cropped both tight (~3.3:1,
+  matches the real wordmark shape) and added a separate square `serfix-icon.png` (letterboxed
+  on white) for favicon use; nav/header/sidebar `<img>` tags switched from square to
+  height-fixed/`w-auto` boxes. (2) User asked for a full brand-guideline rollout, not just
+  the logo — chose the "full sweep incl. logged-in product UI" scope over three options.
+  Registered the guideline's exact color ramp in `resources/css/app.css` `@theme`
+  (`orange-600`=`#F26419`, `orange-700`=`#C44E0E`, full 50–950 scale + `ink`/`surface-warm`/
+  `surface-cool`/semantic colors — see [frontend/README.md](./frontend/README.md) §Brand
+  tokens), removing dead unused indigo `--color-primary` vars. Then mechanically renamed
+  **every `indigo-NNN` Tailwind class → `orange-NNN`** app-wide (1300+ occurrences, 103 view
+  files — `indigo-600` was literally `#4f46e5`, Tailwind's exact hex, confirming indigo was
+  always the brand accent), plus hardcoded indigo hex in non-Tailwind contexts the class sweep
+  can't reach: all 9 mailables' inline CSS, both dompdf PDF templates
+  (`pdf/site-audit.blade.php`, `emails/growth-report-pdf.blade.php`), inline SVG chart
+  strokes (`admin/usage`, `keyword-detail`), and `ReportBranding` Livewire/`DemoDataSeeder`
+  PHP defaults (`#4f46e5` → `#F26419`, matching the already-updated `ReportBranding::
+  ebqDefault()` model default — these three were missed in the original 06-07 rebrand pass).
+  Caught one real regression from the mechanical rename: several marketing CTAs
+  (`landing.blade.php`, all 4 guest-tool pages, `tools/*`) used a two-tone
+  `from-indigo-600 to-violet-600` gradient button — renaming only the indigo half left a
+  jarring orange→violet gradient live on the homepage. Flattened all 18 occurrences to solid
+  `bg-orange-600`/`hover:bg-orange-700` per the guideline's explicit CTA spec (flat accent,
+  never a gradient). Verified via Chrome headless screenshots against the live Apache vhost
+  (localhost) — landing, pricing, login, features all render correctly; `npm run build` +
+  `php8.3-fpm` restart applied. Left untouched (separate design question, not asked): ~100
+  remaining standalone `violet-*` badges/tags (AI Studio badge, admin plan-tier chips) that
+  aren't part of the old indigo-brand gradient pattern — those may be an intentional
+  secondary "AI" accent rather than a rebrand miss.
+
+- **2026-07-06 (brand — EBQ → Serfix rebrand, visible surfaces only)** — Product brand
+  renamed EBQ → Serfix per `serfix-branding/SERFIX Brand Guidelines.pdf` (Inter 800
+  wordmark, ink `#111111` + orange `#F26419`, dark variant for product UI only). Changed:
+  logo assets (`public/serfix-logo.png` light / `public/serfix-logo-dark.png` dark,
+  replacing `public/ebq-logo.png`, wired through `partials/favicon-links.blade.php`);
+  `.env` `APP_NAME=Serfix`, `APP_PUBLIC_URL=https://serfix.io` (`APP_URL` stays
+  `ebq.io` — see [serfix-io-domain-migration](../CLAUDE.md) note: Google/Microsoft OAuth
+  redirect URIs stay pinned to `ebq.io` until Google approves the new domain); all
+  marketing/admin/email blade views; `ReportBranding::ebqDefault()` company_name +
+  accent_color (now `#F26419`, was indigo `#4f46e5`) — this is what unbranded PDF/email
+  reports show; mail subjects (`PageAuditReportMail`, `TrafficDropAlert`); WordPress
+  plugin (`ebq-wordpress-plugin/`) **visible strings only** — Plugin Name header, admin
+  menu labels (EBQ HQ → Serfix HQ, etc.), readme.txt, `.wordpress-org/` placeholder
+  icon/banner (recompiled `src/` → `build/` via `npm run build`). **Left unchanged by
+  design**: WP plugin technical identity (slug `ebq-seo`, main file `ebq-seo.php`, text
+  domain, `EBQ_*` PHP classes/constants, `ebq-sitemap.xml` rewrite path) — renaming any
+  of this breaks auto-update matching for every existing install; support/legal email
+  addresses (`support@`, `billing@`, `legal@`, `privacy@ebq.io`) — `serfix.io` has no MX
+  record yet, so those addresses would bounce; `marketing.ebq.io` booking links (separate
+  app, unaffected); code comments/log strings/console command descriptions (not
+  user-visible). Follow-up: plugin `languages/*.po` translations now stale against the
+  renamed source strings — regenerate via `npm run make-pot` before next plugin release.
+  Docs: [wordpress-plugin/README.md](./wordpress-plugin/README.md).
+
+- **2026-06-28 (perf — `search_console_data` index fixes + `RankCache` split)** —
+  Statistics page and PageDetail were triggering 60s+ `GROUP BY` scans on large sites
+  (1.17M-row `search_console_data` for one account). Three fixes: (1) **`whereDate` → `where`**
+  in `PageDetail.php` (3 occurrences) — `->whereDate('date','>=',…)` generates `date(col)>=?`
+  which bypasses the index; `date` is already a DATE type so a plain `->where` is correct and
+  index-safe. (2) **Two new indexes** (`scd_wid_page_date (website_id,page,date)` for PageDetail
+  keyword queries; `scd_wid_country (website_id,country)` for CountryFilter/top-countries
+  aggregations) via migration `2026_06_28_000100_add_page_country_indexes_to_search_console_data`.
+  (3) **`RankCache` split** — `ebq:track-rankings` (hourly) was calling `ReportCache::flushWebsite()`,
+  orphaning 24h GSC caches (cannibalization, top countries, quick wins) every hour and forcing
+  repeated 590K-row scans. Created `app/Services/RankCache.php` (same version-integer mechanic
+  as `ReportCache`); `TrackKeywordRankJob` now calls `RankCache::flushWebsite()`;
+  `PluginHqController::overview` cache key includes both versions so rank KPIs still refresh.
+  GSC-only dashboard caches now stay warm for the full 24h TTL, busted only by nightly
+  `SyncSearchConsoleData`. Also added 90-day date window to `CountryFilter` to reduce scan scope
+  for sites with long history. Docs: [reports/README.md](./reports/README.md) ·
+  [keywords/rank-tracking.md](./keywords/rank-tracking.md) ·
+  [reference/database.md](./reference/database.md).
 
 - **2026-06-26 (billing — 5-tier pricing rework: Trial/Solo/Pro/Agency/Enterprise)** —
   Replaced the 4-tier model (Free/Pro/Startup/Agency) with 5 tiers. Old rows renamed

@@ -1,6 +1,6 @@
 <x-marketing.page
-    title="Guide — EBQ"
-    description="Customer documentation for the EBQ portal: dashboards, keywords, pages, rank tracking, audits, reports, alerts, and optional CMS integration—what each screen shows and how to use it."
+    title="Guide — Serfix"
+    description="Customer documentation for the Serfix portal: dashboards, keywords, pages, rank tracking, audits, reports, alerts, and optional CMS integration—what each screen shows and how to use it."
     active="guide"
 >
     {{-- ── Hero ──────────────────────────────────────────────── --}}
@@ -8,7 +8,7 @@
         <div class="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-20">
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">User guide · full reference</p>
             <h1 class="mt-4 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-                The complete EBQ guide.
+                The complete Serfix guide.
             </h1>
             <p class="mt-5 text-balance text-[17px] leading-8 text-slate-600">
                 Start with the product reference for dashboard, keywords, pages, rank tracking, audits, and reports—real UI layouts with every column explained—then follow the numbered setup path for integrations, tracking, and publishing workflows.
@@ -95,7 +95,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Add your first website</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Every signal in EBQ — clicks, ranks, audits, backlinks, alerts — is scoped to a website. Before anything else syncs, EBQ needs to know which property it should hold.
+                        Every signal in Serfix — clicks, ranks, audits, backlinks, alerts — is scoped to a website. Before anything else syncs, Serfix needs to know which property it should hold.
                     </p>
 
                     {{-- Mockup: add website form --}}
@@ -160,10 +160,10 @@
                             <span class="h-2 w-2 rounded-full bg-rose-400"></span>
                             <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                             <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                            <span class="ml-2 text-[11px] font-medium text-slate-500">Authorization — grant access for EBQ</span>
+                            <span class="ml-2 text-[11px] font-medium text-slate-500">Authorization — grant access for Serfix</span>
                         </div>
                         <div class="px-5 py-5">
-                            <p class="text-[13px] text-slate-700">EBQ would like to:</p>
+                            <p class="text-[13px] text-slate-700">Serfix would like to:</p>
                             <ul class="mt-3 space-y-2.5 text-[12px]">
                                 @foreach ([
                                     ['Read-only access to your connected analytics property', 'sensitive'],
@@ -184,7 +184,7 @@
                             </ul>
                             <div class="mt-4 flex items-center gap-2">
                                 <span class="rounded-md bg-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-700">Cancel</span>
-                                <span class="rounded-md bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white">Allow</span>
+                                <span class="rounded-md bg-orange-600 px-3 py-1.5 text-[11px] font-semibold text-white">Allow</span>
                             </div>
                         </div>
                     </div>
@@ -196,11 +196,11 @@
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Token safety</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Integration credentials stay on EBQ servers and are encrypted; short-lived access is rotated automatically.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Integration credentials stay on Serfix servers and are encrypted; short-lived access is rotated automatically.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Partial grants</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">If you decline part of the access, EBQ keeps working with reduced coverage. You can approve more later from the same screen.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">If you decline part of the access, Serfix keeps working with reduced coverage. You can approve more later from the same screen.</p>
                         </div>
                     </div>
 
@@ -218,7 +218,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Track keywords and competitors</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Live results pages are captured per device, country, language, and optional city. EBQ overlays search clicks for the same query when available so a rank gain is judged on traffic, not only position.
+                        Live results pages are captured per device, country, language, and optional city. Serfix overlays search clicks for the same query when available so a rank gain is judged on traffic, not only position.
                     </p>
 
                     {{-- Mockup: keyword grid --}}
@@ -272,7 +272,7 @@
                         <li><span class="font-mono text-slate-400">1.</span> Open <strong>Keywords</strong>. Click <em>Add keywords</em>.</li>
                         <li><span class="font-mono text-slate-400">2.</span> Paste one per line, or upload a CSV with columns <code>query, country, device, language</code>.</li>
                         <li><span class="font-mono text-slate-400">3.</span> Set the default targeting. Override per-row if you operate in multiple regions.</li>
-                        <li><span class="font-mono text-slate-400">4.</span> (Optional) Add up to three competitor domains. EBQ will record their position on every check.</li>
+                        <li><span class="font-mono text-slate-400">4.</span> (Optional) Add up to three competitor domains. Serfix will record their position on every check.</li>
                         <li><span class="font-mono text-slate-400">5.</span> First SERP capture starts within minutes. Subsequent captures run on your plan's interval.</li>
                     </ol>
 
@@ -287,7 +287,7 @@
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">SERP features matter</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">A #2 below an AI overview earns less than a #4 with sitelinks. EBQ flags the feature so the rank number isn't read in isolation.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">A #2 below an AI overview earns less than a #4 with sitelinks. Serfix flags the feature so the rank number isn't read in isolation.</p>
                         </div>
                     </div>
                 </section>
@@ -396,7 +396,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Import or track backlinks</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        EBQ verifies presence, anchor, and rel on every check, then measures the 28-day click delta on the target page so you can prove which links actually lifted traffic.
+                        Serfix verifies presence, anchor, and rel on every check, then measures the 28-day click delta on the target page so you can prove which links actually lifted traffic.
                     </p>
 
                     {{-- Mockup: backlinks table --}}
@@ -419,7 +419,7 @@
                                 @foreach ([
                                     ['blog.partner.io → /pricing', 'best pricing for SEO', 'follow', 58, '+412', 'emerald'],
                                     ['news.example.org → /blog/saas-seo', 'SaaS SEO playbook', 'follow', 49, '+186', 'emerald'],
-                                    ['forum.community.dev → /features', 'EBQ', 'ugc', 42, '+38', 'emerald'],
+                                    ['forum.community.dev → /features', 'Serfix', 'ugc', 42, '+38', 'emerald'],
                                     ['low-quality.tld → /product/ai-writer', 'click here', 'nofollow', 14, '-22', 'rose'],
                                 ] as [$row, $anchor, $rel, $da, $delta, $tone])
                                     <tr class="hover:bg-slate-50/60">
@@ -442,7 +442,7 @@
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">CSV upload</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Columns: <code>source_url, target_url, anchor</code>. Anchor is optional — EBQ extracts it on first verify.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Columns: <code>source_url, target_url, anchor</code>. Anchor is optional — Serfix extracts it on first verify.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Manual entry</p>
@@ -482,7 +482,7 @@
                     <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
                         @foreach ([
                             ['Cannibalizations', '14', 'Two pages competing for one query', 'amber'],
-                            ['Striking distance', '27', 'Keywords at pos 5–20 with below-curve CTR', 'indigo'],
+                            ['Striking distance', '27', 'Keywords at pos 5–20 with below-curve CTR', 'orange'],
                             ['Content decay', '8', '90-day click decline beyond seasonality', 'slate'],
                             ['Indexing fails', '3', 'URLs earning impressions but not indexed', 'rose'],
                             ['Audit vs traffic', '11', 'High-traffic pages with poor audit scores', 'slate'],
@@ -494,7 +494,7 @@
                                     <p @class([
                                         'text-2xl font-semibold tabular-nums',
                                         'text-amber-600' => $tone === 'amber',
-                                        'text-indigo-600' => $tone === 'indigo',
+                                        'text-orange-600' => $tone === 'orange',
                                         'text-slate-900' => $tone === 'slate',
                                         'text-rose-600' => $tone === 'rose',
                                         'text-emerald-600' => $tone === 'emerald',
@@ -533,7 +533,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Schedule reports + turn on alerts</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Reports and alerts share one recipient list per website. Reports run on a fixed cadence; alerts fire only when EBQ detects an unusual change against your recent baseline—so normal volatility does not spam your inbox.
+                        Reports and alerts share one recipient list per website. Reports run on a fixed cadence; alerts fire only when Serfix detects an unusual change against your recent baseline—so normal volatility does not spam your inbox.
                     </p>
 
                     <div class="mt-6 grid gap-5 lg:grid-cols-2">
@@ -579,13 +579,13 @@
                                     <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Sessions</span><span class="font-mono text-rose-600">480 vs typical 1,540</span></li>
                                     <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Avg position</span><span class="font-mono text-amber-600">14.2 vs typical 11.4</span></li>
                                 </ul>
-                                <div class="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Open EBQ →</div>
+                                <div class="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Open Serfix →</div>
                             </div>
                         </div>
                     </div>
 
                     <h3 class="mt-8 text-lg font-semibold text-slate-900">When alerts fire</h3>
-                    <p class="mt-3 text-[14px] leading-7 text-slate-700">EBQ compares recent daily totals to your rolling baseline and only notifies you when the drop is both material and unusual for that metric. Alerts are deduplicated so you do not get repeated noise for the same issue.</p>
+                    <p class="mt-3 text-[14px] leading-7 text-slate-700">Serfix compares recent daily totals to your rolling baseline and only notifies you when the drop is both material and unusual for that metric. Alerts are deduplicated so you do not get repeated noise for the same issue.</p>
 
                     <h3 class="mt-8 text-lg font-semibold text-slate-900">Reports and scheduled email</h3>
                     <p class="mt-3 text-[13px] leading-6 text-slate-700">
@@ -601,7 +601,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Install the WordPress plugin</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        The EBQ SEO plugin adds HQ, the block-editor panel, the posts-list EBQ column, and the dashboard widget. Full layouts and column-by-column notes for each surface are in <strong><a href="#wordpress-plugin" class="text-indigo-600 underline decoration-indigo-600/30 underline-offset-2 hover:text-indigo-800">WordPress plugin</a></strong> at the top of this guide.
+                        The Serfix SEO plugin adds HQ, the block-editor panel, the posts-list Serfix column, and the dashboard widget. Full layouts and column-by-column notes for each surface are in <strong><a href="#wordpress-plugin" class="text-orange-600 underline decoration-orange-600/30 underline-offset-2 hover:text-orange-800">WordPress plugin</a></strong> at the top of this guide.
                     </p>
 
                     {{-- ── 8.1 Plugin settings ───────────────────── --}}
@@ -610,9 +610,9 @@
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Connection</p>
                             <ul class="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-700">
-                                <li>One-click <em>Connect to EBQ</em> using a short verification step—no secrets to copy.</li>
+                                <li>One-click <em>Connect to Serfix</em> using a short verification step—no secrets to copy.</li>
                                 <li>Live status badge (Connected / Reconnect needed / Revoked).</li>
-                                <li><em>Disconnect</em> ends the link for this site in EBQ right away.</li>
+                                <li><em>Disconnect</em> ends the link for this site in Serfix right away.</li>
                             </ul>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -626,7 +626,7 @@
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Auto-updates</p>
                             <ul class="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-700">
-                                <li>The plugin checks EBQ for new releases on a routine schedule.</li>
+                                <li>The plugin checks Serfix for new releases on a routine schedule.</li>
                                 <li>Optional auto-install for security/patch releases.</li>
                                 <li>Manual update from <strong>Plugins</strong> at any time.</li>
                             </ul>
@@ -644,10 +644,10 @@
                     {{-- ── 8.2 Install in 4 steps ───────────────── --}}
                     <h3 class="mt-12 text-lg font-semibold text-slate-900">8.2 Install in four steps</h3>
                     <ol class="mt-3 space-y-2 text-[14px] leading-7 text-slate-700">
-                        <li><span class="font-mono text-slate-400">1.</span> In EBQ, open <strong>Settings → WordPress</strong>. Click <em>Download plugin</em> — you'll get the latest packaged ZIP.</li>
+                        <li><span class="font-mono text-slate-400">1.</span> In Serfix, open <strong>Settings → WordPress</strong>. Click <em>Download plugin</em> — you'll get the latest packaged ZIP.</li>
                         <li><span class="font-mono text-slate-400">2.</span> In WordPress, go to <strong>Plugins → Add New → Upload Plugin</strong>. Upload the ZIP, then activate.</li>
-                        <li><span class="font-mono text-slate-400">3.</span> In the WP plugin settings, click <em>Connect to EBQ</em>. You'll be redirected back to EBQ, pick the matching website, and approve.</li>
-                        <li><span class="font-mono text-slate-400">4.</span> Open any post — the EBQ panel appears in the block editor sidebar. The dashboard widget and posts-list column fill in shortly after.</li>
+                        <li><span class="font-mono text-slate-400">3.</span> In the WP plugin settings, click <em>Connect to Serfix</em>. You'll be redirected back to Serfix, pick the matching website, and approve.</li>
+                        <li><span class="font-mono text-slate-400">4.</span> Open any post — the Serfix panel appears in the block editor sidebar. The dashboard widget and posts-list column fill in shortly after.</li>
                     </ol>
 
                     {{-- ── 8.3 Security ──────────────────────────── --}}
@@ -655,11 +655,11 @@
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Scoped to one site</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Each plugin connection applies to a single website in your EBQ account. A compromised site-specific link could only reach that site’s data—not your other properties or full account.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Each plugin connection applies to a single website in your Serfix account. A compromised site-specific link could only reach that site’s data—not your other properties or full account.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Stored on your server</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Connection credentials stay on your server. They are not embedded in public pages or exposed to visitors—only EBQ’s plugin uses them to fetch your workspace data.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Connection credentials stay on your server. They are not embedded in public pages or exposed to visitors—only Serfix’s plugin uses them to fetch your workspace data.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Verified connect flow</p>
@@ -667,7 +667,7 @@
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Instant revoke</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Choose <em>Disconnect</em> in either your site admin or EBQ. The link stops working immediately on the next request.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Choose <em>Disconnect</em> in either your site admin or Serfix. The link stops working immediately on the next request.</p>
                         </div>
                     </div>
                 </section>
@@ -675,7 +675,7 @@
                 {{-- ── METRIC GLOSSARY ──────────────────────── --}}
                 <section id="metric-glossary" class="not-prose mt-24 scroll-mt-24">
                     <h2 class="text-3xl font-semibold tracking-tight text-slate-900">Metric glossary</h2>
-                    <p class="mt-4 text-[16px] leading-7 text-slate-600">Quick definitions for the metrics you'll see across EBQ. Open the table for the source and exact window.</p>
+                    <p class="mt-4 text-[16px] leading-7 text-slate-600">Quick definitions for the metrics you'll see across Serfix. Open the table for the source and exact window.</p>
 
                     <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
                         <table class="min-w-full text-[13px]">
@@ -700,8 +700,8 @@
                                     ['TBT', 'Lab', 'Total Blocking Time — main-thread blocking from scripts.'],
                                     ['FCP', 'Lab / field', 'First Contentful Paint — first paint of text or image.'],
                                     ['TTFB', 'Lab / field', 'Time To First Byte — server response latency.'],
-                                    ['Δ clicks (28d)', 'EBQ', 'Backlink view: change in target-page clicks around when the link was first seen.'],
-                                    ['Anomaly signal', 'EBQ', 'Indicates how far a daily metric sits from its usual range for your site (used for alerts).'],
+                                    ['Δ clicks (28d)', 'Serfix', 'Backlink view: change in target-page clicks around when the link was first seen.'],
+                                    ['Anomaly signal', 'Serfix', 'Indicates how far a daily metric sits from its usual range for your site (used for alerts).'],
                                 ] as [$m, $src, $def])
                                     <tr>
                                         <td class="px-4 py-2.5 font-semibold text-slate-800">{{ $m }}</td>
@@ -725,7 +725,7 @@
                         @foreach ([
                             [
                                 'Search sync returns zero rows',
-                                'Property mismatch — the URL prefix for your connected search property must exactly match the canonical URL in EBQ (protocol, host, trailing slash).',
+                                'Property mismatch — the URL prefix for your connected search property must exactly match the canonical URL in Serfix (protocol, host, trailing slash).',
                                 'Open <strong>Settings → Integrations</strong>, click <em>Reselect property</em>, and pick the correct prefix. Force a sync from the same screen.',
                             ],
                             [
@@ -735,8 +735,8 @@
                             ],
                             [
                                 'Audit fails with "fetch blocked"',
-                                'robots.txt or an edge firewall / bot challenge is blocking the EBQ audit fetch.',
-                                'Allow <code>EBQAuditBot</code> in robots.txt and whitelist the EBQ IP range listed in <strong>Settings → Audit access</strong>.',
+                                'robots.txt or an edge firewall / bot challenge is blocking the Serfix audit fetch.',
+                                'Allow <code>EBQAuditBot</code> in robots.txt and whitelist the Serfix IP range listed in <strong>Settings → Audit access</strong>.',
                             ],
                             [
                                 'URL resubmit returns "permission denied"',
@@ -784,7 +784,7 @@
                             ],
                             [
                                 'Is my account data shared externally?',
-                                'Integration credentials stay on EBQ servers and are encrypted at rest. Delivered reports are generated inside EBQ.',
+                                'Integration credentials stay on Serfix servers and are encrypted at rest. Delivered reports are generated inside Serfix.',
                             ],
                             [
                                 'How accurate are the ranks?',

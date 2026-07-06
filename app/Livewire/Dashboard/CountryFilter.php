@@ -3,6 +3,7 @@
 namespace App\Livewire\Dashboard;
 
 use App\Models\SearchConsoleData;
+use App\Services\ReportCache;
 use App\Support\Countries;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -18,7 +19,9 @@ use Livewire\Component;
  *
  * Countries available = distinct countries in search_console_data for the
  * currently-selected website — so the dropdown never shows markets where this
- * site has no presence. Cached for 10 minutes to keep the select snappy.
+ * site has no presence. Cached until the next GSC sync (ReportCache version
+ * in the key; 24h sanity TTL) — the distinct-country set only changes when
+ * new GSC rows land.
  */
 class CountryFilter extends Component
 {
@@ -49,28 +52,35 @@ class CountryFilter extends Component
     {
         $options = [];
         if (($this->websiteId !== null && $this->websiteId !== '') && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $options = Cache::remember(
-                "country_filter:{$this->websiteId}",
-                600,
-                fn () => SearchConsoleData::query()
-                    ->where('website_id', $this->websiteId)
-                    ->where('country', '!=', '')
-                    ->selectRaw('country, SUM(clicks) as clicks')
-                    ->groupBy('country')
-                    ->orderByDesc('clicks')
-                    ->limit(50)
-                    ->pluck('country')
-                    ->map(fn ($code) => [
-                        'code' => (string) $code,
-                        'name' => Countries::name((string) $code),
-                        'flag' => Countries::flag((string) $code),
-                    ])
-                    ->all()
-            );
+            $options = self::payload($this->websiteId);
         }
 
         return view('livewire.dashboard.country-filter', [
             'options' => $options,
         ]);
+    }
+
+    /** Cached country options — shared by render() and WarmDashboardCaches. */
+    public static function payload(string $websiteId): array
+    {
+        return Cache::remember(
+            "country_filter:{$websiteId}:v".ReportCache::version($websiteId),
+            86400,
+            fn () => SearchConsoleData::query()
+                ->where('website_id', $websiteId)
+                ->where('date', '>=', now()->subDays(90)->toDateString())
+                ->where('country', '!=', '')
+                ->selectRaw('country, SUM(clicks) as clicks')
+                ->groupBy('country')
+                ->orderByDesc('clicks')
+                ->limit(50)
+                ->pluck('country')
+                ->map(fn ($code) => [
+                    'code' => (string) $code,
+                    'name' => Countries::name((string) $code),
+                    'flag' => Countries::flag((string) $code),
+                ])
+                ->all()
+        );
     }
 }

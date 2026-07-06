@@ -16,7 +16,7 @@
             @foreach ([
                 ['Clicks (30d)', '12,480', '+4.2%', 'text-blue-600', 'bg-blue-100'],
                 ['Impressions (30d)', '284,900', '-1.1%', 'text-emerald-600', 'bg-emerald-100'],
-                ['Users (30d)', '38,200', '+2.0%', 'text-violet-600', 'bg-violet-100'],
+                ['Users (30d)', '38,200', '+2.0%', 'text-orange-600', 'bg-orange-100'],
                 ['Sessions (30d)', '44,100', '0.0%', 'text-amber-600', 'bg-amber-100'],
             ] as [$label, $val, $chg, $c, $bg])
                 <div class="group flex min-h-[142px] flex-col rounded-xl border border-slate-200 bg-white p-5 transition hover:shadow-md">
@@ -53,7 +53,7 @@
             </div>
         </dl>
 
-        <div class="mt-8 rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-2.5 text-xs text-indigo-900">
+        <div class="mt-8 rounded-xl border border-orange-200 bg-orange-50/60 px-4 py-2.5 text-xs text-orange-900">
             <span class="font-semibold">Organic value hint</span> — when enough data is available, a banner may show a rough monthly equivalent of your organic traffic. It is a planning number for stakeholders, not a bill or guarantee.
         </div>
 
@@ -64,7 +64,7 @@
                 </div>
                 <div class="flex h-40 items-end gap-0.5 px-4 pb-4 pt-6">
                     @foreach ([40, 52, 48, 61, 55, 70, 66, 72, 68, 75, 80, 78] as $h)
-                        <div class="min-w-0 flex-1 rounded-t bg-indigo-200/80" style="height: {{ $h }}%"></div>
+                        <div class="min-w-0 flex-1 rounded-t bg-orange-200/80" style="height: {{ $h }}%"></div>
                     @endforeach
                 </div>
                 <p class="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">Sessions and search clicks over time (chart in the app is interactive).</p>
@@ -96,7 +96,7 @@
         <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             @foreach ([
                 ['Cannibalizations', '14', 'Queries split across pages', 'amber'],
-                ['Striking distance', '27', 'Pos 5–20 with low CTR', 'indigo'],
+                ['Striking distance', '27', 'Pos 5–20 with low CTR', 'orange'],
                 ['Index fails w/ traffic', '3', 'Non-PASS, still earning impressions', 'red'],
                 ['Content decay', '8', 'Losing clicks 28d/28d', 'slate'],
             ] as [$lbl, $val, $help, $tone])
@@ -106,7 +106,7 @@
                         <span @class([
                             'flex h-9 w-9 items-center justify-center rounded-lg',
                             'bg-amber-100' => $tone === 'amber',
-                            'bg-indigo-100' => $tone === 'indigo',
+                            'bg-orange-100' => $tone === 'orange',
                             'bg-red-100' => $tone === 'red',
                             'bg-slate-100' => $tone === 'slate',
                         ])></span>
@@ -114,7 +114,7 @@
                     <p @class([
                         'mt-3 text-3xl font-bold tabular-nums',
                         'text-amber-600' => $tone === 'amber',
-                        'text-indigo-600' => $tone === 'indigo',
+                        'text-orange-600' => $tone === 'orange',
                         'text-red-600' => $tone === 'red',
                         'text-slate-700' => $tone === 'slate',
                     ])>{{ $val }}</p>
@@ -161,7 +161,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <tr class="hover:bg-slate-50/60">
-                            <td class="whitespace-nowrap px-4 py-2.5 font-medium text-indigo-600">best seo tools <span class="rounded-full bg-indigo-50 px-1.5 py-px text-[10px] font-semibold text-indigo-700">tracked</span></td>
+                            <td class="whitespace-nowrap px-4 py-2.5 font-medium text-orange-600">best seo tools <span class="rounded-full bg-orange-50 px-1.5 py-px text-[10px] font-semibold text-orange-700">tracked</span></td>
                             <td class="px-4 py-2.5 text-right tabular-nums">1,284</td>
                             <td class="px-4 py-2.5 text-right tabular-nums">21,400</td>
                             <td class="px-4 py-2.5 text-right tabular-nums">6.0%</td>
@@ -170,7 +170,7 @@
                             <td class="px-4 py-2.5 text-right font-semibold">$3,200</td>
                         </tr>
                         <tr class="hover:bg-slate-50/60">
-                            <td class="whitespace-nowrap px-4 py-2.5 font-medium text-indigo-600">saas seo guide</td>
+                            <td class="whitespace-nowrap px-4 py-2.5 font-medium text-orange-600">saas seo guide</td>
                             <td class="px-4 py-2.5 text-right tabular-nums">218</td>
                             <td class="px-4 py-2.5 text-right tabular-nums">5,100</td>
                             <td class="px-4 py-2.5 text-right tabular-nums">4.3%</td>
@@ -213,7 +213,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <tr class="hover:bg-slate-50/60">
-                            <td class="max-w-sm truncate px-4 py-2.5 font-medium text-indigo-600">/blog/saas-seo-guide</td>
+                            <td class="max-w-sm truncate px-4 py-2.5 font-medium text-orange-600">/blog/saas-seo-guide</td>
                             <td class="px-4 py-2.5 text-[11px] text-slate-600">en-US</td>
                             <td class="px-4 py-2.5 text-right tabular-nums">842</td>
                             <td class="px-4 py-2.5 text-right tabular-nums">18,200</td>
@@ -296,7 +296,7 @@
                             <td class="px-4 py-3 text-[11px]">49,500/mo <span class="text-emerald-600">↑</span></td>
                             <td class="px-4 py-3 text-right font-semibold">$3,200</td>
                             <td class="px-4 py-3 text-slate-600">2 hours ago</td>
-                            <td class="px-4 py-3 text-right text-indigo-600">···</td>
+                            <td class="px-4 py-3 text-right text-orange-600">···</td>
                         </tr>
                     </tbody>
                 </table>
@@ -393,7 +393,7 @@
             <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
                 @foreach ([
                     ['Cannibalizations', '14', 'amber'],
-                    ['Striking distance', '27', 'indigo'],
+                    ['Striking distance', '27', 'orange'],
                     ['Index fails w/ traffic', '3', 'red'],
                     ['Content decay', '8', 'slate'],
                     ['Quick wins', 'View', 'emerald'],
@@ -402,14 +402,14 @@
                 ] as [$lab, $num, $tone])
                     <div @class([
                         'flex flex-col rounded-lg border px-3 py-2.5 text-left',
-                        'border-indigo-300 bg-indigo-50' => $lab === 'Cannibalizations',
+                        'border-orange-300 bg-orange-50' => $lab === 'Cannibalizations',
                         'border-slate-200 bg-white' => $lab !== 'Cannibalizations',
                     ])>
                         <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $lab }}</span>
                         <span @class([
                             'mt-1 text-xl font-bold tabular-nums',
                             'text-amber-600' => $tone === 'amber',
-                            'text-indigo-600' => $tone === 'indigo',
+                            'text-orange-600' => $tone === 'orange',
                             'text-red-600' => $tone === 'red',
                             'text-slate-700' => $tone === 'slate',
                             'text-rose-600' => $tone === 'rose',
@@ -489,19 +489,19 @@
         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">CMS plugin</p>
         <h2 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">WordPress plugin surfaces</h2>
         <p class="mt-3 text-[16px] leading-7 text-slate-600">
-            The EBQ SEO plugin brings your workspace into the WordPress admin—same numbers and actions as the web app, sized for editors and site managers working inside the CMS.
+            The Serfix SEO plugin brings your workspace into the WordPress admin—same numbers and actions as the web app, sized for editors and site managers working inside the CMS.
         </p>
 
-        <h3 class="mt-10 text-xl font-semibold text-slate-900">EBQ Head Quarter</h3>
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Serfix Head Quarter</h3>
         <p class="mt-2 text-[14px] leading-7 text-slate-600">
-            Main admin screen for workspace stats (typically visible to users who can manage site settings). Data matches what you see in EBQ in the browser. Use the horizontal sections to switch views:
+            Main admin screen for workspace stats (typically visible to users who can manage site settings). Data matches what you see in Serfix in the browser. Use the horizontal sections to switch views:
         </p>
         <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
                 <div class="flex items-center gap-3">
                     <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">E</span>
                     <div>
-                        <p class="text-sm font-bold text-slate-900">EBQ Head Quarter</p>
+                        <p class="text-sm font-bold text-slate-900">Serfix Head Quarter</p>
                         <p class="text-[11px] text-slate-500"><strong>example.com</strong> · Connected workspace</p>
                     </div>
                 </div>
@@ -524,7 +524,7 @@
                 ] as $tab)
                     <span @class([
                         'rounded-lg border px-2.5 py-1.5',
-                        'border-indigo-400 bg-indigo-50 text-indigo-900' => $tab === 'Overview',
+                        'border-orange-400 bg-orange-50 text-orange-900' => $tab === 'Overview',
                         'border-slate-200 bg-slate-50 text-slate-700' => $tab !== 'Overview',
                     ])>{{ $tab }}</span>
                 @endforeach
@@ -541,21 +541,21 @@
 
         <h3 class="mt-10 text-xl font-semibold text-slate-900">Settings (under Head Quarter)</h3>
         <p class="mt-2 text-[14px] leading-7 text-slate-600">
-            Connect or disconnect your site to EBQ with a guided step—no secrets to paste—clear cached responses, adjust title separators, run optional migrations from prior SEO setups, and view diagnostics. Once connected, Head Quarter, the dashboard widget, posts list column, and editor panel all draw from your workspace.
+            Connect or disconnect your site to Serfix with a guided step—no secrets to paste—clear cached responses, adjust title separators, run optional migrations from prior SEO setups, and view diagnostics. Once connected, Head Quarter, the dashboard widget, posts list column, and editor panel all draw from your workspace.
         </p>
 
-        <h3 class="mt-10 text-xl font-semibold text-slate-900">Block editor · EBQ SEO panel</h3>
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Block editor · Serfix SEO panel</h3>
         <p class="mt-2 text-[14px] leading-7 text-slate-600">
-            Open <strong>EBQ SEO</strong> from the editor’s plugin sidebar list. The same panels also appear in the classic editor metabox area so you keep context whether the sidebar is pinned or not. Your workspace can turn individual tools on or off for this site—unused surfaces simply stay hidden.
+            Open <strong>Serfix SEO</strong> from the editor’s plugin sidebar list. The same panels also appear in the classic editor metabox area so you keep context whether the sidebar is pinned or not. Your workspace can turn individual tools on or off for this site—unused surfaces simply stay hidden.
         </p>
         <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-[12px] shadow-sm">
-            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Editor · EBQ SEO</p>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Editor · Serfix SEO</p>
             <p class="mt-2 text-slate-600">Focus keyphrase, on-page scores, schema and social tabs, and a search-performance snapshot for the URL—aligned with what your workspace allows for this property.</p>
         </div>
 
-        <h3 class="mt-10 text-xl font-semibold text-slate-900">Posts / Pages list · EBQ column</h3>
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Posts / Pages list · Serfix column</h3>
         <p class="mt-2 text-[14px] leading-7 text-slate-600">
-            When enabled, a sortable <strong>EBQ</strong> column appears on supported post types (posts and pages by default). You always see on-page SEO and readability pills plus schema-type chips from your editor settings; after the site is linked to EBQ, rank and performance lines load in the background for all visible rows so long lists stay responsive.
+            When enabled, a sortable <strong>Serfix</strong> column appears on supported post types (posts and pages by default). You always see on-page SEO and readability pills plus schema-type chips from your editor settings; after the site is linked to Serfix, rank and performance lines load in the background for all visible rows so long lists stay responsive.
         </p>
         <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table class="w-full text-xs">
@@ -563,7 +563,7 @@
                     <tr>
                         <th class="px-4 py-2 text-left">Title</th>
                         <th class="px-4 py-2 text-left">Author</th>
-                        <th class="px-4 py-2 text-left">EBQ</th>
+                        <th class="px-4 py-2 text-left">Serfix</th>
                         <th class="px-4 py-2 text-left">Date</th>
                     </tr>
                 </thead>
@@ -596,13 +596,13 @@
             <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">Row action · Track keyphrase</dt><dd class="mt-1">When a focus keyphrase is saved, an extra action can send it to Rank Tracker without leaving the list; if the quick action is unavailable, use Head Quarter instead.</dd></div>
         </dl>
 
-        <h3 class="mt-10 text-xl font-semibold text-slate-900">Dashboard widget · EBQ SEO insights</h3>
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Dashboard widget · Serfix SEO insights</h3>
         <p class="mt-2 text-[14px] leading-7 text-slate-600">
             When enabled, appears on the main WordPress dashboard after login: four insight counts that mirror your workspace priorities, plus a shortcut to open full reports.
         </p>
         <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div class="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
-                <span class="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white">EBQ</span>
+                <span class="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white">Serfix</span>
                 <span>example.com</span>
             </div>
             <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -619,7 +619,7 @@
                     </div>
                 @endforeach
             </div>
-            <p class="mt-3 text-[11px] font-semibold text-indigo-700">Open full EBQ reports →</p>
+            <p class="mt-3 text-[11px] font-semibold text-orange-700">Open full Serfix reports →</p>
         </div>
 
         <h3 class="mt-10 text-xl font-semibold text-slate-900">Toolbar shortcut</h3>

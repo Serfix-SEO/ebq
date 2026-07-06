@@ -103,10 +103,18 @@ tuned without a redeploy.
 
 ## Gotchas
 
-- **`units_consumed` is logged AFTER the call, not reserved before.** A burst of
-  concurrent calls can each pass `assertCanSpend()` (same `consumedInWindow` read) and
-  collectively overshoot the cap — there's no atomic reservation/lock. Acceptable for
-  soft caps on low-concurrency paths; don't assume a hard ceiling.
+- **Fixed 2026-07-06 — `assertCanSpend()` now reserves atomically.**
+  `units_consumed` is still only logged to `client_activities` *after* the external
+  call completes (seconds to minutes later), so the DB sum alone can't see an
+  in-flight call. `UsageMeter::assertCanSpend()` now also atomically increments a
+  Redis-backed reservation counter (`Cache::add()`+`increment()`, 600s TTL —
+  self-expires if a request crashes without logging) once the check passes, and
+  folds `pendingReserved()` into the next check's `used` total. `ClientActivityLogger
+  ::log()` (the single funnel — release now lives there, not in every call site)
+  releases the reservation once the real row is written. `consumedInWindow()`/
+  `remaining()` deliberately still read pure DB history — only the enforcement
+  check accounts for in-flight reservations. Covered by
+  `tests/Feature/UsageMeterReservationTest.php`.
 - **`crawl_reuse` is metered but uncapped + unpriced** — it's a visibility row
   (`min(crawled_pages, cap)`), excluded from the admin cost dashboard's provider list.
 - **Window is per-user, not per-website** — usage rolls up to the billed owner; a

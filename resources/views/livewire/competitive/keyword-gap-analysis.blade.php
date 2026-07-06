@@ -39,7 +39,7 @@
 
             <div class="mt-4 flex items-center gap-3">
                 <button type="button" wire:click="run" @if($this->isPolling()) disabled @endif
-                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50">
+                    class="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500 disabled:opacity-50">
                     @if ($this->isPolling())
                         <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                         Analysing…
@@ -79,7 +79,7 @@
                     <button type="button" wire:click="setTab('{{ $key }}')"
                         @class([
                             'px-4 py-2 text-sm font-medium border-b-2 -mb-px',
-                            'border-indigo-600 text-indigo-600 dark:text-indigo-400' => $tab === $key,
+                            'border-orange-600 text-orange-600 dark:text-orange-400' => $tab === $key,
                             'border-transparent text-slate-500 hover:text-slate-700' => $tab !== $key,
                         ])>
                         {{ $buckets[$key]['label'] }}
@@ -143,8 +143,8 @@
                                 <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
                                     {{ $row->keyword }}
                                     <div class="mt-0.5 inline-flex items-center gap-2 text-[11px]">
-                                        <button type="button" wire:click="sendToVolume('{{ $row->id }}')" class="text-indigo-600 hover:underline dark:text-indigo-400">Volume</button>
-                                        <button type="button" wire:click="sendToIdeas('{{ $row->id }}')" class="text-indigo-600 hover:underline dark:text-indigo-400">Ideas</button>
+                                        <button type="button" wire:click="sendToVolume('{{ $row->id }}')" class="text-orange-600 hover:underline dark:text-orange-400">Volume</button>
+                                        <button type="button" wire:click="sendToIdeas('{{ $row->id }}')" class="text-orange-600 hover:underline dark:text-orange-400">Ideas</button>
                                         <button type="button" wire:click="track(@js($row->keyword))" class="text-slate-500 hover:underline dark:text-slate-400">Track</button>
                                     </div>
                                 </td>
@@ -158,7 +158,7 @@
                                     @if (isset($refinedRows[$row->id]))
                                         <span class="ml-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">refined ✓</span>
                                     @else
-                                        <button type="button" wire:click="computeLive('{{ $row->id }}')" wire:target="computeLive('{{ $row->id }}')" wire:loading.attr="disabled" class="ml-1 text-[11px] text-indigo-500 hover:underline">
+                                        <button type="button" wire:click="computeLive('{{ $row->id }}')" wire:target="computeLive('{{ $row->id }}')" wire:loading.attr="disabled" class="ml-1 text-[11px] text-orange-500 hover:underline">
                                             <span wire:loading.remove wire:target="computeLive('{{ $row->id }}')">refine</span>
                                             <span wire:loading wire:target="computeLive('{{ $row->id }}')">…</span>
                                         </button>

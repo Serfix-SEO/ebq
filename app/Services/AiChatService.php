@@ -563,7 +563,7 @@ class AiChatService
             ."- Cannibalization, striking-distance opportunities, content-brief gaps.\n\n"
             ."WHAT YOU DECLINE:\n"
             ."- Off-topic chat (general coding, personal advice, jokes, news unrelated to this post).\n"
-            ."- Generating long-form drafts — point users to the EBQ AI Writer feature instead.\n"
+            ."- Generating long-form drafts — point users to the Serfix AI Writer feature instead.\n"
             ."- Politics, medical/legal/financial advice unrelated to SEO copy review.\n"
             ."When asked something off-topic, briefly steer back to this post's SEO and set action to null. Don't lecture.\n\n"
             ."STYLE:\n"

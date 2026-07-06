@@ -21,8 +21,8 @@
                 <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">No organic row matched your site’s domain in this snapshot.</p>
             @endif
         </div>
-        <div class="rounded-xl border border-indigo-200/80 bg-indigo-50/40 p-4 shadow-inner dark:border-indigo-900/50 dark:bg-indigo-500/10">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-200">Your page (live URL, audit snapshot)</p>
+        <div class="rounded-xl border border-orange-200/80 bg-orange-50/40 p-4 shadow-inner dark:border-orange-900/50 dark:bg-orange-500/10">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-orange-800 dark:text-orange-200">Your page (live URL, audit snapshot)</p>
             <p class="mt-1 text-[11px] leading-snug text-slate-600 dark:text-slate-400">Title and meta description from the HTML we fetched for this audit — compare wording to the SERP listing on the left.</p>
             @if ($hasAudited)
                 <p class="mt-2 text-xs leading-snug text-emerald-900 dark:text-emerald-300/90">{{ $ys['audited_page_display'] ?? '' }}</p>

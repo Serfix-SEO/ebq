@@ -6,7 +6,7 @@
     {{-- Page header --}}
     <header class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div class="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-            <a href="{{ route('pages.index') }}" wire:navigate class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400">
+            <a href="{{ route('pages.index') }}" wire:navigate class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400">
                 <svg class="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
                 Back to pages
             </a>
@@ -52,15 +52,15 @@
              (live page + SERP checks), but without Analytics/Search Console
              we can't enrich it with real traffic, rankings, impressions or
              indexing status. Prominent CTA opens the connect-sources modal. --}}
-        <div class="overflow-hidden rounded-2xl border border-indigo-300 bg-indigo-50 shadow-sm dark:border-indigo-500/40 dark:bg-indigo-500/10">
+        <div class="overflow-hidden rounded-2xl border border-orange-300 bg-orange-50 shadow-sm dark:border-orange-500/40 dark:bg-orange-500/10">
             <div class="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300">
                         <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.06a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.34 8.374" /></svg>
                     </div>
                     <div class="min-w-0">
-                        <p class="text-sm font-bold text-indigo-900 dark:text-indigo-100">You’re running audits in limited mode</p>
-                        <p class="mt-1 max-w-xl text-xs leading-relaxed text-indigo-800/90 dark:text-indigo-200/80">
+                        <p class="text-sm font-bold text-orange-900 dark:text-orange-100">You’re running audits in limited mode</p>
+                        <p class="mt-1 max-w-xl text-xs leading-relaxed text-orange-800/90 dark:text-orange-200/80">
                             No Google Analytics or Search Console is connected for <span class="font-semibold">{{ $website->domain ?: 'this website' }}</span>, so audits can’t show real traffic, keyword rankings, impressions or indexing status. Connect a source to unlock the full audit.
                         </p>
                     </div>
@@ -68,7 +68,7 @@
                 <button
                     type="button"
                     x-on:click="window.dispatchEvent(new CustomEvent('open-connect-sources'))"
-                    class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+                    class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700"
                 >
                     Connect now
                 </button>
@@ -108,7 +108,7 @@
                             @class([
                                 'mt-1.5 block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500',
                                 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/25 dark:border-rose-500/60' => $errors->has('pageUrl'),
-                                'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-slate-600' => ! $errors->has('pageUrl'),
+                                'border-slate-300 focus:border-orange-500 focus:ring-orange-500/20 dark:border-slate-600' => ! $errors->has('pageUrl'),
                             ])
                             aria-invalid="{{ $errors->has('pageUrl') ? 'true' : 'false' }}"
                             @if ($errors->has('pageUrl')) aria-describedby="custom-audit-url-error" @endif
@@ -130,7 +130,7 @@
                             @class([
                                 'mt-1.5 block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500',
                                 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/25 dark:border-rose-500/60' => $errors->has('targetKeyword'),
-                                'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-slate-600' => ! $errors->has('targetKeyword'),
+                                'border-slate-300 focus:border-orange-500 focus:ring-orange-500/20 dark:border-slate-600' => ! $errors->has('targetKeyword'),
                             ])
                             aria-invalid="{{ $errors->has('targetKeyword') ? 'true' : 'false' }}"
                             @if ($errors->has('targetKeyword')) aria-describedby="custom-audit-keyword-error" @endif
@@ -142,10 +142,10 @@
                 </div>
 
                 @if ($awaitingSerpCountryChoice)
-                    <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900/50 dark:bg-indigo-500/10" role="region" aria-labelledby="custom-audit-serp-heading">
+                    <div class="rounded-xl border border-orange-200 bg-orange-50/60 p-4 dark:border-orange-900/50 dark:bg-orange-500/10" role="region" aria-labelledby="custom-audit-serp-heading">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <h3 id="custom-audit-serp-heading" class="text-sm font-bold text-slate-900 dark:text-slate-100">Confirm SERP country</h3>
-                            <span class="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 ring-1 ring-indigo-200 dark:bg-slate-900/80 dark:text-indigo-300 dark:ring-indigo-800">Step 2 of 2</span>
+                            <span class="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 ring-1 ring-orange-200 dark:bg-slate-900/80 dark:text-orange-300 dark:ring-orange-800">Step 2 of 2</span>
                         </div>
                         @if ($serpCountryRecommendationHint)
                             <p class="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">{{ $serpCountryRecommendationHint }}</p>
@@ -156,7 +156,7 @@
                         <select
                             id="custom-audit-serp-gl"
                             wire:model="serpCountryGl"
-                            class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                            class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                         >
                             @foreach (\App\Support\Audit\SerpGlCatalog::selectOptions() as $code => $label)
                                 <option value="{{ $code }}">{{ $label }}</option>
@@ -171,7 +171,7 @@
                             type="submit"
                             wire:loading.attr="disabled"
                             wire:target="queueAudit"
-                            class="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                            class="inline-flex h-9 items-center justify-center rounded-lg bg-orange-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-orange-500 dark:hover:bg-orange-400"
                         >
                             <span wire:loading.remove wire:target="queueAudit">{{ $awaitingSerpCountryChoice ? 'Confirm and queue audit' : 'Run audit' }}</span>
                             <span wire:loading wire:target="queueAudit" class="inline-flex items-center gap-2">
@@ -192,17 +192,17 @@
                         @endif
                     </div>
                     <p wire:loading.remove wire:target="queueAudit" class="text-[11px] text-slate-500 dark:text-slate-400">First submit checks the page and may ask for SERP region. Second submit queues the audit — it runs in the background.</p>
-                    <p wire:loading wire:target="queueAudit" class="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">Queuing…</p>
+                    <p wire:loading wire:target="queueAudit" class="text-[11px] font-medium text-orange-600 dark:text-orange-400">Queuing…</p>
                 </div>
             </form>
         </div>
 
         @if ($hasPending)
-            <div class="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-sm shadow-sm dark:border-indigo-900/50 dark:bg-indigo-500/10" role="status" aria-live="polite">
-                <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-indigo-600 dark:text-indigo-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                <div class="min-w-0 text-xs leading-relaxed text-indigo-900 dark:text-indigo-200">
+            <div class="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50/70 px-4 py-3 text-sm shadow-sm dark:border-orange-900/50 dark:bg-orange-500/10" role="status" aria-live="polite">
+                <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-orange-600 dark:text-orange-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <div class="min-w-0 text-xs leading-relaxed text-orange-900 dark:text-orange-200">
                     <p class="font-semibold">Audits are running in the background.</p>
-                    <p class="mt-0.5 text-indigo-800/90 dark:text-indigo-200/80">The list updates itself every few seconds. You can close this tab and come back — rows stay here with their final status.</p>
+                    <p class="mt-0.5 text-orange-800/90 dark:text-orange-200/80">The list updates itself every few seconds. You can close this tab and come back — rows stay here with their final status.</p>
                 </div>
             </div>
         @endif
@@ -212,7 +212,7 @@
                 <div>
                     <h2 id="custom-audit-history-heading" class="text-sm font-bold text-slate-900 dark:text-slate-100">Recent audits</h2>
                     <p class="mt-1 max-w-2xl text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                        Runs from this page, WordPress SEO Analysis, and page-level audits on EBQ. Opening the report shows the <span class="font-medium text-slate-600 dark:text-slate-300">latest saved audit</span> for that URL.
+                        Runs from this page, WordPress SEO Analysis, and page-level audits on Serfix. Opening the report shows the <span class="font-medium text-slate-600 dark:text-slate-300">latest saved audit</span> for that URL.
                     </p>
                 </div>
                 @if ($recentAudits->isNotEmpty())
@@ -302,7 +302,7 @@
                                             <a
                                                 href="{{ route('page-audits.show', $row->page_audit_report_id) }}"
                                                 wire:navigate
-                                                class="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-indigo-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 dark:border-slate-600 dark:bg-slate-900 dark:text-indigo-300 dark:hover:border-indigo-900 dark:hover:bg-indigo-500/10"
+                                                class="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-orange-700 shadow-sm transition hover:border-orange-200 hover:bg-orange-50 dark:border-slate-600 dark:bg-slate-900 dark:text-orange-300 dark:hover:border-orange-900 dark:hover:bg-orange-500/10"
                                             >View</a>
                                         @elseif ($row->isFailed())
                                             <button

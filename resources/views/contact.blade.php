@@ -1,6 +1,6 @@
 <x-marketing.page
-    title="Contact — EBQ"
-    description="Contact EBQ for support, demos, and partnership questions."
+    title="Contact — Serfix"
+    description="Contact Serfix for support, demos, and partnership questions."
     active="contact"
 >
     <section class="bg-white">
@@ -8,7 +8,7 @@
             <div class="mx-auto max-w-3xl text-center">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Contact</p>
                 <h1 class="mt-4 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-                    Talk to the EBQ team.
+                    Talk to the Serfix team.
                 </h1>
                 <p class="mt-5 text-balance text-[17px] leading-8 text-slate-600">
                     Questions about setup, pricing, onboarding, or partnerships? We reply quickly and directly.
@@ -18,9 +18,9 @@
             <div class="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-3">
                 <article class="rounded-2xl border border-slate-200 bg-white p-6 md:col-span-3">
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Support</p>
-                    <h2 class="mt-2 text-lg font-semibold text-slate-900">support@ebq.io</h2>
+                    <h2 class="mt-2 text-lg font-semibold text-slate-900">support@serfix.io</h2>
                     <p class="mt-2 text-sm leading-6 text-slate-600">For all product questions, billing, technical issues, and troubleshooting.</p>
-                    <a href="mailto:support@ebq.io" class="mt-4 inline-flex text-sm font-semibold text-slate-900 underline underline-offset-2">Get support</a>
+                    <a href="mailto:support@serfix.io" class="mt-4 inline-flex text-sm font-semibold text-slate-900 underline underline-offset-2">Get support</a>
                 </article>
             </div>
 

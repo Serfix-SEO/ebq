@@ -24,7 +24,7 @@
 
         <div class="mt-8 flex items-center justify-center gap-3 flex-wrap">
             <a href="{{ route('dashboard') }}"
-               class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">
+               class="inline-flex items-center rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500">
                 Go to dashboard
             </a>
             <a href="{{ route('billing.show') }}"

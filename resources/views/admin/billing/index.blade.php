@@ -31,9 +31,9 @@
                 <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Total users</div>
                 <div class="text-2xl font-bold text-slate-900 mt-1">{{ number_format((int) $summary['total']) }}</div>
             </div>
-            <div class="rounded-lg bg-violet-50 border border-violet-200 px-4 py-3">
-                <div class="text-xs font-semibold uppercase tracking-wide text-violet-700">Paying</div>
-                <div class="text-2xl font-bold text-violet-900 mt-1">{{ number_format((int) $summary['paying']) }}</div>
+            <div class="rounded-lg bg-orange-50 border border-orange-200 px-4 py-3">
+                <div class="text-xs font-semibold uppercase tracking-wide text-orange-700">Paying</div>
+                <div class="text-2xl font-bold text-orange-900 mt-1">{{ number_format((int) $summary['paying']) }}</div>
             </div>
             <div class="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
                 <div class="text-xs font-semibold uppercase tracking-wide text-amber-700">In trial</div>
@@ -84,7 +84,7 @@
                             <td class="px-3 py-2.5">
                                 <span @class([
                                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                                    'bg-violet-100 text-violet-800' => $isPaying,
+                                    'bg-orange-100 text-orange-800' => $isPaying,
                                     'bg-slate-100 text-slate-700' => ! $isPaying,
                                 ])>
                                     {{ $planSlug }}
@@ -113,7 +113,7 @@
                                 @if ($user->stripe_id)
                                     <a href="https://dashboard.stripe.com/customers/{{ $user->stripe_id }}"
                                        target="_blank" rel="noopener noreferrer"
-                                       class="text-xs font-mono text-indigo-700 hover:underline">
+                                       class="text-xs font-mono text-orange-700 hover:underline">
                                         {{ \Illuminate\Support\Str::limit($user->stripe_id, 18) }} ↗
                                     </a>
                                 @else

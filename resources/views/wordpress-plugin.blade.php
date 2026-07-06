@@ -1,6 +1,6 @@
 <x-marketing.page
     active="wordpress"
-    title="EBQ SEO – WordPress SEO Plugin with Actionable Audits"
+    title="Serfix SEO – WordPress SEO Plugin with Actionable Audits"
     description="Supercharge your rankings. Get the best WordPress SEO plugin with actionable audits, live GSC insights, automated rank tracking, and a 47-tool AI studio."
 >
     {{-- Page-specific structured data: the plugin itself + breadcrumb. --}}
@@ -10,7 +10,7 @@
             $appSchema = [
                 '@context' => 'https://schema.org',
                 '@type' => 'SoftwareApplication',
-                'name' => 'EBQ SEO',
+                'name' => 'Serfix SEO',
                 'applicationCategory' => 'BusinessApplication',
                 'operatingSystem' => 'WordPress',
                 'url' => route('wordpress-plugin'),
@@ -18,7 +18,7 @@
                 'softwareVersion' => '1.0.5',
                 'description' => 'WordPress SEO plugin with actionable audits, live Google Search Console insights, automated rank tracking, schema, sitemaps, redirects, and a 47-tool AI studio.',
                 'offers' => ['@type' => 'Offer', 'price' => '0', 'priceCurrency' => 'USD'],
-                'publisher' => ['@type' => 'Organization', 'name' => 'EBQ', 'url' => route('landing')],
+                'publisher' => ['@type' => 'Organization', 'name' => 'Serfix', 'url' => route('landing')],
             ];
             $breadcrumbSchema = [
                 '@context' => 'https://schema.org',
@@ -75,7 +75,7 @@
             ],
             [
                 'title' => 'AI writing assistant',
-                'desc'  => 'The full EBQ AI surface, inside WordPress.',
+                'desc'  => 'The full Serfix AI surface, inside WordPress.',
                 'items' => [
                     'Rank Assist — a floating SEO copilot with one-click structured actions',
                     'AI Studio — 47 tools for research, writing, improvement, marketing, eCommerce, media',
@@ -93,14 +93,14 @@
                 ],
             ],
             [
-                'title' => 'EBQ HQ + operations',
+                'title' => 'Serfix HQ + operations',
                 'desc'  => 'A full admin dashboard and hands-off upkeep.',
                 'items' => [
-                    'EBQ HQ admin: overview, performance, keywords, index status, insights, growth report, page audits',
-                    'One-click connect to your EBQ workspace — no codes or tokens to copy',
-                    'Per-site feature toggles controlled from your EBQ admin',
+                    'Serfix HQ admin: overview, performance, keywords, index status, insights, growth report, page audits',
+                    'One-click connect to your Serfix workspace — no codes or tokens to copy',
+                    'Per-site feature toggles controlled from your Serfix admin',
                     'Migrate from Yoast or RankMath (titles, descriptions, schema, redirects)',
-                    'Self-update from EBQ HQ and a built-in 24-language UI',
+                    'Self-update from Serfix HQ and a built-in 24-language UI',
                 ],
             ],
         ];
@@ -113,10 +113,10 @@
         <div class="mx-auto max-w-3xl px-6 pb-16 pt-16 text-center lg:px-8 lg:pt-24">
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">WordPress plugin</p>
             <h1 class="mt-4 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                EBQ SEO for WordPress
+                Serfix SEO for WordPress
             </h1>
             <p class="mx-auto mt-6 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
-                A connected SEO suite that pairs your WordPress editor with your EBQ workspace — real-data keyword scoring, live insights, rank tracking, schema, sitemaps, redirects, and an AI writing assistant.
+                A connected SEO suite that pairs your WordPress editor with your Serfix workspace — real-data keyword scoring, live insights, rank tracking, schema, sitemaps, redirects, and an AI writing assistant.
             </p>
 
             <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -131,7 +131,7 @@
                 </a>
             </div>
 
-            <p class="mt-5 text-xs text-slate-500">Latest packaged build · GPL-2.0 · Upload via Plugins → Add New → Upload, then Connect to EBQ</p>
+            <p class="mt-5 text-xs text-slate-500">Latest packaged build · GPL-2.0 · Upload via Plugins → Add New → Upload, then Connect to Serfix</p>
         </div>
     </section>
 
@@ -163,7 +163,7 @@
             <div class="rounded-3xl border border-slate-200 bg-slate-50/60 px-8 py-12 text-center">
                 <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900">Install in under a minute</h2>
                 <p class="mx-auto mt-3 max-w-2xl text-[15px] leading-7 text-slate-600">
-                    Download the plugin, upload it to your site, activate, and click <span class="font-semibold">Connect to EBQ</span>. Core SEO (sitemap, schema, meta, redirects) works immediately; live data and AI unlock when you connect.
+                    Download the plugin, upload it to your site, activate, and click <span class="font-semibold">Connect to Serfix</span>. Core SEO (sitemap, schema, meta, redirects) works immediately; live data and AI unlock when you connect.
                 </p>
                 <div class="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
                     <a href="{{ $downloadUrl }}"
@@ -173,7 +173,7 @@
                     </a>
                     <a href="{{ route('register') }}"
                        class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
-                        Create your EBQ account
+                        Create your Serfix account
                     </a>
                 </div>
             </div>

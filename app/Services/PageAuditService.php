@@ -138,6 +138,7 @@ class PageAuditService
                     'primary_keyword' => $built['primary_keyword'],
                     'primary_keyword_source' => $built['primary_keyword_source'],
                     'result' => $built['result'],
+                    'content_hash' => $built['content_hash'] ?? null,
                 ]
             );
         } catch (\Throwable $e) {
@@ -167,6 +168,31 @@ class PageAuditService
      *
      * @return array{status: string, result: ?array<string, mixed>, http_status: ?int, response_time_ms: ?int, primary_keyword: ?string, primary_keyword_source: ?string, error_message: ?string}
      */
+    /**
+     * Independently fetch a URL and hash its extracted body text — used by
+     * `ebq:recheck-audit-content` to detect real content drift without
+     * trusting the WP plugin's self-reported `modified` timestamp (see
+     * `content_hash` re-audit gate, infra/audits/page-audit.md §Gotchas).
+     * Returns null on any fetch/SSRF-guard failure (caller should skip,
+     * not treat as "changed").
+     */
+    public function currentContentHash(string $pageUrl): ?string
+    {
+        $guardCheck = $this->guard->check($pageUrl);
+        if (! $guardCheck['ok']) {
+            return null;
+        }
+
+        $fetch = $this->fetch($pageUrl);
+        if (! isset($fetch['body'])) {
+            return null;
+        }
+
+        $bodyText = (new HtmlAuditor($fetch['body'], $pageUrl))->content()['body_text'] ?? '';
+
+        return hash('sha256', $bodyText);
+    }
+
     public function auditGuest(string $pageUrl, string $keyword, ?string $serpGl = null): array
     {
         $kw = trim($keyword);
@@ -264,6 +290,11 @@ class PageAuditService
         $headings = $auditor->headings();
         $content = $auditor->content();
         $bodyText = $content['body_text'];
+        // Hash of the extracted body text (not raw HTML — markup/whitespace
+        // churn shouldn't count as a content change) so a later independent
+        // fetch can detect real content drift without trusting WordPress's
+        // self-reported `modified` timestamp. See `content_hash` re-audit gate.
+        $contentHash = hash('sha256', $bodyText);
         unset($content['body_text']);
         // Persist a truncated excerpt so downstream consumers (e.g. the
         // striking-distance AI snippet rewriter) have page copy to work from
@@ -425,6 +456,7 @@ class PageAuditService
             'result' => $result,
             'primary_keyword' => $storedPrimaryKeyword,
             'primary_keyword_source' => $storedPrimarySource,
+            'content_hash' => $contentHash,
         ];
     }
 

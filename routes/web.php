@@ -169,7 +169,6 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/competitive/competitors', 'competitive.competitors')->middleware('feature:keywords')->name('competitive.competitors');
     Route::view('/rank-tracking', 'rank-tracking.index')->middleware('feature:rank_tracking')->name('rank-tracking.index');
     Route::get('/rank-tracking/{keywordId}', fn (string $keywordId) => view('rank-tracking.show', ['keywordId' => $keywordId]))
-        ->whereNumber('keywordId')
         ->middleware('feature:rank_tracking')
         ->name('rank-tracking.show');
     Route::view('/backlinks', 'backlinks.index')->middleware('feature:backlinks')->name('backlinks.index');
@@ -280,6 +279,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/activities', [AdminActivityController::class, 'index'])->name('activities.index');
 
     Route::get('/crawler', [\App\Http\Controllers\Admin\CrawlerController::class, 'index'])->name('crawler.index');
+
+    // Ops dashboard: failed jobs + never-crawled stuck sites + queue depths.
+    // Companion to the ebq:failed-jobs-alert mailed digest (2026-07-06 incident).
+    Route::get('/ops', [\App\Http\Controllers\Admin\OpsController::class, 'index'])->name('ops.index');
+    Route::post('/ops/retry', [\App\Http\Controllers\Admin\OpsController::class, 'retry'])->name('ops.retry');
+    Route::post('/ops/forget', [\App\Http\Controllers\Admin\OpsController::class, 'forget'])->name('ops.forget');
+    Route::post('/ops/crawl/{crawlSite}', [\App\Http\Controllers\Admin\OpsController::class, 'startCrawl'])->name('ops.start-crawl');
 
     Route::get('/fleet', [\App\Http\Controllers\Admin\FleetController::class, 'index'])->name('fleet.index');
     Route::post('/fleet/settings', [\App\Http\Controllers\Admin\FleetController::class, 'settings'])->name('fleet.settings');

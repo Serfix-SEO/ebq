@@ -129,9 +129,13 @@ poller never hangs.
   (false positive). Fixed 2026-06-20: 429 (rate-limit) wasn't in the fallback list at all
   before, so e.g. `apps.apple.com` 429-ing the HEAD check got flagged broken instantly with no
   retry — see knowledge changelog.
-- **No content-hash re-audit gate.** A persisted `PageAuditReport` is reused indefinitely; the
-  live-score path won't re-audit on content change unless the post's `modified` time is newer
-  than `audited_at` (see live-score doc). Manual re-audit always overwrites.
+- **Fixed 2026-07-06 — content-hash re-audit gate.** `buildAuditResult()` now stores
+  `content_hash` (sha256 of extracted body text) on every completed `PageAuditReport`.
+  `PageAuditService::currentContentHash()` + the scheduled `ebq:recheck-audit-content` command
+  use it to independently detect real content drift and queue a fresh audit — see live-score
+  doc §Gotchas for the full story (this was originally scoped as a live-score-path problem; the
+  fix lives at the `PageAuditReport`/service level so it isn't tied to that one caller). Manual
+  re-audit still always overwrites regardless.
 - **`MAX_BODY_BYTES = 5 MB` truncation** can cut a huge page mid-tag; libxml tolerates it but
   trailing content (and its links/schema) is lost. Logged at info level.
 - **SERP host-match is generous.** `organicHostMatchesAuditedSite()` matches parent/child

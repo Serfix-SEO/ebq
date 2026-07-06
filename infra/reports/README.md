@@ -30,7 +30,8 @@ GSC/GA/rank/audit halves and how they merge.
 | Component | File | Role |
 |---|---|---|
 | `ReportDataService` | `app/Services/ReportDataService.php` | The insight engine. All report numbers + the master `generate()` payload. |
-| `ReportCache` | `app/Services/ReportCache.php` | Per-website data-version integer for event-driven invalidation. |
+| `ReportCache` | `app/Services/ReportCache.php` | Per-website version integer; busted by GSC sync + crawl finalize. |
+| `RankCache` | `app/Services/RankCache.php` | Separate version integer busted by rank checks only; see Caching section. |
 | `ActionQueueService` | `app/Services/ActionQueueService.php` | Merges all sources into the ranked, grouped action queue. |
 | `StrikingDistanceFixService` | `app/Services/StrikingDistanceFixService.php` | The per-keyword fix playbook (audit + AI rewrites + brief + internal links). |
 | `TrafficAnomalyDetector` | `app/Services/TrafficAnomalyDetector.php` | z-score + relative-threshold single-day anomaly detection. |
@@ -67,15 +68,33 @@ fresh GSC/GA rows, and each sync calls `ReportCache::flushWebsite()`.
 
 ## Caching & invalidation
 
-One mechanism underpins everything (full detail in [insights.md](./insights.md)):
+Two version-integer classes underpin all caching (full detail in [insights.md](./insights.md)):
 
-- **`ReportCache::version($websiteId)`** — a `rememberForever` integer mixed into
-  every report/queue/HQ cache key. `flushWebsite()` increments it, atomically
-  orphaning all cached payloads for that website with no key enumeration (works
-  on any cache driver — no tag support needed).
-- **Flushed by** (`grep flushWebsite`): `SyncSearchConsoleData`,
-  `TrackKeywordRankJob`, and `AnalyzeSiteJob::flushSubscribers` (per subscriber
-  website on crawl finalize). A 24h sanity TTL ages out orphaned versions.
+- **`ReportCache::version($websiteId)`** — mixed into every GSC/crawl-derived cache key.
+  `flushWebsite()` increments it, atomically orphaning all cached payloads for that website
+  (works on any driver — no tag support needed). 24h sanity TTL ages out orphaned versions.
+  **Flushed by**: `SyncSearchConsoleData` (nightly GSC sync), `SyncAnalyticsData` (GA sync —
+  added 2026-07-06, KPI/traffic cards read AnalyticsData) and `AnalyzeSiteJob::flushSubscribers`
+  (crawl finalize). **Not** flushed by rank checks — see below.
+
+  **Auto-warming (2026-07-06):** every flusher above also dispatches
+  `App\Jobs\WarmDashboardCaches` (sync queue, `ShouldBeUnique` 5min), which recomputes all
+  /dashboard + /statistics card payloads under the new version so the first visitor never
+  pays the cold aggregate (~2min on the largest accounts). Zero-drift rule: each card's
+  cached payload is a `public static payload()` on its Livewire component — render() and
+  the warmer call the SAME method. Adding a new dashboard card cache? Follow that pattern
+  and register it in `WarmDashboardCaches::handle()`.
+- **`RankCache::version($websiteId)`** (`app/Services/RankCache.php`) — same integer mechanic,
+  but tracks rank-tracker freshness only. **Flushed by**: `TrackKeywordRankJob` on each
+  successful rank check. Mixed into `PluginHqController::overview`'s cache key (that payload
+  surfaces `tracker_distribution` + `tracked_keywords`). **Not** mixed into dashboard or
+  `ReportDataService` caches — they're GSC-only and must not bust on hourly rank checks.
+
+**Why the split (2026-06-28):** `ebq:track-rankings` runs hourly. Before the split,
+`TrackKeywordRankJob` called `ReportCache::flushWebsite()`, orphaning the 24h cannibalization
+and top-countries caches every hour and triggering 590K-row GROUP BY rescans on large sites
+(visible as 60s `SELECT … GROUP BY country` in `SHOW PROCESSLIST`). The split keeps GSC
+caches warm for their full 24h TTL.
 
 ## Gotchas (cross-cutting)
 

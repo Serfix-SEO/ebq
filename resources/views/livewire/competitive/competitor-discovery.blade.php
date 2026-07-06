@@ -26,7 +26,7 @@
 
             <div class="mt-4 flex items-center gap-3">
                 <button type="button" wire:click="discover" wire:loading.attr="disabled" @if($this->isPolling()) disabled @endif
-                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50">
+                    class="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500 disabled:opacity-50">
                     @if ($this->isPolling())
                         <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                         Discovering…
@@ -80,7 +80,7 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3">
-                                <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">{{ (int) $c->score }}</span>
+                                <span class="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">{{ (int) $c->score }}</span>
                             </td>
                             <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ $c->appearances }} / {{ $c->keywords_sampled }}</td>
                             <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ $c->avg_position !== null ? number_format($c->avg_position, 1) : '—' }}</td>

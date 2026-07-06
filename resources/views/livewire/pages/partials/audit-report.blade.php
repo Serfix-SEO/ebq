@@ -31,7 +31,7 @@
     $sevMeta = [
         'critical' => ['label' => 'Critical', 'badge' => 'bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-900/40', 'bar' => 'border-l-rose-500 bg-rose-50/40 dark:bg-rose-500/5', 'icon' => 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z'],
         'warning'  => ['label' => 'Warning',  'badge' => 'bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-900/40', 'bar' => 'border-l-amber-500 bg-amber-50/40 dark:bg-amber-500/5', 'icon' => 'M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z'],
-        'serp_gap' => ['label' => 'SERP gap', 'badge' => 'bg-violet-100 text-violet-800 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-900/40', 'bar' => 'border-l-violet-500 bg-violet-50/40 dark:bg-violet-500/5', 'icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v7.125c0 .621-.504 1.125-1.125 1.125h-2.25A1.125 1.125 0 013 20.25v-7.125zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'],
+        'serp_gap' => ['label' => 'SERP gap', 'badge' => 'bg-orange-100 text-orange-800 ring-1 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-900/40', 'bar' => 'border-l-orange-500 bg-orange-50/40 dark:bg-orange-500/5', 'icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v7.125c0 .621-.504 1.125-1.125 1.125h-2.25A1.125 1.125 0 013 20.25v-7.125zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'],
         'info'     => ['label' => 'Info',     'badge' => 'bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-900/40',          'bar' => 'border-l-sky-500 bg-sky-50/40 dark:bg-sky-500/5',     'icon' => 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z'],
         'good'     => ['label' => 'Good',     'badge' => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-900/40', 'bar' => 'border-l-emerald-500 bg-emerald-50/40 dark:bg-emerald-500/5', 'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
     ];
@@ -136,7 +136,7 @@
                         <span class="font-semibold text-slate-700 dark:text-slate-200">Primary keyword</span>
                         <span class="font-mono text-slate-800 dark:text-slate-100">“{{ $auditReport->primary_keyword }}”</span>
                         @if (($auditReport->primary_keyword_source ?? null) === 'custom_audit')
-                            <span class="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">Custom</span>
+                            <span class="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange-800 dark:bg-orange-500/20 dark:text-orange-200">Custom</span>
                         @elseif (($auditReport->primary_keyword_source ?? null) === 'gsc_primary')
                             <span class="ml-1 text-slate-400 dark:text-slate-500">· Search Console</span>
                         @endif
@@ -193,7 +193,7 @@
                 @if (! empty($recs))
                     <section id="audit-recommendations" class="scroll-mt-16">
                         <div class="mb-3 flex items-center gap-2">
-                            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-orange-100 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400">
                                 <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
                             </div>
                             <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Recommendations</h3>
@@ -203,7 +203,7 @@
                             @foreach ($recs as $r)
                                 @php $sm = $sevMeta[$r['severity']] ?? $sevMeta['info']; @endphp
                                 <div class="flex gap-3 rounded-lg border border-slate-200 border-l-4 {{ $sm['bar'] }} p-3 transition hover:shadow-sm dark:border-slate-700">
-                                    <svg class="mt-0.5 h-4 w-4 shrink-0 {{ $r['severity'] === 'critical' ? 'text-rose-500' : ($r['severity'] === 'warning' ? 'text-amber-500' : ($r['severity'] === 'serp_gap' ? 'text-violet-600 dark:text-violet-400' : ($r['severity'] === 'info' ? 'text-sky-500' : 'text-emerald-500'))) }}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $sm['icon'] }}" /></svg>
+                                    <svg class="mt-0.5 h-4 w-4 shrink-0 {{ $r['severity'] === 'critical' ? 'text-rose-500' : ($r['severity'] === 'warning' ? 'text-amber-500' : ($r['severity'] === 'serp_gap' ? 'text-orange-600 dark:text-orange-400' : ($r['severity'] === 'info' ? 'text-sky-500' : 'text-emerald-500'))) }}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $sm['icon'] }}" /></svg>
                                     <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $r['title'] }}</p>
@@ -263,7 +263,7 @@
                                         <p class="mt-0.5 truncate text-sm font-bold text-slate-900 dark:text-slate-100">{{ $primary['query'] }}</p>
                                     </div>
                                     @if (($keywordData['primary_source'] ?? null) === 'custom_audit')
-                                        <span class="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">Custom audit</span>
+                                        <span class="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-800 dark:bg-orange-500/20 dark:text-orange-200">Custom audit</span>
                                     @else
                                         <div class="flex items-center gap-3 text-[11px] text-slate-500">
                                             <span><span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['clicks'] ?? 0) }}</span> clicks</span>
@@ -485,7 +485,7 @@
                 @endphp
                 <section id="audit-country" class="scroll-mt-16">
                     <div class="mb-3 flex items-center gap-2">
-                        <div class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                        <div class="flex h-7 w-7 items-center justify-center rounded-md bg-orange-100 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400">
                             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0a8.949 8.949 0 004.951-1.488A3.987 3.987 0 0013 16.128V15a2 2 0 012-2h3.88A9 9 0 0012 21zm3-10a1 1 0 11-2 0 1 1 0 012 0zm-7 4a3 3 0 100-6 3 3 0 000 6z" /></svg>
                         </div>
                         <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Traffic by country</h3>
@@ -529,7 +529,7 @@
 
                                         <div class="hidden w-40 items-center gap-2 sm:flex md:w-56">
                                             <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                                                <div class="h-full rounded-full {{ $i === 0 ? 'bg-indigo-600' : 'bg-indigo-400/80 dark:bg-indigo-500/70' }}" style="width: {{ $row['width_pct'] }}%" role="progressbar" aria-valuenow="{{ $row['share_pct'] }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ $row['name'] }} share of clicks: {{ $row['share_pct'] }}%"></div>
+                                                <div class="h-full rounded-full {{ $i === 0 ? 'bg-orange-600' : 'bg-orange-400/80 dark:bg-orange-500/70' }}" style="width: {{ $row['width_pct'] }}%" role="progressbar" aria-valuenow="{{ $row['share_pct'] }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ $row['name'] }} share of clicks: {{ $row['share_pct'] }}%"></div>
                                             </div>
                                         </div>
 
@@ -550,7 +550,7 @@
                     {{-- ══════ SERP readability benchmark ══════ --}}
                     <section id="audit-benchmark" class="scroll-mt-16">
                         <div class="mb-3 flex items-center gap-2">
-                            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-violet-100 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
+                            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-orange-100 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400">
                                 <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" /></svg>
                             </div>
                             <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">SERP readability benchmark</h3>
@@ -623,7 +623,7 @@
                             <p class="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
                                 <span>SERP keyword: <span class="font-mono text-slate-900 dark:text-slate-100">{{ $benchmark['keyword'] }}</span></span>
                                 @if (($benchmark['keyword_source'] ?? null) === 'manual')
-                                    <span class="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">Custom audit</span>
+                                    <span class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-800 dark:bg-orange-500/20 dark:text-orange-200">Custom audit</span>
                                 @elseif (($benchmark['keyword_source'] ?? null) === 'gsc_primary')
                                     <span class="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">From Search Console</span>
                                 @endif
@@ -665,7 +665,7 @@
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                                        <tr class="bg-indigo-50/40 dark:bg-indigo-500/5">
+                                        <tr class="bg-orange-50/40 dark:bg-orange-500/5">
                                             <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">This page (audited)</td>
                                             <td class="px-3 py-2 text-right tabular-nums font-semibold text-slate-900 dark:text-slate-100">{{ is_numeric($benchmark['your_flesch'] ?? null) ? $benchmark['your_flesch'] : '—' }}</td>
                                             <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ data_get($advanced, 'readability.grade') ?? '—' }}</td>
@@ -681,7 +681,7 @@
                                             @endphp
                                             <tr>
                                                 <td class="max-w-[200px] px-3 py-2">
-                                                    <a href="{{ $row['url'] }}" target="_blank" rel="noopener noreferrer" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">{{ \Illuminate\Support\Str::limit($row['title'] ?: $row['url'], 48) }}</a>
+                                                    <a href="{{ $row['url'] }}" target="_blank" rel="noopener noreferrer" class="font-medium text-orange-600 hover:underline dark:text-orange-400">{{ \Illuminate\Support\Str::limit($row['title'] ?: $row['url'], 48) }}</a>
                                                     @if (isset($row['position']))
                                                         <span class="ml-1 text-[10px] text-slate-400">#{{ $row['position'] }}</span>
                                                     @endif
@@ -696,7 +696,7 @@
                                                         <span class="text-[10px] text-slate-400" title="Competitor backlinks will appear here once the background fetch completes. If this has stayed blank for more than a few minutes, the queue worker may not be running — re-open this page to re-queue.">pending…</span>
                                                     @else
                                                         <details class="group/cblk">
-                                                            <summary class="cursor-pointer list-none text-[10px] font-semibold text-indigo-600 transition hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 [&::-webkit-details-marker]:hidden">
+                                                            <summary class="cursor-pointer list-none text-[10px] font-semibold text-orange-600 transition hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300 [&::-webkit-details-marker]:hidden">
                                                                 <span class="inline-flex items-center gap-1">
                                                                     {{ $_compLinkCount }} link{{ $_compLinkCount === 1 ? '' : 's' }}
                                                                     <svg class="h-3 w-3 transition-transform group-open/cblk:rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
@@ -706,10 +706,10 @@
                                                                 @foreach ($_compLinks->take(10) as $_link)
                                                                     <li class="flex items-start gap-2">
                                                                         @if ($_link->domain_authority !== null)
-                                                                            <span class="mt-0.5 inline-flex h-5 w-7 shrink-0 items-center justify-center rounded bg-indigo-100 text-[9px] font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300" title="Referring domain authority (0–100)">{{ $_link->domain_authority }}</span>
+                                                                            <span class="mt-0.5 inline-flex h-5 w-7 shrink-0 items-center justify-center rounded bg-orange-100 text-[9px] font-bold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300" title="Referring domain authority (0–100)">{{ $_link->domain_authority }}</span>
                                                                         @endif
                                                                         <div class="min-w-0 flex-1">
-                                                                            <a href="{{ $_link->referring_page_url }}" target="_blank" rel="noopener noreferrer" class="block truncate font-medium text-slate-800 hover:text-indigo-600 dark:text-slate-200 dark:hover:text-indigo-400" title="{{ $_link->referring_page_url }}">{{ $_link->referring_domain ?: \Illuminate\Support\Str::limit($_link->referring_page_url, 60) }}</a>
+                                                                            <a href="{{ $_link->referring_page_url }}" target="_blank" rel="noopener noreferrer" class="block truncate font-medium text-slate-800 hover:text-orange-600 dark:text-slate-200 dark:hover:text-orange-400" title="{{ $_link->referring_page_url }}">{{ $_link->referring_domain ?: \Illuminate\Support\Str::limit($_link->referring_page_url, 60) }}</a>
                                                                             @if ($_link->anchor_text)
                                                                                 <p class="truncate text-slate-500 dark:text-slate-400" title="{{ $_link->anchor_text }}">“{{ \Illuminate\Support\Str::limit($_link->anchor_text, 80) }}”</p>
                                                                             @endif
@@ -869,7 +869,7 @@
                 {{-- ══════ Content ══════ --}}
                 <section id="audit-content" class="scroll-mt-16">
                     <div class="mb-3 flex items-center gap-2">
-                        <div class="flex h-7 w-7 items-center justify-center rounded-md bg-violet-100 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
+                        <div class="flex h-7 w-7 items-center justify-center rounded-md bg-orange-100 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400">
                             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" /></svg>
                         </div>
                         <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Content &amp; Structure</h3>
@@ -1092,7 +1092,7 @@
                 @if (is_array($cwv))
                     <section id="audit-core-web-vitals" class="scroll-mt-16">
                         <div class="mb-3 flex items-center gap-2">
-                            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-orange-100 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400">
                                 <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v18M8.25 19.5V9m4.5 10.5V13.5M17.25 19.5V6" /></svg>
                             </div>
                             <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Core Web Vitals</h3>
@@ -1220,10 +1220,10 @@
             <div class="relative flex-1">
                 <svg class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
                 <input type="email" wire:model="auditEmail" placeholder="recipient@example.com"
-                       class="h-9 w-full rounded-md border border-slate-300 bg-white pl-8 pr-2.5 text-xs text-slate-700 placeholder-slate-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500" />
+                       class="h-9 w-full rounded-md border border-slate-300 bg-white pl-8 pr-2.5 text-xs text-slate-700 placeholder-slate-400 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500" />
             </div>
             <button type="submit" wire:loading.attr="disabled" wire:target="emailAuditReport"
-                    class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                    class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
                 <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.125A59.769 59.769 0 0121.485 12 59.768 59.768 0 013.27 20.875L5.999 12zm0 0h7.5" /></svg>
                 <span wire:loading.remove wire:target="emailAuditReport">Email report</span>
                 <span wire:loading wire:target="emailAuditReport">Sending…</span>

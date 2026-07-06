@@ -13,12 +13,12 @@
                 // "29.99 days left" or accidentally negative numbers.
                 $daysLeft = max(0, (int) floor(now()->diffInDays($trialEndsAt)));
                 $statusLabel = 'Trial — '.$daysLeft.' '.\Illuminate\Support\Str::plural('day', $daysLeft).' left';
-                $statusTone = 'indigo';
+                $statusTone = 'orange';
             }
             elseif ($subscription && $subscription->active()) { $statusLabel = 'Active'; $statusTone = 'emerald'; }
             $tones = [
                 'emerald' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300',
-                'indigo'  => 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/10 dark:text-indigo-300',
+                'orange'  => 'bg-orange-100 text-orange-800 dark:bg-orange-500/10 dark:text-orange-300',
                 'amber'   => 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300',
                 'red'     => 'bg-rose-100 text-rose-800 dark:bg-rose-500/10 dark:text-rose-300',
                 'slate'   => 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
@@ -149,7 +149,7 @@
                 <div class="border-t border-slate-200 px-5 py-3 dark:border-slate-800">
                     <form method="POST" action="{{ route('billing.resume') }}">
                         @csrf
-                        <button type="submit" class="inline-flex items-center rounded-md bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500">
+                        <button type="submit" class="inline-flex items-center rounded-md bg-orange-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-orange-500">
                             Resume subscription
                         </button>
                         <span class="ml-2 text-[12px] text-slate-500 dark:text-slate-400">Undo the pending cancellation. Stripe keeps billing as normal.</span>
@@ -162,41 +162,80 @@
     {{-- Plan grid — hidden during the free-promo window since there
          is nothing to switch to or buy. --}}
     @if (! $isFreePromo)
-    <div>
-        <h3 class="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-            @if ($subscription && $subscription->valid())
-                Switch plan
-            @else
-                Available plans
-            @endif
-        </h3>
+    <div x-data="{ billing: 'yearly' }">
+        <div class="mb-4 flex items-center justify-between gap-3">
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                @if ($subscription && $subscription->valid())
+                    Switch plan
+                @else
+                    Available plans
+                @endif
+            </h3>
+            {{-- Monthly / yearly toggle --}}
+            <div class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800">
+                <button type="button"
+                        @click="billing = 'monthly'"
+                        :class="billing === 'monthly' ? 'bg-white shadow text-slate-900 dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'"
+                        class="rounded-md px-3 py-1 transition-all">Monthly</button>
+                <button type="button"
+                        @click="billing = 'yearly'"
+                        :class="billing === 'yearly' ? 'bg-white shadow text-slate-900 dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'"
+                        class="rounded-md px-3 py-1 transition-all">
+                    Yearly
+                    <span class="ml-1 rounded bg-emerald-100 px-1 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">Save ~30%</span>
+                </button>
+            </div>
+        </div>
+
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            @foreach ($plans as $plan)
+            @foreach ($plans->reject(fn ($p) => $p->slug === 'trial') as $plan)
                 @php
                     $isCurrent = $currentPlan && $currentPlan->id === $plan->id;
-                    $isFree = (int) $plan->price_yearly_usd === 0;
-                    $isReady = $plan->isCheckoutReady() || $isFree;
+                    $isFree = (int) $plan->price_yearly_usd === 0 && (int) $plan->price_monthly_usd === 0;
+                    $isEnterprise = $plan->slug === 'enterprise';
+                    $isReady = $plan->isCheckoutReady('annual') || $plan->isCheckoutReady('monthly') || $isFree;
                 @endphp
-                <div class="relative flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 {{ $plan->is_highlighted ? 'ring-2 ring-indigo-500/40' : '' }}">
+                <div class="relative flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 {{ $plan->is_highlighted ? 'ring-2 ring-orange-500/40' : '' }}">
                     @if ($plan->is_highlighted)
-                        <span class="absolute -top-2 right-3 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Most popular</span>
+                        <span class="absolute -top-2 right-3 rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Most popular</span>
                     @endif
 
                     <div class="flex items-baseline justify-between">
                         <h4 class="text-base font-semibold text-slate-900 dark:text-white">{{ $plan->name }}</h4>
                         @if ($isCurrent)
-                            <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">Current</span>
+                            <span class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">Current</span>
                         @endif
                     </div>
 
                     <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{{ $plan->tagline }}</p>
 
-                    <div class="mt-3 flex items-baseline gap-1">
-                        <span class="text-2xl font-bold text-slate-900 dark:text-white">${{ $plan->price_monthly_usd }}</span>
-                        <span class="text-xs text-slate-500 dark:text-slate-400">{{ $isFree ? 'forever' : '/mo' }}</span>
-                    </div>
-                    @if (! $isFree)
-                        <p class="text-[10px] text-slate-400 dark:text-slate-500">${{ $plan->price_yearly_usd }} billed yearly</p>
+                    @if ($isEnterprise)
+                        <div class="mt-3">
+                            <span class="text-2xl font-bold text-slate-900 dark:text-white">Custom</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500">Contact us for pricing</p>
+                    @elseif ($isFree)
+                        <div class="mt-3 flex items-baseline gap-1">
+                            <span class="text-2xl font-bold text-slate-900 dark:text-white">$0</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-400">forever</span>
+                        </div>
+                    @else
+                        {{-- Yearly price (default) --}}
+                        <div x-show="billing === 'yearly'" class="mt-3">
+                            <div class="flex items-baseline gap-1">
+                                <span class="text-2xl font-bold text-slate-900 dark:text-white">${{ round($plan->price_yearly_usd / 12) }}</span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400">/mo</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400 dark:text-slate-500">${{ $plan->price_yearly_usd }} billed yearly</p>
+                        </div>
+                        {{-- Monthly price --}}
+                        <div x-show="billing === 'monthly'" style="display:none" class="mt-3">
+                            <div class="flex items-baseline gap-1">
+                                <span class="text-2xl font-bold text-slate-900 dark:text-white">${{ $plan->price_monthly_usd }}</span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400">/mo</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400 dark:text-slate-500">billed monthly</p>
+                        </div>
                     @endif
 
                     <p class="mt-3 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
@@ -214,19 +253,32 @@
                         </ul>
                     @endif
 
-                    <div class="mt-4">
+                    <div class="mt-auto pt-4">
                         @if ($isCurrent)
                             <button type="button" disabled class="w-full cursor-not-allowed rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                                 Current plan
                             </button>
+                        @elseif ($isEnterprise)
+                            <a href="mailto:hello@serfix.io" class="block w-full rounded-md border border-slate-200 px-3 py-1.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                                Contact us
+                            </a>
                         @elseif (! $isReady)
                             <button type="button" disabled class="w-full cursor-not-allowed rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                                 Coming soon
                             </button>
                         @elseif ($subscription && $subscription->valid() && ! $isFree)
-                            <button type="button" wire:click="openSwapConfirm('{{ $plan->slug }}')" class="w-full rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500">
-                                Switch to {{ $plan->name }}
-                            </button>
+                            <div>
+                                <div x-show="billing === 'yearly'">
+                                    <button type="button" wire:click="openSwapConfirm('{{ $plan->slug }}')" class="w-full rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500">
+                                        Switch to {{ $plan->name }}
+                                    </button>
+                                </div>
+                                <div x-show="billing === 'monthly'" style="display:none">
+                                    <a href="{{ route('billing.checkout', ['plan' => $plan->slug, 'interval' => 'monthly']) }}" class="block w-full rounded-md bg-orange-600 px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-orange-500">
+                                        Switch to {{ $plan->name }}
+                                    </a>
+                                </div>
+                            </div>
                         @elseif ($isFree)
                             @if ($subscription && $subscription->valid())
                                 <button type="button" wire:click="openCancelConfirm" class="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
@@ -238,9 +290,18 @@
                                 </button>
                             @endif
                         @else
-                            <a href="{{ route('billing.checkout', ['plan' => $plan->slug]) }}" class="block w-full rounded-md bg-indigo-600 px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-indigo-500">
-                                Start trial
-                            </a>
+                            <div>
+                                <div x-show="billing === 'yearly'">
+                                    <a href="{{ route('billing.checkout', ['plan' => $plan->slug, 'interval' => 'annual']) }}" class="block w-full rounded-md bg-orange-600 px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-orange-500">
+                                        Start trial
+                                    </a>
+                                </div>
+                                <div x-show="billing === 'monthly'" style="display:none">
+                                    <a href="{{ route('billing.checkout', ['plan' => $plan->slug, 'interval' => 'monthly']) }}" class="block w-full rounded-md bg-orange-600 px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-orange-500">
+                                        Start trial
+                                    </a>
+                                </div>
+                            </div>
                         @endif
                     </div>
                 </div>
@@ -254,7 +315,7 @@
         <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
                 <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Recent invoices</h3>
-                <a href="{{ route('billing.portal') }}" class="text-[11px] text-indigo-600 hover:underline dark:text-indigo-400">All invoices in Stripe Portal →</a>
+                <a href="{{ route('billing.portal') }}" class="text-[11px] text-orange-600 hover:underline dark:text-orange-400">All invoices in Stripe Portal →</a>
             </div>
             <ul class="divide-y divide-slate-200 dark:divide-slate-800">
                 @foreach ($invoices as $invoice)
@@ -264,7 +325,7 @@
                             <span class="text-slate-500 dark:text-slate-400">{{ $invoice->total() }}</span>
                         </div>
                         @if ($invoice->invoice_pdf)
-                            <a href="{{ $invoice->invoice_pdf }}" target="_blank" rel="noopener" class="text-[12px] font-medium text-indigo-600 hover:underline dark:text-indigo-400">PDF</a>
+                            <a href="{{ $invoice->invoice_pdf }}" target="_blank" rel="noopener" class="text-[12px] font-medium text-orange-600 hover:underline dark:text-orange-400">PDF</a>
                         @endif
                     </li>
                 @endforeach
@@ -351,7 +412,7 @@
                             <form method="POST" action="{{ route('billing.swap') }}">
                                 @csrf
                                 <input type="hidden" name="plan" value="{{ $targetPlan->slug }}">
-                                <button type="submit" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500">
+                                <button type="submit" class="inline-flex items-center rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500">
                                     Confirm switch
                                 </button>
                             </form>

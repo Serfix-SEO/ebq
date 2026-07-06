@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\RunGuestPageSpeedStrategy;
 use App\Models\GuestPageSpeed;
+use App\Models\Lead;
 use App\Support\Audit\SafeHttpGuard;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -74,6 +75,39 @@ class GuestPageSpeedTest extends TestCase
     {
         config(['services.lighthouse.url' => '', 'services.lighthouse.key' => '']);
         $this->postJson(route('guest-pagespeed.store'), ['url' => 'https://a.com/p'])->assertStatus(503);
+    }
+
+    /**
+     * Regression test (found + fixed 2026-07-06, infra/guest-tools/README.md
+     * §Gotchas): the 2nd-run (email-gated) lead capture used to call
+     * Lead::capture() with no `source` arg, so it silently fell back to
+     * SOURCE_GUEST_AUDIT — PageSpeed funnel attribution was lost.
+     */
+    public function test_second_run_lead_is_tagged_with_the_pagespeed_source(): void
+    {
+        Queue::fake();
+        $this->disableCookieEncryption();
+        $this->withoutMiddleware(EncryptCookies::class);
+        $this->withCredentials();
+        $guard = Mockery::mock(SafeHttpGuard::class);
+        $guard->shouldReceive('check')->andReturn(['ok' => true]);
+        $this->app->instance(SafeHttpGuard::class, $guard);
+
+        // 1st run — free, sets the counter cookie.
+        $r1 = $this->postJson(route('guest-pagespeed.store'), ['url' => 'a.com/p']);
+        $r1->assertStatus(202);
+        $cookies = $this->cookiesFrom($r1);
+
+        // 2nd run — email-gated, captures the lead.
+        $r2 = $this->withCookies($cookies)->postJson(route('guest-pagespeed.store'), [
+            'url' => 'a.com/p2', 'name' => 'Jane Doe', 'email' => 'pagespeed-lead@example.com',
+        ]);
+        $r2->assertStatus(202)->assertJsonPath('emailed', true);
+
+        $this->assertDatabaseHas('leads', [
+            'email' => 'pagespeed-lead@example.com',
+            'source' => Lead::SOURCE_GUEST_PAGESPEED,
+        ]);
     }
 
     // NOTE: the per-browser progressive gate (1st free → 2nd email → 3rd signup)

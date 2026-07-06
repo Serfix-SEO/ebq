@@ -50,7 +50,7 @@
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-900/30">
                         <td class="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-100">
                             {{ $n->name }}
-                            @if ($n->is_pinned)<span class="ml-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">pinned</span>@endif
+                            @if ($n->is_pinned)<span class="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">pinned</span>@endif
                         </td>
                         <td class="px-4 py-2.5">
                             <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold {{ $badge[$n->status] ?? $badge['deleting'] }}">{{ $n->status }}</span>
@@ -87,5 +87,5 @@
             </tbody>
         </table>
     </div>
-    <p class="text-[11px] text-slate-400">Live — refreshes every 5s. The queue is central Redis, so a new box just pulls crawl jobs; no rebalancing. <span class="text-slate-500">In-flight</span> = jobs running on that box right now — wait for <span class="font-mono">0</span> before draining (a drain also lets any in-flight job finish via the 360s stop-grace). Finished/Failed are cumulative since the box started. Full per-queue metrics: <a href="{{ url('/horizon') }}" class="text-indigo-600 hover:underline dark:text-indigo-400">Horizon</a>.</p>
+    <p class="text-[11px] text-slate-400">Live — refreshes every 5s. The queue is central Redis, so a new box just pulls crawl jobs; no rebalancing. <span class="text-slate-500">In-flight</span> = jobs running on that box right now — wait for <span class="font-mono">0</span> before draining (a drain also lets any in-flight job finish via the 360s stop-grace). Finished/Failed are cumulative since the box started. Full per-queue metrics: <a href="{{ url('/horizon') }}" class="text-orange-600 hover:underline dark:text-orange-400">Horizon</a>.</p>
 </div>

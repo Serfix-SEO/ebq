@@ -70,7 +70,7 @@
                     <p class="mt-1 text-[11px] text-slate-500">Max 20 MB. With <em>publish now</em>, the uploaded file replaces <code class="rounded bg-slate-100 px-1 font-mono">public/downloads/ebq-seo.zip</code> directly. Drafts can be created without a ZIP and uploaded later via re-create.</p>
                 </div>
             </div>
-            <button class="mt-3 rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Create release</button>
+            <button class="mt-3 rounded bg-orange-600 px-4 py-2 text-sm font-semibold text-white">Create release</button>
         </form>
 
         <div class="overflow-auto rounded border border-slate-200 bg-white">
@@ -99,7 +99,7 @@
                                 @if ($release->status === \App\Models\PluginRelease::STATUS_PUBLISHED)
                                     <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">Live</span>
                                 @elseif ($hasUploadedZip)
-                                    <span class="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200">Attached</span>
+                                    <span class="rounded bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-orange-200">Attached</span>
                                 @else
                                     <span class="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">Missing</span>
                                 @endif
@@ -115,7 +115,7 @@
                             <td class="px-3 py-2">
                                 <div class="flex flex-wrap gap-2">
                                     @if ($isEditable)
-                                        <form method="POST" action="{{ route('admin.plugin-releases.publish', $release) }}">@csrf<button type="submit" class="rounded border border-indigo-300 px-2 py-1 text-xs disabled:opacity-50" @if (! $hasUploadedZip) title="Attach a ZIP first" @endif>Publish</button></form>
+                                        <form method="POST" action="{{ route('admin.plugin-releases.publish', $release) }}">@csrf<button type="submit" class="rounded border border-orange-300 px-2 py-1 text-xs disabled:opacity-50" @if (! $hasUploadedZip) title="Attach a ZIP first" @endif>Publish</button></form>
                                     @endif
                                     @if ($release->status === \App\Models\PluginRelease::STATUS_PUBLISHED)
                                         <form method="POST" action="{{ route('admin.plugin-releases.rollback', $release) }}">@csrf<button type="submit" class="rounded border border-amber-300 px-2 py-1 text-xs">Rollback</button></form>

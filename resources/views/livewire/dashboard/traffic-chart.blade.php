@@ -5,7 +5,7 @@
             <p class="text-xs text-slate-500 dark:text-slate-400">Last 30 complete days</p>
         </div>
         <div class="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-            <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-indigo-500"></span> Clicks</span>
+            <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-orange-500"></span> Clicks</span>
             <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span> Users</span>
         </div>
     </div>

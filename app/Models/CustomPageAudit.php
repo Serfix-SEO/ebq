@@ -209,7 +209,7 @@ class CustomPageAudit extends Model
         return match ($this->source) {
             self::SOURCE_HQ_WP => 'WordPress',
             self::SOURCE_PAGE_DETAIL => 'Pages',
-            default => 'EBQ',
+            default => 'Serfix',
         };
     }
 

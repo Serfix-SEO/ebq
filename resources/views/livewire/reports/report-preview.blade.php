@@ -254,7 +254,7 @@
             @endif
 
             @if (count($report['search_console']['opportunities']) > 0)
-                <h4 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Optimization Opportunities</h4>
+                <h4 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">Optimization Opportunities</h4>
                 <div class="mb-5 overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800">
                     <table class="w-full text-xs">
                         <thead>
@@ -273,7 +273,7 @@
                                     <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{{ number_format($opp['impressions']) }}</td>
                                     <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{{ $opp['ctr'] }}%</td>
                                     <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{{ $opp['position'] }}</td>
-                                    <td class="px-3 py-2 text-right font-semibold text-indigo-600 dark:text-indigo-400">{{ $opp['score'] }}</td>
+                                    <td class="px-3 py-2 text-right font-semibold text-orange-600 dark:text-orange-400">{{ $opp['score'] }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -310,67 +310,6 @@
 
             @if (count($report['search_console']['top_queries']) === 0 && count($report['search_console']['top_pages']) === 0)
                 <p class="text-xs text-slate-400 dark:text-slate-500">No search console data available for this period.</p>
-            @endif
-        </div>
-    </div>
-
-    {{-- BACKLINKS --}}
-    <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div class="border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:px-5">
-            <div class="flex items-center gap-2">
-                <span class="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-600/20 ring-inset dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/30">Backlinks</span>
-                <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Link Profile</h3>
-            </div>
-        </div>
-
-        <div class="p-4 sm:p-5">
-            <div class="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                @include('livewire.reports.partials.kpi-card', ['label' => 'New Backlinks', 'metric' => $report['backlinks']['count'], 'format' => 'number'])
-                @include('livewire.reports.partials.kpi-card', ['label' => 'Avg DA', 'metric' => $report['backlinks']['avg_da'], 'format' => 'decimal'])
-                @include('livewire.reports.partials.kpi-card', ['label' => 'Dofollow', 'metric' => $report['backlinks']['dofollow'], 'format' => 'number'])
-                @include('livewire.reports.partials.kpi-card', ['label' => 'Nofollow', 'metric' => $report['backlinks']['nofollow'], 'format' => 'number'])
-            </div>
-
-            @if (count($report['backlinks']['top_backlinks']) > 0)
-                <h4 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Top Backlinks by DA</h4>
-                <div class="overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800">
-                    <table class="w-full text-xs">
-                        <thead>
-                            <tr class="bg-slate-50 text-left text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                                <th class="px-3 py-2">Referring Page</th>
-                                <th class="px-3 py-2">Target</th>
-                                <th class="px-3 py-2 text-right">DA</th>
-                                <th class="px-3 py-2">Type</th>
-                                <th class="px-3 py-2">Follow</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            @foreach ($report['backlinks']['top_backlinks'] as $b)
-                                <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                    <td class="max-w-[10rem] truncate px-3 py-2">
-                                        <a href="{{ $b['referring_page_url'] }}" target="_blank" class="text-indigo-600 hover:underline dark:text-indigo-400" title="{{ $b['referring_page_url'] }}">
-                                            {{ \Illuminate\Support\Str::limit($b['referring_page_url'], 40) }}
-                                        </a>
-                                    </td>
-                                    <td class="max-w-[8rem] truncate px-3 py-2 text-slate-600 dark:text-slate-300" title="{{ $b['target_page_url'] }}">
-                                        {{ \Illuminate\Support\Str::limit($b['target_page_url'], 35) }}
-                                    </td>
-                                    <td class="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-100">{{ $b['domain_authority'] ?? '—' }}</td>
-                                    <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ $b['type'] }}</td>
-                                    <td class="px-3 py-2">
-                                        @if ($b['is_dofollow'])
-                                            <span class="inline-flex rounded-full bg-emerald-50 px-1.5 py-px text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">Do</span>
-                                        @else
-                                            <span class="inline-flex rounded-full bg-slate-100 px-1.5 py-px text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">No</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @else
-                <p class="text-xs text-slate-400 dark:text-slate-500">No backlinks recorded for this period.</p>
             @endif
         </div>
     </div>

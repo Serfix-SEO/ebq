@@ -1,5 +1,5 @@
 {{--
-    EBQ AI Studio — dashboard surface. Single-page Alpine app driving
+    Serfix AI Studio — dashboard surface. Single-page Alpine app driving
     the launcher (categories + tool grid), the tool runner (dynamic
     form + per-type result renderer), and brand-voice settings off the
     same payload `AiStudioController::index` ships.
@@ -24,8 +24,8 @@
     <script>
     function aiStudio(opts) {
         const CAT_CHIPS = {
-            research:    'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300',
-            writing:     'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300',
+            research:    'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
+            writing:     'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
             improvement: 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300',
             marketing:   'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
             ecommerce:   'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
@@ -67,7 +67,7 @@
             headerSub() {
                 if (this.view === 'tool' && this.activeTool) return this.activeTool.description;
                 if (this.view === 'brand-voice') return 'Train every tool on your house voice.';
-                return `${this.catalog.tools.length} AI tools, grounded in your GSC data, rank tracking, and the EBQ network.`;
+                return `${this.catalog.tools.length} AI tools, grounded in your GSC data, rank tracking, and the Serfix network.`;
             },
 
             categoryLabel(id) {
@@ -362,7 +362,7 @@
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
                 <div class="flex items-center gap-2">
-                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-600 text-white shadow-sm">
                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
                         </svg>
@@ -376,7 +376,7 @@
                 <button
                     type="button"
                     @click="openBrandVoice()"
-                    class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-orange-500"
                     :class="brandVoice.configured
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-300'
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
@@ -443,7 +443,7 @@
                             type="search"
                             x-model.debounce.150ms="search"
                             placeholder="Search 47 tools…"
-                            class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 placeholder-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                            class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                         >
                     </div>
                 </div>
@@ -456,7 +456,7 @@
                                 @click="activeCat = 'all'"
                                 class="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition"
                                 :class="activeCat === 'all'
-                                    ? 'bg-indigo-50 font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+                                    ? 'bg-orange-50 font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300'
                                     : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'"
                             >
                                 <span>All tools</span>
@@ -471,7 +471,7 @@
                                     :title="cat.description"
                                     class="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition"
                                     :class="activeCat === cat.id
-                                        ? 'bg-indigo-50 font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+                                        ? 'bg-orange-50 font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300'
                                         : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'"
                                 >
                                     <span class="truncate" x-text="cat.label"></span>
@@ -487,7 +487,7 @@
                 <template x-if="filteredTools().length === 0">
                     <div class="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
                         <p>No tools match your search.</p>
-                        <button type="button" @click="search = ''; activeCat = 'all'" class="mt-2 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400">Reset</button>
+                        <button type="button" @click="search = ''; activeCat = 'all'" class="mt-2 text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400">Reset</button>
                     </div>
                 </template>
 
@@ -497,7 +497,7 @@
                             <button
                                 type="button"
                                 @click="openTool(tool.id)"
-                                class="group flex h-full w-full flex-col rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500/50"
+                                class="group flex h-full w-full flex-col rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/50"
                             >
                                 <div class="flex items-center justify-between gap-2">
                                     <span
@@ -512,7 +512,7 @@
                                         <span>~<span x-text="tool.est_credits"></span></span>
                                     </span>
                                 </div>
-                                <h3 class="mt-3 text-sm font-semibold text-slate-900 group-hover:text-indigo-700 dark:text-slate-100 dark:group-hover:text-indigo-300" x-text="tool.name"></h3>
+                                <h3 class="mt-3 text-sm font-semibold text-slate-900 group-hover:text-orange-700 dark:text-slate-100 dark:group-hover:text-orange-300" x-text="tool.name"></h3>
                                 <p class="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400" x-text="tool.description"></p>
                             </button>
                         </li>
@@ -567,7 +567,7 @@
                                             :maxlength="field.max_length || null"
                                             :placeholder="field.placeholder || ''"
                                             x-model="formValues[field.key]"
-                                            class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                                            class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                                         >
                                     </template>
 
@@ -579,7 +579,7 @@
                                             :placeholder="field.placeholder || ''"
                                             :rows="field.type === 'rich_text' ? 10 : 5"
                                             x-model="formValues[field.key]"
-                                            class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                                            class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                                         ></textarea>
                                     </template>
 
@@ -590,7 +590,7 @@
                                             type="number"
                                             :placeholder="field.placeholder || ''"
                                             x-model.number="formValues[field.key]"
-                                            class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                                            class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                                         >
                                     </template>
 
@@ -599,7 +599,7 @@
                                         <select
                                             :id="`field-${field.key}`"
                                             x-model="formValues[field.key]"
-                                            class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                            class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                         >
                                             <template x-if="!field.required">
                                                 <option value="">— Select —</option>
@@ -619,11 +619,11 @@
                                                 :placeholder="field.placeholder || 'Comma-separated'"
                                                 x-model="formValuesRaw[field.key]"
                                                 @input="formValues[field.key] = ($event.target.value || '').split(',').map(s => s.trim()).filter(Boolean)"
-                                                class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                                                class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                                             >
                                             <div class="mt-1.5 flex flex-wrap gap-1" x-show="(formValues[field.key] || []).length > 0">
                                                 <template x-for="(tag, i) in (formValues[field.key] || [])" :key="i + '-' + tag">
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300" x-text="tag"></span>
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300" x-text="tag"></span>
                                                 </template>
                                             </div>
                                         </div>
@@ -644,7 +644,7 @@
                                 <button
                                     type="submit"
                                     :disabled="loading || featureLocked || !formValid()"
-                                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                                    class="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                                 >
                                     <template x-if="loading">
                                         <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -730,7 +730,7 @@
                                         <ul class="space-y-2">
                                             <template x-for="(t, i) in (result.value || [])" :key="i">
                                                 <li class="flex items-start gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
-                                                    <span class="inline-flex h-5 w-5 flex-none items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300" x-text="i + 1"></span>
+                                                    <span class="inline-flex h-5 w-5 flex-none items-center justify-center rounded-full bg-orange-100 text-[10px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300" x-text="i + 1"></span>
                                                     <span class="text-sm" x-text="t"></span>
                                                 </li>
                                             </template>
@@ -775,7 +775,7 @@
                                         <ul class="space-y-2">
                                             <template x-for="(lnk, i) in (result.value || [])" :key="i">
                                                 <li class="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
-                                                    <a :href="lnk.url" target="_blank" rel="noopener" class="text-sm font-semibold text-indigo-600 hover:underline dark:text-indigo-400" x-text="lnk.anchor || lnk.url"></a>
+                                                    <a :href="lnk.url" target="_blank" rel="noopener" class="text-sm font-semibold text-orange-600 hover:underline dark:text-orange-400" x-text="lnk.anchor || lnk.url"></a>
                                                     <p class="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400" x-text="lnk.url"></p>
                                                     <p x-show="lnk.rationale" class="mt-1 text-xs text-slate-600 dark:text-slate-300" x-text="lnk.rationale"></p>
                                                 </li>
@@ -872,13 +872,13 @@
                                     <template x-if="result.output_type === 'json' && activeTool.id === 'content-brief'">
                                         <div class="space-y-4">
                                             <div class="flex flex-wrap gap-2">
-                                                <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                                                <span class="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
                                                     Angle: <span x-text="result.value?.angle"></span>
                                                 </span>
-                                                <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                                                <span class="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
                                                     ~<span x-text="result.value?.recommended_word_count"></span> words
                                                 </span>
-                                                <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                                                <span class="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
                                                     Schema: <span x-text="result.value?.suggested_schema_type"></span>
                                                 </span>
                                             </div>
@@ -924,7 +924,7 @@
                                                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Internal link targets</p>
                                                 <ul class="mt-1 space-y-1">
                                                     <template x-for="(lnk, i) in (result.value?.internal_link_targets || [])" :key="i">
-                                                        <li class="truncate text-xs text-indigo-600 dark:text-indigo-400" x-text="lnk.url || lnk"></li>
+                                                        <li class="truncate text-xs text-orange-600 dark:text-orange-400" x-text="lnk.url || lnk"></li>
                                                     </template>
                                                 </ul>
                                             </div>
@@ -1025,7 +1025,7 @@
                                 x-model="bvSamples[i]"
                                 rows="6"
                                 placeholder="Paste a full post (200+ characters). Plain text or HTML both work — we strip tags."
-                                class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                                class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                             ></textarea>
                             <p class="mt-1 text-[11px] text-slate-400"><span x-text="(bvSamples[i] || '').length"></span> characters</p>
                         </div>
@@ -1036,7 +1036,7 @@
                             type="button"
                             @click="addBvSample()"
                             x-show="bvSamples.length < 5"
-                            class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                            class="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400"
                         >
                             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                             Add another sample
@@ -1045,7 +1045,7 @@
                             type="button"
                             @click="saveBrandVoice()"
                             :disabled="bvSaving || featureLocked || !bvHasValidSamples()"
-                            class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
+                            class="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
                         >
                             <template x-if="bvSaving">
                                 <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>

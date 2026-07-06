@@ -35,35 +35,6 @@ use Illuminate\Database\Seeder;
  */
 class PlanSeeder extends Seeder
 {
-    private const FEATURE_VIDEOS = [
-        '4'  => 'https://youtu.be/bfo2ei66Pts',
-        '5'  => 'https://youtu.be/MHa027Tq9sQ',
-        '16' => 'https://youtu.be/Rzme7QvSbLE',
-    ];
-
-    private function features(string $websitesLine, string $keywordsLine): array
-    {
-        return [
-            $websitesLine,
-            'Search Console performance + indexing',
-            'Detailed Audits',
-            'AI Studio (47 AI writer tools)',
-            'Long Form AI writer',
-            'Cannibalization Tracking',
-            'Striking Distance tracker',
-            'Content Decay tracker',
-            'Keyword Quick Win Finder',
-            'Page Speed Insights',
-            'Detailed Google Search Console Report',
-            'Detailed Google Analytics Report',
-            'Keywords Report',
-            'Pages Report',
-            'Team Access',
-            $keywordsLine,
-            'WordPress plugin (full)',
-        ];
-    }
-
     public function run(): void
     {
         $plans = [
@@ -81,8 +52,19 @@ class PlanSeeder extends Seeder
                 'display_order'      => 1,
                 'is_highlighted'     => false,
                 'is_active'          => true,
-                'features'           => $this->features('1 website', '20 tracked keywords'),
-                'feature_videos'     => self::FEATURE_VIDEOS,
+                'features'           => [
+                    '1 website',
+                    '1 team seat',
+                    '20,000 page crawl budget',
+                    '20 tracked keywords',
+                    '50 keyword searches / mo',
+                    '25,000 AI Studio tokens / mo',
+                    '2 long-form articles / mo',
+                    'Backlink & SERP analysis',
+                    'WordPress plugin (full)',
+                    'GA4 + GSC integration',
+                ],
+                'feature_videos'     => [],
                 'plan_features'      => [
                     'chatbot'           => false,
                     'ai_writer'         => true,
@@ -117,8 +99,19 @@ class PlanSeeder extends Seeder
                 'display_order'      => 2,
                 'is_highlighted'     => false,
                 'is_active'          => true,
-                'features'           => $this->features('3 websites', '100 tracked keywords'),
-                'feature_videos'     => self::FEATURE_VIDEOS,
+                'features'           => [
+                    '3 websites',
+                    '1 team seat',
+                    '100,000 page crawl budget',
+                    '100 tracked keywords',
+                    '250 keyword searches / mo',
+                    '60,000 AI Studio tokens / mo',
+                    '5 long-form articles / mo',
+                    'Backlink & SERP analysis',
+                    'WordPress plugin (full)',
+                    'GA4 + GSC integration',
+                ],
+                'feature_videos'     => [],
                 'plan_features'      => [
                     'chatbot'           => false,
                     'ai_writer'         => true,
@@ -153,8 +146,20 @@ class PlanSeeder extends Seeder
                 'display_order'      => 3,
                 'is_highlighted'     => true,
                 'is_active'          => true,
-                'features'           => $this->features('10 websites', '500 tracked keywords'),
-                'feature_videos'     => self::FEATURE_VIDEOS,
+                'features'           => [
+                    '10 websites',
+                    '3 team seats',
+                    '300,000 page crawl budget',
+                    '500 tracked keywords',
+                    '1,000 keyword searches / mo',
+                    '150,000 AI Studio tokens / mo',
+                    '15 long-form articles / mo',
+                    'Scheduled reports',
+                    'Backlink & SERP analysis',
+                    'WordPress plugin (full)',
+                    'GA4 + GSC integration',
+                ],
+                'feature_videos'     => [],
                 'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
@@ -189,8 +194,21 @@ class PlanSeeder extends Seeder
                 'display_order'      => 4,
                 'is_highlighted'     => false,
                 'is_active'          => true,
-                'features'           => $this->features('30 websites', '2000 tracked keywords'),
-                'feature_videos'     => self::FEATURE_VIDEOS,
+                'features'           => [
+                    '30 websites',
+                    '10 team seats',
+                    '1,000,000 page crawl budget',
+                    '2,000 tracked keywords',
+                    '4,000 keyword searches / mo',
+                    '600,000 AI Studio tokens / mo',
+                    '50 long-form articles / mo',
+                    'White-label reports',
+                    'Scheduled reports',
+                    'Backlink & SERP analysis',
+                    'WordPress plugin (full)',
+                    'GA4 + GSC integration',
+                ],
+                'feature_videos'     => [],
                 'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
@@ -216,17 +234,30 @@ class PlanSeeder extends Seeder
                 'name'               => 'Enterprise',
                 'tagline'            => 'Custom scale. Contact us.',
                 'price_monthly_usd'  => 0,
-                'price_yearly_usd'   => 0,      // no self-serve checkout; isCheckoutReady() = false (price>0 not met)
+                'price_yearly_usd'   => 0,
                 'trial_days'         => 0,
-                'max_websites'       => null,   // unlimited
-                'max_seats'          => null,   // unlimited
+                'max_websites'       => null,
+                'max_seats'          => null,
                 'extra_seat_price_usd' => null,
-                'max_crawl_pages'    => null,   // unlimited
+                'max_crawl_pages'    => null,
                 'display_order'      => 5,
                 'is_highlighted'     => false,
                 'is_active'          => true,
-                'features'           => $this->features('Unlimited websites', 'Unlimited tracked keywords'),
-                'feature_videos'     => self::FEATURE_VIDEOS,
+                'features'           => [
+                    'Unlimited websites',
+                    'Unlimited team seats',
+                    'Custom crawl budget',
+                    'Unlimited tracked keywords',
+                    'Unlimited keyword searches',
+                    'Unlimited AI tokens & articles',
+                    'White-label reports',
+                    'Scheduled & automated reports',
+                    'SSO & custom integrations',
+                    'Dedicated support + SLA',
+                    'WordPress plugin (full)',
+                    'GA4 + GSC integration',
+                ],
+                'feature_videos'     => [],
                 'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
@@ -239,7 +270,7 @@ class PlanSeeder extends Seeder
                     'report_whitelabel' => true,
                     'scheduled_reports' => true,
                 ],
-                'api_limits'         => null,   // unlimited everything
+                'api_limits'         => null,
             ],
         ];
 

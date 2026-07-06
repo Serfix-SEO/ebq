@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CrawlSite;
 use App\Models\Plan;
 use App\Models\User;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierController;
@@ -81,7 +82,7 @@ class StripeWebhookController extends CashierController
             $subscription = $user->subscription('default');
             $price = (string) ($subscription->stripe_price ?? '');
             if ($price !== '') {
-                $plan = Plan::where('stripe_price_id_yearly', $price)->first();
+                $plan = Plan::findByStripePrice($price);
                 if ($plan) {
                     $newSlug = $plan->slug;
                 }
@@ -90,6 +91,14 @@ class StripeWebhookController extends CashierController
 
         if ($user->current_plan_slug !== $newSlug) {
             $user->forceFill(['current_plan_slug' => $newSlug])->save();
+
+            // crawl_sites.effective_cap is a stored aggregate, only recomputed on
+            // website create/delete or first crawl link — an upgrade/downgrade alone
+            // never touches a Website row, so without this the crawler keeps
+            // enforcing the OLD plan's page cap until something else re-links the site.
+            $user->websites()->whereNotNull('crawl_site_id')->with('crawlSite')->get()
+                ->pluck('crawlSite')->filter()->unique('id')
+                ->each(fn (CrawlSite $cs) => $cs->recomputeEffectiveCap());
         }
     }
 }

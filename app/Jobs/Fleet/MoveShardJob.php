@@ -42,4 +42,26 @@ class MoveShardJob implements ShouldQueue
             $mover->moveTenant($this->id, $target);
         }
     }
+
+    /**
+     * The mover marks its own ShardMove row failed on exceptions, but a
+     * TimeoutExceeded/worker-kill bypasses its catch block — without this the
+     * progress row would show "copying" forever (the June 18 timeout did
+     * exactly that in spirit, pre-tracking). Data-wise a killed copy is safe:
+     * insertOrIgnore makes re-runs idempotent and the source is intact until
+     * the purge phase.
+     */
+    public function failed(?\Throwable $e): void
+    {
+        \App\Models\ShardMove::query()
+            ->where('kind', $this->kind)
+            ->where('subject_id', $this->id)
+            ->whereNotIn('status', [\App\Models\ShardMove::STATUS_COMPLETED, \App\Models\ShardMove::STATUS_FAILED])
+            ->latest()
+            ->first()?->update([
+                'status' => \App\Models\ShardMove::STATUS_FAILED,
+                'error' => 'job killed: '.mb_substr($e?->getMessage() ?? 'timeout/worker restart', 0, 1900),
+                'finished_at' => now(),
+            ]);
+    }
 }

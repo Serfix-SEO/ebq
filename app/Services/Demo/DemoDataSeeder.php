@@ -455,7 +455,7 @@ class DemoDataSeeder
                     'checked_at' => $checkedAt->toDateTimeString(),
                     'position' => $pos,
                     'url' => 'https://'.self::DEMO_DOMAIN.$entry['page'],
-                    'title' => Str::title(str_replace('-', ' ', trim($entry['page'], '/'))) ?: 'EBQ',
+                    'title' => Str::title(str_replace('-', ' ', trim($entry['page'], '/'))) ?: 'Serfix',
                     'snippet' => null,
                     'total_results' => $this->rand($entry['q'].'tr'.$d, 1_000_000, 90_000_000),
                     'search_time' => round($this->rand($entry['q'].'st'.$d, 20, 90) / 100, 3),
@@ -507,7 +507,7 @@ class DemoDataSeeder
             'wpbeginner.com', 'kinsta.com', 'cloudways.com', 'reddit.com',
             'producthunt.com', 'medium.com', 'dev.to', 'hackernews.com',
         ];
-        $anchors = ['EBQ SEO', 'connected SEO suite', 'this SEO tool', 'keyword research tool', 'rank tracking software', 'backlink checker', 'EBQ', 'SEO dashboard'];
+        $anchors = ['Serfix SEO', 'connected SEO suite', 'this SEO tool', 'keyword research tool', 'rank tracking software', 'backlink checker', 'Serfix', 'SEO dashboard'];
 
         for ($i = 0; $i < 40; $i++) {
             $ref = $referrers[$i % count($referrers)];
@@ -622,7 +622,7 @@ class DemoDataSeeder
                 'word_count' => $wordCount,
                 'h1_count' => 1,
                 'heading_order_ok' => true,
-                'first_150_words' => 'EBQ is a connected SEO suite that pairs your WordPress editor with live Search Console, rank tracking, and audit data so every content decision is grounded in real numbers. This page covers '.$primary.' with practical, up-to-date guidance you can act on today.',
+                'first_150_words' => 'Serfix is a connected SEO suite that pairs your WordPress editor with live Search Console, rank tracking, and audit data so every content decision is grounded in real numbers. This page covers '.$primary.' with practical, up-to-date guidance you can act on today.',
                 'keyword_density' => $this->keywordDensity($primary),
                 'headings' => $this->headings($primary),
             ],
@@ -645,7 +645,7 @@ class DemoDataSeeder
                 'page_size_bytes' => $this->rand('ps2'.$page, 380_000, 920_000),
                 'compression' => 'gzip',
                 'is_https' => true,
-                'stack' => ['label' => 'WordPress + EBQ', 'type' => 'modern'],
+                'stack' => ['label' => 'WordPress + Serfix', 'type' => 'modern'],
             ],
             'advanced' => [
                 'schema_blocks' => $this->rand('schema'.$page, 2, 4),
@@ -693,16 +693,16 @@ class DemoDataSeeder
     private function pageTitle(string $page): string
     {
         return match ($page) {
-            '/' => 'EBQ SEO — Connected SEO Suite for WordPress',
-            '/features' => 'Features — Rank Tracking, Audits & AI | EBQ SEO',
-            '/pricing' => 'Pricing — Plans for Every SEO Team | EBQ SEO',
-            '/features/rank-tracking' => 'Rank Tracking Software with Daily SERP Snapshots | EBQ',
-            '/features/keyword-research' => 'Keyword Research Tool Built on Real GSC Data | EBQ',
-            '/features/site-audit' => 'SEO Site Audit Tool with Core Web Vitals | EBQ',
-            '/features/backlinks' => 'Backlink Checker & Monitoring | EBQ SEO',
-            '/blog/seo-audit-checklist' => 'The Complete SEO Audit Checklist for 2026 | EBQ',
-            '/blog/keyword-research-guide' => 'Keyword Research Guide: Find Keywords That Rank | EBQ',
-            default => 'EBQ SEO — Connected SEO Suite',
+            '/' => 'Serfix SEO — Connected SEO Suite for WordPress',
+            '/features' => 'Features — Rank Tracking, Audits & AI | Serfix SEO',
+            '/pricing' => 'Pricing — Plans for Every SEO Team | Serfix SEO',
+            '/features/rank-tracking' => 'Rank Tracking Software with Daily SERP Snapshots | Serfix',
+            '/features/keyword-research' => 'Keyword Research Tool Built on Real GSC Data | Serfix',
+            '/features/site-audit' => 'SEO Site Audit Tool with Core Web Vitals | Serfix',
+            '/features/backlinks' => 'Backlink Checker & Monitoring | Serfix SEO',
+            '/blog/seo-audit-checklist' => 'The Complete SEO Audit Checklist for 2026 | Serfix',
+            '/blog/keyword-research-guide' => 'Keyword Research Guide: Find Keywords That Rank | Serfix',
+            default => 'Serfix SEO — Connected SEO Suite',
         };
     }
 
@@ -710,16 +710,16 @@ class DemoDataSeeder
     private function pageDescription(string $page): string
     {
         return match ($page) {
-            '/' => 'EBQ is a connected SEO suite for WordPress: real-data keyword scoring, live rank tracking, site audits, and an AI writer in one dashboard.',
-            '/features' => 'Explore EBQ features: rank tracking, keyword research, site audits, backlink monitoring, and an AI content writer, all grounded in your GSC data.',
-            '/pricing' => 'Simple EBQ pricing for freelancers, agencies, and in-house teams. Start free, then scale rank tracking, audits, and AI as your sites grow.',
-            '/features/rank-tracking' => 'Track keyword positions daily with EBQ rank tracking software: device and country targeting, SERP features, and movement alerts.',
-            '/features/keyword-research' => 'Find long-tail keywords that rank with EBQ keyword research, built on your real Search Console data and live SERP intent.',
-            '/features/site-audit' => 'Run a full SEO site audit with EBQ: Core Web Vitals, metadata, content, links, and prioritised fixes in one report.',
-            '/features/backlinks' => 'Monitor your backlink profile with EBQ: live link verification, anchor text, domain authority, and lost-link alerts.',
+            '/' => 'Serfix is a connected SEO suite for WordPress: real-data keyword scoring, live rank tracking, site audits, and an AI writer in one dashboard.',
+            '/features' => 'Explore Serfix features: rank tracking, keyword research, site audits, backlink monitoring, and an AI content writer, all grounded in your GSC data.',
+            '/pricing' => 'Simple Serfix pricing for freelancers, agencies, and in-house teams. Start free, then scale rank tracking, audits, and AI as your sites grow.',
+            '/features/rank-tracking' => 'Track keyword positions daily with Serfix rank tracking software: device and country targeting, SERP features, and movement alerts.',
+            '/features/keyword-research' => 'Find long-tail keywords that rank with Serfix keyword research, built on your real Search Console data and live SERP intent.',
+            '/features/site-audit' => 'Run a full SEO site audit with Serfix: Core Web Vitals, metadata, content, links, and prioritised fixes in one report.',
+            '/features/backlinks' => 'Monitor your backlink profile with Serfix: live link verification, anchor text, domain authority, and lost-link alerts.',
             '/blog/seo-audit-checklist' => 'A practical SEO audit checklist for 2026: technical, on-page, content, and Core Web Vitals checks you can run before every refresh.',
             '/blog/keyword-research-guide' => 'Learn keyword research the right way: map intent, find low-competition wins, and prioritise terms using real Search Console data.',
-            default => 'EBQ is a connected SEO suite for WordPress with rank tracking, audits, keyword research, and an AI writer in one dashboard.',
+            default => 'Serfix is a connected SEO suite for WordPress with rank tracking, audits, keyword research, and an AI writer in one dashboard.',
         };
     }
 
@@ -759,7 +759,7 @@ class DemoDataSeeder
             ['level' => 2, 'text' => 'What is '.$title.'?'],
             ['level' => 2, 'text' => 'Why it matters for SEO'],
             ['level' => 3, 'text' => 'Key metrics to watch'],
-            ['level' => 2, 'text' => 'How EBQ helps'],
+            ['level' => 2, 'text' => 'How Serfix helps'],
             ['level' => 3, 'text' => 'Step-by-step workflow'],
             ['level' => 2, 'text' => 'Frequently asked questions'],
         ];
@@ -841,7 +841,7 @@ class DemoDataSeeder
     /**
      * SERP benchmark: ebq.io versus ebqcompetitor1.io and ebqcompetitor2.io.
      * ebq.io ranks ahead and reads easier (higher Flesch) than both, with a
-     * you-vs-market gap table that shows EBQ in the lead.
+     * you-vs-market gap table that shows Serfix in the lead.
      *
      * @return array<string, mixed>
      */
@@ -889,14 +889,14 @@ class DemoDataSeeder
             'competitors' => [
                 [
                     'url' => 'https://ebqcompetitor1.io'.$page,
-                    'title' => 'EBQ Competitor 1 — '.$title2,
+                    'title' => 'Serfix Competitor 1 — '.$title2,
                     'position' => $yourPos + 2,
                     'flesch' => $c1Flesch,
                     'grade' => 'Grade 9 — Fairly difficult',
                 ],
                 [
                     'url' => 'https://ebqcompetitor2.io'.$page,
-                    'title' => 'EBQ Competitor 2 — '.$title2,
+                    'title' => 'Serfix Competitor 2 — '.$title2,
                     'position' => $yourPos + 4,
                     'flesch' => $c2Flesch,
                     'grade' => 'Grade 11 — Difficult',
@@ -1048,14 +1048,14 @@ class DemoDataSeeder
         ReportBranding::create([
             'user_id' => null,
             'website_id' => $websiteId,
-            'company_name' => 'EBQ Demo',
+            'company_name' => 'Serfix Demo',
             'logo_path' => null,
-            'accent_color' => '#4f46e5',
-            'footer_text' => 'Generated by EBQ — connected SEO suite.',
-            'contact_email' => 'demo@ebq.io',
+            'accent_color' => '#F26419',
+            'footer_text' => 'Generated by Serfix — connected SEO suite.',
+            'contact_email' => 'demo@serfix.io',
             'contact_phone' => null,
             'contact_address' => null,
-            'reply_to_email' => 'demo@ebq.io',
+            'reply_to_email' => 'demo@serfix.io',
         ]);
     }
 

@@ -101,6 +101,16 @@ Empty result → the `Website` saved hook skips linking (placeholder row).
 `recomputeEffectiveCap()` = `max(crawlPageCap)` over all subscriber websites, and updates
 `subscriber_count`.
 
+**`effective_cap` is a stored aggregate, not computed live** — it's only refreshed by the
+three triggers above (website create/link, website delete, first-ever crawl_site link in
+`CrawlWebsitePagesJob::resolveCrawlSite`). It does **not** self-heal on recrawl once a
+website is already linked. A plan upgrade/downgrade alone never saves a `Website` row, so
+`ClientController::update()` (admin comp-plan) and `StripeWebhookController::syncPlanSlugFromStripeCustomer()`
+(subscription webhook) both explicitly call `recomputeEffectiveCap()` for the user's
+websites right after writing `current_plan_slug` (fixed 2026-07-03 — a legacy→trial plan
+switch left `effective_cap` pinned at the old cap indefinitely, since no code path
+recomputed it on plan change).
+
 ## Subscribe charge
 
 `CrawlSiteBootstrapper::subscribeWebsite()` logs a `client_activities` row via

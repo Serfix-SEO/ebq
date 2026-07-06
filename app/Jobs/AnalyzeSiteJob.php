@@ -124,8 +124,13 @@ class AnalyzeSiteJob implements ShouldQueue
         if ($blockVerdict['blocked']) {
             $this->recordCrawlability($run, $crawlSite, $blockVerdict['reason']);
             $this->resolveStale($crawlSiteId, $run);
+            $protection = match (true) {
+                $blockVerdict['reason'] === BlockDetector::CAPTCHA => 'cloudflare',
+                isset($blockVerdict['waf_vendor'])                 => $blockVerdict['waf_vendor'],
+                default                                            => 'blocked',
+            };
             $crawlSite->forceFill([
-                'crawl_protection' => $blockVerdict['reason'] === BlockDetector::CAPTCHA ? 'cloudflare' : 'blocked',
+                'crawl_protection' => $protection,
                 'crawl_protection_at' => now(),
                 'status' => 'blocked',
             ])->save();
@@ -188,6 +193,9 @@ class AnalyzeSiteJob implements ShouldQueue
     {
         foreach ($crawlSite->websites()->pluck('id') as $wid) {
             \App\Services\ReportCache::flushWebsite((string) $wid);
+            // Re-warm each subscriber's dashboard caches (incl. the heavy
+            // actionGroups scan this finalize just invalidated).
+            \App\Jobs\WarmDashboardCaches::dispatch((string) $wid);
         }
     }
 
@@ -197,16 +205,27 @@ class AnalyzeSiteJob implements ShouldQueue
     private function blockRollup(string $crawlSiteId, int $fetched, BlockDetector $detector): array
     {
         $reasonCounts = [];
+        $vendorCounts = [];
         WebsitePage::where('crawl_site_id', $crawlSiteId)
             ->where('http_error', 'like', 'blocked:%')
             ->select('http_error', DB::raw('COUNT(*) as c'))
             ->groupBy('http_error')
-            ->each(function ($row) use (&$reasonCounts): void {
-                $reason = substr((string) $row->http_error, strlen('blocked:'));
+            ->each(function ($row) use (&$reasonCounts, &$vendorCounts): void {
+                $error = substr((string) $row->http_error, strlen('blocked:'));
+                [$reason, $vendor] = array_pad(explode('|', $error, 2), 2, null);
                 $reasonCounts[$reason] = ($reasonCounts[$reason] ?? 0) + (int) $row->c;
+                if ($vendor !== null) {
+                    $vendorCounts[$vendor] = ($vendorCounts[$vendor] ?? 0) + (int) $row->c;
+                }
             });
 
-        return $detector->rollup($reasonCounts, $fetched);
+        $verdict = $detector->rollup($reasonCounts, $fetched);
+        if ($verdict['blocked'] && ! empty($vendorCounts)) {
+            arsort($vendorCounts);
+            $verdict['waf_vendor'] = (string) array_key_first($vendorCounts);
+        }
+
+        return $verdict;
     }
 
     private function recordCrawlability(CrawlRun $run, CrawlSite $crawlSite, ?string $reason): void

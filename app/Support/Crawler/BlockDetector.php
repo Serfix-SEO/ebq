@@ -94,6 +94,59 @@ class BlockDetector
     }
 
     /**
+     * Known WAF/CDN fingerprints: [header => vendor] or [server substring => vendor].
+     * Detection priority: specific WAF headers first, then the generic `server` header.
+     */
+    private const WAF_HEADERS = [
+        'cf-ray'               => 'cloudflare',
+        'x-sucuri-id'          => 'sucuri',
+        'x-sucuri-cache'       => 'sucuri',
+        'x-sg-cdn'             => 'siteground',
+        'x-iinfo'              => 'incapsula',
+        'x-amz-cf-id'          => 'cloudfront',
+        'x-akamai-transformed' => 'akamai',
+    ];
+
+    private const WAF_SERVER_STRINGS = [
+        'cloudflare'  => 'cloudflare',
+        'cloudproxy'  => 'sucuri',
+        'sucuri'      => 'sucuri',
+        'incapsula'   => 'incapsula',
+        'cloudfront'  => 'cloudfront',
+        'akamaihost'  => 'akamai',
+        'akamaighost' => 'akamai',
+        'bigip'       => 'f5',
+        'barracuda'   => 'barracuda',
+    ];
+
+    /**
+     * Detect a WAF/CDN layer from response headers. Returns the vendor name or null.
+     *
+     * @param  array{headers?:array<string,string>}  $res
+     */
+    public function detectWaf(array $res): ?string
+    {
+        $headers = $res['headers'] ?? [];
+
+        foreach (self::WAF_HEADERS as $header => $vendor) {
+            if (isset($headers[$header]) && (string) $headers[$header] !== '') {
+                return $vendor;
+            }
+        }
+
+        $server = strtolower((string) ($headers['server'] ?? ''));
+        if ($server !== '') {
+            foreach (self::WAF_SERVER_STRINGS as $needle => $vendor) {
+                if (str_contains($server, $needle)) {
+                    return $vendor;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Roll up per-page outcomes into a site-wide block verdict.
      *
      * @param  array<string,int>  $reasonCounts  reason => count of pages flagged

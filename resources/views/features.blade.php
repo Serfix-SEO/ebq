@@ -1,5 +1,5 @@
 <x-marketing.page
-    title="Features — EBQ"
+    title="Features — Serfix"
     description="Cross-signal insights, rank tracking, page audits, backlink impact, anomaly alerts, reporting, and the WordPress plugin — all built into one workspace."
     active="features"
 >
@@ -11,7 +11,7 @@
                 Every signal, every action, in one workspace.
             </h1>
             <p class="mx-auto mt-5 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
-                EBQ joins Search Console, Analytics, ranking, audits, and backlinks into a single decision surface. Each module is built to answer: what should we ship next, and what changed after we did?
+                Serfix joins Search Console, Analytics, ranking, audits, and backlinks into a single decision surface. Each module is built to answer: what should we ship next, and what changed after we did?
             </p>
             <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start free trial</a>
@@ -41,7 +41,7 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Cross-signal insights</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Cross-signal insights</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Six insight boards that produce action lists.</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
                         Cannibalization, striking distance, content decay, indexing fails with traffic, audit-vs-traffic, and backlink impact. Each report ranks the highest-impact items so your sprint stays focused.
@@ -59,7 +59,7 @@
                     <div class="grid grid-cols-2 gap-3">
                         @foreach ([
                             ['Cannibalizations', '14', 'amber'],
-                            ['Striking distance', '27', 'indigo'],
+                            ['Striking distance', '27', 'orange'],
                             ['Content decay', '8', 'slate'],
                             ['Indexing fails', '3', 'rose'],
                             ['Audit vs traffic', '11', 'slate'],
@@ -70,7 +70,7 @@
                                 <p @class([
                                     'mt-1.5 text-2xl font-semibold tabular-nums',
                                     'text-amber-600' => $tone === 'amber',
-                                    'text-indigo-600' => $tone === 'indigo',
+                                    'text-orange-600' => $tone === 'orange',
                                     'text-slate-900' => $tone === 'slate',
                                     'text-rose-600' => $tone === 'rose',
                                     'text-emerald-600' => $tone === 'emerald',
@@ -100,11 +100,11 @@
                         <svg viewBox="0 0 320 110" class="mt-4 h-32 w-full" aria-hidden="true">
                             <defs>
                                 <linearGradient id="rk-fill" x1="0" x2="0" y1="0" y2="1">
-                                    <stop offset="0%" stop-color="#6366f1" stop-opacity="0.18"/>
-                                    <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+                                    <stop offset="0%" stop-color="#F26419" stop-opacity="0.18"/>
+                                    <stop offset="100%" stop-color="#F26419" stop-opacity="0"/>
                                 </linearGradient>
                             </defs>
-                            <path d="M0 80 L40 75 L80 78 L120 60 L160 55 L200 42 L240 30 L280 22 L320 14" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round"/>
+                            <path d="M0 80 L40 75 L80 78 L120 60 L160 55 L200 42 L240 30 L280 22 L320 14" fill="none" stroke="#F26419" stroke-width="2" stroke-linejoin="round"/>
                             <path d="M0 80 L40 75 L80 78 L120 60 L160 55 L200 42 L240 30 L280 22 L320 14 L320 110 L0 110 Z" fill="url(#rk-fill)"/>
                         </svg>
                         <div class="mt-2 flex items-center justify-between text-[10px] text-slate-400">
@@ -124,10 +124,10 @@
                 </div>
 
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Rank tracking</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Rank tracking</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">SERP-accurate ranks with click overlays.</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Real positions captured per device and country. EBQ overlays GSC clicks for the same query so you instantly see when a rank gain stops producing traffic — and which SERP feature is to blame.
+                        Real positions captured per device and country. Serfix overlays GSC clicks for the same query so you instantly see when a rank gain stops producing traffic — and which SERP feature is to blame.
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Country, device, language, and city targeting</li>
@@ -145,7 +145,7 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Page audits</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Page audits</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Core Web Vitals, on-page, and content in one pass.</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
                         On-demand audits combine mobile + desktop CWV with a deep HTML analyzer and keyword-strategy review tailored to the page's target query. Output is a prioritized recommendation list — not a 200-row spreadsheet.
@@ -256,10 +256,10 @@
                 </div>
 
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Backlinks</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Backlinks</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Track every link, prove every lift.</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Bulk import or manual entry. EBQ verifies presence, anchor, and rel — then measures click delta on the target page in the 28 days after the link goes live.
+                        Bulk import or manual entry. Serfix verifies presence, anchor, and rel — then measures click delta on the target page in the 28 days after the link goes live.
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Live verification of presence + anchor + rel</li>
@@ -277,7 +277,7 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Anomaly alerts</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Anomaly alerts</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Know within hours when something breaks.</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
                         Statistical detection compares yesterday against a 28-day baseline on clicks, sessions, and average tracked-keyword position. Two gates — relative drop and z-score — keep the inbox quiet.
@@ -305,7 +305,7 @@
                             <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Sessions</span><span class="font-mono text-rose-600">480 vs 1,610 (z=-2.8)</span></li>
                             <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Avg position</span><span class="font-mono text-amber-600">14.2 vs 11.6 (z=-1.9)</span></li>
                         </ul>
-                        <div class="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Open EBQ →</div>
+                        <div class="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Open Serfix →</div>
                     </div>
                 </div>
             </div>
@@ -334,8 +334,8 @@
                                 </div>
                             @endforeach
                         </div>
-                        <div class="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">Action insights</p>
+                        <div class="mt-4 rounded-xl border border-orange-100 bg-orange-50/60 p-4">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-orange-700">Action insights</p>
                             <ul class="mt-2 space-y-1.5 text-[12px] text-slate-700">
                                 <li>• 5 striking-distance keywords ready to push</li>
                                 <li>• 3 cannibalization conflicts on "saas seo guide"</li>
@@ -346,7 +346,7 @@
                 </div>
 
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Reporting</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Reporting</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Executive-ready, zero rework.</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
                         Daily, weekly, or monthly. Every report includes YoY, top gainers/losers, traffic-source concentration, and the top-5 actionable insights.
@@ -367,10 +367,10 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">WordPress plugin</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">WordPress plugin</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Surface insights where editors write.</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        The EBQ plugin embeds rank, click, and content opportunity context inside Gutenberg, the post list, and the WordPress dashboard. Connect with one click; tokens are website-scoped and never live in browser JS.
+                        The Serfix plugin embeds rank, click, and content opportunity context inside Gutenberg, the post list, and the WordPress dashboard. Connect with one click; tokens are website-scoped and never live in browser JS.
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Gutenberg sidebar with rank, clicks, opportunities</li>
@@ -386,7 +386,7 @@
                         <span class="h-2 w-2 rounded-full bg-rose-400"></span>
                         <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                         <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                        <span class="ml-2 text-[11px] font-medium text-slate-500">Gutenberg · EBQ SEO</span>
+                        <span class="ml-2 text-[11px] font-medium text-slate-500">Gutenberg · Serfix SEO</span>
                     </div>
                     <div class="mt-4 space-y-3 text-[12px]">
                         <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
@@ -412,8 +412,8 @@
                             <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Cannibalization</p>
                             <p class="mt-1 text-[11px] text-slate-700">Splits with /blog/seo-tools-guide</p>
                         </div>
-                        <div class="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Striking distance</p>
+                        <div class="rounded-lg border border-orange-100 bg-orange-50/60 p-3">
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-orange-700">Striking distance</p>
                             <p class="mt-1 text-[11px] text-slate-700">3 queries at pos 5–20 with below-curve CTR</p>
                         </div>
                     </div>
@@ -452,7 +452,7 @@
     <section class="bg-white py-20 sm:py-24">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
             <div class="rounded-3xl border border-slate-200 bg-slate-50/60 px-6 py-14 text-center sm:px-12">
-                <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">See EBQ on your own data.</h2>
+                <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">See Serfix on your own data.</h2>
                 <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">Connect your first website and run an action-ready report in minutes.</p>
                 <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                     <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start free trial</a>

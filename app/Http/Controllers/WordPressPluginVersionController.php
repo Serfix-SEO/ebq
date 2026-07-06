@@ -35,7 +35,7 @@ class WordPressPluginVersionController extends Controller
 
         return response()->json([
             'slug' => 'ebq-seo',
-            'name' => 'EBQ SEO',
+            'name' => 'Serfix SEO',
             'version' => $version,
             'channel' => $channel,
             'download_url' => route('wordpress.plugin.download', ['channel' => $channel]),

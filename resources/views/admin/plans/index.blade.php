@@ -19,7 +19,7 @@
                 </p>
             </div>
             <a href="{{ route('admin.plans.create') }}"
-               class="text-sm font-medium px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-500 whitespace-nowrap">
+               class="text-sm font-medium px-3 py-1.5 rounded-md bg-orange-600 text-white hover:bg-orange-500 whitespace-nowrap">
                 + New plan
             </a>
         </div>
@@ -32,7 +32,7 @@
 
         <div class="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-800">
             <strong class="font-semibold">Stripe price IDs:</strong>
-            EBQ only sells <em>yearly</em> subscriptions. Create products + yearly prices in your Stripe dashboard, then paste each
+            Serfix only sells <em>yearly</em> subscriptions. Create products + yearly prices in your Stripe dashboard, then paste each
             <code class="rounded bg-amber-100 px-1 py-0.5 font-mono text-xs">price_…</code>
             ID into its plan row below. Plans without a yearly Stripe price ID show as
             "Coming soon" on the pricing page and can't accept checkout sessions. The monthly price column is display-only ("$X/mo, billed yearly").
@@ -64,7 +64,7 @@
                                 <div class="font-medium text-slate-900">
                                     {{ $plan->name }}
                                     @if ($plan->is_highlighted)
-                                        <span class="ml-1 inline-flex items-center rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-violet-800 tracking-wide">Featured</span>
+                                        <span class="ml-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-orange-800 tracking-wide">Featured</span>
                                     @endif
                                 </div>
                                 @if ($plan->tagline)
@@ -104,7 +104,7 @@
                             </td>
                             <td class="px-3 py-2.5 text-right">
                                 <a href="{{ route('admin.plans.edit', $plan) }}"
-                                   class="text-xs font-medium text-indigo-700 hover:underline">Edit</a>
+                                   class="text-xs font-medium text-orange-700 hover:underline">Edit</a>
                             </td>
                         </tr>
                     @empty

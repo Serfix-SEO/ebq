@@ -29,7 +29,7 @@ class TrafficDropAlert extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $mail = (new MailMessage)
-            ->subject('EBQ Alert: Traffic anomaly on '.$this->website->domain)
+            ->subject('Serfix Alert: Traffic anomaly on '.$this->website->domain)
             ->line("An unusual drop was detected for {$this->website->domain} on {$this->detection['date']}.");
 
         foreach (($this->detection['metrics'] ?? []) as $key => $m) {
@@ -55,7 +55,7 @@ class TrafficDropAlert extends Notification
         }
 
         return $mail
-            ->action('Open EBQ', route('dashboard'))
+            ->action('Open Serfix', route('dashboard'))
             ->line('Review traffic sources and keyword changes to investigate.');
     }
 

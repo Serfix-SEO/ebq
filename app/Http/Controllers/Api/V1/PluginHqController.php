@@ -15,6 +15,7 @@ use App\Services\BacklinkProspectingService;
 use App\Services\CrossSiteBenchmarkService;
 use App\Services\Google\GoogleClientFactory;
 use App\Services\PluginInsightResolver;
+use App\Services\RankCache;
 use App\Services\ReportCache;
 use App\Services\ReportDataService;
 use App\Support\Audit\SerpGlCatalog;
@@ -65,7 +66,7 @@ class PluginHqController extends Controller
         [$start, $end, $prevStart, $prevEnd, $rangeKey] = $this->resolveRange($request);
 
         $payload = Cache::remember(
-            sprintf('hq:overview:v1:%s:%s:%d', $website->id, $rangeKey, ReportCache::version($website->id)),
+            sprintf('hq:overview:v1:%s:%s:%d:%d', $website->id, $rangeKey, ReportCache::version($website->id), RankCache::version($website->id)),
             now()->addHours(24),
             fn () => $this->buildOverviewPayload($website, $start, $end, $prevStart, $prevEnd, $rangeKey),
         );
@@ -902,7 +903,7 @@ class PluginHqController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'not_connected',
-                'message' => 'Connect a Google account in EBQ.io to submit URLs for indexing.',
+                'message' => 'Connect a Google account in Serfix to submit URLs for indexing.',
             ], 400);
         }
 
@@ -913,7 +914,7 @@ class PluginHqController extends Controller
                 return response()->json([
                     'ok' => false,
                     'error' => 'no_access_token',
-                    'message' => 'Google access token is missing — reconnect Google in EBQ.io.',
+                    'message' => 'Google access token is missing — reconnect Google in Serfix.',
                     'needs_google_reconnect' => true,
                 ], 400);
             }
@@ -986,7 +987,7 @@ class PluginHqController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'no_gsc_property',
-                'message' => 'Connect a Search Console property for this site in EBQ.io.',
+                'message' => 'Connect a Search Console property for this site in Serfix.',
             ], 400);
         }
 
@@ -995,7 +996,7 @@ class PluginHqController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'not_connected',
-                'message' => 'Connect a Google account in EBQ.io to recheck indexing status.',
+                'message' => 'Connect a Google account in Serfix to recheck indexing status.',
             ], 400);
         }
 
@@ -1006,7 +1007,7 @@ class PluginHqController extends Controller
                 return response()->json([
                     'ok' => false,
                     'error' => 'no_access_token',
-                    'message' => 'Google access token is missing — reconnect Google in EBQ.io.',
+                    'message' => 'Google access token is missing — reconnect Google in Serfix.',
                     'needs_google_reconnect' => true,
                 ], 400);
             }
@@ -1173,7 +1174,7 @@ class PluginHqController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'no_recipients',
-                'message' => 'No report recipients configured for this website in EBQ.',
+                'message' => 'No report recipients configured for this website in Serfix.',
             ], 422);
         }
 
@@ -1212,7 +1213,7 @@ class PluginHqController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'send_failed',
-                'message' => 'Could not send the report. Check mail configuration on EBQ.',
+                'message' => 'Could not send the report. Check mail configuration on Serfix.',
             ], 502);
         }
     }
@@ -1381,7 +1382,7 @@ class PluginHqController extends Controller
         return response()->json([
             'ok' => true,
             'audit' => $this->formatPageAuditRow($audit->fresh(['pageAuditReport'])),
-            'message' => 'Analysis queued — open the report on EBQ when it completes.',
+            'message' => 'Analysis queued — open the report on Serfix when it completes.',
         ], 201);
     }
 

@@ -52,7 +52,7 @@ Every `impactFor()` reads this map — so impact/severity differ per user with z
 | `Livewire/Dashboard/SiteHealthStats` | `summary` | dashboard health card |
 | `Livewire/Dashboard/PriorityActionQueue` → `ActionQueueService` | `actionGroups`, `issueRows` | the action queue (merged with GSC/rank/audit sources) |
 | `Livewire/SiteIssues` | `issuesQuery`, `mapFinding`, `typeCounts` | paginated issue detail |
-| `Livewire/LinkStructure/LinkStructurePanel` | `pageLinkStructure` (+ a raw example query — see known-issues) | link-structure explorer |
+| `Livewire/LinkStructure/LinkStructurePanel` | `pageLinkStructure`, `topInboundPages` (cap-filtered examples — the raw query it replaced was the known-issues cap leak, fixed 2026-07-06) | link-structure explorer |
 | `Services/ReportDataService` | `summary`, `actionGroups` | growth-report "Technical SEO" section |
 | `Http/Controllers/Admin/MarketingController` | `summary`, `reportBreakdown` | admin email snapshots |
 | `Services/Ai/ContextBuilder` | `pageIntel` | AI tool context |
@@ -63,17 +63,27 @@ Every `impactFor()` reads this map — so impact/severity differ per user with z
 
 - **`ReportCache`** (`app/Services/ReportCache.php`) — per-website, version-keyed
   (`ws:dataver:{websiteId}` bumped on data change). Cached payloads include the version, so a
-  bump orphans stale keys. Keys: `action-queue:{websiteId}:{version}:…` (600s),
-  `hq:overview:v1:{websiteId}:…:{version}` (24h).
+  bump orphans stale keys. Keys: `action-queue:{websiteId}:{reportVer}:{rankVer}:…` (24h —
+  includes the RankCache version too since 2026-07-06, so hourly rank drops surface without
+  waiting for a GSC sync), `hq:overview:v1:{websiteId}:…:{version}` (24h). All dashboard/
+  statistics Livewire card caches are also version-keyed at 24h as of 2026-07-06 (they were
+  600s, five of them un-versioned — see main.md changelog).
 - **Link-graph BFS cache** — `ls-parents-cs:{crawl_site_id}:{version}` (3600s), keyed on the
   crawl_site (shared) + version.
 - **Flush** — `AnalyzeSiteJob::flushSubscribers` calls `ReportCache::flushWebsite()` for
   **every** subscriber website on crawl finalize (any terminal status). Also flushed by
-  `SyncSearchConsoleData` and `TrackKeywordRankJob`.
+  `SyncSearchConsoleData` and (since 2026-07-06) `SyncAnalyticsData` — GA rows feed the KPI/
+  traffic cards, so a GA sync must orphan them too. `TrackKeywordRankJob` bumps **RankCache**,
+  not ReportCache (the 2026-06-28 split — this doc previously said ReportCache, stale).
+- **`context()` is deliberately click-free** — `CrawlReportService::context()` resolves only
+  `{crawl_site_id, cap}`; the 28d per-user GSC click map (a full GROUP BY page, 20s+ on a
+  1.3M-row site) is lazy via `userClicks()`, built only when a finding-impact path calls
+  `impactFor()`. Before 2026-07-06 it was eager, which made the deliberately-uncached
+  `summary()` (live crawl banner) take ~20s per /dashboard load on big sites.
 
 ## Scoping-leak audit
 
 All AI / plugin / report reads go through `CrawlReportService` or `ReportDataService`
-(GSC-scoped) — **no raw crawl-table reads** there. The one exception is the
-`LinkStructurePanel` example-pages query (cap-window leak, low severity) — see
-[known-issues.md](./known-issues.md).
+(GSC-scoped) — **no raw crawl-table reads** there. (The one former exception — the
+`LinkStructurePanel` example-pages query — was fixed 2026-07-06 via `topInboundPages()`;
+see [known-issues.md](./known-issues.md).)

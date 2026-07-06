@@ -135,10 +135,10 @@ class WebsiteFeatureController extends Controller
             'ai_writer'        => 'AI Writer page',
             'ai_inline'        => 'AI inline block toolbar',
             'live_audit'       => 'Live SEO score / audit',
-            'hq'               => 'EBQ HQ (rank tracking)',
+            'hq'               => 'Serfix HQ (rank tracking)',
             'redirects'        => 'Redirects + 404 tracker',
             'dashboard_widget' => 'Dashboard widget',
-            'post_column'      => 'Posts-list EBQ column',
+            'post_column'      => 'Posts-list Serfix column',
         ];
     }
 }

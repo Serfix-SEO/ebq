@@ -8,7 +8,7 @@
             $landingSchema = [
                 '@context' => 'https://schema.org',
                 '@type' => 'SoftwareApplication',
-                'name' => 'EBQ',
+                'name' => 'Serfix',
                 'applicationCategory' => 'BusinessApplication',
                 'operatingSystem' => 'Web, WordPress',
                 'url' => route('landing'),
@@ -35,27 +35,31 @@
             </h1>
 
             <p class="mx-auto mt-6 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
-                Unify Search Console, Analytics, ranking, audits, and backlinks into one quiet workspace. EBQ tells you what to fix this week, what to ship next, and what changed after release.
+                Unify Search Console, Analytics, ranking, audits, and backlinks into one quiet workspace. Serfix tells you what to fix this week, what to ship next, and what changed after release.
             </p>
 
             {{-- ── Free tools ── --}}
             <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
-                <span class="text-xs font-medium text-slate-400">Free tools:</span>
-                <a href="{{ route('tools.pagespeed') }}" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700">
-                    <svg class="h-3.5 w-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+                <span class="text-xs font-semibold text-slate-500">Free tools:</span>
+                <a href="{{ route('tools.pagespeed') }}" class="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-sm transition hover:border-orange-400 hover:bg-orange-100 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">
+                    <svg class="h-3.5 w-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
                     PageSpeed Test
+                    <svg class="h-3 w-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
                 </a>
-                <a href="{{ route('tools.audit') }}" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700">
-                    <svg class="h-3.5 w-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
+                <a href="{{ route('tools.audit') }}" class="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-sm transition hover:border-orange-400 hover:bg-orange-100 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">
+                    <svg class="h-3.5 w-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
                     SEO Audit
+                    <svg class="h-3 w-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
                 </a>
-                <a href="{{ route('tools.rank-tracker') }}" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700">
-                    <svg class="h-3.5 w-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                <a href="{{ route('tools.rank-tracker') }}" class="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-sm transition hover:border-orange-400 hover:bg-orange-100 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">
+                    <svg class="h-3.5 w-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
                     Rank Checker
+                    <svg class="h-3 w-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
                 </a>
-                <a href="{{ route('tools.keyword-volume') }}" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700">
-                    <svg class="h-3.5 w-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+                <a href="{{ route('tools.keyword-volume') }}" class="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-sm transition hover:border-orange-400 hover:bg-orange-100 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">
+                    <svg class="h-3.5 w-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
                     Volume Checker
+                    <svg class="h-3 w-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
                 </a>
             </div>
 
@@ -63,43 +67,52 @@
             <div class="relative mx-auto mt-10 max-w-3xl">
                 <div aria-hidden="true" class="pointer-events-none absolute -inset-x-8 -inset-y-10 -z-10 bg-[radial-gradient(55%_60%_at_50%_0%,rgba(99,102,241,0.20),transparent_70%)] blur-2xl"></div>
 
+                {{-- Live indicator --}}
+                <div class="mb-4 flex items-center justify-center gap-2">
+                    <span class="flex h-2 w-2 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span class="text-xs font-semibold text-slate-600 tracking-wide">Live tool — enter your URL below and run a free audit</span>
+                </div>
+
                 <form id="guest-audit-form" class="text-left" data-action="{{ route('guest-audit.store') }}" novalidate>
-                    <div class="flex flex-col rounded-[20px] bg-white p-2 shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)] ring-1 ring-slate-200/80 transition focus-within:ring-2 focus-within:ring-indigo-500/70 sm:flex-row sm:items-center sm:divide-x sm:divide-slate-200/70 divide-y divide-slate-100 sm:divide-y-0">
+                    <div class="flex flex-col rounded-[20px] bg-white p-2 shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)] ring-2 ring-orange-200/60 transition hover:ring-orange-300/80 focus-within:ring-2 focus-within:ring-orange-500/70 sm:flex-row sm:items-center sm:divide-x sm:divide-slate-200/70 divide-y divide-slate-100 sm:divide-y-0">
                         {{-- URL --}}
-                        <div class="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5">
-                            <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100">
+                        <div class="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 cursor-text transition-colors hover:bg-slate-50">
+                            <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-100">
                                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12a8.964 8.964 0 0 1-1.318 4.682M12 21a8.997 8.997 0 0 1-7.843-4.582" /></svg>
                             </span>
                             <div class="min-w-0 flex-1">
-                                <label for="ga-url" class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Page URL</label>
+                                <label for="ga-url" class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Page URL</label>
                                 <input id="ga-url" name="url" type="text" inputmode="url" autocomplete="url" autofocus required
                                     placeholder="yourwebsite.com/page"
-                                    class="w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0">
+                                    class="w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0 cursor-text">
                             </div>
                         </div>
 
                         {{-- Keyword --}}
-                        <div class="flex items-center gap-3 px-3 py-2.5 sm:w-52">
+                        <div class="flex items-center gap-3 rounded-xl px-3 py-2.5 cursor-text transition-colors hover:bg-slate-50 sm:w-52">
                             <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200">
                                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
                             </span>
                             <div class="min-w-0 flex-1">
-                                <label for="ga-keyword" class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Keyword</label>
+                                <label for="ga-keyword" class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Keyword</label>
                                 <input id="ga-keyword" name="keyword" type="text" required maxlength="200"
                                     placeholder="best seo tools"
-                                    class="w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0">
+                                    class="w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0 cursor-text">
                             </div>
                         </div>
 
                         {{-- Country --}}
-                        <div class="flex items-center gap-3 px-3 py-2.5 sm:w-44">
+                        <div class="flex items-center gap-3 rounded-xl px-3 py-2.5 cursor-pointer transition-colors hover:bg-slate-50 sm:w-44">
                             <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200">
                                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
                             </span>
                             <div class="min-w-0 flex-1">
-                                <label for="ga-country" class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Country</label>
+                                <label for="ga-country" class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Country</label>
                                 <select id="ga-country" name="country"
-                                    class="-ml-0.5 w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 focus:outline-none focus:ring-0">
+                                    class="-ml-0.5 w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 focus:outline-none focus:ring-0 cursor-pointer">
                                     <option value="">Auto-detect</option>
                                     @foreach (\App\Support\Audit\SerpGlCatalog::selectOptions() as $code => $label)
                                         <option value="{{ $code }}" @selected($code === 'us')>{{ $label }}</option>
@@ -111,7 +124,7 @@
                         {{-- Submit --}}
                         <div class="pt-2 sm:pl-2 sm:pt-0">
                             <button type="submit" id="ga-submit"
-                                class="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 px-6 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-600/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
+                                class="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-orange-600 px-6 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700 hover:shadow-orange-600/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
                                 <svg id="ga-spinner" class="hidden h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                 <span id="ga-label">Run free audit</span>
                                 <svg id="ga-arrow" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5l7.5 7.5-7.5 7.5M21 12H3" /></svg>
@@ -134,7 +147,7 @@
                         <span class="text-slate-300">·</span>
                         <span>No credit card</span>
                         <span class="text-slate-300">—</span>
-                        <a href="{{ route('register') }}" class="font-medium text-indigo-600 underline-offset-2 transition hover:text-indigo-700 hover:underline">or start a free trial →</a>
+                        <a href="{{ route('register') }}" class="font-medium text-orange-600 underline-offset-2 transition hover:text-orange-700 hover:underline">or start a free trial →</a>
                     </p>
                 </form>
 
@@ -157,7 +170,7 @@
         <div id="ga-email-backdrop" class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
         <div role="dialog" aria-modal="true" aria-labelledby="ga-email-title" class="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5">
             <div class="px-7 pt-7">
-                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100">
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-100">
                     <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
                 </span>
                 <h2 id="ga-email-title" class="mt-4 text-xl font-semibold tracking-tight text-slate-900">We'll email you this audit</h2>
@@ -168,12 +181,12 @@
                     <div>
                         <label for="ga-name" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Your name</label>
                         <input id="ga-name" name="name" type="text" autocomplete="name" maxlength="120" required placeholder="Jane Doe"
-                            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500">
                     </div>
                     <div>
                         <label for="ga-email" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Email address</label>
                         <input id="ga-email" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@company.com"
-                            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500">
                     </div>
                 </div>
                 @if (\App\Support\Recaptcha::isEnabled())
@@ -182,7 +195,7 @@
                 <p id="ga-email-error" role="alert" class="mt-3 hidden text-[13px] font-medium text-rose-600"></p>
                 <div class="mt-5 flex flex-col gap-2 sm:flex-row-reverse">
                     <button type="submit" id="ga-email-submit"
-                        class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:from-indigo-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-60">
+                        class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">
                         <svg id="ga-email-spinner" class="hidden h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                         <span id="ga-email-label">Email me my audit</span>
                     </button>
@@ -199,8 +212,8 @@
     <div id="ga-signup-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
         <div id="ga-signup-backdrop" class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
         <div role="dialog" aria-modal="true" aria-labelledby="ga-signup-title" class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5">
-            <div class="bg-gradient-to-br from-indigo-600 to-violet-600 px-7 py-6 text-white">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-100">Keep auditing — free</p>
+            <div class="bg-orange-600 px-7 py-6 text-white">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-orange-100">Keep auditing — free</p>
                 <h2 id="ga-signup-title" class="mt-2 text-2xl font-semibold tracking-tight">Create your free account</h2>
             </div>
             <div class="px-7 py-6">
@@ -226,7 +239,7 @@
                         Maybe later
                     </button>
                 </div>
-                <p class="mt-3 text-center text-xs text-slate-400">Already have an account? <a href="{{ route('login') }}" class="font-medium text-indigo-600 hover:underline">Sign in</a></p>
+                <p class="mt-3 text-center text-xs text-slate-400">Already have an account? <a href="{{ route('login') }}" class="font-medium text-orange-600 hover:underline">Sign in</a></p>
             </div>
         </div>
     </div>
@@ -236,7 +249,7 @@
         <div class="mx-auto max-w-6xl">
             <div class="text-center mb-8">
                 <h2 class="text-3xl font-bold text-slate-900 mb-2">Everything you need to rank.</h2>
-                <div class="h-1 w-20 bg-indigo-600 mx-auto rounded"></div>
+                <div class="h-1 w-20 bg-orange-600 mx-auto rounded"></div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach ([
@@ -248,7 +261,7 @@
                     ['icon' => 'M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z', 'title' => 'GA4 + GSC Integration', 'desc' => 'Connect Search Console and Analytics for a unified view of traffic, rankings, and on-page performance per URL.'],
                 ] as $f)
                     <div class="bg-white p-6 border border-slate-200 rounded-xl hover:shadow-md transition-shadow">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 mb-4">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 text-orange-600 mb-4">
                             <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $f['icon'] }}" /></svg>
                         </div>
                         <h3 class="text-base font-semibold text-slate-900 mb-2">{{ $f['title'] }}</h3>
@@ -260,17 +273,17 @@
     </section>
 
     {{-- ── CTA Banner 1 ────────────────────────────────────────── --}}
-    <section class="bg-indigo-600 py-12 px-6 text-center">
+    <section class="bg-orange-600 py-12 px-6 text-center">
         <h2 class="text-2xl font-semibold text-white mb-4">Same features. A fraction of the price.</h2>
-        <a href="{{ route('register') }}" class="inline-flex items-center justify-center bg-white text-indigo-700 px-8 py-3 rounded-xl font-semibold text-sm hover:shadow-xl transition-all">Start Your 14-Day Free Trial</a>
+        <a href="{{ route('register') }}" class="inline-flex items-center justify-center bg-white text-orange-700 px-8 py-3 rounded-xl font-semibold text-sm hover:shadow-xl transition-all">Start Your 14-Day Free Trial</a>
     </section>
 
-    {{-- ── Why EBQ ─────────────────────────────────────────────── --}}
+    {{-- ── Why Serfix ─────────────────────────────────────────────── --}}
     <section class="bg-white py-20 sm:py-24 px-6">
         <div class="mx-auto max-w-6xl">
             <div class="text-center mb-10">
                 <h2 class="text-3xl font-bold text-slate-900 mb-4">Built for the way modern SEO actually works.</h2>
-                <p class="text-base leading-7 text-slate-600 max-w-2xl mx-auto">Most tools show you data. EBQ turns every signal into a ranked action — so you always know what to work on next.</p>
+                <p class="text-base leading-7 text-slate-600 max-w-2xl mx-auto">Most tools show you data. Serfix turns every signal into a ranked action — so you always know what to work on next.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                 @foreach ([
@@ -279,7 +292,7 @@
                     ['icon' => 'M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'title' => 'Proof after every change', 'desc' => 'Every fix is tracked against rank, click, and CWV deltas. Reports auto-attach the evidence your stakeholders need — without you building a deck.'],
                 ] as $w)
                     <div class="p-6 border border-slate-200 rounded-xl bg-slate-50/60">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white mb-4">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-600 text-white mb-4">
                             <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $w['icon'] }}" /></svg>
                         </div>
                         <h3 class="text-base font-semibold text-slate-900 mb-2">{{ $w['title'] }}</h3>
@@ -304,14 +317,14 @@
                             <th class="py-3.5 pl-6 pr-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Feature</th>
                             <th class="px-4 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">SEMrush</th>
                             <th class="px-4 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ahrefs</th>
-                            <th class="bg-indigo-50 px-4 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-indigo-700">EBQ</th>
+                            <th class="bg-orange-50 px-4 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-orange-700">Serfix</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         @php
                             $checkSvg  = '<svg class="mx-auto h-4 w-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>';
                             $crossSvg  = '<svg class="mx-auto h-4 w-4 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>';
-                            $ebqCheck  = '<svg class="mx-auto h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>';
+                            $ebqCheck  = '<svg class="mx-auto h-4 w-4 text-orange-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>';
                             $rows = [
                                 ['Keyword Research',            'check', 'check', 'ebq'],
                                 ['Technical Site Audit',        'check', 'check', 'ebq'],
@@ -341,8 +354,8 @@
                                         @endif
                                     </td>
                                 @endforeach
-                                <td class="bg-indigo-50/60 px-4 py-3 text-center">
-                                    @if ($ebq === 'agency') <span class="text-[11px] font-medium text-indigo-600">Agency+</span>
+                                <td class="bg-orange-50/60 px-4 py-3 text-center">
+                                    @if ($ebq === 'agency') <span class="text-[11px] font-medium text-orange-600">Agency+</span>
                                     @else {!! $ebqCheck !!}
                                     @endif
                                 </td>
@@ -352,7 +365,7 @@
                             <td class="py-4 pl-6 pr-4 text-[14px] text-slate-900">Starting Price</td>
                             <td class="px-4 py-4 text-center text-[13px] text-slate-400 line-through">$117/mo</td>
                             <td class="px-4 py-4 text-center text-[13px] text-slate-400 line-through">$108/mo</td>
-                            <td class="bg-indigo-50/60 px-4 py-4 text-center text-base font-bold text-indigo-600">$14/mo</td>
+                            <td class="bg-orange-50/60 px-4 py-4 text-center text-base font-bold text-orange-600">$14/mo</td>
                         </tr>
                     </tbody>
                 </table>
@@ -363,8 +376,8 @@
     {{-- ── CTA Banner 2 (dark) ─────────────────────────────────── --}}
     <section class="bg-slate-900 py-12 px-6 text-center">
         <h2 class="text-2xl font-semibold text-white mb-3">14 days. Full access. No card.</h2>
-        <p class="text-slate-400 text-sm mb-6">Experience the full power of EBQ for zero risk.</p>
-        <a href="{{ route('register') }}" class="inline-flex items-center justify-center bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-500 transition-all">Claim Your Trial Now</a>
+        <p class="text-slate-400 text-sm mb-6">Experience the full power of Serfix for zero risk.</p>
+        <a href="{{ route('register') }}" class="inline-flex items-center justify-center bg-orange-600 text-white px-8 py-3 rounded-xl font-semibold text-sm hover:bg-orange-500 transition-all">Claim Your Trial Now</a>
     </section>
 
     {{-- ── Who is this for ─────────────────────────────────────── --}}
@@ -380,7 +393,7 @@
                     ['icon' => 'M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z', 'title' => 'SME Business Owner', 'desc' => 'Powerful enough for experts, simple enough for founders. High-end SEO features at a price that makes sense for your stage — free plan included.'],
                 ] as $p)
                     <div class="flex flex-col items-center rounded-2xl border border-slate-200 p-8 text-center bg-slate-50/60 hover:-translate-y-1 transition-transform">
-                        <div class="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 mb-5">
+                        <div class="flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 text-orange-600 mb-5">
                             <svg class="h-7 w-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $p['icon'] }}" /></svg>
                         </div>
                         <h3 class="text-base font-semibold text-slate-900 mb-3">{{ $p['title'] }}</h3>
@@ -398,13 +411,30 @@
             return $svgCheck;
         };
     @endphp
-    <section id="pricing" class="bg-slate-50/60 py-20 sm:py-24 px-6">
+    <section id="pricing" class="bg-slate-50/60 py-20 sm:py-24 px-6" x-data="{ billing: 'annual' }">
         <div class="mx-auto max-w-6xl">
-            <div class="text-center mb-10">
+            <div class="text-center mb-8">
                 <h2 class="text-3xl font-bold text-slate-900 mb-3">Transparent Pricing</h2>
-                <p class="text-base text-slate-600 mb-2">From free to enterprise — scale your SEO without switching tools.</p>
+                <p class="text-base text-slate-600 mb-5">From free to enterprise — scale your SEO without switching tools.</p>
+                {{-- Billing toggle --}}
+                <div class="inline-flex rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+                    <button
+                        @click="billing = 'monthly'"
+                        :class="billing === 'monthly' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                        class="rounded-full px-5 py-1.5 text-sm font-semibold transition">
+                        Monthly
+                    </button>
+                    <button
+                        @click="billing = 'annual'"
+                        :class="billing === 'annual' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                        class="inline-flex items-center gap-2 rounded-full px-5 py-1.5 text-sm font-semibold transition">
+                        Annual
+                        <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Save 26%</span>
+                    </button>
+                </div>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 items-start">
 
                 {{-- Trial (free) --}}
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
@@ -416,9 +446,7 @@
                     <p class="text-xs text-slate-500 mb-5">Free forever. No card required.</p>
                     <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
                         @foreach (['1 website', '1 team seat', '20k crawl budget', '20 tracked keywords', '50 keyword searches/mo', '25k AI tokens/mo', '2 long-form articles', 'WordPress plugin', 'GA4 + GSC integration'] as $item)
-                            <li class="flex items-center gap-2">
-                                {!! $ck('') !!}{{ $item }}
-                            </li>
+                            <li class="flex items-center gap-2">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
                     <a href="{{ route('register') }}" class="block w-full py-2.5 text-center rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:border-slate-400 hover:text-slate-900 transition-all">Start free</a>
@@ -428,59 +456,84 @@
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Solo</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-bold text-slate-900">$19</span>
+                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'annual'">$14</span>
+                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'monthly'" style="display:none">$19</span>
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-5">$168 billed annually</p>
+                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">$168 billed annually</p>
+                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">Billed monthly.</p>
                     <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
                         @foreach (['3 websites', '1 team seat', '100k crawl budget', '100 tracked keywords', '250 keyword searches/mo', '60k AI tokens/mo', '5 long-form articles', 'WordPress plugin', 'GA4 + GSC integration'] as $item)
-                            <li class="flex items-center gap-2">
-                                {!! $ck('') !!}{{ $item }}
-                            </li>
+                            <li class="flex items-center gap-2">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
-                    <a href="{{ route('register', ['plan' => 'solo']) }}" class="block w-full py-2.5 text-center rounded-xl border border-indigo-600 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 transition-all">Get started</a>
+                    <a data-url-annual="{{ route('register', ['plan' => 'solo']) }}"
+                       data-url-monthly="{{ route('register', ['plan' => 'solo', 'interval' => 'monthly']) }}"
+                       :href="billing === 'monthly' ? $el.dataset.urlMonthly : $el.dataset.urlAnnual"
+                       class="block w-full py-2.5 text-center rounded-xl border border-orange-600 text-orange-600 font-semibold text-sm hover:bg-orange-50 transition-all">Get started</a>
                 </div>
 
                 {{-- Pro (Most Popular) --}}
-                <div class="relative bg-white p-6 rounded-2xl border-2 border-indigo-600 flex flex-col shadow-xl lg:-translate-y-3">
-                    <span class="absolute -top-3 left-5 inline-flex items-center rounded-full bg-indigo-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">Most Popular</span>
+                <div class="relative bg-white p-6 rounded-2xl border-2 border-orange-600 flex flex-col shadow-xl lg:-translate-y-3">
+                    <span class="absolute -top-3 left-5 inline-flex items-center rounded-full bg-orange-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">Most Popular</span>
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Pro</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-bold text-slate-900">$49</span>
+                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'annual'">$37</span>
+                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'monthly'" style="display:none">$49</span>
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-5">$444 billed annually</p>
+                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">$444 billed annually</p>
+                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">Billed monthly.</p>
                     <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
                         @foreach (['All Solo features', '10 websites', '3 team seats', '300k crawl budget', '500 tracked keywords', '1,000 keyword searches/mo', '150k AI tokens/mo', '15 long-form articles', 'Scheduled reports'] as $item)
-                            <li class="flex items-center gap-2 {{ $item === 'All Solo features' ? 'font-semibold' : '' }}">
-                                {!! $ck('') !!}{{ $item }}
-                            </li>
+                            <li class="flex items-center gap-2 {{ $item === 'All Solo features' ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
-                    <a href="{{ route('register', ['plan' => 'pro']) }}" class="block w-full py-2.5 text-center rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-500 transition-all">Get started</a>
+                    <a data-url-annual="{{ route('register', ['plan' => 'pro']) }}"
+                       data-url-monthly="{{ route('register', ['plan' => 'pro', 'interval' => 'monthly']) }}"
+                       :href="billing === 'monthly' ? $el.dataset.urlMonthly : $el.dataset.urlAnnual"
+                       class="block w-full py-2.5 text-center rounded-xl bg-orange-600 text-white font-semibold text-sm hover:bg-orange-500 transition-all">Get started</a>
                 </div>
 
                 {{-- Agency --}}
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Agency</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-bold text-slate-900">$99</span>
+                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'annual'">$74</span>
+                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'monthly'" style="display:none">$99</span>
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-5">$888 billed annually</p>
+                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">$888 billed annually</p>
+                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">Billed monthly.</p>
                     <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
                         @foreach (['All Pro features', '30 websites', '10 team seats', '1M crawl budget', '2,000 tracked keywords', '4,000 keyword searches/mo', '600k AI tokens/mo', '50 long-form articles', 'White-label reports'] as $item)
-                            <li class="flex items-center gap-2 {{ $item === 'All Pro features' ? 'font-semibold' : '' }}">
-                                {!! $ck('') !!}{{ $item }}
-                            </li>
+                            <li class="flex items-center gap-2 {{ $item === 'All Pro features' ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
-                    <a href="{{ route('register', ['plan' => 'agency']) }}" class="block w-full py-2.5 text-center rounded-xl border border-indigo-600 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 transition-all">Get started</a>
+                    <a data-url-annual="{{ route('register', ['plan' => 'agency']) }}"
+                       data-url-monthly="{{ route('register', ['plan' => 'agency', 'interval' => 'monthly']) }}"
+                       :href="billing === 'monthly' ? $el.dataset.urlMonthly : $el.dataset.urlAnnual"
+                       class="block w-full py-2.5 text-center rounded-xl border border-orange-600 text-orange-600 font-semibold text-sm hover:bg-orange-50 transition-all">Get started</a>
+                </div>
+
+                {{-- Enterprise --}}
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Enterprise</p>
+                    <div class="flex items-baseline gap-1 mb-1">
+                        <span class="text-4xl font-bold text-slate-900">Custom</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-5">Contact us for pricing.</p>
+                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
+                        @foreach (['Unlimited websites', 'Unlimited team seats', 'Custom crawl budget', 'Unlimited keywords', 'SSO & custom integrations', 'Dedicated support + SLA', 'White-label reports', 'WordPress plugin', 'GA4 + GSC integration'] as $item)
+                            <li class="flex items-center gap-2">{!! $ck('') !!}{{ $item }}</li>
+                        @endforeach
+                    </ul>
+                    <a href="{{ route('contact') }}" class="block w-full py-2.5 text-center rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:border-slate-400 hover:text-slate-900 transition-all">Contact us</a>
                 </div>
             </div>
+
             <div class="mt-8 text-center space-y-2">
-                <p class="text-xs font-semibold text-indigo-600">SEMrush starts at $117/mo. Ahrefs at $108/mo. You do the math.</p>
+                <p class="text-xs font-semibold text-orange-600">SEMrush starts at $117/mo. Ahrefs at $108/mo. You do the math.</p>
                 <p class="text-xs text-slate-500">Start free — no credit card. Upgrade anytime. <a href="{{ route('pricing') }}" class="font-semibold text-slate-700 hover:underline">View full pricing + Enterprise →</a></p>
             </div>
         </div>
@@ -492,8 +545,8 @@
             <h2 class="text-3xl font-bold text-slate-900 mb-4">Ready to dominate search results?</h2>
             <p class="text-base leading-7 text-slate-600 mb-8">The SEO platform built for teams that ship. Every feature. One price. Start free.</p>
             <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                <a href="{{ route('register') }}" class="inline-flex items-center justify-center bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-500 transition-all shadow-lg w-full sm:w-auto">Start Free Trial Now</a>
-                <a href="{{ route('contact') }}" class="inline-flex items-center justify-center border border-indigo-600 text-indigo-600 px-8 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-50 transition-all w-full sm:w-auto">Request Demo</a>
+                <a href="{{ route('register') }}" class="inline-flex items-center justify-center bg-orange-600 text-white px-8 py-3 rounded-xl font-semibold text-sm hover:bg-orange-500 transition-all shadow-lg w-full sm:w-auto">Start Free Trial Now</a>
+                <a href="{{ route('contact') }}" class="inline-flex items-center justify-center border border-orange-600 text-orange-600 px-8 py-3 rounded-xl font-semibold text-sm hover:bg-orange-50 transition-all w-full sm:w-auto">Request Demo</a>
             </div>
         </div>
     </section>

@@ -1,7 +1,7 @@
 <x-layouts.guest>
     <div>
         <h1 class="text-2xl font-bold tracking-tight text-slate-900">Welcome back</h1>
-        <p class="mt-2 text-sm text-slate-600">Sign in to your EBQ account</p>
+        <p class="mt-2 text-sm text-slate-600">Sign in to your Serfix account</p>
     </div>
 
     @error('auth')
@@ -34,7 +34,7 @@
         <div>
             <label for="email" class="mb-1.5 block text-xs font-medium text-slate-700">Email address</label>
             <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus autocomplete="username"
-                class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
             @error('email')
                 <p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>
             @enderror
@@ -43,7 +43,7 @@
         <div>
             <label for="password" class="mb-1.5 block text-xs font-medium text-slate-700">Password</label>
             <input id="password" name="password" type="password" required autocomplete="current-password"
-                class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
             @error('password')
                 <p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>
             @enderror
@@ -51,7 +51,7 @@
 
         <div class="flex items-center">
             <input id="remember" name="remember" type="checkbox" value="1"
-                class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
             <label for="remember" class="ml-2 text-sm text-slate-600">Remember me</label>
         </div>
 

@@ -20,7 +20,7 @@
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden;">
                     <tr>
                         <td style="padding:28px 32px 8px;">
-                            <p style="margin:0 0 4px; font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#4f46e5;">SEO crawl report</p>
+                            <p style="margin:0 0 4px; font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#F26419;">SEO crawl report</p>
                             <h1 style="margin:0; font-size:22px; line-height:1.3; color:#0f172a;">{{ $website->domain }}</h1>
                             <p style="margin:14px 0 0; font-size:14px; line-height:1.6; color:#475569;">
                                 @if ($recipientName)Hi {{ $recipientName }},@endif
@@ -141,7 +141,7 @@
                         <td style="padding:20px 32px 28px;">
                             <table role="presentation" cellpadding="0" cellspacing="0">
                                 <tr>
-                                    <td style="border-radius:10px; background:#4f46e5;">
+                                    <td style="border-radius:10px; background:#F26419;">
                                         <a href="{{ $dashboardUrl }}" style="display:inline-block; padding:13px 26px; font-size:14px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:10px;">Open your dashboard →</a>
                                     </td>
                                 </tr>

@@ -12,7 +12,7 @@
     {{-- ═══ Header ═══ --}}
     <header class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div class="px-5 pt-4">
-            <a href="{{ route('pages.index') }}" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400">
+            <a href="{{ route('pages.index') }}" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400">
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
                 Back to pages
             </a>
@@ -25,7 +25,7 @@
                 @if ($headerLocaleLabel)
                     <span class="inline-flex max-w-[14rem] items-center truncate rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-800 dark:border-sky-800 dark:bg-sky-500/10 dark:text-sky-200" title="From latest audit HTML">{{ $headerLocaleLabel }}</span>
                 @endif
-                <a href="{{ $pageUrl }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-400">
+                <a href="{{ $pageUrl }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:border-orange-300 hover:text-orange-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-orange-400">
                     Open
                     <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                 </a>
@@ -35,7 +35,7 @@
         {{-- Actions --}}
         <div class="flex flex-wrap items-center gap-2 px-5 pt-3">
             <button type="button" wire:click="preparePageAudit" wire:loading.attr="disabled" wire:target="preparePageAudit,confirmPageAuditWithSerpCountry"
-                    class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                 <span wire:loading.remove wire:target="preparePageAudit,confirmPageAuditWithSerpCountry">Audit this page</span>
                 <span wire:loading wire:target="preparePageAudit,confirmPageAuditWithSerpCountry">Auditing…</span>
@@ -97,14 +97,14 @@
                     <p class="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">Pick the market used for the SERP organic snapshot (competitor sample and rank-in-top-10 check).</p>
                 @endif
                 <label for="serp-country-gl" class="mt-4 block text-xs font-semibold text-slate-700 dark:text-slate-300">Country</label>
-                <select id="serp-country-gl" wire:model="serpCountryGl" class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                <select id="serp-country-gl" wire:model="serpCountryGl" class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
                     @foreach (\App\Support\Audit\SerpGlCatalog::selectOptions() as $code => $label)
                         <option value="{{ $code }}">{{ $label }}</option>
                     @endforeach
                 </select>
                 <div class="mt-5 flex flex-wrap justify-end gap-2">
                     <button type="button" wire:click="cancelPageAuditSerpCountryModal" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">Cancel</button>
-                    <button type="button" wire:click="confirmPageAuditWithSerpCountry" wire:loading.attr="disabled" wire:target="confirmPageAuditWithSerpCountry" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400">
+                    <button type="button" wire:click="confirmPageAuditWithSerpCountry" wire:loading.attr="disabled" wire:target="confirmPageAuditWithSerpCountry" class="rounded-lg bg-orange-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-500 disabled:opacity-60 dark:bg-orange-500 dark:hover:bg-orange-400">
                         <span wire:loading.remove wire:target="confirmPageAuditWithSerpCountry">Run audit</span>
                         <span wire:loading wire:target="confirmPageAuditWithSerpCountry">Auditing…</span>
                     </button>
@@ -119,7 +119,7 @@
             @foreach ([
                 ['label' => 'Clicks', 'value' => number_format($summary->total_clicks), 'color' => 'text-blue-600 dark:text-blue-400', 'icon' => 'M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z'],
                 ['label' => 'Impressions', 'value' => number_format($summary->total_impressions), 'color' => 'text-emerald-600 dark:text-emerald-400', 'icon' => 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z'],
-                ['label' => 'Avg CTR', 'value' => number_format(($summary->avg_ctr ?? 0) * 100, 1).'%', 'color' => 'text-violet-600 dark:text-violet-400', 'icon' => 'M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zm-7.518-.267A8.25 8.25 0 1120.25 10.5M8.288 14.212A5.25 5.25 0 1117.25 10.5'],
+                ['label' => 'Avg CTR', 'value' => number_format(($summary->avg_ctr ?? 0) * 100, 1).'%', 'color' => 'text-orange-600 dark:text-orange-400', 'icon' => 'M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zm-7.518-.267A8.25 8.25 0 1120.25 10.5M8.288 14.212A5.25 5.25 0 1117.25 10.5'],
                 ['label' => 'Avg Position', 'value' => number_format($summary->avg_position ?? 0, 1), 'color' => 'text-amber-600 dark:text-amber-400', 'icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'],
             ] as $card)
                 <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -209,7 +209,7 @@
                         <a
                             href="{{ route('page-audits.show', $auditReport) }}"
                             wire:navigate
-                            class="inline-flex h-9 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                            class="inline-flex h-9 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-500 dark:bg-orange-500 dark:hover:bg-orange-400"
                         >
                             Latest report
                         </a>
@@ -239,11 +239,11 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                             @foreach ($pageAuditRuns as $run)
-                                <tr @class(['bg-indigo-50/40 dark:bg-indigo-500/5' => $auditReport && $run->page_audit_report_id === $auditReport->id])>
+                                <tr @class(['bg-orange-50/40 dark:bg-orange-500/5' => $auditReport && $run->page_audit_report_id === $auditReport->id])>
                                     <td class="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300" title="{{ $run->created_at->toIso8601String() }}">{{ $run->created_at->diffForHumans() }}</td>
                                     <td class="px-3 py-2">
                                         @if ($run->source === \App\Models\CustomPageAudit::SOURCE_CUSTOM)
-                                            <span class="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">Custom</span>
+                                            <span class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-800 dark:bg-orange-500/20 dark:text-orange-200">Custom</span>
                                         @else
                                             <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-600 dark:text-slate-200">Page</span>
                                         @endif
@@ -268,7 +268,7 @@
                                     </td>
                                     <td class="whitespace-nowrap px-3 py-2 text-right">
                                         @if ($run->page_audit_report_id)
-                                            <a href="{{ route('page-audits.show', $run->page_audit_report_id) }}" wire:navigate class="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">View</a>
+                                            <a href="{{ route('page-audits.show', $run->page_audit_report_id) }}" wire:navigate class="font-semibold text-orange-600 hover:text-orange-500 dark:text-orange-400">View</a>
                                         @else
                                             <span class="text-slate-400">—</span>
                                         @endif

@@ -24,8 +24,8 @@
                     <p style="margin: 12px 0 0; font-size: 12px; color: #64748b;">No organic row matched your site’s domain in this snapshot.</p>
                 @endif
             </td>
-            <td style="width: 50%; vertical-align: top; padding: 12px 14px; border-radius: 10px; border: 1px solid #c7d2fe; background: #eef2ff;">
-                <p style="margin: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #3730a3;">Your page (audit snapshot)</p>
+            <td style="width: 50%; vertical-align: top; padding: 12px 14px; border-radius: 10px; border: 1px solid #FBD1BB; background: #FEF0E7;">
+                <p style="margin: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #9F3D09;">Your page (audit snapshot)</p>
                 <p style="margin: 6px 0 0; font-size: 10px; line-height: 1.45; color: #475569;">Title and meta description from fetched HTML.</p>
                 @if ($hasAudited)
                     @if (! empty($ys['audited_page_display']))

@@ -328,7 +328,7 @@ class LiveSeoScoreService
                 'running'    => 'Audit running — refreshes when complete.',
                 'queued'     => 'Audit queued — refreshes when complete.',
                 'refreshing' => 'Re-auditing in the background — factor refreshes when the run finishes.',
-                'blocked'    => 'Publish the post (or change visibility from Private to Public) so EBQ\'s external auditor can fetch it. Lighthouse / Core Web Vitals require a publicly reachable URL.',
+                'blocked'    => 'Publish the post (or change visibility from Private to Public) so Serfix\'s external auditor can fetch it. Lighthouse / Core Web Vitals require a publicly reachable URL.',
                 default      => 'No audit on file. Trigger one from HQ → Page Audits.',
             };
             $factors[] = $this->pendingFactor('core_web_vitals', 'Core Web Vitals', $msg);
@@ -401,7 +401,7 @@ class LiveSeoScoreService
         // as the dominant reason regardless of GSC state — fixing post
         // visibility unblocks both halves once the post is also indexed.
         if ($auditStatus === 'blocked') {
-            return 'Provisional score — this post isn\'t publicly accessible yet, so EBQ\'s external auditor can\'t run Lighthouse / Core Web Vitals on it. Publish (or change visibility from Private to Public) to enable the full audit. The on-page placement, links, and content checks below run from the editor content directly and stay live.';
+            return 'Provisional score — this post isn\'t publicly accessible yet, so Serfix\'s external auditor can\'t run Lighthouse / Core Web Vitals on it. Publish (or change visibility from Private to Public) to enable the full audit. The on-page placement, links, and content checks below run from the editor content directly and stay live.';
         }
 
         if (! $gscHasData && ! $auditReady) {
@@ -469,7 +469,7 @@ class LiveSeoScoreService
             };
             return [
                 'status' => 'blocked',
-                'message' => "Audit needs the page to be publicly accessible. This post is {$human}, so EBQ's external auditor can't fetch it for Lighthouse / Core Web Vitals checks. Once you publish (or change visibility from Private to Public), the audit auto-runs and the score sharpens.",
+                'message' => "Audit needs the page to be publicly accessible. This post is {$human}, so Serfix's external auditor can't fetch it for Lighthouse / Core Web Vitals checks. Once you publish (or change visibility from Private to Public), the audit auto-runs and the score sharpens.",
                 'audited_at' => $auditReady && $latest ? $latest->audited_at?->toIso8601String() : null,
                 'post_status' => $postStatus,
             ];
@@ -498,10 +498,10 @@ class LiveSeoScoreService
             // factor data is from the last audit but a refresh is on the way.
             $status = $auditStale && $auditReady ? 'refreshing' : $inFlight->status;
             $message = $status === 'refreshing'
-                ? 'Post was updated since the last audit — EBQ is re-auditing now. Factor data will refresh automatically.'
+                ? 'Post was updated since the last audit — Serfix is re-auditing now. Factor data will refresh automatically.'
                 : ($inFlight->status === CustomPageAudit::STATUS_RUNNING
-                    ? 'EBQ is auditing this page right now. Usually takes 30–90s.'
-                    : 'Audit queued. EBQ will run it in the background — score will refresh automatically.');
+                    ? 'Serfix is auditing this page right now. Usually takes 30–90s.'
+                    : 'Audit queued. Serfix will run it in the background — score will refresh automatically.');
 
             return [
                 'status' => $status,
@@ -550,7 +550,7 @@ class LiveSeoScoreService
             if ($auditStale && $auditReady) {
                 return [
                     'status' => 'refreshing',
-                    'message' => 'Post was updated since the last audit — EBQ is re-auditing now. Factor data will refresh automatically.',
+                    'message' => 'Post was updated since the last audit — Serfix is re-auditing now. Factor data will refresh automatically.',
                     'queued_at' => $queued->queued_at?->toIso8601String(),
                     'previous_audited_at' => $latest?->audited_at?->toIso8601String(),
                 ];
@@ -558,7 +558,7 @@ class LiveSeoScoreService
 
             return [
                 'status' => 'queued',
-                'message' => 'EBQ is auditing this page for the first time. Usually takes 30–90s — your score will refresh automatically.',
+                'message' => 'Serfix is auditing this page for the first time. Usually takes 30–90s — your score will refresh automatically.',
                 'queued_at' => $queued->queued_at?->toIso8601String(),
             ];
         } catch (\Throwable $e) {
@@ -694,7 +694,7 @@ class LiveSeoScoreService
                 'score' => 50,
                 'weight' => 12,
                 'detail' => 'No URL Inspection data yet for this page.',
-                'recommendation' => 'Open Search Console → URL Inspection on this URL so EBQ can check whether Google is indexing it. Indexing health is a hard precondition for any traffic.',
+                'recommendation' => 'Open Search Console → URL Inspection on this URL so Serfix can check whether Google is indexing it. Indexing health is a hard precondition for any traffic.',
             ];
         }
 
@@ -988,7 +988,7 @@ class LiveSeoScoreService
                 'score' => 50,
                 'weight' => 7,
                 'detail' => $reason,
-                'recommendation' => 'Once Google starts surfacing impressions for this URL, EBQ will check whether your focus keyphrase appears in the title, H1, and meta description — the three slots that move the needle most.',
+                'recommendation' => 'Once Google starts surfacing impressions for this URL, Serfix will check whether your focus keyphrase appears in the title, H1, and meta description — the three slots that move the needle most.',
             ];
         }
 
@@ -1082,7 +1082,7 @@ class LiveSeoScoreService
             $kwText = $focusKeyword !== null && $focusKeyword !== '' ? '"' . $focusKeyword . '"' : 'the focus keyphrase';
             $auditTitle = trim((string) data_get($audit->result, 'metadata.title', ''));
             $reconcileHint = ($auditTitle !== '' && ! $inTitle && $focusKeyword !== null && $focusKeyword !== '')
-                ? sprintf(' Heads-up: the audit fetched the live page and parsed the <title> tag as "%s". If that doesn\'t match what you set in the EBQ SEO field, another plugin or theme may be overriding the title — check the page\'s rendered HTML.', mb_substr($auditTitle, 0, 140))
+                ? sprintf(' Heads-up: the audit fetched the live page and parsed the <title> tag as "%s". If that doesn\'t match what you set in the Serfix SEO field, another plugin or theme may be overriding the title — check the page\'s rendered HTML.', mb_substr($auditTitle, 0, 140))
                 : '';
             $recommendation = sprintf(
                 'Place %s in the missing slot%s: %s. Title and H1 carry the most weight; meta description influences CTR (which loops back into rank).%s',
@@ -1203,7 +1203,7 @@ class LiveSeoScoreService
                 : 'Focus keyword is not yet tracked.',
             'recommendation' => $tracked
                 ? null
-                : 'Add this keyphrase to Rank Tracker so EBQ can monitor weekly position, SERP features, and competitor changes.',
+                : 'Add this keyphrase to Rank Tracker so Serfix can monitor weekly position, SERP features, and competitor changes.',
             'action' => $tracked || $focusKeyword === null || $focusKeyword === ''
                 ? null
                 : [
@@ -1334,10 +1334,10 @@ class LiveSeoScoreService
     private function buildExplanation(int $score, float $rankBasis, bool $cannibalized, int $coverage, bool $kwKnown, string $auditStatus): string
     {
         if (in_array($auditStatus, ['queued', 'running'], true)) {
-            return 'EBQ is auditing this page in the background. The score above uses GSC + indexing + backlinks while the on-page audit completes — it will refresh automatically with Core Web Vitals, performance, on-page SEO, technical health, and content-quality factors once the audit finishes.';
+            return 'Serfix is auditing this page in the background. The score above uses GSC + indexing + backlinks while the on-page audit completes — it will refresh automatically with Core Web Vitals, performance, on-page SEO, technical health, and content-quality factors once the audit finishes.';
         }
         if ($auditStatus === 'refreshing') {
-            return 'Post was edited since the last audit — EBQ is re-auditing now. The audit-derived factors below show the previous run\'s data; they\'ll refresh automatically when the new audit completes.';
+            return 'Post was edited since the last audit — Serfix is re-auditing now. The audit-derived factors below show the previous run\'s data; they\'ll refresh automatically when the new audit completes.';
         }
         if ($score >= 65) {
             return sprintf('Live performance is strong. Average rank %.0f across %d queries. Keep adding internal links and tracking competitor moves to defend the position.', $rankBasis, $coverage);

@@ -123,7 +123,7 @@ as `''` and collided.
 |---|---|
 | `google_accounts` | Connected Google login; tokens **encrypted**; unique `(user_id, google_id)`. `GoogleAccount.php`. |
 | `microsoft_accounts` | Connected Outlook login (mail send only); same shape. `MicrosoftAccount.php`. |
-| `search_console_data` | The **big** GSC fact table (query×page×country×device×date), tens of millions of rows; unique `sc_unique`; several covering indexes. `SearchConsoleData.php`. |
+| `search_console_data` | The **big** GSC fact table (query×page×country×device×date); unique `sc_unique (website_id,date,query,page,country,device)`; covering indexes: `(website_id,date)`, `(website_id,date,query)`, `(website_id,page,date)` ← PageDetail, `(website_id,country)` ← CountryFilter/top-countries, `(website_id,query,clicks,impressions,ctr,position)`, `(website_id,date,position)`. Use `->where('date','>=',…)` not `->whereDate(…)` — the latter wraps in `date()` and kills the index. `SearchConsoleData.php`. |
 | `analytics_data` | GA4 daily traffic-by-source; unique `(website_id, date, source)`. `AnalyticsData.php`. |
 | `page_indexing_statuses` | GSC URL-Inspection verdict per page; unique `(website_id, page)`. `PageIndexingStatus.php`. |
 

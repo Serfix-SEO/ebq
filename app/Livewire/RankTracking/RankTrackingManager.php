@@ -155,7 +155,7 @@ class RankTrackingManager extends Component
 
         $rows = SearchConsoleData::query()
             ->where('website_id', $this->websiteId)
-            ->whereDate('date', '>=', $since)
+            ->where('date', '>=', $since)
             ->where('query', '!=', '')
             ->when($country !== '', fn ($q) => $q->where('country', $country))
             ->selectRaw('query, SUM(impressions) as impressions, SUM(clicks) as clicks, AVG(position) as position, AVG(ctr) as ctr')
@@ -544,7 +544,7 @@ class RankTrackingManager extends Component
             if (! empty($keywords) && $this->websiteId) {
                 $gscRows = SearchConsoleData::query()
                     ->where('website_id', $this->websiteId)
-                    ->whereDate('date', '>=', $since)
+                    ->where('date', '>=', $since)
                     ->whereIn(DB::raw('LOWER(`query`)'), $keywords)
                     ->when($this->filterCountry !== '', fn ($q) => $q->where('country', strtoupper($this->filterCountry)))
                     ->selectRaw('LOWER(`query`) as q, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')

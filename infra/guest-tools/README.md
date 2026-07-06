@@ -81,15 +81,18 @@ the lead is marked converted on capture. `Lead::markConvertedFor($user)` fires f
 
 ## Gotchas / known issues
 
-- **Cookie-only friction is trivially bypassable.** The 1/2/3 limit lives in a client cookie;
-  clearing it (or a fresh browser) resets to free. Per-IP `RateLimiter` is the real backstop, and
-  even that is shared NAT-blind. This is intentional (lead-gen, not a paywall) but means the "free
-  checks" are effectively unlimited to a determined user.
+- **Cookie-only friction is trivially bypassable — by design, not a bug.** The 1/2/3 limit lives
+  in a client cookie; clearing it (or a fresh browser) resets to free. Per-IP `RateLimiter` is the
+  real backstop, and even that is shared NAT-blind. This is intentional (lead-gen, not a paywall)
+  — the checked-2026-07-06 sweep left this alone on purpose; don't "fix" it into a hard limit
+  without confirming that's actually wanted, it'd change the product's funnel intent.
 - **Results are protected only by the unguessable token.** No auth on `show()`/`status()`; the
   "emailed, not shown" rule is just the JSON omitting `results_url`. Don't treat guest reports as private.
-- **PageSpeed lead has no `source`.** `GuestPageSpeedController` calls `Lead::capture($email, $name, null)`
-  with no 4th arg, so its leads are tagged `guest_audit`, not a pagespeed-specific source — funnel
-  attribution for PageSpeed is lost.
+- **Fixed 2026-07-06 — PageSpeed lead now tagged `guest_pagespeed`.** `GuestPageSpeedController`
+  used to call `Lead::capture($email, $name, null)` with no 4th arg, silently falling back to the
+  `guest_audit` source default — PageSpeed funnel attribution was lost. Added
+  `Lead::SOURCE_GUEST_PAGESPEED` and passed it explicitly. Covered by
+  `test_second_run_lead_is_tagged_with_the_pagespeed_source` in `tests/Feature/GuestPageSpeedTest.php`.
 - **No GC / retention.** None of the four guest tables are pruned here; rows (with IP + email) accumulate
   indefinitely. Add a scheduled cleanup if volume grows.
 - **Email failures are swallowed.** All four jobs `try/catch` the `Mail::send` and only `Log::warning` —

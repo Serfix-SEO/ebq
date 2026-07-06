@@ -81,8 +81,8 @@ return [
     // clean minute up to rate_max. If a domain's recent fetch latency rises above
     // baseline × rate_degrade_factor it backs off (halves) BEFORE getting blocked.
     // rate_min_samples = fetches needed before the latency signal is trusted.
-    'rate_step' => (int) env('CRAWLER_RATE_STEP', 10),
-    'rate_max' => (int) env('CRAWLER_RATE_MAX', 100),
+    'rate_step' => (int) env('CRAWLER_RATE_STEP', 1),
+    'rate_max' => (int) env('CRAWLER_RATE_MAX', 15),
     'rate_degrade_factor' => (float) env('CRAWLER_RATE_DEGRADE_FACTOR', 1.5),
     'rate_min_samples' => (int) env('CRAWLER_RATE_MIN_SAMPLES', 8),
 

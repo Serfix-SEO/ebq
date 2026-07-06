@@ -101,7 +101,8 @@ class CrawlFetcher
             $redirectTarget = $redirected ? (string) end($history) : null;
 
             $keep = [];
-            foreach (['server', 'x-powered-by', 'x-generator', 'via', 'cf-ray', 'cf-cache-status', 'cf-mitigated', 'x-robots-tag', 'content-type'] as $h) {
+            foreach (['server', 'x-powered-by', 'x-generator', 'via', 'cf-ray', 'cf-cache-status', 'cf-mitigated', 'x-robots-tag', 'content-type',
+                      'x-sucuri-id', 'x-sucuri-cache', 'x-sg-cdn', 'x-iinfo', 'x-amz-cf-id', 'x-akamai-transformed'] as $h) {
                 $v = (string) $response->header($h);
                 if ($v !== '') {
                     $keep[$h] = $v;

@@ -91,7 +91,7 @@ class RankTrackingKeyword extends Model
     {
         $q = SearchConsoleData::query()
             ->where('website_id', $this->website_id)
-            ->whereRaw('LOWER(`query`) = ?', [mb_strtolower(trim($this->keyword))]);
+            ->where('query', mb_strtolower(trim($this->keyword)));
 
         if ($device !== null && $device !== '') {
             $q->where('device', strtoupper($device));

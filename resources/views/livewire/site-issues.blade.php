@@ -165,7 +165,7 @@
                         @if (! empty($row['fix_url']) && ! empty($row['fix_allowed']))
                             <a href="{{ $row['fix_url'] }}"
                                 @if (! empty($row['fix_new_tab'])) target="_blank" rel="noopener" @else wire:navigate @endif
-                                class="inline-flex flex-none items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500">
+                                class="inline-flex flex-none items-center gap-1 rounded-md bg-orange-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-500">
                                 Fix
                                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
                             </a>

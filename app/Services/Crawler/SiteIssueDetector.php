@@ -60,6 +60,12 @@ class SiteIssueDetector
 
     public function detect(CrawlSite $website, CrawlRun $run): int
     {
+        // Capture before any row() calls so stale resolution (last_seen_at < $detectStart)
+        // only resolves findings NOT touched this run. If captured after detection, every
+        // freshly-built row (last_seen_at = now() during detection) would satisfy
+        // last_seen_at < $detectStart and be immediately resolved → 0 findings shown.
+        $detectStart = now();
+
         $this->pending = [];
         $this->loadClicks($website);
         $this->loadBrokenReferrers($website);
@@ -91,7 +97,17 @@ class SiteIssueDetector
         $this->detectDuplicateContent($website, $importantClicks);
         $this->detectRobotsBlocked($website);
 
-        return $this->flush($website->id, $run->id);
+        $count = $this->flush($website->id, $run->id);
+
+        // Any finding not refreshed in this run is stale (issue no longer exists).
+        // Mark it resolved so it disappears from the open-findings UI.
+        DB::table('crawl_findings')
+            ->where('crawl_site_id', $website->id)
+            ->where('status', 'open')
+            ->where('last_seen_at', '<', $detectStart)
+            ->update(['status' => 'resolved', 'resolved_at' => now(), 'updated_at' => now()]);
+
+        return $count;
     }
 
     /**
@@ -157,12 +173,18 @@ class SiteIssueDetector
             ->whereNull('redirect_target')
             ->where($column, '!=', '')
             ->whereNotNull($column)
-            ->select($column, 'id', 'url', 'url_hash', 'crawl_site_id')
+            ->select($column, 'id', 'url', 'url_hash', 'crawl_site_id', 'canonical_url')
             ->get()
             ->groupBy($column)
             ->filter(fn ($pages) => $pages->count() > 1);
 
         foreach ($groups as $value => $pages) {
+            // All pages share the same canonical → duplication is intentional, not a bug.
+            $canonicals = $pages->pluck('canonical_url')->filter()->unique();
+            if ($canonicals->count() === 1) {
+                continue;
+            }
+
             foreach ($pages as $page) {
                 $clicks = $this->clicks[$page->url_hash] ?? 0;
                 $others = $pages->reject(fn ($p) => $p->id === $page->id)->pluck('url')->values()->all();
@@ -191,12 +213,18 @@ class SiteIssueDetector
             ->whereNull('redirect_target')
             ->where('word_count', '>', 0)
             ->whereNotNull('content_hash')
-            ->select('content_hash', 'id', 'url', 'url_hash', 'crawl_site_id')
+            ->select('content_hash', 'id', 'url', 'url_hash', 'crawl_site_id', 'canonical_url')
             ->get()
             ->groupBy('content_hash')
             ->filter(fn ($pages) => $pages->count() > 1);
 
         foreach ($groups as $pages) {
+            // All pages share the same canonical → intentional deduplication, not a bug.
+            $canonicals = $pages->pluck('canonical_url')->filter()->unique();
+            if ($canonicals->count() === 1) {
+                continue;
+            }
+
             foreach ($pages as $page) {
                 $clicks = $this->clicks[$page->url_hash] ?? 0;
                 $others = $pages->reject(fn ($p) => $p->id === $page->id)->pluck('url')->values()->all();
@@ -216,11 +244,15 @@ class SiteIssueDetector
         $signals = $page->seo_signals ?? [];
         $sev = fn (string $withClicks, string $without) => $clicks >= max(1, $importantClicks) ? $withClicks : $without;
 
-        // Broken page (URL known to GSC/sitemap/internal links returns 4xx/5xx).
-        // Carry discovery provenance so the fix surface can say where it came from
-        // (which internal pages link to it, the sitemap, or Search Console history)
-        // instead of leaving the user with a bare 404 and nowhere to look.
-        if ($status >= 400) {
+        // Broken page (URL known to GSC/sitemap/internal links returns 4xx).
+        // Excluded: 5xx (transient server errors — rate-limit, bot-protection, temp
+        // outage) and 429 (Too Many Requests — we hit the site too fast; page exists).
+        // Only hard client-error codes (404, 410, 400, 403, etc.) mean the page is
+        // genuinely gone or forbidden. Carry discovery provenance so the fix surface
+        // can say where it came from (which internal pages link to it, the sitemap,
+        // or Search Console history) instead of leaving the user with a bare 404 and
+        // nowhere to look.
+        if ($status >= 400 && $status < 500 && $status !== 429) {
             $ref = $this->referrers[$page->url_hash] ?? null;
             $detail = ['http_status' => $status, 'inbound_internal' => $ref['count'] ?? 0];
             if ($page->source_sitemap) {
@@ -327,6 +359,12 @@ class SiteIssueDetector
             return; // remaining checks only meaningful for live, indexable pages
         }
 
+        // seo_signals=null means HTML parser never ran (non-HTML response, first-crawl
+        // bot-block, or pre-WAF-detection crawl). Skip all onpage checks — no signal to analyse.
+        if ($page->seo_signals === null) {
+            return;
+        }
+
         // On-page SEO.
         $title = (string) $page->title;
         $titleLen = mb_strlen($title);
@@ -426,6 +464,8 @@ class SiteIssueDetector
             ->where('l.crawl_site_id', $website->id)
             ->where('l.status', 'discovered')
             ->where('t.http_status', '>=', 400)
+            ->where('t.http_status', '<', 500)
+            ->where('t.http_status', '!=', 429)
             ->select('t.id', 't.url', 't.url_hash', 't.http_status', DB::raw('COUNT(*) as inbound'))
             ->groupBy('t.id', 't.url', 't.url_hash', 't.http_status')
             ->orderByDesc('inbound')
@@ -490,7 +530,7 @@ class SiteIssueDetector
             // Click-to-chat/shortlink services 302 by design (e.g. wa.me -> api.whatsapp.com)
             // — not a site issue, not actionable by the owner. Confirmed 2026-06-23 on a
             // real site: every wa.me "Order on WhatsApp" link was flagged as external_redirect.
-            $isKnownRedirector = $this->isKnownRedirector($href);
+            $isKnownRedirector = $this->isKnownRedirector($href) || $this->isKnownAntibotHost($href);
             if (! empty($p['redirected']) && ! $isKnownRedirector) {
                 $this->pending['ext_redirect|'.CrawlFinding::hashUrl($href)] = $this->row(
                     $website->id, $run->id, $fromId,
@@ -499,11 +539,10 @@ class SiteIssueDetector
                 );
             }
             $status = $p['status'];
-            $isUntrustedAntibotBlock = $status !== null
-                && in_array($status, self::ANTIBOT_BLOCK_STATUSES, true)
-                && $this->isKnownAntibotHost($href);
-            // 403 from any external host almost always means WAF/bot-blocking, not a dead link —
-            // not actionable by the site owner, so skip it universally.
+            // Known social/antibot hosts always block bots — skip regardless of status.
+            // Their share/profile URLs are never dead links, any response is untrustworthy.
+            $isUntrustedAntibotBlock = $this->isKnownAntibotHost($href);
+            // 403 from any external host almost always means WAF/bot-blocking, not a dead link.
             $isAccessBlocked = $status === 403;
             if ($isUntrustedAntibotBlock || $isAccessBlocked) {
                 Log::info('crawler.broken_external.antibot_skip', [

@@ -30,7 +30,7 @@
             <div class="px-5 py-4">
                 {{-- Loading state while the Google pool is fetched --}}
                 <div wire:loading.flex wire:target="open" class="items-center justify-center gap-2 py-8 text-xs text-slate-500" role="status">
-                    <svg class="h-4 w-4 animate-spin text-indigo-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                    <svg class="h-4 w-4 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
                     Loading your Google properties…
                 </div>
 
@@ -55,7 +55,7 @@
                         <form wire:submit="saveSources" class="space-y-3">
                             <div>
                                 <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Google Analytics (GA4) Property</label>
-                                <select wire:model="gaSelection" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                                <select wire:model="gaSelection" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                                     <option value="">Not connected</option>
                                     @foreach ($gaOptions as $opt)
                                         <option value="{{ $opt['account_id'] }}|{{ $opt['id'] }}">{{ $opt['name'] }} ({{ $opt['id'] }}) — {{ $opt['account_label'] }}</option>
@@ -65,7 +65,7 @@
 
                             <div>
                                 <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Search Console Site</label>
-                                <select wire:model="gscSelection" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                                <select wire:model="gscSelection" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                                     <option value="">Not connected</option>
                                     @foreach ($gscOptions as $opt)
                                         <option value="{{ $opt['account_id'] }}|{{ $opt['siteUrl'] }}">{{ $opt['siteUrl'] }} — {{ $opt['account_label'] }}</option>
@@ -73,13 +73,13 @@
                                 </select>
                             </div>
 
-                            <a href="{{ route('google.redirect', ['return' => 'settings.integrations']) }}" class="block text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">
+                            <a href="{{ route('google.redirect', ['return' => 'settings.integrations']) }}" class="block text-[11px] font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400">
                                 Property on a different Google account? Connect another →
                             </a>
 
                             <div class="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
                                 <button type="button" x-on:click="show = false" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-slate-500 transition hover:text-slate-700 dark:hover:text-slate-300">Cancel</button>
-                                <button type="submit" wire:loading.attr="disabled" wire:target="saveSources" class="inline-flex h-8 items-center rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                                <button type="submit" wire:loading.attr="disabled" wire:target="saveSources" class="inline-flex h-8 items-center rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
                                     <span wire:loading.remove wire:target="saveSources">Save &amp; sync</span>
                                     <span wire:loading wire:target="saveSources">Saving…</span>
                                 </button>

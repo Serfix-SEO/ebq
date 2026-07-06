@@ -1,6 +1,6 @@
 <x-layouts.app>
     @php
-        /** @var array $cfg @var array $serverTypes @var \Illuminate\Support\Collection $dbNodes @var array $dbCfg @var array $dbServerTypes @var array $moveOptions */
+        /** @var array $cfg @var array $serverTypes @var \Illuminate\Support\Collection $dbNodes @var array $dbCfg @var array $dbServerTypes*/
         $num = fn ($k, $v) => view('admin.fleet._num', ['k' => $k, 'v' => $v]);
     @endphp
     <div class="space-y-5">
@@ -8,7 +8,7 @@
         <div>
             <h1 class="text-2xl font-bold tracking-tight">Fleet</h1>
             <p class="mt-1 max-w-3xl text-sm text-slate-500">
-                Every Hetzner box EBQ runs, on one screen. Two independent pools:
+                Every Hetzner box Serfix runs, on one screen. Two independent pools:
                 <span class="font-medium text-slate-700 dark:text-slate-200">crawl workers</span> (elastic compute that pulls jobs)
                 and <span class="font-medium text-slate-700 dark:text-slate-200">database shards</span> (MariaDB nodes that hold the data).
                 Pick a tab below.
@@ -49,7 +49,7 @@
                 <p><span class="font-semibold">Everything is async.</span>
                     Provision / bootstrap / migrate / move / drain / destroy are dispatched as background <span class="font-mono text-xs">App\Jobs\Fleet\*</span> jobs on the <span class="font-mono text-xs">fleet</span> queue, processed only by the root <span class="font-mono text-xs">ebq-queue-fleet</span> worker on the web box (they SSH/rsync and take minutes). The tables here update on their own as jobs progress.</p>
                 <p><span class="font-semibold">Proof.</span> The full lifecycle is exercised end-to-end by a browser test — see the screenshot slideshow at
-                    <a href="{{ route('admin.fleet-test') }}" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">/admin/fleet-test</a>.</p>
+                    <a href="{{ route('admin.fleet-test') }}" class="font-medium text-orange-600 hover:underline dark:text-orange-400">/admin/fleet-test</a>.</p>
             </div>
         </details>
 
@@ -139,7 +139,7 @@
                     {{ $num('min_box_lifetime_s', $cfg['min_box_lifetime_s']) }}
                 </div>
                 <div class="mt-4">
-                    <button class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Save settings</button>
+                    <button class="rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700">Save settings</button>
                 </div>
             </form>
         </section>
@@ -150,64 +150,9 @@
                 MariaDB shard nodes. Tenant data shards by owner (<span class="font-mono text-xs">websites.db_node_id</span>); crawl data shards by domain (<span class="font-mono text-xs">crawl_sites.crawl_node_id</span>). Identity / billing / catalogs stay on the central primary. Unlike workers, these hold <span class="font-medium">live data</span> — destroy only ever deletes an <em>empty</em> node.
             </p>
 
-            {{-- Nodes --}}
-            <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900/40">
-                        <tr>
-                            <th class="px-3 py-2">Node</th><th class="px-3 py-2">Role</th><th class="px-3 py-2">Status</th>
-                            <th class="px-3 py-2">IP / DB</th><th class="px-3 py-2">Tenants</th><th class="px-3 py-2">Sites</th>
-                            <th class="px-3 py-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60">
-                        @forelse ($dbNodes as $n)
-                            <tr>
-                                <td class="px-3 py-2"><div class="font-medium">{{ $n->name }}</div><div class="font-mono text-[10px] text-slate-400">{{ $n->id }}</div>@if ($n->is_pinned)<span class="text-[10px] font-semibold text-indigo-600">PINNED PRIMARY</span>@endif</td>
-                                <td class="px-3 py-2">{{ $n->role }}</td>
-                                <td class="px-3 py-2"><span class="rounded px-1.5 py-0.5 text-[11px] font-semibold {{ $n->status === 'active' ? 'bg-emerald-100 text-emerald-700' : ($n->status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600') }}">{{ $n->status }}</span>@if ($n->last_error)<div class="text-[10px] text-red-500">{{ \Illuminate\Support\Str::limit($n->last_error, 60) }}</div>@endif</td>
-                                <td class="px-3 py-2 text-xs">{{ $n->private_ip }}<br><span class="text-slate-400">{{ $n->db_name }}</span></td>
-                                <td class="px-3 py-2">{{ $n->tenant_count }}</td>
-                                <td class="px-3 py-2">{{ $n->site_count }}</td>
-                                <td class="px-3 py-2">
-                                    @unless ($n->is_pinned)
-                                        <div class="flex flex-wrap gap-1">
-                                            <form method="POST" action="{{ route('admin.db-fleet.bootstrap', $n) }}" onsubmit="return confirm('Bootstrap (configure + migrate) this node?')">@csrf<button class="rounded border border-slate-300 px-2 py-0.5 text-[11px] hover:bg-slate-50">bootstrap</button></form>
-                                            <form method="POST" action="{{ route('admin.db-fleet.migrate', $n) }}">@csrf<button class="rounded border border-slate-300 px-2 py-0.5 text-[11px] hover:bg-slate-50">migrate</button></form>
-                                            <form method="POST" action="{{ route('admin.db-fleet.drain', $n) }}">@csrf<button class="rounded border border-slate-300 px-2 py-0.5 text-[11px] hover:bg-slate-50">drain</button></form>
-                                            <form method="POST" action="{{ route('admin.db-fleet.destroy', $n) }}" onsubmit="return confirm('Destroy this node? (must be empty)')">@csrf<button class="rounded border border-red-300 px-2 py-0.5 text-[11px] text-red-600 hover:bg-red-50">destroy</button></form>
-                                        </div>
-                                    @endunless
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="7" class="px-3 py-6 text-center text-sm text-slate-400">No nodes registered. Register the primary to begin.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            <p class="text-[11px] text-slate-400">bootstrap = configure MariaDB + run migrations · migrate = re-run migrations on the node · drain = stop placing new tenants here · destroy = delete the (empty) Hetzner server. The pinned primary cannot be drained or destroyed.</p>
-
-            {{-- Operator actions --}}
-            <div class="flex flex-wrap gap-2">
-                <form method="POST" action="{{ route('admin.db-fleet.register-primary') }}">@csrf<button class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Register primary</button></form>
-                <form method="POST" action="{{ route('admin.db-fleet.provision') }}" onsubmit="return confirm('Provision a tenant-shard node on Hetzner?')">@csrf<input type="hidden" name="role" value="tenant-shard"><button class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">+ Provision tenant node</button></form>
-                <form method="POST" action="{{ route('admin.db-fleet.provision') }}" onsubmit="return confirm('Provision a crawl-shard node on Hetzner?')">@csrf<input type="hidden" name="role" value="crawl-shard"><button class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">+ Provision crawl node</button></form>
-            </div>
-
-            {{-- Move a tenant / crawl-site --}}
-            <form method="POST" action="{{ route('admin.db-fleet.move') }}" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-2 dark:border-slate-700 dark:bg-slate-800" onsubmit="return confirm('Move this data to the target node now?')">
-                @csrf
-                <h2 class="text-sm font-semibold">Move data between nodes</h2>
-                <p class="text-xs text-slate-400">Pick <span class="font-medium">tenant</span> to move one user (all their websites' data) or <span class="font-medium">crawl</span> to move one site's crawl data. Runs in the background behind a migrating-lock; reversible until the source is purged.</p>
-                <div class="flex flex-wrap items-end gap-2">
-                    <label class="text-xs">Kind<select id="moveKind" name="kind" class="mt-0.5 block rounded border-slate-300 text-xs"><option value="tenant">tenant (user)</option><option value="crawl">crawl (crawl_site)</option></select></label>
-                    <label class="text-xs">Search<input id="moveSearch" type="text" autocomplete="off" class="mt-0.5 block w-44 rounded border-slate-300 text-xs" placeholder="filter by name / domain…"></label>
-                    <label class="text-xs">Id<select id="moveId" name="id" required class="mt-0.5 block w-72 rounded border-slate-300 text-xs"></select></label>
-                    <label class="text-xs">Target node<select name="to" class="mt-0.5 block rounded border-slate-300 text-xs">@foreach ($dbNodes as $n)<option value="{{ $n->id }}">{{ $n->name }} ({{ $n->role }})</option>@endforeach</select></label>
-                    <button class="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500">Move</button>
-                </div>
-            </form>
+            {{-- Nodes + residents + move form + live move progress (Livewire, wire:poll —
+                 replaces the old static table + window.location.reload loop) --}}
+            <livewire:admin.db-shard-panel />
 
             {{-- Settings --}}
             <form method="POST" action="{{ route('admin.db-fleet.settings') }}" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-3 dark:border-slate-700 dark:bg-slate-800">
@@ -240,7 +185,7 @@
 
     <script>
         (function () {
-            var ACTIVE_CLS = ['border-indigo-500', 'text-indigo-600'];
+            var ACTIVE_CLS = ['border-orange-500', 'text-orange-600'];
             var IDLE_CLS = ['border-transparent', 'text-slate-500', 'hover:text-slate-700', 'hover:border-slate-300'];
             var tabs = Array.prototype.slice.call(document.querySelectorAll('.fleet-tab'));
             var panels = Array.prototype.slice.call(document.querySelectorAll('[data-panel]'));
@@ -266,46 +211,6 @@
                 });
             });
 
-            // Searchable move-form dropdown: options switch with Kind (tenant=users / crawl=crawl-sites).
-            var OPTS = @json($moveOptions);
-            var kindEl = document.getElementById('moveKind'),
-                searchEl = document.getElementById('moveSearch'),
-                idEl = document.getElementById('moveId');
-            function renderId() {
-                var kind = kindEl.value,
-                    q = searchEl.value.trim().toLowerCase(),
-                    prev = idEl.value,
-                    list = (OPTS[kind] || []).filter(function (o) {
-                        return !q || o.label.toLowerCase().indexOf(q) !== -1 || o.id.toLowerCase().indexOf(q) !== -1;
-                    });
-                idEl.innerHTML = '';
-                if (!list.length) {
-                    var none = document.createElement('option');
-                    none.value = ''; none.disabled = true; none.textContent = q ? 'no match' : 'none available';
-                    idEl.appendChild(none);
-                    return;
-                }
-                list.forEach(function (item) {
-                    var o = document.createElement('option');
-                    o.value = item.id; o.textContent = item.label + '  ·  ' + item.id;
-                    idEl.appendChild(o);
-                });
-                if (prev && list.some(function (i) { return i.id === prev; })) idEl.value = prev;
-            }
-            kindEl.addEventListener('change', function () { searchEl.value = ''; renderId(); });
-            searchEl.addEventListener('input', renderId);
-            renderId();
-
-            // DB nodes change via background FLEET jobs and are NOT live (crawl workers
-            // are, via wire:poll). Gently reload while the Database-shards tab is open so
-            // provisioning → active appears — but never while a field is focused, and
-            // never on the workers tab (Livewire already polls it).
-            setInterval(function () {
-                if (active !== 'data') return;
-                var a = document.activeElement;
-                if (a && ['INPUT', 'SELECT', 'TEXTAREA'].indexOf(a.tagName) !== -1) return;
-                window.location.reload();
-            }, 10000);
         })();
     </script>
 </x-layouts.app>

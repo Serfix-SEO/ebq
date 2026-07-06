@@ -85,7 +85,14 @@ default 28 — used by audits/keyword windows, not the sync window).
 
 - **`gsc_site_url` / `ga_property_id` empty-string ≠ null.** The columns are NOT-NULL strings; a
   pay-first / placeholder site stores `''`, which `hasGsc()`/`hasGa()` (and the sync guards)
-  treat as *absent*. Don't assume null.
+  treat as *absent*. Don't assume null. **Audited 2026-07-06** (repo-wide grep of every
+  `gsc_site_url`/`ga_property_id` read-path): every consumer already checks both — `hasGsc()`/
+  `hasGa()` (`Website.php:567,577`), all 4 job guards (`SyncSearchConsoleData`,
+  `SyncPageIndexingStatus`, `SyncSitemaps`, `SyncAnalyticsData`), the one raw `whereNotNull()`
+  query (`CrawlWebsites.php:102`, paired with `!= ''`), `PageDetail.php`/`PluginHqController.php`
+  (check `=== ''` only, which is sufficient since the DB schema enforces NOT NULL — a real row can
+  never actually be null). No live bug found — this is a gotcha to stay careful about in *new*
+  code, not a currently-broken path.
 - **`country`/`device` default `''`** — GSC rows without those dimensions (or older backfills)
   sort into the empty bucket; they're part of the unique key, so re-syncing with the full
   dimension set creates *new* rows rather than updating the bucketed ones (hence the

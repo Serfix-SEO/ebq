@@ -131,8 +131,8 @@ class MailTransport extends Component
         $message = (new SymfonyEmail())
             ->from(new \Symfony\Component\Mime\Address($row->from_address, $row->display_name ?? ''))
             ->to(new \Symfony\Component\Mime\Address($user->email))
-            ->subject('Test: EBQ report transport')
-            ->html('<p>Sent from your configured EBQ report mail transport. If you can read this, the transport is working.</p>');
+            ->subject('Test: Serfix report transport')
+            ->html('<p>Sent from your configured Serfix report mail transport. If you can read this, the transport is working.</p>');
 
         try {
             if ($row->provider === MailTransportModel::PROVIDER_SMTP) {

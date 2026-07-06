@@ -48,13 +48,24 @@ class CrawlReportService
      */
     private const GSC_SOURCED_TYPES = ['indexed_not_in_sitemap'];
 
-    /** @var array<int,array{cs:?int,cap:int,clicks:array<string,int>}> per-request memo */
+    /** @var array<int,array{cs:?int,cap:int}> per-request memo */
     private array $ctx = [];
+
+    /** @var array<string,array<string,int>> per-request memo, built on first impactFor() call */
+    private array $clicks = [];
 
     /**
      * Resolve a website to its shared-crawl read context (cached per request).
      *
-     * @return array{cs:?int,cap:int,clicks:array<string,int>}
+     * Deliberately does NOT load the 28d GSC click map — that's a full
+     * GROUP BY page over the website's search_console_data (20s+ on a
+     * 1.3M-row site) and only the finding-impact paths need it. Loading it
+     * here made every context() consumer pay for it; summary() (called on
+     * every /dashboard load, uncached by design for the live crawl banner)
+     * was spending ~all of its time building a click map it never read
+     * (found 2026-07-06). Clicks are lazy via userClicks() instead.
+     *
+     * @return array{cs:?int,cap:int}
      */
     private function context(string $websiteId): array
     {
@@ -64,35 +75,36 @@ class CrawlReportService
             return [
                 'cs' => $website?->crawl_site_id,
                 'cap' => $website ? (int) $website->crawlPageCap() : 0,
-                'clicks' => $this->loadUserClicks($websiteId),
             ];
         })();
     }
 
-    /** This website's own 28d GSC clicks, keyed by url_hash (per-user impact). */
-    private function loadUserClicks(string $websiteId): array
+    /** This website's own 28d GSC clicks, keyed by url_hash (per-user impact). Lazy + memoized. */
+    private function userClicks(string $websiteId): array
     {
-        $since = Carbon::now()->subDays(28)->toDateString();
-        $clicks = [];
-        SearchConsoleData::query()
-            ->where('website_id', $websiteId)
-            ->whereDate('date', '>=', $since)
-            ->where('page', '!=', '')
-            ->select('page', DB::raw('SUM(clicks) as c'))
-            ->groupBy('page')
-            ->chunk(2000, function ($rows) use (&$clicks): void {
-                foreach ($rows as $r) {
-                    $clicks[WebsitePage::hashUrl((string) $r->page)] = (int) $r->c;
-                }
-            });
+        return $this->clicks[$websiteId] ??= (function () use ($websiteId): array {
+            $since = Carbon::now()->subDays(28)->toDateString();
+            $clicks = [];
+            SearchConsoleData::query()
+                ->where('website_id', $websiteId)
+                ->whereDate('date', '>=', $since)
+                ->where('page', '!=', '')
+                ->select('page', DB::raw('SUM(clicks) as c'))
+                ->groupBy('page')
+                ->chunk(2000, function ($rows) use (&$clicks): void {
+                    foreach ($rows as $r) {
+                        $clicks[WebsitePage::hashUrl((string) $r->page)] = (int) $r->c;
+                    }
+                });
 
-        return $clicks;
+            return $clicks;
+        })();
     }
 
     /** Per-user impact (clicks-at-risk) for a finding's URL. */
     private function impactFor(string $websiteId, string $urlHash): int
     {
-        return (int) ($this->context($websiteId)['clicks'][$urlHash] ?? 0);
+        return (int) ($this->userClicks($websiteId)[$urlHash] ?? 0);
     }
 
     /**
@@ -119,6 +131,22 @@ class CrawlReportService
 
         return $q->where('crawl_site_id', $ctx['cs'])
             ->where(fn (Builder $v) => $v->whereNull('value_rank')->orWhere('value_rank', '<=', $ctx['cap']));
+    }
+
+    /**
+     * Top-N most-inbound-linked crawled pages, inside this user's cap window.
+     * Used to suggest example URLs (Link Structure panel) — cap-filtered so a
+     * small-cap user is never shown pages outside their window (found
+     * 2026-07-06: the caller used to query WebsitePage directly with no cap
+     * filter at all).
+     *
+     * @return list<string>
+     */
+    public function topInboundPages(string $websiteId, int $limit = 8): array
+    {
+        return $this->windowPages($websiteId)
+            ->whereNotNull('last_crawled_at')->whereNull('removed_at')
+            ->orderByDesc('inbound_link_count')->limit($limit)->pluck('url')->all();
     }
 
     /**
@@ -378,9 +406,21 @@ class CrawlReportService
             ];
         }
 
+        // Broken internal links carry referrers (the source page(s) linking to the
+        // dead URL) in detail — surface the first one inline, same as broken_external
+        // does with its source page, so the user isn't forced to click through to
+        // Page Health just to see what to fix.
+        $referrers = $f->detail['referrers'] ?? [];
+        $sourcePrefix = '';
+        if ($referrers !== []) {
+            $first = $this->shortUrl($referrers[0]['url'] ?? null);
+            $extra = count($referrers) - 1;
+            $sourcePrefix = 'Linked from '.$first.($extra > 0 ? " (+{$extra} more)" : '').' · ';
+        }
+
         return [
             'title' => $this->shortUrl($f->affected_url),
-            'subtitle' => $this->describe($f),
+            'subtitle' => $sourcePrefix.$this->describe($f),
             'metric' => $impact > 0 ? number_format($impact).' clicks (28d)' : null,
             'fix_url' => route('link-structure.index', ['url' => $f->affected_url, 'issue' => $f->type]),
             'fix_feature' => 'link_structure',

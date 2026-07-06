@@ -39,23 +39,60 @@ class MarketingController extends Controller
             ->whereHas('crawlSite', fn ($cs) => $cs
                 ->whereHas('crawlRuns', fn ($r) => $r->where('status', CrawlRun::STATUS_COMPLETED))
                 ->whereHas('crawlFindings', fn ($f) => $f->where('status', CrawlFinding::STATUS_OPEN)))
-            ->with('user:id,name,email')
+            ->with(['user:id,name,email', 'crawlSite:id'])
             ->when($q !== '', fn ($query) => $query->where('domain', 'like', '%'.$q.'%'))
             ->orderBy('domain')
             ->paginate(25)
             ->withQueryString();
 
-        // Per-row crawl numbers. summary() reads each site's latest run; 25 rows
-        // per page keeps this well within a normal admin-page query budget.
-        $rows = $websites->getCollection()->map(function (Website $w): array {
-            $s = $this->crawl->summary($w->id);
+        $crawlSiteIds = $websites->getCollection()->pluck('crawlSite.id')->filter()->values()->all();
+
+        // Batch: latest run + latest completed run per crawl_site (2 queries total).
+        $latestRuns = CrawlRun::whereIn('crawl_site_id', $crawlSiteIds)
+            ->orderByDesc('started_at')
+            ->get(['id', 'crawl_site_id', 'status', 'health_score', 'started_at', 'finished_at', 'blocked_reason'])
+            ->groupBy('crawl_site_id')
+            ->map(fn ($runs) => [
+                'latest'    => $runs->first(),
+                'completed' => $runs->firstWhere('status', CrawlRun::STATUS_COMPLETED),
+            ]);
+
+        // Batch: open finding severity counts per crawl_site (1 query).
+        $findingCounts = CrawlFinding::whereIn('crawl_site_id', $crawlSiteIds)
+            ->where('status', CrawlFinding::STATUS_OPEN)
+            ->select('crawl_site_id', 'severity', \Illuminate\Support\Facades\DB::raw('COUNT(*) as c'))
+            ->groupBy('crawl_site_id', 'severity')
+            ->get()
+            ->groupBy('crawl_site_id')
+            ->map(fn ($rows) => $rows->pluck('c', 'severity'));
+
+        // Batch: crawled page counts per crawl_site (1 query).
+        $pageCounts = \App\Models\WebsitePage::whereIn('crawl_site_id', $crawlSiteIds)
+            ->whereNull('removed_at')
+            ->whereNotNull('last_crawled_at')
+            ->select('crawl_site_id', \Illuminate\Support\Facades\DB::raw('COUNT(*) as c'))
+            ->groupBy('crawl_site_id')
+            ->pluck('c', 'crawl_site_id');
+
+        $rows = $websites->getCollection()->map(function (Website $w) use ($latestRuns, $findingCounts, $pageCounts): array {
+            $csId = $w->crawlSite?->id;
+            $runs = $latestRuns[$csId] ?? ['latest' => null, 'completed' => null];
+            $display = $runs['completed'] ?? $runs['latest'];
+            $sev = $findingCounts[$csId] ?? collect();
 
             return [
-                'website' => $w,
-                'health' => $s['health_score'],
-                'counts' => $s['findings'],
-                'last_crawled_at' => $s['last_crawled_at'],
-                'run_status' => $s['run_status'],
+                'website'        => $w,
+                'health'         => $display?->health_score,
+                'counts'         => [
+                    'critical' => (int) ($sev['critical'] ?? 0),
+                    'high'     => (int) ($sev['high'] ?? 0),
+                    'medium'   => (int) ($sev['medium'] ?? 0),
+                    'low'      => (int) ($sev['low'] ?? 0),
+                    'total'    => (int) $sev->sum(),
+                ],
+                'last_crawled_at' => $display?->finished_at ?? $display?->started_at,
+                'run_status'      => $runs['latest']?->status,
+                'pages_total'     => (int) ($pageCounts[$csId] ?? 0),
             ];
         });
 
@@ -63,10 +100,10 @@ class MarketingController extends Controller
             ->latest('id')->limit(10)->get();
 
         return view('admin.marketing.index', [
-            'websites' => $websites,
-            'rows' => $rows,
-            'recentSends' => $recentSends,
-            'q' => $q,
+            'websites'     => $websites,
+            'rows'         => $rows,
+            'recentSends'  => $recentSends,
+            'q'            => $q,
         ]);
     }
 

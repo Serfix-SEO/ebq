@@ -28,7 +28,7 @@
                   class="flex items-center gap-2">
                 <input type="search" name="q" value="{{ $q }}"
                        placeholder="Search by domain"
-                       class="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                       class="text-sm border-gray-300 rounded-md shadow-sm focus:border-orange-500 focus:ring-orange-500" />
                 <button type="submit"
                         class="text-sm font-medium px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700">
                     Search
@@ -47,13 +47,13 @@
              every install (connected AND unconnected). Visually distinct
              so admins understand the blast radius. --}}
         <form method="POST" action="{{ route('admin.website-features.global-update') }}"
-              class="mb-6 rounded-lg border border-violet-200 bg-violet-50/60 shadow-sm">
+              class="mb-6 rounded-lg border border-orange-200 bg-orange-50/60 shadow-sm">
             @csrf
             @method('PUT')
-            <div class="px-4 py-3 border-b border-violet-200 flex items-center justify-between">
+            <div class="px-4 py-3 border-b border-orange-200 flex items-center justify-between">
                 <div>
-                    <h2 class="text-sm font-semibold text-violet-900">⚠️ Global feature kill-switch</h2>
-                    <p class="text-xs text-violet-700 mt-0.5">
+                    <h2 class="text-sm font-semibold text-orange-900">⚠️ Global feature kill-switch</h2>
+                    <p class="text-xs text-orange-700 mt-0.5">
                         Master toggles that override every per-website flag below. Reaches connected sites
                         within seconds (next API call) and unconnected sites within ~6 hours (next plugin
                         update check). Turning a feature OFF here hides it from every installation, even ones
@@ -61,7 +61,7 @@
                     </p>
                 </div>
                 <button type="submit"
-                        class="text-xs font-medium px-3 py-1.5 rounded-md bg-violet-700 text-white hover:bg-violet-600 whitespace-nowrap">
+                        class="text-xs font-medium px-3 py-1.5 rounded-md bg-orange-700 text-white hover:bg-orange-600 whitespace-nowrap">
                     Save global flags
                 </button>
             </div>
@@ -72,12 +72,12 @@
                                name="global_features[{{ $key }}]"
                                value="1"
                                @checked($global_flags[$key] ?? true)
-                               class="mt-0.5 h-4 w-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500">
+                               class="mt-0.5 h-4 w-4 rounded border-orange-300 text-orange-600 focus:ring-orange-500">
                         <div>
-                            <div class="text-xs font-medium text-violet-900">
+                            <div class="text-xs font-medium text-orange-900">
                                 {{ $feature_labels[$key] ?? $key }}
                             </div>
-                            <div class="text-[10px] uppercase tracking-wide text-violet-600/70 mt-0.5">
+                            <div class="text-[10px] uppercase tracking-wide text-orange-600/70 mt-0.5">
                                 {{ $key }}
                             </div>
                         </div>
@@ -135,8 +135,8 @@
                                 : array_fill_keys(\App\Models\Website::FEATURE_KEYS, true);
                             $tierTone = match ($effectiveTier) {
                                 'free'    => 'bg-gray-100 text-gray-700',
-                                'pro'     => 'bg-violet-100 text-violet-800',
-                                'startup' => 'bg-indigo-100 text-indigo-800',
+                                'pro'     => 'bg-orange-100 text-orange-800',
+                                'startup' => 'bg-orange-100 text-orange-800',
                                 'agency'  => 'bg-emerald-100 text-emerald-800',
                                 default   => 'bg-gray-100 text-gray-700',
                             };
@@ -175,7 +175,7 @@
                                                        name="feature_flags[{{ $key }}]"
                                                        value="1"
                                                        @checked(array_key_exists($key, $stored) ? (bool) $stored[$key] : true)
-                                                       class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                                       class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500">
                                             </label>
                                         @else
                                             <span class="inline-flex flex-col items-center gap-0.5"
@@ -195,7 +195,7 @@
                                 @endforeach
                                 <td class="px-3 py-3 text-right">
                                     <button type="submit"
-                                            class="text-xs font-medium px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-500">
+                                            class="text-xs font-medium px-3 py-1.5 rounded-md bg-orange-600 text-white hover:bg-orange-500">
                                         Save
                                     </button>
                                 </td>
@@ -209,7 +209,7 @@
                                     No websites match "{{ $q }}".
                                 @else
                                     No websites yet. Once a customer connects their WordPress
-                                    site via the EBQ plugin, it'll appear here.
+                                    site via the Serfix plugin, it'll appear here.
                                 @endif
                             </td>
                         </tr>
@@ -224,7 +224,7 @@
 
         <p class="mt-6 text-xs text-gray-500">
             <strong>How feature toggles propagate:</strong> the WordPress plugin caches the
-            flag map for 12 hours. Toggles take effect on the next plugin → EBQ API call
+            flag map for 12 hours. Toggles take effect on the next plugin → Serfix API call
             (passive sync via every API response carrying a fresh <code>features</code>
             field), or at the latest within 12 hours when the local transient expires.
             Toggling a feature OFF retracts every UI surface, REST route, and enqueued

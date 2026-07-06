@@ -1,5 +1,5 @@
 <x-marketing.page
-    title="Website Revamp for Business Sites | More Leads & Sales | EBQ"
+    title="Website Revamp for Business Sites | More Leads & Sales | Serfix"
     description="We take tired business websites and rebuild them into fast, modern ones that make it easy to contact you or buy. Built for SEO and ad traffic, so more of your visitors turn into leads and customers."
     active="revamp"
 >
@@ -13,7 +13,7 @@
                 '@type' => 'Service',
                 'name' => 'Business Website Revamp for Leads & Sales',
                 'serviceType' => 'Website redesign, conversion optimization, and SEO',
-                'provider' => ['@type' => 'Organization', 'name' => 'EBQ', 'url' => route('landing')],
+                'provider' => ['@type' => 'Organization', 'name' => 'Serfix', 'url' => route('landing')],
                 'areaServed' => 'Worldwide',
                 'audience' => ['@type' => 'Audience', 'audienceType' => 'Businesses'],
                 'url' => url()->current(),
@@ -25,7 +25,7 @@
                 ['Is this a redesign or an SEO service?', 'Both, really. We modernize how the site looks and works, fix the SEO so Google sends you more of the right people, and shape each page to turn those visits into enquiries. A sharp-looking site earns trust, SEO brings the traffic, and the conversion work brings the leads. You need all three.'],
                 ['Will I lose my Google rankings?', 'No. We handle the move carefully. Your URLs stay the same or get redirected properly, the structure and metadata carry over, and we check indexing before and after launch. You get a modern site and keep the search visibility you’ve already earned.'],
                 ['How long does it take, and what do I need to do?', 'Most projects take two to four weeks. After a quick call we handle the design, build, SEO and conversion work, and you just review and sign off. Your brand stays yours. We only rebuild the parts that bring in and convert traffic.'],
-                ['How will I know it worked?', 'We take a snapshot before we start, then show you what changed: more enquiries and sales, better conversion on your ads, higher rankings and more organic traffic. It all lives in an EBQ workspace you keep after we’re done.'],
+                ['How will I know it worked?', 'We take a snapshot before we start, then show you what changed: more enquiries and sales, better conversion on your ads, higher rankings and more organic traffic. It all lives in a Serfix workspace you keep after we’re done.'],
             ];
             $faqSchema = [
                 '@context' => 'https://schema.org',
@@ -52,7 +52,7 @@
         <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
             {{-- subtle tinted halves --}}
             <div class="absolute inset-y-0 left-0 w-1/2 bg-slate-100/70"></div>
-            <div class="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-br from-indigo-50 to-emerald-50/60"></div>
+            <div class="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-br from-orange-50 to-emerald-50/60"></div>
 
             {{-- left: realistic dated site --}}
             <div class="absolute top-12 hidden w-[27rem] -rotate-2 opacity-95 md:-left-14 md:block lg:-left-8 lg:w-[31rem]">
@@ -74,7 +74,7 @@
 
             {{-- corner labels --}}
             <span class="absolute left-5 top-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400/80">Before</span>
-            <span class="absolute right-5 top-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-500/80">After</span>
+            <span class="absolute right-5 top-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-500/80">After</span>
         </div>
         <div class="relative mx-auto max-w-4xl px-6 pb-20 pt-16 text-center lg:px-8 lg:pb-24 lg:pt-24">
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Website revamp for business</p>
@@ -97,7 +97,7 @@
                     @include('partials.revamp-before-site')
                 </div>
                 <div>
-                    <p class="mb-1.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-500">After</p>
+                    <p class="mb-1.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-orange-500">After</p>
                     @include('partials.revamp-after-site')
                 </div>
             </div>
@@ -145,7 +145,7 @@
     <section id="what" class="bg-slate-50/60 py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">What we do</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">What we do</p>
                 <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">A modern site that turns visitors into customers.</h2>
                 <p class="mt-4 text-base leading-7 text-slate-600">Four things that work together so the traffic you earn and pay for actually turns into customers.</p>
             </div>
@@ -169,7 +169,7 @@
     <section id="example" class="bg-white py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Before &amp; after</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Before &amp; after</p>
                 <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">See where the leads were leaking.</h2>
                 <p class="mt-4 text-base leading-7 text-slate-600">
                     Here’s a real example. A local plumbing firm was running Google Ads, but the old site let visitors slip away before they ever picked up the phone. Same traffic, same budget. This is what changed.
@@ -308,19 +308,19 @@
                             {{-- sticky header with nav + click-to-call --}}
                             <div class="flex items-center justify-between border-b border-slate-100 px-6 py-3">
                                 <div class="flex items-center gap-1.5">
-                                    <span class="flex h-4 w-4 items-center justify-center rounded bg-indigo-600 text-[8px] font-black leading-none text-white">S</span>
-                                    <span class="text-[11px] font-extrabold tracking-tight text-slate-900">Smith&nbsp;&amp;&nbsp;Co<span class="text-indigo-600">.</span></span>
+                                    <span class="flex h-4 w-4 items-center justify-center rounded bg-orange-600 text-[8px] font-black leading-none text-white">S</span>
+                                    <span class="text-[11px] font-extrabold tracking-tight text-slate-900">Smith&nbsp;&amp;&nbsp;Co<span class="text-orange-600">.</span></span>
                                 </div>
                                 <div class="hidden items-center gap-2.5 text-[8px] font-medium text-slate-500 sm:flex">
                                     <span>Services</span><span>Reviews</span><span>Areas</span><span>Contact</span>
                                 </div>
-                                <span class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1 text-[9px] font-semibold text-white shadow-sm">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-orange-600 px-2.5 py-1 text-[9px] font-semibold text-white shadow-sm">
                                     <svg class="h-2.5 w-2.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 3.5A1.5 1.5 0 013.5 2h1.148a1.5 1.5 0 011.465 1.175l.716 3.223a1.5 1.5 0 01-1.052 1.767l-.933.267c.41 1.115 1.07 2.13 1.93 2.99s1.875 1.52 2.99 1.93l.267-.933a1.5 1.5 0 011.767-1.052l3.223.716A1.5 1.5 0 0118 15.352V16.5a1.5 1.5 0 01-1.5 1.5H15c-7.18 0-13-5.82-13-13V3.5z" clip-rule="evenodd" /></svg>
                                     Call (555) 010-2030
                                 </span>
                             </div>
                             {{-- hero --}}
-                            <div class="bg-gradient-to-b from-indigo-50/70 to-white px-6 pb-8 pt-8 text-center">
+                            <div class="bg-gradient-to-b from-orange-50/70 to-white px-6 pb-8 pt-8 text-center">
                                 <span class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[8px] font-semibold text-emerald-700 ring-1 ring-emerald-100">★★★★★ 480+ reviews · Licensed &amp; insured</span>
                                 <p class="mt-4 text-[18px] font-extrabold leading-tight tracking-tight text-slate-900">Emergency Plumber<br>in Manchester, Fixed Today</p>
                                 <p class="mx-auto mt-3 max-w-[15rem] text-[9px] leading-relaxed text-slate-600">No call-out fee. Upfront pricing. A qualified engineer at your door within 60 minutes.</p>
@@ -340,7 +340,7 @@
                                     ['M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', '12-Month Guarantee', 'On all workmanship'],
                                 ] as [$d, $t, $sub])
                                     <div class="rounded-lg border border-slate-200 bg-white p-3 text-center shadow-sm">
-                                        <svg class="mx-auto h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $d }}" /></svg>
+                                        <svg class="mx-auto h-4 w-4 text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $d }}" /></svg>
                                         <p class="mt-2 text-[8px] font-bold leading-tight text-slate-800">{{ $t }}</p>
                                         <p class="mt-1 text-[6.5px] leading-tight text-slate-500">{{ $sub }}</p>
                                     </div>
@@ -414,7 +414,7 @@
     <section id="process" class="bg-slate-50/60 py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">How it works</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">How it works</p>
                 <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Done for you, built around results.</h2>
             </div>
             <ol class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -422,7 +422,7 @@
                     ['01', 'Strategy call & audit', 'A 15-minute call and a proper look at your site and ad pages. We find where you’re losing leads and how much it’s worth fixing.'],
                     ['02', 'Plan', 'A clear plan covering the redesign, the conversion fixes and the SEO work, with the leads each change should bring. We agree it before any building starts.'],
                     ['03', 'Design & build', 'We redesign and rebuild your pages with a modern look, clear ways to contact you or buy, and SEO and speed built in. You review and approve as we go.'],
-                    ['04', 'Launch & measure', 'A safe launch with no lost rankings, then before-and-after numbers on leads, conversions, ad performance and rankings, tracked in EBQ so the growth keeps building.'],
+                    ['04', 'Launch & measure', 'A safe launch with no lost rankings, then before-and-after numbers on leads, conversions, ad performance and rankings, tracked in Serfix so the growth keeps building.'],
                 ] as [$n, $t, $d])
                     <li class="rounded-2xl border border-slate-200 bg-white p-6">
                         <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-semibold tabular-nums text-white">{{ $n }}</span>
@@ -442,7 +442,7 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Measured results</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Measured results</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">More enquiries from the same traffic.</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
                         We measure your leads, conversion rate and ad performance before we touch anything, then show you the lift once the new site is live. The aim is simple: more customers getting in touch, both from the visitors you already have and the new ones SEO brings in.
@@ -491,7 +491,7 @@
     <section id="faq" class="bg-slate-50/60 py-20 sm:py-24">
         <div class="mx-auto max-w-3xl px-6 lg:px-8">
             <div class="text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">FAQ</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">FAQ</p>
                 <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Questions, answered.</h2>
             </div>
             <div class="mt-12 divide-y divide-slate-200 border-y border-slate-200">

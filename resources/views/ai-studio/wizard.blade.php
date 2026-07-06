@@ -1,5 +1,5 @@
 {{--
-    EBQ AI Studio — Blog Post Wizard (dashboard surface).
+    Serfix AI Studio — Blog Post Wizard (dashboard surface).
 
     A faithful Blade + Alpine re-implementation of the WP plugin's React
     AI Writer wizard (src/hq/aiwriter/*). Same multi-step lifecycle —
@@ -771,7 +771,7 @@
             </div>
             <div class="flex items-center gap-2">
                 <template x-if="view === 'wizard' && project">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300" title="EBQ Content Credits used by this project">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300" title="Serfix Content Credits used by this project">
                         <span aria-hidden="true">✦</span>
                         <span x-text="creditsUsed.toLocaleString()"></span>
                         <span>credits</span>
@@ -800,10 +800,10 @@
             <div class="mb-4 flex items-center justify-between">
                 <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-semibold dark:border-slate-700 dark:bg-slate-900">
                     <template x-for="f in ['active','completed','all']" :key="f">
-                        <button type="button" @click="setFilter(f)" class="rounded-md px-3 py-1.5 capitalize transition" :class="pk.filter === f ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'" x-text="f"></button>
+                        <button type="button" @click="setFilter(f)" class="rounded-md px-3 py-1.5 capitalize transition" :class="pk.filter === f ? 'bg-orange-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'" x-text="f"></button>
                     </template>
                 </div>
-                <button type="button" @click="startNew()" class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">+ New project</button>
+                <button type="button" @click="startNew()" class="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700">+ New project</button>
             </div>
 
             <template x-if="pk.error">
@@ -817,13 +817,13 @@
             <template x-if="pickerEmpty()">
                 <div class="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center dark:border-slate-700 dark:bg-slate-900">
                     <p class="text-sm text-slate-500 dark:text-slate-400">No projects yet.</p>
-                    <button type="button" @click="startNew()" class="mt-3 inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">+ Start a new project</button>
+                    <button type="button" @click="startNew()" class="mt-3 inline-flex rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700">+ Start a new project</button>
                 </div>
             </template>
 
             <ul class="space-y-2" x-show="!pk.loading && pk.items.length > 0">
                 <template x-for="p in pk.items" :key="p.id">
-                    <li class="group flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500/50">
+                    <li class="group flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/50">
                         <button type="button" @click="openProject(p.id)" class="min-w-0 flex-1 text-left">
                             <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100" x-text="p.title || 'Untitled draft'"></div>
                             <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
@@ -845,14 +845,14 @@
             <template x-if="project">
                 <div class="mb-4">
                     <template x-if="!titleEditing">
-                        <button type="button" @click="beginTitleEdit()" class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-indigo-600 dark:text-slate-200" title="Click to rename">
+                        <button type="button" @click="beginTitleEdit()" class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-orange-600 dark:text-slate-200" title="Click to rename">
                             <span x-text="project.title || 'Untitled draft'"></span>
                             <span class="text-slate-400" aria-hidden="true">✎</span>
                         </button>
                     </template>
                     <template x-if="titleEditing">
                         <input type="text" x-ref="titleInput" x-model="titleDraft" @blur="commitTitle()" @keydown.enter="commitTitle()" @keydown.escape="titleEditing = false"
-                            class="w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                            class="w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                     </template>
                 </div>
             </template>
@@ -863,7 +863,7 @@
                     <li class="flex items-center">
                         <button type="button" @click="stepReached(i) && project && goToStep(s)" :disabled="!project || !stepReached(i)"
                             class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed"
-                            :class="step() === s ? 'bg-indigo-600 text-white' : (stepReached(i) ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300' : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500')">
+                            :class="step() === s ? 'bg-orange-600 text-white' : (stepReached(i) ? 'bg-orange-50 text-orange-700 hover:bg-orange-100 dark:bg-orange-500/10 dark:text-orange-300' : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500')">
                             <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/30 text-[10px]" x-text="i + 1"></span>
                             <span x-text="STEP_LABELS[s]"></span>
                         </button>
@@ -897,7 +897,7 @@
                     <div class="mt-4 flex items-center justify-end gap-2">
                         <button type="button" @click="t.showSaveModal = false" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400">Cancel</button>
                         <button type="button" @click="skipSaveAndContinue()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Don't save</button>
-                        <button type="button" @click="savePromptAndContinue()" :disabled="t.saveBusy" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50" x-text="t.saveBusy ? 'Saving…' : 'Save & continue'"></button>
+                        <button type="button" @click="savePromptAndContinue()" :disabled="t.saveBusy" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50" x-text="t.saveBusy ? 'Saving…' : 'Save & continue'"></button>
                     </div>
                 </div>
             </div>

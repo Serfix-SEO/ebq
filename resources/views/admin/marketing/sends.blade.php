@@ -57,7 +57,7 @@
                             <span class="rounded bg-amber-50 px-2 py-1 text-amber-700"><b>{{ (int) ($counts['medium'] ?? 0) }}</b> medium</span>
                             <span class="rounded bg-slate-50 px-2 py-1 text-slate-600"><b>{{ (int) ($counts['low'] ?? 0) }}</b> low</span>
                             @if ($traffic && isset($traffic['gsc']))
-                                <span class="rounded bg-indigo-50 px-2 py-1 text-indigo-700"><b>{{ number_format((int) $traffic['gsc']['clicks']) }}</b> clicks · {{ number_format((int) $traffic['gsc']['impressions']) }} impr</span>
+                                <span class="rounded bg-orange-50 px-2 py-1 text-orange-700"><b>{{ number_format((int) $traffic['gsc']['clicks']) }}</b> clicks · {{ number_format((int) $traffic['gsc']['impressions']) }} impr</span>
                             @endif
                             @if ($traffic && isset($traffic['ga']))
                                 <span class="rounded bg-sky-50 px-2 py-1 text-sky-700"><b>{{ number_format((int) $traffic['ga']['users']) }}</b> users</span>

@@ -74,5 +74,12 @@ class SyncAnalyticsData implements ShouldQueue
         );
 
         Website::whereKey($this->websiteId)->update(['last_analytics_sync_at' => now()]);
+
+        // New GA rows landed — orphan every version-keyed dashboard/report
+        // cache for this website (KPI cards, traffic chart read AnalyticsData).
+        // SyncSearchConsoleData does the same for GSC rows; without this bump
+        // the GA half of those payloads stayed stale for the full TTL.
+        \App\Services\ReportCache::flushWebsite((string) $this->websiteId);
+        \App\Jobs\WarmDashboardCaches::dispatch((string) $this->websiteId);
     }
 }

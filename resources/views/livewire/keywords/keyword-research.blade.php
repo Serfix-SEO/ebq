@@ -8,7 +8,7 @@
             <button type="button" wire:click="setTab('{{ $key }}')"
                 @class([
                     'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition',
-                    'border-indigo-600 text-indigo-600 dark:text-indigo-400' => $tab === $key,
+                    'border-orange-600 text-orange-600 dark:text-orange-400' => $tab === $key,
                     'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300' => $tab !== $key,
                 ])>
                 {{ $label }}

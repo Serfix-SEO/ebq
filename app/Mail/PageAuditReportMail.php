@@ -25,7 +25,7 @@ class PageAuditReportMail extends Mailable
         $host = mb_substr(preg_replace('/[\r\n\t]+/', '', (string) $host), 0, 100);
 
         return new Envelope(
-            subject: "EBQ Page Audit — {$host}",
+            subject: "Serfix Page Audit — {$host}",
         );
     }
 

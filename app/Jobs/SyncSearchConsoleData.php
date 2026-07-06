@@ -126,6 +126,12 @@ class SyncSearchConsoleData implements ShouldQueue
         Log::info("SyncSearchConsoleData: completed website {$this->websiteId}");
 
         $this->queueKeywordMetricsRefresh();
+
+        // Fresh rows just orphaned every version-keyed dashboard cache — warm
+        // them now so the first dashboard/statistics visit is instant instead
+        // of paying the cold aggregate (~2min on the largest accounts).
+        // ShouldBeUnique(5min) collapses this with the GA sync's dispatch.
+        \App\Jobs\WarmDashboardCaches::dispatch((string) $this->websiteId);
     }
 
     /**

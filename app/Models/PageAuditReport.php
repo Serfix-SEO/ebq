@@ -25,6 +25,7 @@ class PageAuditReport extends Model
         'page_size_bytes',
         'error_message',
         'result',
+        'content_hash',
     ];
 
     protected function casts(): array

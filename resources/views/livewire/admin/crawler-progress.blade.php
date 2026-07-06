@@ -11,7 +11,7 @@
         };
         $statusBadge = [
             'running'    => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-            'finalizing' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+            'finalizing' => 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300',
             'completed'  => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
             'aborted'    => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
             'failed'     => 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
@@ -47,7 +47,7 @@
         </summary>
         <div class="space-y-3 border-t border-slate-200 px-4 py-3 text-[13px] leading-relaxed text-slate-600 dark:border-slate-700 dark:text-slate-300">
             <p>
-                EBQ crawls each <strong>domain once</strong> and shares that one crawl with every client
+                Serfix crawls each <strong>domain once</strong> and shares that one crawl with every client
                 who added it. So a row here is a <strong>domain</strong>, not a client — the
                 <strong>Website / Client</strong> column shows which client website(s) it serves. The crawl
                 runs to the <strong>largest</strong> page cap among those clients; each client then sees only
@@ -59,7 +59,7 @@
                 <div>· <strong>Queue backlog</strong></div><div>crawl jobs waiting to run (turns amber over 500 — a sign of congestion).</div>
                 <div>· <strong>Pages crawled / Open issues</strong></div><div>totals across every domain.</div>
                 <div class="mt-1.5"><strong>Columns</strong></div><div class="mt-1.5"></div>
-                <div>· <strong>Status</strong></div><div><span class="font-medium text-blue-600 dark:text-blue-400">Crawling</span> = fetching pages · <span class="font-medium text-violet-600 dark:text-violet-400">Computing</span> = scoring + building issues · <span class="font-medium text-emerald-600 dark:text-emerald-400">Ready</span> = finished · <span class="font-medium text-red-600 dark:text-red-400">Aborted/Failed</span> = stopped (e.g. site blocked us) · <span class="text-slate-500">Never crawled</span>.</div>
+                <div>· <strong>Status</strong></div><div><span class="font-medium text-blue-600 dark:text-blue-400">Crawling</span> = fetching pages · <span class="font-medium text-orange-600 dark:text-orange-400">Computing</span> = scoring + building issues · <span class="font-medium text-emerald-600 dark:text-emerald-400">Ready</span> = finished · <span class="font-medium text-red-600 dark:text-red-400">Aborted/Failed</span> = stopped (e.g. site blocked us) · <span class="text-slate-500">Never crawled</span>.</div>
                 <div>· <strong>Progress</strong></div><div>pages crawled / total discovered for the domain (climbs as more pages are found).</div>
                 <div>· <strong>Crawled / Errors / Issues</strong></div><div>pages fetched · pages returning 4xx/5xx · open SEO findings.</div>
                 <div>· <strong>Health</strong></div><div>0–100 site-health score (green ≥ 80, amber 50–79, red &lt; 50).</div>

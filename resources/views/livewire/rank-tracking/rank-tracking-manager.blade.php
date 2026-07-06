@@ -51,7 +51,7 @@
                 <div class="relative w-full sm:w-64">
                     <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search keywords…"
-                        class="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
+                        class="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs placeholder-slate-400 shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
                 </div>
                 <select wire:model.live="filterStatus" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
                     <option value="">All status</option>
@@ -98,7 +98,7 @@
                     {{ $showBulkAdd ? 'Close' : 'Bulk add from GSC' }}
                 </button>
                 <button wire:click="toggleForm" type="button"
-                    class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700">
                     <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                     {{ $showForm ? 'Close form' : 'Add keyword' }}
                 </button>
@@ -108,7 +108,7 @@
 
     {{-- Bulk add panel --}}
     @if ($showBulkAdd)
-        <div class="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm dark:border-indigo-900/40 dark:bg-indigo-500/5">
+        <div class="rounded-xl border border-orange-200 bg-orange-50/40 p-4 shadow-sm dark:border-orange-900/40 dark:bg-orange-500/5">
             <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Bulk add from Search Console</h3>
@@ -174,7 +174,7 @@
                             <span class="ml-1 font-normal text-slate-400">· not yet tracked</span>
                         </span>
                         <div class="flex items-center gap-3">
-                            <button wire:click="bulkSelectAll(true)" type="button" class="text-indigo-600 hover:underline dark:text-indigo-400">Select all</button>
+                            <button wire:click="bulkSelectAll(true)" type="button" class="text-orange-600 hover:underline dark:text-orange-400">Select all</button>
                             <button wire:click="bulkSelectAll(false)" type="button" class="text-slate-500 hover:underline dark:text-slate-400">Clear</button>
                         </div>
                     </div>
@@ -194,7 +194,7 @@
                                 @foreach ($_candidates as $cand)
                                     <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
                                         <td class="px-3 py-2">
-                                            <input type="checkbox" wire:model.live="bulkSelected" value="{{ $cand['query'] }}" class="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-700" />
+                                            <input type="checkbox" wire:model.live="bulkSelected" value="{{ $cand['query'] }}" class="h-3.5 w-3.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 dark:border-slate-600 dark:bg-slate-700" />
                                         </td>
                                         <td class="px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{{ $cand['query'] }}</td>
                                         <td class="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($cand['impressions']) }}</td>
@@ -225,7 +225,7 @@
                     <button wire:click="toggleBulkAdd" type="button" class="h-8 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</button>
                     <button wire:click="bulkAddSelected" wire:loading.attr="disabled" type="button"
                         @disabled(count($bulkSelected) === 0)
-                        class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">
+                        class="inline-flex h-8 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
                         <span wire:loading.remove wire:target="bulkAddSelected">Add {{ count($bulkSelected) }} keyword{{ count($bulkSelected) === 1 ? '' : 's' }}</span>
                         <span wire:loading wire:target="bulkAddSelected">Adding…</span>
                     </button>
@@ -247,12 +247,12 @@
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Keyword <span class="text-red-500">*</span></label>
                         <input wire:model="newKeyword" type="text" placeholder="e.g. best seo tools"
-                            class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
                         @error('newKeyword')<p class="mt-1 text-[11px] text-red-500">{{ $message }}</p>@enderror
                     </div>
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Target URL (optional)</label>
-                        <div class="flex h-9 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                        <div class="flex h-9 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                             <span class="flex max-w-[55%] shrink-0 items-center border-r border-slate-200 bg-slate-50 px-2 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">{{ $targetUrlPrefix }}</span>
                             <input wire:model="newTargetUrlPath" type="text" placeholder="/page-path"
                                 class="min-w-0 flex-1 border-0 bg-transparent px-2 text-xs focus:outline-none focus:ring-0 dark:text-slate-100" />
@@ -307,10 +307,10 @@
 
                 <div class="flex flex-wrap items-center gap-5">
                         <label class="flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                            <input wire:model="newAutocorrect" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" /> Autocorrect queries
+                            <input wire:model="newAutocorrect" type="checkbox" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500" /> Autocorrect queries
                         </label>
                         <label class="flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                            <input wire:model="newSafeSearch" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" /> Safe search
+                            <input wire:model="newSafeSearch" type="checkbox" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500" /> Safe search
                         </label>
                 </div>
 
@@ -329,7 +329,7 @@
                 <button type="submit"
                     wire:loading.attr="disabled"
                     wire:target="addKeyword"
-                    class="inline-flex h-8 items-center gap-2 rounded-md bg-indigo-600 px-4 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60">
+                    class="inline-flex h-8 items-center gap-2 rounded-md bg-orange-600 px-4 text-xs font-semibold text-white shadow-sm hover:bg-orange-700 disabled:opacity-60">
                     <svg wire:loading wire:target="addKeyword" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4zm2 5.3A7.96 7.96 0 014 12H0c0 3.04 1.1 5.8 3 7.9l3-2.6z"></path></svg>
                     Add & run first check
                 </button>
@@ -388,7 +388,7 @@
                                 <tr wire:key="rtk-{{ $kw->id }}" class="group transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
                                     <td class="px-4 py-3">
                                         <a href="{{ route('rank-tracking.show', $kw->id) }}" wire:navigate
-                                            class="block font-semibold text-slate-900 hover:text-indigo-600 dark:text-slate-100 dark:hover:text-indigo-400">
+                                            class="block font-semibold text-slate-900 hover:text-orange-600 dark:text-slate-100 dark:hover:text-orange-400">
                                             {{ $kw->keyword }}<x-keyword-language :language="($detectedLanguages ?? [])[mb_strtolower(trim((string) $kw->keyword))] ?? null" />
                                         </a>
                                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -519,7 +519,7 @@
                                     <td class="px-4 py-3 text-right">
                                         <div class="inline-flex items-center gap-1">
                                             <a href="{{ route('rank-tracking.show', $kw->id) }}" wire:navigate
-                                                class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm hover:bg-indigo-700"
+                                                class="inline-flex items-center gap-1 rounded-md bg-orange-600 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm hover:bg-orange-700"
                                                 title="View detail">
                                                 View
                                                 <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
@@ -527,7 +527,7 @@
                                             <button wire:click="recheck('{{ $kw->id }}')"
                                                 wire:loading.attr="disabled"
                                                 wire:target="recheck('{{ $kw->id }}')"
-                                                class="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-400"
+                                                class="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 hover:text-orange-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-orange-400"
                                                 title="Force re-check">
                                                 <svg wire:loading.remove wire:target="recheck('{{ $kw->id }}')" class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                                                 <svg wire:loading wire:target="recheck('{{ $kw->id }}')" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
@@ -556,8 +556,8 @@
             <div class="mt-3">{{ $rows->links() }}</div>
         @else
             <div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-20 dark:border-slate-700 dark:bg-slate-900">
-                <div class="rounded-full bg-indigo-50 p-3 dark:bg-indigo-500/10">
-                    <svg class="h-8 w-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+                <div class="rounded-full bg-orange-50 p-3 dark:bg-orange-500/10">
+                    <svg class="h-8 w-8 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
                 </div>
                 <p class="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
                     @if ($search || $filterDevice || $filterCountry || $filterType || $filterStatus)
@@ -577,7 +577,7 @@
                     @if ($search || $filterDevice || $filterCountry || $filterType || $filterStatus)
                         <button wire:click="clearFilters" class="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">Clear filters</button>
                     @endif
-                    <button wire:click="toggleForm" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700">
+                    <button wire:click="toggleForm" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-orange-700">
                         <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                         Add your first keyword
                     </button>

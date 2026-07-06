@@ -987,7 +987,7 @@ class PluginInsightsController extends Controller
         $website = $this->resolveWebsite($request);
         if ($gate = $website->featureGateInfo('chatbot')) {
             return response()->json($gate + [
-                'message' => 'The EBQ Assistant chat is available on Pro. Upgrade to unlock.',
+                'message' => 'The Serfix Assistant chat is available on Pro. Upgrade to unlock.',
             ], 402);
         }
 

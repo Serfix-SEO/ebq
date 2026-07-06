@@ -26,9 +26,40 @@ class DbFleetService
 {
     public function __construct(private HetznerClient $hetzner) {}
 
+    /**
+     * Reject node addresses that only resolve on ONE box. `db_nodes.private_ip`
+     * becomes a live DB connection host on EVERY box that runs jobs (see
+     * ShardManager), so loopback/link-local addresses silently kill all
+     * anchored jobs on the worker fleet while working fine on the box that
+     * registered them — incident 2026-07-06: the primary was registered as
+     * 127.0.0.1 and every anchored crawl job died on the worker box with
+     * "Connection refused" for three days.
+     */
+    private function assertReachableFromAllBoxes(string $privateIp): void
+    {
+        $ip = trim($privateIp);
+        if ($ip === '' || in_array(strtolower($ip), ['localhost', 'localhost.localdomain'], true)) {
+            throw new \InvalidArgumentException(
+                "db_node address '{$privateIp}' is not valid — use an address reachable from every box (e.g. the 10.0.0.x private-net IP)."
+            );
+        }
+        $packed = @inet_pton($ip);
+        if ($packed !== false) {
+            $isLoopback = str_starts_with($ip, '127.') || $ip === '::1';
+            $isLinkLocal = str_starts_with($ip, '169.254.') || stripos($ip, 'fe80:') === 0;
+            if ($isLoopback || $isLinkLocal) {
+                throw new \InvalidArgumentException(
+                    "db_node address '{$privateIp}' is loopback/link-local — it would only resolve on the registering box. Use the private-net IP (e.g. 10.0.0.2)."
+                );
+            }
+        }
+    }
+
     /** Record the existing primary (Box A) as the pinned node. Idempotent. */
     public function registerPrimary(string $privateIp, string $dbName): DbNode
     {
+        $this->assertReachableFromAllBoxes($privateIp);
+
         return DbNode::updateOrCreate(
             ['is_pinned' => true],
             [
@@ -47,6 +78,8 @@ class DbFleetService
     /** Register an already-running MariaDB box as a node (no Hetzner provision). */
     public function registerExisting(string $name, string $role, string $privateIp, string $dbName, ?int $port = null): DbNode
     {
+        $this->assertReachableFromAllBoxes($privateIp);
+
         $node = DbNode::create([
             'name' => $name,
             'role' => $role,

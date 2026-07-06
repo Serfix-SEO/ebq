@@ -92,14 +92,24 @@ class PriorityActionQueue extends Component
     {
         $country = $this->country !== '' ? $this->country : null;
 
-        // Mix the per-website data version into the key so a completed crawl
-        // (or GSC/rank sync) invalidates this cache via ReportCache::flushWebsite.
-        $version = \App\Services\ReportCache::version($this->websiteId);
+        return self::payload($this->websiteId, $country);
+    }
+
+    /**
+     * Cached grouped-actions payload — shared by groupedActions() and
+     * WarmDashboardCaches. Mixes BOTH data versions into the key: ReportCache
+     * covers crawl + GSC/GA syncs; RankCache covers the hourly rank checks
+     * (since the 2026-06-28 split rank syncs no longer bump ReportCache).
+     */
+    public static function payload(string $websiteId, ?string $country = null): array
+    {
+        $version = \App\Services\ReportCache::version($websiteId);
+        $rankVersion = \App\Services\RankCache::version($websiteId);
 
         return Cache::remember(
-            sprintf('action-queue:%s:%d:%s', $this->websiteId, $version, $country ?? 'all'),
-            600,
-            fn (): array => app(ActionQueueService::class)->groupedActions($this->websiteId, $country),
+            sprintf('action-queue:%s:%d:%d:%s', $websiteId, $version, $rankVersion, $country ?? 'all'),
+            86400,
+            fn (): array => app(ActionQueueService::class)->groupedActions($websiteId, $country),
         );
     }
 }

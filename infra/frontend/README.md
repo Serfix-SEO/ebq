@@ -42,6 +42,28 @@ assets in `resources/{js,css}`. Marketing + meet are separate surfaces (see
 - `[x-cloak]{display:none !important}` (`app.css:23`) hides Alpine-bound elements until
   Alpine boots — load-bearing for marketing tab/panel reveals (see `marketing.js` note).
 
+### Brand tokens (SERFIX, `app.css:13-40`)
+
+Per `serfix-branding/SERFIX Brand Guidelines.pdf`. **`orange` is overridden in `@theme`**
+to the exact brand ramp (not Tailwind's stock orange) — `orange-600` = `#F26419` (primary
+accent/CTA), `orange-700` = `#C44E0E` (hover), rest of the 50–950 scale interpolated at the
+same hue/saturation. Every `bg/text/border/ring-orange-*` utility across the app resolves
+to this ramp automatically. Also defined: `ink`/`ink-500`/`ink-300` (text scale),
+`surface-warm`/`surface-cool`, and `success`/`warning`/`error` semantic colors. `font-arabic`
+(Cairo) is registered for the guideline's bilingual-by-architecture direction but **no
+Arabic/RTL UI exists yet** — Latin `font-sans` (Inter) is still the only font actually wired
+into layouts.
+
+The whole app was previously themed in **indigo** (`#4f46e5` = Tailwind `indigo-600`, the
+old EBQ brand color). The 2026-07-06 rebrand mechanically renamed every `indigo-NNN` Tailwind
+class to `orange-NNN` (1300+ occurrences, 103 view files) plus hardcoded indigo hex literals
+in non-Tailwind contexts (emails, dompdf PDF templates, inline SVG chart strokes) to their
+matching orange-ramp hex. **If you add new UI, use `orange-*` for brand accent — never
+reintroduce indigo/violet/purple**, which have no place in the palette (a leftover
+`from-orange-600 to-violet-600` two-tone CTA gradient from the old brand was caught and
+flattened to solid `bg-orange-600` during the sweep; check for other stray non-brand hues
+before shipping new gradients).
+
 ## JS entrypoints
 
 | File | Loaded by | Purpose |

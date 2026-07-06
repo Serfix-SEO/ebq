@@ -17,6 +17,18 @@ Schedule::command('ebq:track-rankings')->hourly();
 Schedule::command('ebq:auto-discover-prospects')->dailyAt('03:30');
 Schedule::command('ebq:publish-scheduled-plugin-releases')->everyMinute();
 
+// Failed-job visibility (2026-07-06 incident: crawl jobs died on the worker for
+// 3 days, seen only in failed_jobs). Queue::failing() on every box buffers into
+// shared Redis; this drains + mails admins a digest. Empty buffer = no mail.
+Schedule::command('ebq:failed-jobs-alert')->everyFifteenMinutes()->withoutOverlapping();
+
+// Content-hash re-audit gate (2026-07-06): independently re-fetches a bounded
+// batch of the oldest completed audits and queues a re-audit only if the
+// page's actual content changed — catches WordPress not bumping `modified`
+// correctly, which the live-score path's timestamp-only staleness check
+// otherwise misses. Batched + rate-limited by --limit, safe to run often.
+Schedule::command('ebq:recheck-audit-content --limit=200')->hourly()->withoutOverlapping();
+
 // Site crawler. Weekly full recrawl (conditional-GET + content-hash keep it
 // cheap — every URL is re-verified, unchanged pages cost a 304/no re-parse). A
 // daily sitemap-delta check crawls brand-new sitemap URLs within a day instead
@@ -58,6 +70,5 @@ Schedule::command('ebq:refresh-worker-snapshot')->hourly()->withoutOverlapping(3
 Schedule::command('ebq:proxy-list-refresh')->everyThirtyMinutes()->withoutOverlapping()
     ->when(fn () => (bool) config('crawler.proxy.auto_import'));
 
-// Always on regardless of the import flag above — keeps the pool clean by
-// live-testing every already-tracked proxy and deleting the ones that fail.
-Schedule::command('ebq:proxy-pool-prune')->everyFifteenMinutes()->withoutOverlapping();
+// Auto-prune disabled — run manually via: php artisan ebq:proxy-pool-prune
+// Schedule::command('ebq:proxy-pool-prune')->everyFifteenMinutes()->withoutOverlapping();

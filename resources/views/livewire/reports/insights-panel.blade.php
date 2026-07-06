@@ -1,7 +1,7 @@
 @php
     $tabs = [
         ['key' => 'cannibalization',  'label' => 'Cannibalizations',        'count' => $counts['cannibalizations'],             'tone' => 'amber',   'hint' => 'Queries split across pages'],
-        ['key' => 'striking_distance','label' => 'Striking distance',       'count' => $counts['striking_distance'],            'tone' => 'indigo',  'hint' => 'Pos 5–20, low CTR'],
+        ['key' => 'striking_distance','label' => 'Striking distance',       'count' => $counts['striking_distance'],            'tone' => 'orange',  'hint' => 'Pos 5–20, low CTR'],
         ['key' => 'content_decay',    'label' => 'Content decay',           'count' => $counts['content_decay'],                'tone' => 'slate',   'hint' => 'Losing clicks 28d/28d'],
         ['key' => 'quick_wins',       'label' => 'Quick wins',              'count' => $counts['quick_wins'] ?? null,           'tone' => 'emerald', 'hint' => 'Low-competition keywords you aren\'t winning'],
         ['key' => 'audit_performance','label' => 'Audit vs traffic',        'count' => null,                                     'tone' => 'rose',    'hint' => 'Poor CWV, high impressions'],
@@ -16,7 +16,7 @@
             <div class="flex items-center gap-3">
                 <livewire:dashboard.country-filter />
                 <div wire:loading.flex wire:target="setTab,onCountryChanged" class="items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400" role="status" aria-live="polite">
-                    <svg class="h-3 w-3 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" class="opacity-75"></path></svg>
+                    <svg class="h-3 w-3 animate-spin text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" class="opacity-75"></path></svg>
                     Loading…
                 </div>
             </div>
@@ -32,15 +32,15 @@
                     id="insights-tab-{{ $t['key'] }}"
                     tabindex="{{ $active ? 0 : -1 }}"
                     @class([
-                        'flex flex-col items-start rounded-lg border px-3 py-2.5 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus-visible:ring-2',
-                        'border-indigo-300 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10' => $active,
+                        'flex flex-col items-start rounded-lg border px-3 py-2.5 text-left transition focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus-visible:ring-2',
+                        'border-orange-300 bg-orange-50 dark:border-orange-500/40 dark:bg-orange-500/10' => $active,
                         'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800' => ! $active,
                     ])>
                     <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ $t['label'] }}</span>
                     <span @class([
                         'mt-1 text-xl font-bold tabular-nums',
                         'text-amber-600 dark:text-amber-400' => $t['tone'] === 'amber',
-                        'text-indigo-600 dark:text-indigo-400' => $t['tone'] === 'indigo',
+                        'text-orange-600 dark:text-orange-400' => $t['tone'] === 'orange',
                         'text-red-600 dark:text-red-400' => $t['tone'] === 'red',
                         'text-slate-700 dark:text-slate-200' => $t['tone'] === 'slate',
                         'text-rose-600 dark:text-rose-400' => $t['tone'] === 'rose',
@@ -148,7 +148,7 @@
                                             <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}<x-keyword-language :language="$row['language'] ?? null" /></td>
                                             <td class="py-2 pr-3 max-w-[280px] truncate text-slate-600 dark:text-slate-300" title="{{ $row['page'] ?? '' }}">
                                                 @if (! empty($row['page']))
-                                                    <a href="{{ $row['page'] }}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $row['page'] }}</a>
+                                                    <a href="{{ $row['page'] }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline dark:text-orange-400">{{ $row['page'] }}</a>
                                                     <span class="ml-1 text-[10px] text-slate-400">#{{ $row['page_position'] ?? $row['position'] }}</span>
                                                 @else
                                                     <span class="text-slate-400">—</span>
@@ -165,7 +165,7 @@
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['impressions']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['clicks']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ $row['ctr'] }}%</td>
-                                            <td class="py-2 pr-3 text-right tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">
+                                            <td class="py-2 pr-3 text-right tabular-nums font-semibold text-orange-600 dark:text-orange-400">
                                                 @if (! empty($row['upside_value']))
                                                     ${{ number_format($row['upside_value'], 0) }}
                                                 @else
@@ -175,7 +175,7 @@
                                             <td class="py-2 pr-3 text-right">
                                                 @if (! empty($row['page']))
                                                     <a href="{{ route('keywords.fix', ['keyword' => $row['query'], 'page' => $row['page']]) }}" wire:navigate
-                                                        class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-indigo-500">Fix →</a>
+                                                        class="inline-flex items-center gap-1 rounded-md bg-orange-600 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-orange-500">Fix →</a>
                                                 @endif
                                             </td>
                                         </tr>
@@ -311,7 +311,7 @@
                                             <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['keyword'] }}<x-keyword-language :language="$row['language'] ?? null" /></td>
                                             <td class="py-2 pr-3 max-w-[280px] truncate text-slate-600 dark:text-slate-300" title="{{ $row['current_page'] ?? '' }}">
                                                 @if (! empty($row['current_page']))
-                                                    <a href="{{ $row['current_page'] }}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $row['current_page'] }}</a>
+                                                    <a href="{{ $row['current_page'] }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline dark:text-orange-400">{{ $row['current_page'] }}</a>
                                                     @if ($row['current_position'] !== null)
                                                         <span class="ml-1 text-[10px] text-slate-400">#{{ $row['current_position'] }}</span>
                                                     @endif
@@ -344,7 +344,7 @@
                                                         $_auditParams['pageUrl'] = $row['current_page'];
                                                     }
                                                 @endphp
-                                                <a href="{{ route('custom-audit.index') }}?{{ http_build_query($_auditParams) }}" wire:navigate class="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
+                                                <a href="{{ route('custom-audit.index') }}?{{ http_build_query($_auditParams) }}" wire:navigate class="font-semibold text-orange-600 hover:underline dark:text-orange-400">
                                                     @if (! empty($row['current_page']))
                                                         Audit current page →
                                                     @else

@@ -46,14 +46,17 @@ class BillingController extends Controller
     public function checkout(Request $request): RedirectResponse|Response|Checkout
     {
         $request->validate([
-            'plan' => 'required|string|max:32',
+            'plan'     => 'required|string|max:32',
+            'interval' => 'nullable|in:monthly,annual',
             'return_to' => 'nullable|string|max:2048',
         ]);
+
+        $interval = $request->input('interval', 'annual');
 
         $plan = Plan::where('slug', $request->string('plan'))
             ->where('is_active', true)
             ->first();
-        if (! $plan || ! $plan->isCheckoutReady()) {
+        if (! $plan || ! $plan->isCheckoutReady($interval)) {
             return redirect()->route('pricing')
                 ->with('error', 'That plan is not available for purchase right now.');
         }
@@ -77,17 +80,18 @@ class BillingController extends Controller
         $successUrl = route('billing.success', array_filter(['return_to' => $returnTo]));
         $cancelUrl = route('billing.cancel-checkout', array_filter(['return_to' => $returnTo]));
 
+        $priceId = $plan->stripePriceIdFor($interval);
+
         try {
-            // EBQ only sells yearly subscriptions. The monthly price on
-            // the Plan row is for "$X/mo, billed yearly" display copy
-            // only — never used to mint a Stripe subscription.
-            return $user
-                ->newSubscription('default', $plan->stripe_price_id_yearly)
-                ->trialDays($plan->trial_days)
-                ->checkout([
-                    'success_url' => $successUrl,
-                    'cancel_url' => $cancelUrl,
-                ]);
+            $builder = $user->newSubscription('default', $priceId);
+            $plan->trial_days > 0
+                ? $builder->trialDays($plan->trial_days)
+                : $builder->skipTrial();
+
+            return $builder->checkout([
+                'success_url' => $successUrl,
+                'cancel_url' => $cancelUrl,
+            ]);
         } catch (IncompletePayment $exception) {
             return redirect()->route(
                 'cashier.payment',
@@ -122,7 +126,9 @@ class BillingController extends Controller
 
         $subscription = $user->fresh()->subscription('default');
         if ($subscription && $subscription->valid()) {
-            $plan = Plan::where('stripe_price_id_yearly', $subscription->stripe_price)->first();
+            $plan = Plan::where('stripe_price_id_yearly', $subscription->stripe_price)
+                ->orWhere('stripe_price_id_monthly', $subscription->stripe_price)
+                ->first();
             if ($plan && $user->current_plan_slug !== $plan->slug) {
                 $user->forceFill(['current_plan_slug' => $plan->slug])->save();
             }
@@ -223,20 +229,29 @@ class BillingController extends Controller
         $plan = Plan::where('slug', $request->string('plan'))
             ->where('is_active', true)
             ->first();
-        if (! $plan || ! $plan->isCheckoutReady()) {
-            return redirect()->route('billing.show')
-                ->with('error', 'That plan is not available right now.');
-        }
 
         $subscription = $user->subscription('default');
         if (! $subscription || ! $subscription->valid()) {
             // No active subscription — route into the standard checkout
             // flow instead of trying to swap a non-existent sub.
+            if (! $plan || ! $plan->isCheckoutReady()) {
+                return redirect()->route('billing.show')
+                    ->with('error', 'That plan is not available right now.');
+            }
+
             return redirect()->route('billing.checkout', ['plan' => $plan->slug]);
         }
 
+        // Preserve the subscriber's current billing interval — swapping must not
+        // silently move a monthly subscriber onto yearly billing for the new tier.
+        $interval = Plan::intervalForStripePrice($subscription->stripe_price);
+        if (! $plan || ! $plan->isCheckoutReady($interval)) {
+            return redirect()->route('billing.show')
+                ->with('error', 'That plan is not available right now.');
+        }
+
         try {
-            $subscription->swap($plan->stripe_price_id_yearly);
+            $subscription->swap($plan->stripePriceIdFor($interval));
         } catch (\Throwable $e) {
             return redirect()->route('billing.show')
                 ->with('error', 'Could not switch plan: '.$e->getMessage());

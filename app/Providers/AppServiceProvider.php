@@ -107,5 +107,12 @@ class AppServiceProvider extends ServiceProvider
             Queue::exceptionOccurred(fn (\Illuminate\Queue\Events\JobExceptionOccurred $e) => \App\Support\FleetMetrics::onException($nodeId));
             Queue::failing(fn (\Illuminate\Queue\Events\JobFailed $e) => \App\Support\FleetMetrics::onFailed($nodeId));
         }
+
+        // EVERY box (web + pinned worker + ephemeral fleet): buffer permanent job
+        // failures into shared Redis for the admin digest (`ebq:failed-jobs-alert`).
+        // Deliberately outside the fleet gate above — the 2026-07-06 incident was
+        // crawl jobs failing silently on the worker for 3 days, visible only in
+        // failed_jobs, which nobody watches.
+        Queue::failing(fn (\Illuminate\Queue\Events\JobFailed $e) => \App\Support\FailedJobAlertBuffer::record($e));
     }
 }

@@ -19,7 +19,29 @@ use Illuminate\Support\Carbon;
 
 class GrowthReportMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels {
+        getSerializedPropertyValue as traitGetSerializedPropertyValue;
+    }
+
+    /**
+     * SerializesModels turns every Eloquent property into a
+     * ModelIdentifier and re-fetches it (`firstOrFail`) on the queue
+     * worker. `ReportBranding::ebqDefault()` — the branding every
+     * NON-whitelabel recipient gets — is an in-memory, never-persisted
+     * model (`exists = false`, id null), so that re-fetch threw
+     * `ModelNotFoundException` and every default-branded growth report
+     * email silently failed from 2026-06-18 until this fix. Serialize
+     * the unsaved default whole (it's a plain attribute bag); persisted
+     * branding rows keep the normal identifier round-trip.
+     */
+    protected function getSerializedPropertyValue($value, $withRelations = true)
+    {
+        if ($value instanceof ReportBranding && ! $value->exists) {
+            return $value;
+        }
+
+        return $this->traitGetSerializedPropertyValue($value, $withRelations);
+    }
 
     public string $startDate;
 
@@ -85,9 +107,9 @@ class GrowthReportMail extends Mailable
             : $start->format('M j').' - '.$end->format('M j, Y');
 
         return new Envelope(
-            // Branding's company_name swaps in for the hardcoded "EBQ" so
+            // Branding's company_name swaps in for the hardcoded "Serfix" so
             // recipients see the agency's brand in their inbox preview.
-            // ReportBranding::ebqDefault() returns "EBQ" so the default
+            // ReportBranding::ebqDefault() returns "Serfix" so the default
             // path is byte-identical to the pre-whitelabel behavior.
             subject: "{$this->branding->company_name} {$typeLabel} Report — {$this->website->domain} ({$dateStr})",
             replyTo: $this->branding->reply_to_email
@@ -118,8 +140,8 @@ class GrowthReportMail extends Mailable
 
     /**
      * PDF attachment — always included on report emails, branded or not.
-     * When the plan disables whitelabel, the PDF renders with the EBQ
-     * default branding (no logo, EBQ accent color) so the recipient
+     * When the plan disables whitelabel, the PDF renders with the Serfix
+     * default branding (no logo, Serfix accent color) so the recipient
      * still gets a saveable / shareable artifact.
      *
      * @return list<Attachment>

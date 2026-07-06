@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClientActivity;
+use App\Models\CrawlSite;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\ClientActivityLogger;
@@ -220,6 +221,14 @@ class ClientController extends Controller
                 'from' => $oldPlanSlug ?? User::TIER_FREE,
                 'to' => $newPlanSlug ?? User::TIER_FREE,
             ]);
+
+            // crawl_sites.effective_cap is a stored aggregate (max crawl cap across
+            // subscribers), only recomputed on website create/delete or first crawl
+            // link — a plan change alone never touches a Website row, so without this
+            // it silently keeps enforcing the OLD plan's page cap indefinitely.
+            $user->websites()->whereNotNull('crawl_site_id')->with('crawlSite')->get()
+                ->pluck('crawlSite')->filter()->unique('id')
+                ->each(fn (CrawlSite $cs) => $cs->recomputeEffectiveCap());
         }
 
         $msg = "Client {$user->email} updated.";

@@ -21,7 +21,7 @@
             {{-- ── Header ─────────────────────────────────────────── --}}
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Free SEO audit</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Free SEO audit</p>
                     <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl" title="{{ $pageTitle !== '' ? $pageTitle : $audit->url }}">{{ $headingText }}</h1>
                     <p class="mt-1 truncate text-sm text-slate-500" title="{{ $audit->url }}">{{ $displayUrl }}</p>
                     <p class="mt-1 text-sm text-slate-600">
@@ -36,10 +36,10 @@
 
             {{-- ── Upsell banner (top) ────────────────────────────── --}}
             @if ($isCompleted)
-                <div class="mt-8 overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm sm:p-7">
+                <div class="mt-8 overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6 shadow-sm sm:p-7">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div class="max-w-2xl">
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700">This is just the surface</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">This is just the surface</p>
                             <h2 class="mt-2 text-balance text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
                                 See what Google actually knows about your site.
                             </h2>
@@ -69,7 +69,7 @@
                     {{-- Working — poll the status endpoint and reload when done. --}}
                     <div id="ga-working" class="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-20 text-center shadow-sm"
                          data-status-url="{{ route('guest-audit.status', $audit) }}">
-                        <svg class="h-10 w-10 animate-spin text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <svg class="h-10 w-10 animate-spin text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                         <h2 class="mt-5 text-lg font-semibold text-slate-900">Auditing your page…</h2>
                         <p class="mt-2 max-w-sm text-sm text-slate-600">We’re fetching your page, analyzing on-page SEO, checking your keyword, and comparing you against the top-ranking competitors. This usually takes up to a minute.</p>
                     </div>
@@ -124,7 +124,7 @@
                 <div class="mt-10 rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm sm:px-12">
                     <h2 class="text-balance text-2xl font-semibold tracking-tight text-slate-900">Ready for the full picture?</h2>
                     <p class="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-                        Connect Search Console + Analytics and EBQ turns this one-page snapshot into a continuous,
+                        Connect Search Console + Analytics and Serfix turns this one-page snapshot into a continuous,
                         site-wide growth engine — ranked action lists, anomaly alerts, rank tracking, and reports that prove what shipped.
                     </p>
                     <div class="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">

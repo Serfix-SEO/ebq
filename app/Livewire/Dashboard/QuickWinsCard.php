@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Services\ReportCache;
 use App\Services\ReportDataService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -49,17 +50,26 @@ class QuickWinsCard extends Component
         $rows = [];
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $user = Auth::user();
-            $limit = $user?->effectivePlan()?->apiLimit('quick_win_finder.results_shown') ?? 5;
-            $rows = Cache::remember(
-                'quick_wins_card:'.$this->websiteId.':'.$limit,
-                600,
-                fn () => app(ReportDataService::class)->quickWins($this->websiteId, $limit),
-            );
+            $rows = self::payload($this->websiteId, Auth::user());
         }
 
         return view('livewire.dashboard.quick-wins-card', [
             'rows' => $rows,
         ]);
+    }
+
+    /**
+     * Cached quick-wins payload — shared by render() and WarmDashboardCaches.
+     * The row limit is plan-derived, so the warmer passes the website OWNER.
+     */
+    public static function payload(string $websiteId, ?\App\Models\User $user): array
+    {
+        $limit = $user?->effectivePlan()?->apiLimit('quick_win_finder.results_shown') ?? 5;
+
+        return Cache::remember(
+            'quick_wins_card:'.$websiteId.':'.$limit.':v'.ReportCache::version($websiteId),
+            86400,
+            fn () => app(ReportDataService::class)->quickWins($websiteId, $limit),
+        );
     }
 }

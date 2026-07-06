@@ -48,7 +48,7 @@ final class BlogIdeaGenerator extends AbstractAiTool
 
         $networkBlock = '';
         if (is_array($context->networkInsight) && ($context->networkInsight['cohort_size'] ?? 0) >= 5) {
-            $networkBlock = "\n\nAcross the EBQ network for this topic (cohort: {$context->networkInsight['cohort_size']} sites), top schema patterns: ";
+            $networkBlock = "\n\nAcross the Serfix network for this topic (cohort: {$context->networkInsight['cohort_size']} sites), top schema patterns: ";
             foreach (array_slice((array) ($context->networkInsight['schema_types'] ?? []), 0, 3) as $s) {
                 $networkBlock .= ($s['type'] ?? '') . ' ';
             }

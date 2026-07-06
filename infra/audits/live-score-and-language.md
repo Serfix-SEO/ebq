@@ -73,9 +73,17 @@ Region subtags are stripped to a bare ISO-639-1 code (except `zh-Hans`/`zh-Hant`
 
 ## Gotchas / known issues
 
-- **No content-hash re-audit gate.** The live score reuses a completed `PageAuditReport`
-  indefinitely; only a newer post-`modified` timestamp triggers a refresh. Stale CWV/perf can
-  persist if WordPress doesn't report `modified` correctly.
+- **Fixed 2026-07-06 — independent content-hash re-audit gate added.** The live score still
+  only refreshes on a newer post-`modified` timestamp (unchanged — that path is "no extra
+  fetch" by design and stays that way). But `PageAuditReport.content_hash` (sha256 of the
+  audited page's extracted body text) is now stored on every completed audit, and a new
+  scheduled command, `ebq:recheck-audit-content` (hourly, `--limit=200`, `routes/console.php`),
+  independently re-fetches a bounded batch of the oldest completed audits and queues a fresh
+  one only if the hash actually changed — catching the "WordPress didn't report `modified`
+  correctly" case the timestamp check misses, without slowing the interactive live-score
+  request path. See `PageAuditService::currentContentHash()` +
+  `app/Console/Commands/RecheckAuditContent.php`. Covered by
+  `tests/Feature/RecheckAuditContentTest.php`.
 - **Sparse-GSC honesty.** `1–9` impressions is treated like "no data" (factors pending) — a
   deliberate choice so "avg position 69 across 2 queries" doesn't masquerade as signal.
 - **Language detection is best-effort on tiny inputs.** Below 10 chars or on ties it returns

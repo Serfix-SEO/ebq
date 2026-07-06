@@ -9,11 +9,11 @@
     <style>
         @page { margin: 32px 36px; }
         body { font-family: DejaVu Sans, sans-serif; color: #1e293b; font-size: 11px; line-height: 1.45; }
-        h1 { font-size: 18px; margin: 0 0 4px; color: {{ $branding->accent_color ?? '#4f46e5' }}; }
+        h1 { font-size: 18px; margin: 0 0 4px; color: {{ $branding->accent_color ?? '#F26419' }}; }
         .meta { color: #64748b; font-size: 11px; margin: 0 0 4px; }
         .compare-line { color: #94a3b8; font-style: italic; margin: 0 0 12px; font-size: 10px; }
 
-        .brand-header { border-bottom: 2px solid {{ $branding->accent_color ?? '#4f46e5' }}; padding-bottom: 8px; margin-bottom: 14px; }
+        .brand-header { border-bottom: 2px solid {{ $branding->accent_color ?? '#F26419' }}; padding-bottom: 8px; margin-bottom: 14px; }
         .brand-header img { max-height: 44px; max-width: 200px; }
         .brand-header .brand-name { font-size: 14px; font-weight: 700; color: #475569; }
 

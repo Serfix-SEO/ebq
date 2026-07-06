@@ -37,6 +37,7 @@ during impersonation so the client's id never pollutes the actor column.
 | Artisan commands | `app/Http/Controllers/Admin/ArtisanCommandsController.php:21` | Read-only reference: curated `CATALOG` + live signatures from `Artisan::all()` (can't drift from `php artisan list`). |
 | Activities | `app/Http/Controllers/Admin/ActivityController.php:11` | Filterable audit feed over `client_activities` (user/type/provider). |
 | Crawler (xref) | `app/Http/Controllers/Admin/CrawlerController.php` + `app/Livewire/Admin/CrawlerProgress.php:18` | Fleet-wide crawl progress + queue depth. See [infra/crawler](../crawler/README.md). |
+| Ops | `app/Http/Controllers/Admin/OpsController.php` | Queue/worker health (added 2026-07-06 after the silent worker-failure incident): failed jobs last-7d grouped by job+exception with Retry-all/Forget (`queue:retry`/`queue:forget`), crawl_sites with subscribers stuck `pending` >24h with a Start-crawl button (frozen sites labeled), live queue depths + undelivered alert-buffer count. Companion to the `ebq:failed-jobs-alert` mailed digest (every 15 min — `FailedJobAlertBuffer`, fed by `Queue::failing()` on every box). Tests: `AdminOpsDashboardTest`, `FailedJobsAlertTest`. |
 
 **Documented elsewhere (index only):** `PluginReleaseController`,
 `PluginAdoptionController`, `WebsiteFeatureController` (plugin area);

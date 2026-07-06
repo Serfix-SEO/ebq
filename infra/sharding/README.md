@@ -88,18 +88,19 @@ are kept. Integrity is now app-enforced:
   (`FleetController::index` renders both fleets; `DbFleetController` still owns the DB-fleet POST
   actions/data). `/admin/db-fleet` now **302-redirects to `/admin/fleet#data`** (old links still work).
   The page is one tabbed, self-documented screen — "Crawl workers" (compute, live via Livewire poll)
-  and "Database shards" (data); a collapsible "How the fleet works" block documents the model. Tab
-  state persists in the URL hash; the Data tab gently full-reloads (10s) to surface provisioning→active.
+  and "Database shards" (data — also fully live since 2026-07-06 via `Livewire\Admin\DbShardPanel`,
+  see §Fleet-page Database tab below; the old 10s full-page reload is gone). Tab state persists in
+  the URL hash.
 - `config/services.php` `hetzner.db_image` + `hetzner.db_firewall_id`.
 - **Server-type dropdowns** (`DbFleetController::SERVER_TYPES`, `FleetController::SERVER_TYPES`) are
   hardcoded slug=>label lists. Verified against the live Hetzner API for this account (fsn1, 2026-06-17):
   the Intel CX line is **cx23**(2/4) / **cx33**(4/8) / **cx43**(8/16) / **cx53**(16/32) — there is **no
   cx22/cx32**, and an invalid slug fails at provision time. An earlier list had `cx22`/`cx32` (nonexistent)
   and shifted specs; re-confirm via `GET /v1/server_types` if the catalog changes.
-- **Move form** (Database-shards tab): the `id` field is a **searchable `<select>`** whose options switch
-  with **Kind** — `tenant`→users that own websites (id=user id), `crawl`→crawl-sites (id=crawl_site id).
-  Options + a client-side filter are built from `moveOptions` (passed by `DbFleetController::index`);
-  small datasets so all options ship inline.
+- **Move form** (Database-shards tab): Livewire-driven since 2026-07-06 (`DbShardPanel`) — Kind
+  switches the subject list (`tenant`→users owning websites, `crawl`→crawl-sites), a debounced search
+  filters it, each option is labeled with its **current host node**, and that node is disabled in the
+  target list (server-side re-checked in `move()`). The old inline-JS `moveOptions` dropdown is gone.
 - **Node counts** (`db_nodes.tenant_count` / `site_count`): these columns are only ever bumped by
   `ShardMover` increment/decrement on **moves** — organic signups / new crawl-sites land on the primary
   via NULL `db_node_id`/`crawl_node_id` and are **never** counted, so the **primary drifts low** (it had
@@ -123,6 +124,35 @@ node_b has the rows, node_a purged, anchors flipped.
 > move, so tenant/crawl write jobs (GSC sync, audits, rank, crawl) re-queue themselves (`release(30)`)
 > instead of writing to the source during the window — no lost writes. Mover copy is chunked (bounded
 > memory); for very large tenants a `mariabackup`/`mysqldump` streaming path is the next optimization.
+
+### Fleet-page Database tab is fully live (2026-07-06)
+
+The tab's node table, resident lists, move form and move progress are one Livewire
+component (`Livewire\Admin\DbShardPanel`, `wire:poll.5s`) — the old full-page
+`window.location.reload` loop (which wiped in-progress form input every 10s) is gone.
+Per node: **residents** (tenants with their websites; crawl sites) expandable per row,
+with **total row counts** per resident (all tenant/crawl-tier tables summed on the
+hosting node — computed on expand, cached 1h; per-resident ↻ busts one, a "recount all
+rows on this node" button busts every resident on that node and recounts in the same
+request; a wire:loading "counting rows…" spinner shows while counts run).
+The move form is **host-aware**: each subject option shows its current node, and that
+node is disabled in the target list (can't "move" something onto its own host).
+Anchor-NULL subjects display as residents of the pinned primary. Tests:
+`tests/Feature/Admin/DbShardPanelTest.php`.
+
+### Live progress (`shard_moves`, added 2026-07-06)
+
+Every move creates a **`shard_moves`** row (`App\Models\ShardMove`) that the mover updates through
+`counting → copying → verifying → cutover → purging → completed|failed`: totals are pre-counted per
+table (so the percentage is real), `rows_copied` bumps per 1000-row chunk, `current_table` +
+`tables_done/tables_total` track position, `table_counts` stores the final per-table numbers,
+`error` the failure. The fleet page's Database tab renders a **"Data moves"** panel
+(`Livewire\Admin\ShardMoves`, `wire:poll.3s`) with a progress bar for running moves and history for
+the last 10. `ebq:shard` CLI moves get the same row for free (the mover owns tracking, not the job).
+A worker-kill/timeout can't leave a row stuck "copying": `MoveShardJob::failed()` marks the
+in-flight row failed (data stays safe — source intact until purge, `insertOrIgnore` re-runs are
+idempotent). Before this a move was a black box — the June 18 `MoveShardJob` timeout was visible
+only in `failed_jobs`. Tests: `tests/Feature/Sharding/ShardMoveProgressTest.php`.
 
 ## Known follow-ups (deferred)
 - Boundary-join CI test (run read paths with each tier on a separate sqlite connection).

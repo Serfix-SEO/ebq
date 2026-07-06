@@ -30,9 +30,9 @@
 <section>
     <div class="grid gap-4 sm:grid-cols-3">
         {{-- Headline volume --}}
-        <div class="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm ring-1 {{ $volume !== null ? 'ring-indigo-200' : 'ring-slate-200' }}">
+        <div class="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm ring-1 {{ $volume !== null ? 'ring-orange-200' : 'ring-slate-200' }}">
             <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Monthly searches</p>
-            <p class="mt-1 text-5xl font-extrabold tabular-nums {{ $volume !== null ? 'text-indigo-600' : 'text-slate-400' }}">{{ $volume !== null ? number_format($volume) : '—' }}</p>
+            <p class="mt-1 text-5xl font-extrabold tabular-nums {{ $volume !== null ? 'text-orange-600' : 'text-slate-400' }}">{{ $volume !== null ? number_format($volume) : '—' }}</p>
             <p class="mt-2 text-xs font-medium text-slate-500">{{ $volume !== null ? 'avg. searches / month' : 'No volume data for this keyword' }}</p>
         </div>
 
@@ -54,7 +54,7 @@
                     <div class="mt-2 flex h-20 items-end gap-1 px-1">
                         @foreach ($series as $pt)
                             <div class="flex flex-1 flex-col items-center gap-1">
-                                <div class="w-full rounded-t bg-indigo-400/80" style="height: {{ max(4, (int) round(($pt['value'] / $peak) * 64)) }}px" title="{{ number_format($pt['value']) }}"></div>
+                                <div class="w-full rounded-t bg-orange-400/80" style="height: {{ max(4, (int) round(($pt['value'] / $peak) * 64)) }}px" title="{{ number_format($pt['value']) }}"></div>
                                 <span class="text-[8px] text-slate-400">{{ $pt['label'] }}</span>
                             </div>
                         @endforeach

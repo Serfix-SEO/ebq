@@ -69,7 +69,7 @@
                         <div>
                             <label for="invite-email-{{ $websiteId }}" class="mb-1 block text-[11px] font-medium text-slate-600 dark:text-slate-400">Email address</label>
                             <input id="invite-email-{{ $websiteId }}" wire:model="inviteEmail" type="email" placeholder="colleague@example.com" autocomplete="email"
-                                class="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                                class="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
                             @error('inviteEmail')<p class="mt-1 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
                         </div>
                         <div>
@@ -80,7 +80,7 @@
                             </select>
                         </div>
                         <button type="submit" wire:loading.attr="disabled" wire:target="inviteMember"
-                            class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-indigo-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                            class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-orange-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
                             <svg wire:loading wire:target="inviteMember" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
                             Send invite
                         </button>
@@ -91,7 +91,7 @@
                             <div class="mb-2 flex items-center justify-between">
                                 <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Feature access</div>
                                 <div class="flex items-center gap-2 text-[10px]">
-                                    <button type="button" wire:click="$set('invitePermissions', {{ json_encode(array_fill_keys(array_keys($features), true)) }})" class="text-indigo-600 hover:underline">Select all</button>
+                                    <button type="button" wire:click="$set('invitePermissions', {{ json_encode(array_fill_keys(array_keys($features), true)) }})" class="text-orange-600 hover:underline">Select all</button>
                                     <span class="text-slate-300">·</span>
                                     <button type="button" wire:click="$set('invitePermissions', {{ json_encode(array_fill_keys(array_keys($features), false)) }})" class="text-slate-500 hover:underline">Clear</button>
                                 </div>
@@ -99,7 +99,7 @@
                             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                 @foreach ($features as $key => $feature)
                                     <label class="flex cursor-pointer items-start gap-2 rounded-md border border-transparent p-2 transition hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-700 dark:hover:bg-slate-800/60">
-                                        <input type="checkbox" wire:model="invitePermissions.{{ $key }}" class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                                        <input type="checkbox" wire:model="invitePermissions.{{ $key }}" class="mt-0.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
                                         <div class="min-w-0">
                                             <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">{{ $feature['label'] }}</div>
                                             <div class="text-[10px] text-slate-500 dark:text-slate-400">{{ $feature['description'] }}</div>
@@ -110,7 +110,7 @@
                         </div>
                     @else
                         <p class="mt-3 flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                            <svg class="h-3.5 w-3.5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                            <svg class="h-3.5 w-3.5 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Admins have full access to every feature and can manage the team.
                         </p>
                     @endif
@@ -127,7 +127,7 @@
                             <span class="font-medium text-slate-900 dark:text-slate-100">{{ $website->user->name }}</span>
                             <span class="block text-xs text-slate-500 dark:text-slate-400">{{ $website->user->email }}</span>
                         </div>
-                        <span class="rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200">Owner</span>
+                        <span class="rounded-md bg-orange-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-orange-800 dark:bg-orange-500/20 dark:text-orange-200">Owner</span>
                     </li>
 
                     {{-- Members --}}
@@ -248,7 +248,7 @@
                                                 wire:click="resendInvitation('{{ $inv->id }}')"
                                                 wire:loading.attr="disabled"
                                                 wire:target="resendInvitation('{{ $inv->id }}')"
-                                                class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                                                class="inline-flex items-center gap-1 rounded-md bg-orange-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
                                                 <svg wire:loading.remove wire:target="resendInvitation('{{ $inv->id }}')" class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v.906a2.25 2.25 0 0 1-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 0 0 1.183 1.981l6.478 3.488m8.839 2.51-4.66-2.51m0 0-1.023-.55a2.25 2.25 0 0 0-2.134 0l-1.022.55m0 0-4.661 2.51m16.5 1.615a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V8.844a2.25 2.25 0 0 1 1.183-1.98l7.5-4.04a2.25 2.25 0 0 1 2.134 0l7.5 4.04a2.25 2.25 0 0 1 1.183 1.98V19.5Z" /></svg>
                                                 <svg wire:loading wire:target="resendInvitation('{{ $inv->id }}')" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
                                                 <span wire:loading.remove wire:target="resendInvitation('{{ $inv->id }}')">Resend</span>

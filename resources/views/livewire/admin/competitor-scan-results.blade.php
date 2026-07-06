@@ -112,7 +112,7 @@
                                         @foreach ($row['top_pages'] as $entry)
                                             @if ($entry['page'])
                                                 <li class="flex items-center justify-between gap-3">
-                                                    <a href="{{ $entry['page']->url }}" target="_blank" rel="noopener" class="flex-1 truncate text-indigo-600 hover:underline dark:text-indigo-400">{{ $entry['page']->title ?: $entry['page']->url }}</a>
+                                                    <a href="{{ $entry['page']->url }}" target="_blank" rel="noopener" class="flex-1 truncate text-orange-600 hover:underline dark:text-orange-400">{{ $entry['page']->title ?: $entry['page']->url }}</a>
                                                     <span class="tabular-nums text-slate-500">{{ $entry['occurrences'] }}× · {{ number_format($entry['density'] * 100, 3) }}%</span>
                                                 </li>
                                             @endif
@@ -208,7 +208,7 @@
                             @foreach ($backlinksSummary['linking_pages'] as $row)
                                 <tr>
                                     <td class="px-3 py-2">
-                                        <a href="{{ $row->from_url }}" target="_blank" rel="noopener" class="block truncate text-indigo-600 hover:underline dark:text-indigo-400">{{ $row->from_title ?: $row->from_url }}</a>
+                                        <a href="{{ $row->from_url }}" target="_blank" rel="noopener" class="block truncate text-orange-600 hover:underline dark:text-orange-400">{{ $row->from_title ?: $row->from_url }}</a>
                                         <p class="text-[11px] text-slate-500">{{ $row->from_domain }}</p>
                                     </td>
                                     <td class="px-3 py-2 text-xs text-slate-600">{{ $row->anchor_text ?: '—' }}</td>
@@ -256,7 +256,7 @@
                         @foreach ($pages as $page)
                             <tr>
                                 <td class="px-3 py-2">
-                                    <a href="{{ $page->url }}" target="_blank" rel="noopener" class="block truncate text-indigo-600 hover:underline dark:text-indigo-400">{{ $page->title ?: $page->url }}</a>
+                                    <a href="{{ $page->url }}" target="_blank" rel="noopener" class="block truncate text-orange-600 hover:underline dark:text-orange-400">{{ $page->title ?: $page->url }}</a>
                                     @if ($page->meta_description)
                                         <p class="mt-0.5 truncate text-[11px] text-slate-500">{{ \Illuminate\Support\Str::limit($page->meta_description, 140) }}</p>
                                     @endif

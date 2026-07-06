@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ClientActivity;
+use App\Services\Usage\UsageMeter;
 use App\Support\TeamPermissions;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +62,14 @@ class ClientActivityLogger
             'meta'            => $meta,
             'units_consumed'  => $unitsConsumed,
         ]);
+
+        // Release the UsageMeter::assertCanSpend() reservation now that the
+        // real row is persisted (consumedInWindow() will see it from here
+        // on) — see UsageMeter::assertCanSpend() docblock for why this
+        // reserve/release pair exists.
+        if ($provider !== null && $unitsConsumed !== null && $billedUserId !== null) {
+            app(UsageMeter::class)->release($billedUserId, $provider, $unitsConsumed);
+        }
     }
 
     /**

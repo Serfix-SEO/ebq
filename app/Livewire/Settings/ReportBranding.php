@@ -26,7 +26,7 @@ class ReportBranding extends Component
 
     public string $scope = 'user'; // 'user' = default, 'website' = override
     public string $company_name = '';
-    public string $accent_color = '#4f46e5';
+    public string $accent_color = '#F26419';
     public ?string $footer_text = null;
     public ?string $contact_email = null;
     public ?string $contact_phone = null;
@@ -125,7 +125,7 @@ class ReportBranding extends Component
         $row = $this->findRow();
         if ($row) {
             $this->company_name = (string) $row->company_name;
-            $this->accent_color = (string) ($row->accent_color ?: '#4f46e5');
+            $this->accent_color = (string) ($row->accent_color ?: '#F26419');
             $this->footer_text = $row->footer_text;
             $this->contact_email = $row->contact_email;
             $this->contact_phone = $row->contact_phone;
@@ -136,7 +136,7 @@ class ReportBranding extends Component
             // First-time render — pre-fill the company name with the
             // user's name so the form isn't empty. Operator can overwrite.
             $this->company_name = (string) (Auth::user()->name ?? '');
-            $this->accent_color = '#4f46e5';
+            $this->accent_color = '#F26419';
             $this->footer_text = null;
             $this->contact_email = null;
             $this->contact_phone = null;

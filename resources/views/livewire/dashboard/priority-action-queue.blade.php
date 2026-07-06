@@ -34,7 +34,7 @@
                 @if ($canWhitelabel)
                     <a href="{{ route('site-audit.download', ['whitelabel' => 0]) }}"
                         class="text-[10px] text-slate-400 hover:text-slate-600 hover:underline dark:text-slate-500 dark:hover:text-slate-300">
-                        (EBQ branding instead)
+                        (Serfix branding instead)
                     </a>
                 @endif
             </div>

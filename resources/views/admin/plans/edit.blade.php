@@ -167,22 +167,28 @@
                 </div>
             </div>
 
-            <div>
-                <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Stripe price ID (yearly)</label>
-                <input type="text" name="stripe_price_id_yearly" value="{{ old('stripe_price_id_yearly', $plan->stripe_price_id_yearly) }}"
-                       pattern="price_.*"
-                       class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
-                       placeholder="price_1AbCd…" />
-                <p class="text-[11px] text-slate-500 mt-1">
-                    EBQ only sells yearly subscriptions. Paste the Stripe yearly price ID — without it, the plan card on /pricing
-                    grays out and the WordPress wizard hides the CTA. Monthly price above is display-only ("$X/mo, billed yearly").
-                </p>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Stripe price ID (yearly)</label>
+                    <input type="text" name="stripe_price_id_yearly" value="{{ old('stripe_price_id_yearly', $plan->stripe_price_id_yearly) }}"
+                           pattern="price_.*"
+                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+                           placeholder="price_1AbCd…" />
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Annual billing. Required for checkout — without it the plan card grays out and the WP wizard hides the CTA.
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Stripe price ID (monthly)</label>
+                    <input type="text" name="stripe_price_id_monthly" value="{{ old('stripe_price_id_monthly', $plan->stripe_price_id_monthly) }}"
+                           pattern="price_.*"
+                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+                           placeholder="price_1AbCd…" />
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Monthly billing. Paste the Stripe monthly price ID to enable month-to-month checkout for this plan.
+                    </p>
+                </div>
             </div>
-
-            {{-- Hidden so PlanController::update() still receives the field even though we're hiding the input.
-                 The monthly Stripe price ID is now legacy: never used to mint a subscription, but kept on the
-                 row for historical Stripe Dashboard linkage. --}}
-            <input type="hidden" name="stripe_price_id_monthly" value="{{ old('stripe_price_id_monthly', $plan->stripe_price_id_monthly) }}" />
 
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Marketing bullets (one per line)</label>
@@ -209,15 +215,15 @@
             @php
                 $planFeatures = $plan->featureMap();
                 $featureLabels = [
-                    'chatbot'          => ['Chatbot', 'Floating "EBQ Assistant" panel inside the WordPress editor.'],
+                    'chatbot'          => ['Chatbot', 'Floating "Serfix Assistant" panel inside the WordPress editor.'],
                     'ai_writer'        => ['AI Writer', 'Multi-step "Generate full draft from focus keyword" tool.'],
-                    'ai_inline'        => ['AI inline edits', 'Block toolbar "EBQ AI" menu + // slash commands.'],
+                    'ai_inline'        => ['AI inline edits', 'Block toolbar "Serfix AI" menu + // slash commands.'],
                     'live_audit'       => ['Live audit', 'Real-time SEO + readability scoring with GSC signals.'],
-                    'hq'               => ['EBQ HQ admin page', 'Top-level "EBQ HQ" admin page with rank tracker, performance, pages, AI Studio.'],
-                    'redirects'        => ['Redirects manager', '"EBQ Redirects" admin page with CSV import/export.'],
-                    'dashboard_widget' => ['Dashboard widget', 'WP Dashboard "EBQ summary" widget on the home screen.'],
-                    'post_column'      => ['Post list column', '"EBQ score" column in the wp-admin posts list.'],
-                    'report_whitelabel'  => ['Report whitelabel', 'Branded report emails + PDF attachment, plus Gmail/Outlook/SMTP send-as. Off = EBQ default branding and mailer.'],
+                    'hq'               => ['Serfix HQ admin page', 'Top-level "Serfix HQ" admin page with rank tracker, performance, pages, AI Studio.'],
+                    'redirects'        => ['Redirects manager', '"Serfix Redirects" admin page with CSV import/export.'],
+                    'dashboard_widget' => ['Dashboard widget', 'WP Dashboard "Serfix summary" widget on the home screen.'],
+                    'post_column'      => ['Post list column', '"Serfix score" column in the wp-admin posts list.'],
+                    'report_whitelabel'  => ['Report whitelabel', 'Branded report emails + PDF attachment, plus Gmail/Outlook/SMTP send-as. Off = Serfix default branding and mailer.'],
                     'scheduled_reports'  => ['Scheduled reports (platform, not yet enforced)', 'Reserved for a future Scheduled Reports feature. Seeded per-tier; no enforcement yet.'],
                 ];
             @endphp
@@ -237,7 +243,7 @@
                         @endphp
                         <label class="flex items-start gap-2 rounded border border-slate-200 px-3 py-2 hover:border-slate-300">
                             <input type="checkbox" name="plan_features[{{ $key }}]" value="on" @checked($checked)
-                                   class="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600">
+                                   class="mt-1 h-4 w-4 rounded border-slate-300 text-orange-600">
                             <span class="text-sm leading-tight">
                                 <span class="font-medium text-slate-800">{{ $label }}</span>
                                 <span class="block text-[11px] text-slate-500 mt-0.5">{{ $help }}</span>
@@ -339,12 +345,12 @@
             <div class="flex flex-wrap items-center gap-6 border-t border-slate-200 pt-4">
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                     <input type="checkbox" name="is_active" value="1" @checked(old('is_active', (bool) $plan->is_active))
-                           class="h-4 w-4 rounded border-slate-300 text-indigo-600">
+                           class="h-4 w-4 rounded border-slate-300 text-orange-600">
                     <span>Active <span class="text-xs text-slate-500">(visible on /pricing &amp; in the wizard)</span></span>
                 </label>
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                     <input type="checkbox" name="is_highlighted" value="1" @checked(old('is_highlighted', (bool) $plan->is_highlighted))
-                           class="h-4 w-4 rounded border-slate-300 text-violet-600">
+                           class="h-4 w-4 rounded border-slate-300 text-orange-600">
                     <span>Highlighted <span class="text-xs text-slate-500">(featured ring + "Most popular" badge)</span></span>
                 </label>
             </div>
@@ -355,7 +361,7 @@
                     Cancel
                 </a>
                 <button type="submit"
-                        class="text-sm font-medium px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-500">
+                        class="text-sm font-medium px-4 py-2 rounded-md bg-orange-600 text-white hover:bg-orange-500">
                     {{ $isNew ? 'Create plan' : 'Save changes' }}
                 </button>
             </div>

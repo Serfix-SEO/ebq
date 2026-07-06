@@ -1,6 +1,6 @@
 @props([
-    'title' => 'EBQ',
-    'description' => 'EBQ — clear SEO operations with rankings, backlinks, audits, and AI-powered content tools.',
+    'title' => 'Serfix',
+    'description' => 'Serfix — clear SEO operations with rankings, backlinks, audits, and AI-powered content tools.',
     'canonical' => null,
     'active' => null,
     'ogImage' => null,
@@ -8,7 +8,7 @@
 ])
 @php
     $canonicalUrl = $canonical ?? url()->current();
-    $ogImageUrl = $ogImage ?? asset('ebq-logo.png');
+    $ogImageUrl = $ogImage ?? asset('serfix-logo.png');
     $homeUrl = route('landing');
 
     // Site-wide structured data — Organization + WebSite. Page-specific
@@ -17,15 +17,15 @@
     $orgSchema = [
         '@context' => 'https://schema.org',
         '@type' => 'Organization',
-        'name' => 'EBQ',
+        'name' => 'Serfix',
         'url' => $homeUrl,
-        'logo' => asset('ebq-logo.png'),
+        'logo' => asset('serfix-logo.png'),
         'description' => 'Connected SEO suite: rankings, backlinks, audits, live Search Console data, and AI content tools.',
     ];
     $siteSchema = [
         '@context' => 'https://schema.org',
         '@type' => 'WebSite',
-        'name' => 'EBQ',
+        'name' => 'Serfix',
         'url' => $homeUrl,
     ];
     $jsonFlags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
@@ -35,6 +35,7 @@
 <head>
     <meta charset="utf-8">
     @include('partials.google-analytics')
+    @include('partials.clarity')
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -45,7 +46,7 @@
     <title>{{ $title }}</title>
     <meta name="description" content="{{ $description }}">
     <meta name="robots" content="{{ $robots }}">
-    <meta name="author" content="EBQ">
+    <meta name="author" content="Serfix">
     <link rel="canonical" href="{{ $canonicalUrl }}">
 
     {{-- Open Graph --}}
@@ -53,7 +54,7 @@
     <meta property="og:title" content="{{ $title }}">
     <meta property="og:description" content="{{ $description }}">
     <meta property="og:url" content="{{ $canonicalUrl }}">
-    <meta property="og:site_name" content="EBQ">
+    <meta property="og:site_name" content="Serfix">
     <meta property="og:locale" content="en_US">
     <meta property="og:image" content="{{ $ogImageUrl }}">
     <meta property="og:image:secure_url" content="{{ $ogImageUrl }}">
@@ -84,8 +85,8 @@
 
     <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
-            <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="EBQ home">
-                <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="56" height="56" class="h-14 w-14 object-contain">
+            <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="Serfix home">
+                <img src="{{ asset('serfix-logo.png') }}" alt="Serfix" width="101" height="36" class="h-9 w-auto object-contain">
             </a>
 
             <nav aria-label="Primary" class="hidden items-center gap-7 text-sm text-slate-600 md:flex">
@@ -111,8 +112,8 @@
     <footer class="border-t border-slate-200 bg-white">
         <div class="mx-auto grid max-w-6xl gap-10 px-6 py-14 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-5 lg:px-8">
             <div class="lg:col-span-2">
-                <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="EBQ home">
-                    <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="56" height="56" class="h-14 w-14 object-contain">
+                <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="Serfix home">
+                    <img src="{{ asset('serfix-logo.png') }}" alt="Serfix" width="101" height="36" class="h-9 w-auto object-contain">
                 </a>
                 <p class="mt-4 max-w-xs text-slate-500">The SEO command center for teams that ship every week. Discover, prioritize, execute, measure.</p>
             </div>
@@ -144,7 +145,7 @@
         </div>
         <div class="border-t border-slate-200">
             <div class="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-                <p>&copy; {{ date('Y') }} EBQ. All rights reserved.</p>
+                <p>&copy; {{ date('Y') }} Serfix. All rights reserved.</p>
                 <p>Built for SEO teams that ship weekly.</p>
             </div>
         </div>

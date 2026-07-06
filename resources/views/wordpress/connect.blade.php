@@ -1,11 +1,11 @@
 <x-layouts.app>
     <div class="mx-auto max-w-xl space-y-5">
         <div class="flex items-center gap-3">
-            <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+            <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
             </span>
             <div>
-                <h1 class="text-xl font-bold tracking-tight">Connect WordPress to EBQ</h1>
+                <h1 class="text-xl font-bold tracking-tight">Connect WordPress to Serfix</h1>
                 <p class="text-sm text-slate-500 dark:text-slate-400">The plugin on <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $siteHost }}</span> is asking to read insights.</p>
             </div>
         </div>
@@ -32,7 +32,7 @@
                     </p>
                 @else
                     <select id="website_id" name="website_id" required
-                        class="h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                        class="h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                         @foreach ($websites as $w)
                             <option value="{{ $w->id }}" @selected($suggestedWebsiteId === $w->id)>{{ $w->domain }}</option>
                         @endforeach
@@ -46,7 +46,7 @@
             <div class="mt-6 flex items-center justify-between gap-3">
                 <a href="{{ route('dashboard') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">Cancel</a>
                 <button type="submit" @disabled($websites->isEmpty())
-                    class="inline-flex h-9 items-center gap-1.5 rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60">
+                    class="inline-flex h-9 items-center gap-1.5 rounded-md bg-orange-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-500 disabled:opacity-60">
                     Connect and send token →
                 </button>
             </div>

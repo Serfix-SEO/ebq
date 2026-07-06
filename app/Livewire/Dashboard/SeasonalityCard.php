@@ -5,6 +5,7 @@ namespace App\Livewire\Dashboard;
 use App\Models\KeywordMetric;
 use App\Models\SearchConsoleData;
 use App\Services\KeywordValueCalculator;
+use App\Services\ReportCache;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -54,11 +55,7 @@ class SeasonalityCard extends Component
         $rows = [];
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $rows = Cache::remember(
-                'seasonality_card:'.$this->websiteId,
-                600,
-                fn () => $this->computeRows(),
-            );
+            $rows = self::payload($this->websiteId);
         }
 
         return view('livewire.dashboard.seasonality-card', [
@@ -129,5 +126,22 @@ class SeasonalityCard extends Component
         usort($out, fn ($a, $b) => $a['months_until'] <=> $b['months_until']);
 
         return array_slice($out, 0, 5);
+    }
+
+    /**
+     * Cached seasonality payload — shared by render() and WarmDashboardCaches.
+     * computeRows() only reads $this->websiteId, so a throwaway instance keeps
+     * the internals untouched.
+     */
+    public static function payload(string $websiteId): array
+    {
+        $self = new self;
+        $self->websiteId = $websiteId;
+
+        return Cache::remember(
+            'seasonality_card:'.$websiteId.':v'.ReportCache::version($websiteId),
+            86400,
+            fn () => $self->computeRows(),
+        );
     }
 }

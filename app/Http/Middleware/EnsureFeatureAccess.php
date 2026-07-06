@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\TeamPermissions;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,10 +18,14 @@ class EnsureFeatureAccess
             return redirect()->route('login');
         }
 
-        if (! array_key_exists($feature, TeamPermissions::FEATURES)) {
-            return $next($request);
-        }
-
+        // No unknown-feature bypass here on purpose: a typo'd `feature:` route arg
+        // must fail closed, not silently pass every request through (found
+        // 2026-07-06 — the old `! array_key_exists(...) -> next()` branch did the
+        // opposite). `User::hasFeatureAccess()` -> `TeamPermissions::allows()`
+        // already handles an unrecognised key safely: owners/admins and
+        // full-access members (permissions === null) are unaffected either way,
+        // and a restricted member's explicit permission list simply won't contain
+        // a bogus key, so they're correctly denied.
         $websiteId = session('current_website_id');
         $accessible = ($websiteId !== null && $websiteId !== '')
             ? $user->accessibleWebsitesQuery()->whereKey($websiteId)->exists()

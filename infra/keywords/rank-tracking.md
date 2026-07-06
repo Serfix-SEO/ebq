@@ -18,7 +18,7 @@ ebq:track-rankings (hourly cron)
                     ├─ write RankTrackingSnapshot (status ok|failed)
                     ├─ update keyword: current/best/initial_position, position_change,
                     │   next_check_at = now + check_interval_hours
-                    └─ ReportCache::flushWebsite()  (Overview tracker_distribution rebuild)
+                    └─ RankCache::flushWebsite()  (invalidates HQ overview rank KPIs only)
 ```
 
 ## Key components
@@ -26,7 +26,8 @@ ebq:track-rankings (hourly cron)
 | Component | Role | File |
 |---|---|---|
 | `RankTrackingService` | The SERP check: query Serper, locate target, build snapshot, update keyword | `app/Services/RankTrackingService.php` |
-| `TrackKeywordRankJob` | Queue wrapper; flushes report cache; on error writes failed status + reschedules | `app/Jobs/TrackKeywordRankJob.php` |
+| `TrackKeywordRankJob` | Queue wrapper; calls `RankCache::flushWebsite()` (not `ReportCache` — see Gotchas); on error writes failed status + reschedules | `app/Jobs/TrackKeywordRankJob.php` |
+| `RankCache` | Rank-specific version integer; separate from `ReportCache` so hourly rank checks don't bust 24h GSC caches | `app/Services/RankCache.php` |
 | `RankTrackingKeyword` | Tracked keyword + last-known state; `gscQuery()`/`hasGscMatch()` overlay | `app/Models/RankTrackingKeyword.php` |
 | `RankTrackingSnapshot` | One SERP check result (position, top results, features, PAA, competitors) | `app/Models/RankTrackingSnapshot.php` |
 | `RankTrackingKeywordObserver` | On create: enforce plan cap + queue a volume lookup | `app/Observers/RankTrackingKeywordObserver.php` |
@@ -102,6 +103,13 @@ top-pages and a 90-day series alongside the Serper position chart (last 60 ok sn
 
 ## Gotchas / limits
 
+- **`TrackKeywordRankJob` calls `RankCache::flushWebsite()`, not `ReportCache::flushWebsite()`.**
+  The hourly rank check previously called `ReportCache::flushWebsite()`, which orphaned all 24h
+  GSC-aggregation caches (cannibalization, quick wins, top countries) every hour — causing
+  repeated 590K-row GROUP BY scans on large sites. Split on 2026-06-28: `RankCache` (`app/Services/RankCache.php`)
+  tracks rank freshness; `ReportCache` tracks GSC/crawl freshness. `PluginHqController::overview`
+  includes **both** versions so HQ rank KPIs still refresh. GSC-only dashboard caches now stay
+  warm for their full 24h TTL, busted only by nightly `SyncSearchConsoleData`.
 - **`TrackKeywordRankJob` runs on the `sync` queue** with `timeout=120, tries=2, backoff=30`;
   the observer/manager dispatch *additions* on the `interactive` queue for snappy first checks.
 - **A failed Serper call still reschedules** `next_check_at` — by design, but it means a

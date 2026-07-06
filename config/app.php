@@ -59,12 +59,12 @@ return [
     | Browser-facing application URL
     |--------------------------------------------------------------------------
     |
-    | URLs returned to the WordPress plugin for "Open in EBQ" links. Use this
+    | URLs returned to the WordPress plugin for "Open in Serfix" links. Use this
     | when APP_URL is an internal hostname (e.g. host.docker.internal) but
-    | admins open EBQ in the browser at localhost or a public domain.
+    | admins open Serfix in the browser at localhost or a public domain.
     |
     */
-    'public_url' => env('APP_PUBLIC_URL', env('EBQ_PUBLIC_URL', env('APP_URL', 'https://ebq.io'))),
+    'public_url' => env('APP_PUBLIC_URL', env('EBQ_PUBLIC_URL', env('APP_URL', 'https://serfix.io'))),
 
     /*
     |--------------------------------------------------------------------------
