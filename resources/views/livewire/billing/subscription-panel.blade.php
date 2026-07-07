@@ -245,6 +245,36 @@
                             <span class="text-2xl font-bold text-slate-900 dark:text-white">$0</span>
                             <span class="text-xs text-slate-500 dark:text-slate-400">forever</span>
                         </div>
+                    @elseif ($showWinback)
+                        {{-- Winback pricing: strikethrough + discounted first payment
+                             (coupon is duration=once, so only the first invoice). --}}
+                        @php
+                            $fmtMoney = fn (float $v) => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+                            $discYearly = $plan->price_yearly_usd * (100 - $winbackPercent) / 100;
+                            $discMonthly = $plan->price_monthly_usd * (100 - $winbackPercent) / 100;
+                        @endphp
+                        <div x-show="billing === 'yearly'" class="mt-3">
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="text-sm font-semibold text-slate-400 line-through dark:text-slate-500">${{ round($plan->price_yearly_usd / 12) }}</span>
+                                <span class="text-2xl font-bold text-orange-600 dark:text-orange-400">${{ $fmtMoney($discYearly / 12) }}</span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400">/mo</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400 dark:text-slate-500">
+                                <span class="line-through">${{ $plan->price_yearly_usd }}</span>
+                                <span class="font-semibold text-orange-600 dark:text-orange-400">${{ $fmtMoney($discYearly) }}</span>
+                                first year with {{ $winbackCode }}
+                            </p>
+                        </div>
+                        <div x-show="billing === 'monthly'" style="display:none" class="mt-3">
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="text-sm font-semibold text-slate-400 line-through dark:text-slate-500">${{ $plan->price_monthly_usd }}</span>
+                                <span class="text-2xl font-bold text-orange-600 dark:text-orange-400">${{ $fmtMoney($discMonthly) }}</span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400">/mo</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400 dark:text-slate-500">
+                                first month with {{ $winbackCode }}, then ${{ $plan->price_monthly_usd }}/mo
+                            </p>
+                        </div>
                     @else
                         {{-- Yearly price (default) --}}
                         <div x-show="billing === 'yearly'" class="mt-3">

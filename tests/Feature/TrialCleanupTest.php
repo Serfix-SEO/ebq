@@ -184,11 +184,22 @@ class TrialCleanupTest extends TestCase
     {
         config(['services.stripe.winback_promo_code' => 'SAVE30', 'services.stripe.winback_promo_percent' => 30]);
 
+        Plan::create([
+            'slug' => 'pro', 'name' => 'Pro', 'is_active' => true,
+            'price_monthly_usd' => 44, 'price_yearly_usd' => 444,
+        ]);
+
         $expired = $this->trialUser(15 * 24);
         $this->actingAs($expired)->get(route('billing.show'))
             ->assertOk()
             ->assertSee('30% OFF any plan')
-            ->assertSee('SAVE30');
+            ->assertSee('SAVE30')
+            // strikethrough original + discounted first payment on the plan card
+            ->assertSee('line-through')
+            ->assertSee('$310.8')                    // 444 * 0.7 (yearly)
+            ->assertSee('first year with SAVE30')
+            ->assertSee('$30.8')                     // 44 * 0.7 (monthly)
+            ->assertSee('first month with SAVE30');
 
         $active = $this->trialUser(5 * 24);
         $this->actingAs($active)->get(route('billing.show'))
