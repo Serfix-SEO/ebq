@@ -6,6 +6,7 @@ use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Single source of truth for "is this user's free trial expired?" — shared by
@@ -54,6 +55,27 @@ class TrialStatus
         }
 
         return ! $user->subscribed('default');
+    }
+
+    /**
+     * Team member on at least one OTHER user's website (website_user pivot).
+     * Such users work under the owner's plan, so trial expiry must not lock
+     * them out of the app — only their OWN websites are on the deletion track.
+     */
+    public static function isTeamMember(User $user): bool
+    {
+        return DB::table('website_user')->where('user_id', $user->id)->exists();
+    }
+
+    /**
+     * Lockout rule for the billing-confinement middleware: expired AND not a
+     * team member anywhere. Data deletion (TrialCleanup) intentionally uses
+     * the broader isExpired() — an expired team member keeps app access but
+     * still loses their own trial websites after the buffer.
+     */
+    public static function isLockedOut(User $user): bool
+    {
+        return self::isExpired($user) && ! self::isTeamMember($user);
     }
 
     public static function expiryAt(User $user): ?Carbon

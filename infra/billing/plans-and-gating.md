@@ -96,13 +96,22 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
   **The 72h countdown anchors to the first 'expired' email actually sent**, not the
   theoretical schedule — accounts predating the feature get the full 3-day buffer from first
   contact (dry-run caught 3 users who'd otherwise have had 12h). Login survives; expiry
-  derives from `created_at`, so no second trial; `trial_data_deleted_at` makes deletion
-  one-shot. `--dry-run` prints without sending/deleting.
-- **`EnsureTrialNotExpired`** (web middleware): expired users are confined to `billing.*`/
-  `cashier.*`/logout/impersonation-stop; everything else redirects to /billing with an
-  explanatory flash. Impersonating admins pass through.
+  derives from `created_at`, so no second trial. `--dry-run` prints without sending/deleting.
+- **Team members (2026-07-07)**: only users **owning ≥1 website** (`has('websites')`) enter
+  the email/deletion pipeline — a member-only user (rows in `website_user`, zero owned sites)
+  gets no emails and nothing deleted; their memberships are never touched. Deletion **clears
+  `trial_deletion_notices`** so a re-added site restarts a FRESH countdown (never instant
+  delete, never free-forever — the old one-shot `trial_data_deleted_at` query gate was
+  removed; the column remains as an audit timestamp). Stale-anchor guard: if every owned
+  site was created after the first warning (`created_at <= anchor` check), the countdown
+  resets (`TrialCleanup.php` handle()).
+- **`EnsureTrialNotExpired`** (web middleware): lockout uses `TrialStatus::isLockedOut()` =
+  expired **AND not a team member anywhere** — a user managing other owners' websites keeps
+  full app access (works under those owners' plans) while their own sites still expire.
+  Locked users are confined to `billing.*`/`cashier.*`/logout/impersonation-stop; everything
+  else redirects to /billing with an explanatory flash. Impersonating admins pass through.
 - Tests: `tests/Feature/TrialCleanupTest.php` (stages, anchor, dedupe, shared-crawl safety,
-  exemptions, lockout).
+  exemptions, lockout, team-member exemptions, re-add countdown restart, stale anchor).
 
 ## Resolving the user's plan (`User::effectivePlan()`, line 291)
 

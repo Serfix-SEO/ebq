@@ -40,6 +40,7 @@ class TrialCleanupTest extends TestCase
     {
         Mail::fake();
         $user = $this->trialUser(14 * 24 + 12); // 60h to deletion — only the 'expired' stage is crossed
+        Website::factory()->create(['user_id' => $user->id, 'domain' => 'once.test']);
 
         $this->artisan('ebq:trial-cleanup')->assertSuccessful();
         $this->artisan('ebq:trial-cleanup')->assertSuccessful(); // second run: no dupe
@@ -55,6 +56,7 @@ class TrialCleanupTest extends TestCase
         // "deleted in 12 hours" first contact.
         Mail::fake();
         $user = $this->trialUser(40 * 24); // way past schedule
+        Website::factory()->create(['user_id' => $user->id, 'domain' => 'stages.test']);
 
         $this->artisan('ebq:trial-cleanup');
         Mail::assertSent(TrialExpiryMail::class, fn (TrialExpiryMail $m) => $m->stage === 'expired');
@@ -100,10 +102,79 @@ class TrialCleanupTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $user->id]); // login survives
         $this->assertNotNull($user->fresh()->trial_data_deleted_at);
 
-        // One-shot: a re-added website is never auto-deleted again.
+        // A re-added website is NOT exempt — it restarts a FRESH countdown
+        // (warning email first, deletion only after the full 72h buffer), so
+        // an expired-but-unlocked team member can't park data free forever.
+        Mail::fake();
         $second = Website::factory()->create(['user_id' => $user->id, 'domain' => 'readded.test']);
         $this->artisan('ebq:trial-cleanup')->assertSuccessful();
-        $this->assertDatabaseHas('websites', ['id' => $second->id]);
+        $this->assertDatabaseHas('websites', ['id' => $second->id]); // warned, not deleted
+        Mail::assertSent(TrialExpiryMail::class, fn (TrialExpiryMail $m) => $m->stage === 'expired');
+
+        $this->travel(73)->hours();
+        $this->artisan('ebq:trial-cleanup')->assertSuccessful();
+        $this->assertDatabaseMissing('websites', ['id' => $second->id]);
+    }
+
+    public function test_team_member_is_not_locked_out_and_membership_survives(): void
+    {
+        Mail::fake();
+        $owner = User::factory()->create(['email_verified_at' => now()]);
+        $ownerSite = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'owner-site.test']);
+
+        $member = $this->trialUser(20 * 24); // way past trial
+        $ownerSite->members()->attach($member->id, ['role' => 'member']);
+
+        session(['current_website_id' => $ownerSite->id]);
+        $this->actingAs($member)->get(route('dashboard'))->assertOk(); // no billing lockout
+
+        // Cleanup: member owns no websites — no scary deletion emails, no
+        // deletion, membership pivot untouched, owner's site untouched.
+        $this->artisan('ebq:trial-cleanup')->assertSuccessful();
+        Mail::assertNothingSent();
+        $this->assertDatabaseHas('websites', ['id' => $ownerSite->id]);
+        $this->assertDatabaseHas('website_user', ['website_id' => $ownerSite->id, 'user_id' => $member->id]);
+        $this->assertNull($member->fresh()->trial_data_deleted_at);
+    }
+
+    public function test_expired_member_keeps_access_but_own_sites_still_deleted(): void
+    {
+        Mail::fake();
+        $owner = User::factory()->create(['email_verified_at' => now()]);
+        $ownerSite = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'team-owner.test']);
+
+        $member = $this->trialUser(20 * 24);
+        $ownerSite->members()->attach($member->id, ['role' => 'member']);
+        $ownSite = Website::factory()->create(['user_id' => $member->id, 'domain' => 'member-own.test']);
+        $ownSite->forceFill(['created_at' => now()->subDays(10)])->saveQuietly(); // predates the anchor
+        // Pre-anchor the countdown 73h ago so this run deletes immediately.
+        $member->forceFill(['trial_deletion_notices' => ['expired' => now()->subHours(73)->toIso8601String()]])->saveQuietly();
+
+        $this->artisan('ebq:trial-cleanup')->assertSuccessful();
+
+        $this->assertDatabaseMissing('websites', ['id' => $ownSite->id]); // own trial data gone
+        $this->assertDatabaseHas('websites', ['id' => $ownerSite->id]);   // team site untouched
+        $this->assertDatabaseHas('website_user', ['website_id' => $ownerSite->id, 'user_id' => $member->id]);
+
+        // Still not locked out afterwards — team access continues.
+        session(['current_website_id' => $ownerSite->id]);
+        $this->actingAs($member->fresh())->get(route('dashboard'))->assertOk();
+    }
+
+    public function test_stale_anchor_resets_for_readded_site(): void
+    {
+        // User was warned, self-deleted everything, later re-adds a site:
+        // the old anchor must NOT instant-delete the new site.
+        Mail::fake();
+        $user = $this->trialUser(30 * 24);
+        $user->forceFill(['trial_deletion_notices' => ['expired' => now()->subDays(20)->toIso8601String()]])->saveQuietly();
+        $site = Website::factory()->create(['user_id' => $user->id, 'domain' => 'fresh-after-stale.test']);
+
+        $this->artisan('ebq:trial-cleanup')->assertSuccessful();
+
+        $this->assertDatabaseHas('websites', ['id' => $site->id]); // fresh countdown, not deleted
+        Mail::assertSent(TrialExpiryMail::class, fn (TrialExpiryMail $m) => $m->stage === 'expired');
+        $this->assertArrayHasKey('expired', (array) $user->fresh()->trial_deletion_notices);
     }
 
     public function test_shared_crawl_site_survives_when_other_client_subscribes(): void
@@ -113,6 +184,7 @@ class TrialCleanupTest extends TestCase
         // Pre-anchor the countdown 73h ago so this run deletes immediately.
         $expired->forceFill(['trial_deletion_notices' => ['expired' => now()->subHours(73)->toIso8601String()]])->saveQuietly();
         $siteA = Website::factory()->create(['user_id' => $expired->id, 'domain' => 'shared-domain.test']);
+        $siteA->forceFill(['created_at' => now()->subDays(10)])->saveQuietly(); // predates the anchor
 
         $paying = User::factory()->create();
         $siteB = Website::factory()->create(['user_id' => $paying->id, 'domain' => 'shared-domain.test']);

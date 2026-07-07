@@ -25,8 +25,20 @@ use Illuminate\Support\Facades\Mail;
  * untouched (see Website.php boot).
  *
  * Eligibility (TrialStatus::isExpired): never admins, never active
- * subscribers, never comped (force-applied) plans. `trial_data_deleted_at`
- * makes deletion one-shot per user.
+ * subscribers, never comped (force-applied) plans.
+ *
+ * TEAM MEMBERS: only users OWNING >=1 website enter the pipeline. A user who
+ * is merely a team member on other users' websites owns nothing to delete —
+ * no emails, no deletion, and their website_user memberships are never
+ * touched (the lockout middleware also exempts them via isLockedOut). An
+ * expired user who both owns sites AND is a member elsewhere keeps app
+ * access but their own sites still get the countdown + deletion.
+ *
+ * Deletion clears trial_deletion_notices, so if an (unlocked, team-member)
+ * expired user ever adds a website again, it gets a FRESH full countdown —
+ * never a surprise instant delete, and never permanent free usage (the old
+ * one-shot trial_data_deleted_at gate would have exempted re-added sites
+ * forever). trial_data_deleted_at stays as an audit timestamp only.
  */
 class TrialCleanup extends Command
 {
@@ -55,7 +67,7 @@ class TrialCleanup extends Command
 
         $candidates = User::query()
             ->where('is_admin', false)
-            ->whereNull('trial_data_deleted_at')
+            ->has('websites') // owns nothing => nothing to warn about or delete
             ->where('created_at', '<=', $cutoff)
             ->where(fn ($q) => $q->whereNull('current_plan_slug')->orWhere('current_plan_slug', User::TIER_TRIAL))
             ->orderBy('created_at')
@@ -76,6 +88,19 @@ class TrialCleanup extends Command
             // command downtime) would get their first-ever email already deep
             // in the buffer — or deleted with almost no warning.
             $sent = (array) ($user->trial_deletion_notices ?? []); // stage => iso timestamp
+
+            // STALE-ANCHOR GUARD: if every website the user owns was created
+            // AFTER the first warning was sent, the warned-about sites are gone
+            // (user self-deleted them and later re-added — possible for
+            // unlocked team members). Restart the countdown so a fresh site is
+            // never instant-deleted off an old anchor.
+            if (isset($sent['expired'])
+                && $user->websites()->where('created_at', '<=', Carbon::parse($sent['expired']))->doesntExist()) {
+                $sent = [];
+                if (! $dryRun) {
+                    $user->forceFill(['trial_deletion_notices' => null])->save();
+                }
+            }
 
             if (! isset($sent['expired'])) {
                 $deletionAt = Carbon::now()->addHours(72);
@@ -152,6 +177,9 @@ class TrialCleanup extends Command
             $website->delete();
         }
 
-        $user->forceFill(['trial_data_deleted_at' => now()])->save();
+        $user->forceFill([
+            'trial_data_deleted_at' => now(),
+            'trial_deletion_notices' => null, // re-added sites restart the countdown
+        ])->save();
     }
 }

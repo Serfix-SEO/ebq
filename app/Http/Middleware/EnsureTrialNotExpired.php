@@ -17,6 +17,11 @@ use Symfony\Component\HttpFoundation\Response;
  * Allowlist: billing + checkout routes (the whole point), logout, and admin
  * impersonation-stop (an admin viewing an expired client must be able to
  * leave). Guests pass through untouched (auth middleware owns them).
+ *
+ * TEAM MEMBERS ARE NEVER LOCKED (TrialStatus::isLockedOut): a user managing
+ * other users' websites via website_user works under those owners' plans, so
+ * their own trial expiring must not cut that access. Their OWN websites still
+ * expire and get deleted by ebq:trial-cleanup.
  */
 class EnsureTrialNotExpired
 {
@@ -43,7 +48,7 @@ class EnsureTrialNotExpired
         if ($request->session()->has('impersonator_id')) {
             return $next($request);
         }
-        if (! TrialStatus::isExpired($user)) {
+        if (! TrialStatus::isLockedOut($user)) {
             return $next($request);
         }
 
