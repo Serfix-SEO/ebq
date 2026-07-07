@@ -293,12 +293,12 @@
                             <div>
                                 <div x-show="billing === 'yearly'">
                                     <a href="{{ route('billing.checkout', ['plan' => $plan->slug, 'interval' => 'annual']) }}" class="block w-full rounded-md bg-orange-600 px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-orange-500">
-                                        Start trial
+                                        Subscribe — yearly
                                     </a>
                                 </div>
                                 <div x-show="billing === 'monthly'" style="display:none">
                                     <a href="{{ route('billing.checkout', ['plan' => $plan->slug, 'interval' => 'monthly']) }}" class="block w-full rounded-md bg-orange-600 px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-orange-500">
-                                        Start trial
+                                        Subscribe — monthly
                                     </a>
                                 </div>
                             </div>
