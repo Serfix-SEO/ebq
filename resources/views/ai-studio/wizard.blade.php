@@ -762,23 +762,23 @@
             <div class="flex min-w-0 items-center gap-3">
                 <a href="{{ route('ai-studio.index') }}" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                    All tools
+                    {{ __('All tools') }}
                 </a>
                 <div class="min-w-0">
                     <h1 class="truncate text-xl font-semibold text-slate-900 dark:text-slate-100" x-text="headerTitle()"></h1>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Full multi-step blog post — topic, brief, strategy, images, then generate.</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Full multi-step blog post — topic, brief, strategy, images, then generate.') }}</p>
                 </div>
             </div>
             <div class="flex items-center gap-2">
                 <template x-if="view === 'wizard' && project">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300" title="Serfix Content Credits used by this project">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300" title="{{ __('Serfix Content Credits used by this project') }}">
                         <span aria-hidden="true">✦</span>
                         <span x-text="creditsUsed.toLocaleString()"></span>
-                        <span>credits</span>
+                        <span>{{ __('credits') }}</span>
                     </span>
                 </template>
                 <template x-if="view === 'wizard'">
-                    <button type="button" @click="exitToList()" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">Projects</button>
+                    <button type="button" @click="exitToList()" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">{{ __('Projects') }}</button>
                 </template>
             </div>
         </div>
@@ -786,8 +786,8 @@
         {{-- Tier banner --}}
         <template x-if="featureLocked && tierGate">
             <div class="mb-5 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                <p class="font-semibold">The Blog Post Wizard is a <span x-text="(tierGate.required_tier || 'Pro')" class="capitalize"></span> feature. Upgrade to generate.</p>
-                <a :href="billingUrl" class="inline-flex items-center justify-center rounded-md bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-amber-700">See plans</a>
+                <p class="font-semibold">{{ __('The Blog Post Wizard is a') }} <span x-text="(tierGate.required_tier || 'Pro')" class="capitalize"></span> {{ __('feature. Upgrade to generate.') }}</p>
+                <a :href="billingUrl" class="inline-flex items-center justify-center rounded-md bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-amber-700">{{ __('See plans') }}</a>
             </div>
         </template>
 
@@ -803,7 +803,7 @@
                         <button type="button" @click="setFilter(f)" class="rounded-md px-3 py-1.5 capitalize transition" :class="pk.filter === f ? 'bg-orange-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'" x-text="f"></button>
                     </template>
                 </div>
-                <button type="button" @click="startNew()" class="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700">+ New project</button>
+                <button type="button" @click="startNew()" class="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700">{{ __('+ New project') }}</button>
             </div>
 
             <template x-if="pk.error">
@@ -811,20 +811,20 @@
             </template>
 
             <template x-if="pk.loading">
-                <p class="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">Loading projects…</p>
+                <p class="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">{{ __('Loading projects…') }}</p>
             </template>
 
             <template x-if="pickerEmpty()">
                 <div class="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center dark:border-slate-700 dark:bg-slate-900">
-                    <p class="text-sm text-slate-500 dark:text-slate-400">No projects yet.</p>
-                    <button type="button" @click="startNew()" class="mt-3 inline-flex rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700">+ Start a new project</button>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('No projects yet.') }}</p>
+                    <button type="button" @click="startNew()" class="mt-3 inline-flex rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700">{{ __('+ Start a new project') }}</button>
                 </div>
             </template>
 
             <ul class="space-y-2" x-show="!pk.loading && pk.items.length > 0">
                 <template x-for="p in pk.items" :key="p.id">
                     <li class="group flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/50">
-                        <button type="button" @click="openProject(p.id)" class="min-w-0 flex-1 text-left">
+                        <button type="button" @click="openProject(p.id)" class="min-w-0 flex-1 text-start">
                             <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100" x-text="p.title || 'Untitled draft'"></div>
                             <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
                                 <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold capitalize text-slate-600 dark:bg-slate-800 dark:text-slate-300" x-text="STEP_LABELS[p.step] || p.step"></span>
@@ -833,7 +833,7 @@
                                 <span x-text="formatDate(p.updated_at)"></span>
                             </div>
                         </button>
-                        <button type="button" @click="removeProject(p.id)" class="rounded-md p-1.5 text-slate-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:hover:bg-red-900/30" title="Delete project">✕</button>
+                        <button type="button" @click="removeProject(p.id)" class="rounded-md p-1.5 text-slate-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:hover:bg-red-900/30" title="{{ __('Delete project') }}">✕</button>
                     </li>
                 </template>
             </ul>
@@ -845,7 +845,7 @@
             <template x-if="project">
                 <div class="mb-4">
                     <template x-if="!titleEditing">
-                        <button type="button" @click="beginTitleEdit()" class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-orange-600 dark:text-slate-200" title="Click to rename">
+                        <button type="button" @click="beginTitleEdit()" class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-orange-600 dark:text-slate-200" title="{{ __('Click to rename') }}">
                             <span x-text="project.title || 'Untitled draft'"></span>
                             <span class="text-slate-400" aria-hidden="true">✎</span>
                         </button>
@@ -873,7 +873,7 @@
             </ol>
 
             <template x-if="loading">
-                <div class="mb-4 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">Working…</div>
+                <div class="mb-4 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">{{ __('Working…') }}</div>
             </template>
 
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-slate-900">
@@ -890,13 +890,13 @@
         <template x-if="t.showSaveModal">
             <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" @click.self="t.showSaveModal = false">
                 <div class="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Save this prompt for next time?</h3>
-                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Give it a title to reuse it across your sites, or skip — it still applies to this project.</p>
-                    <input type="text" x-model="t.saveTitle" placeholder="Prompt title" class="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('Save this prompt for next time?') }}</h3>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Give it a title to reuse it across your sites, or skip — it still applies to this project.') }}</p>
+                    <input type="text" x-model="t.saveTitle" placeholder="{{ __('Prompt title') }}" class="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                     <template x-if="t.saveError"><p class="mt-1.5 text-xs text-red-600 dark:text-red-400" x-text="t.saveError"></p></template>
                     <div class="mt-4 flex items-center justify-end gap-2">
-                        <button type="button" @click="t.showSaveModal = false" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400">Cancel</button>
-                        <button type="button" @click="skipSaveAndContinue()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Don't save</button>
+                        <button type="button" @click="t.showSaveModal = false" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400">{{ __('Cancel') }}</button>
+                        <button type="button" @click="skipSaveAndContinue()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('Don\'t save') }}</button>
                         <button type="button" @click="savePromptAndContinue()" :disabled="t.saveBusy" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50" x-text="t.saveBusy ? 'Saving…' : 'Save & continue'"></button>
                     </div>
                 </div>

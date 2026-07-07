@@ -16,14 +16,14 @@
 @if ($bannerWebsite && (! $bannerWebsite->hasGa() || ! $bannerWebsite->hasGsc()))
     @php
         if (! $bannerWebsite->hasGa() && ! $bannerWebsite->hasGsc()) {
-            $missingLabel = 'Google Analytics and Search Console';
-            $bannerLead = 'Connect your data to unlock reports';
+            $missingLabel = __('Google Analytics and Search Console');
+            $bannerLead = __('Connect your data to unlock reports');
         } elseif (! $bannerWebsite->hasGsc()) {
-            $missingLabel = 'Search Console';
-            $bannerLead = 'Connect Search Console to unlock the full report';
+            $missingLabel = __('Search Console');
+            $bannerLead = __('Connect Search Console to unlock the full report');
         } else {
-            $missingLabel = 'Google Analytics';
-            $bannerLead = 'Connect Google Analytics to unlock the full report';
+            $missingLabel = __('Google Analytics');
+            $bannerLead = __('Connect Google Analytics to unlock the full report');
         }
     @endphp
     <div
@@ -34,19 +34,19 @@
     >
         <div class="flex-1">
             <div class="font-semibold">{{ $bannerLead }}</div>
-            <div class="mt-1">You haven’t connected {{ $missingLabel }} for <span class="font-medium">{{ $bannerWebsite->domain ?: 'this website' }}</span>. Some sections stay empty until you do.</div>
+            <div class="mt-1">{{ __('You haven’t connected') }} {{ $missingLabel }} {{ __('for') }} <span class="font-medium">{{ $bannerWebsite->domain ?: __('this website') }}</span>. {{ __('Some sections stay empty until you do.') }}</div>
         </div>
         <div class="flex items-center gap-2">
             <button
                 type="button"
                 x-on:click="window.dispatchEvent(new CustomEvent('open-connect-sources'))"
                 class="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white hover:bg-amber-700"
-            >Connect now</button>
+            >{{ __('Connect now') }}</button>
             <button
                 type="button"
                 x-on:click="open = false"
                 class="rounded-md p-1 text-amber-700 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
-                aria-label="Dismiss"
+                aria-label="{{ __('Dismiss') }}"
             >&times;</button>
         </div>
     </div>

@@ -2,10 +2,10 @@
     @if (! $keyword)
         <div class="rounded-xl border border-slate-200 bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900">
             <svg class="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
-            <p class="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-200">Keyword not found</p>
-            <p class="mt-1 text-xs text-slate-500">It may have been deleted or belong to another website you don't have access to.</p>
+            <p class="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-200">{{ __('Keyword not found') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('It may have been deleted or belong to another website you don\'t have access to.') }}</p>
             <a href="{{ route('rank-tracking.index') }}" wire:navigate class="mt-4 inline-flex h-8 items-center gap-1 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white hover:bg-orange-700">
-                ← Back to Rank Tracking
+                ← {{ __('Back to Rank Tracking') }}
             </a>
         </div>
     @else
@@ -22,7 +22,7 @@
 
         {{-- Breadcrumb + header --}}
         <nav class="mb-3 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            <a href="{{ route('rank-tracking.index') }}" wire:navigate class="font-semibold uppercase tracking-wider hover:text-orange-600 dark:hover:text-orange-400">Rank Tracking</a>
+            <a href="{{ route('rank-tracking.index') }}" wire:navigate class="font-semibold uppercase tracking-wider hover:text-orange-600 dark:hover:text-orange-400">{{ __('Rank Tracking') }}</a>
             <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
             <span class="truncate uppercase tracking-wider">{{ $keyword->keyword }}</span>
         </nav>
@@ -35,13 +35,13 @@
                     <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $keyword->country }}</span>
                     <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $keyword->language }}</span>
                     <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $keyword->device }}</span>
-                    <span class="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">Top {{ $keyword->depth }}</span>
-                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">Every {{ $keyword->check_interval_hours }}h</span>
-                    @if (! $keyword->is_active)<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">Paused</span>@endif
+                    <span class="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">{{ __('Top') }} {{ $keyword->depth }}</span>
+                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('Every') }} {{ $keyword->check_interval_hours }}h</span>
+                    @if (! $keyword->is_active)<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">{{ __('Paused') }}</span>@endif
                 </div>
                 <div class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Tracking <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $keyword->target_domain }}</span>
-                    @if ($keyword->target_url)<span>· URL-specific: <a href="{{ $keyword->target_url }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline">{{ \Illuminate\Support\Str::limit($keyword->target_url, 60) }}</a></span>@endif
+                    {{ __('Tracking') }} <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $keyword->target_domain }}</span>
+                    @if ($keyword->target_url)<span>· {{ __('URL-specific:') }} <a href="{{ $keyword->target_url }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline">{{ \Illuminate\Support\Str::limit($keyword->target_url, 60) }}</a></span>@endif
                 </div>
             </div>
             <button wire:click="recheck"
@@ -51,15 +51,15 @@
                 class="inline-flex h-9 items-center gap-1.5 rounded-md bg-orange-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
                 <svg wire:loading.remove wire:target="recheck" class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                 <svg wire:loading wire:target="recheck" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
-                <span wire:loading.remove wire:target="recheck">Force re-check</span>
-                <span wire:loading wire:target="recheck">Queuing…</span>
+                <span wire:loading.remove wire:target="recheck">{{ __('Force re-check') }}</span>
+                <span wire:loading wire:target="recheck">{{ __('Queuing…') }}</span>
             </button>
         </div>
 
         {{-- Summary --}}
         <div class="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Current rank</div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Current rank') }}</div>
                 <div class="mt-1 flex items-baseline gap-2">
                     @php
                         $curPos = $keyword->current_position;
@@ -75,22 +75,22 @@
                         <span class="text-xs font-semibold text-red-600 dark:text-red-400">▼ {{ abs($keyword->position_change) }}</span>
                     @endif
                 </div>
-                <div class="mt-0.5 text-[10px] text-slate-400">vs previous check</div>
+                <div class="mt-0.5 text-[10px] text-slate-400">{{ __('vs previous check') }}</div>
             </div>
             <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Best ever</div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Best ever') }}</div>
                 <div class="mt-1 text-3xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{{ $keyword->best_position ? '#'.$keyword->best_position : '—' }}</div>
-                <div class="mt-0.5 text-[10px] text-slate-400">historical high</div>
+                <div class="mt-0.5 text-[10px] text-slate-400">{{ __('historical high') }}</div>
             </div>
             <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Initial rank</div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Initial rank') }}</div>
                 <div class="mt-1 text-3xl font-bold tabular-nums text-slate-700 dark:text-slate-300">{{ $keyword->initial_position ? '#'.$keyword->initial_position : '—' }}</div>
-                <div class="mt-0.5 text-[10px] text-slate-400">first recorded</div>
+                <div class="mt-0.5 text-[10px] text-slate-400">{{ __('first recorded') }}</div>
             </div>
             <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Last checked</div>
-                <div class="mt-1 text-base font-semibold text-slate-700 dark:text-slate-300">{{ $keyword->last_checked_at ? $keyword->last_checked_at->diffForHumans() : 'Never' }}</div>
-                <div class="mt-0.5 text-[10px] text-slate-400">Next: {{ $keyword->next_check_at ? $keyword->next_check_at->diffForHumans() : '—' }}</div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Last checked') }}</div>
+                <div class="mt-1 text-base font-semibold text-slate-700 dark:text-slate-300">{{ $keyword->last_checked_at ? $keyword->last_checked_at->diffForHumans() : __('Never') }}</div>
+                <div class="mt-0.5 text-[10px] text-slate-400">{{ __('Next:') }} {{ $keyword->next_check_at ? $keyword->next_check_at->diffForHumans() : '—' }}</div>
             </div>
         </div>
 
@@ -106,37 +106,37 @@
                     <div class="flex items-center gap-2">
                         <span class="inline-flex h-6 items-center gap-1 rounded-full bg-emerald-600 px-2 text-[10px] font-semibold uppercase tracking-wider text-white">
                             <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                            Matched in GSC
+                            {{ __('Matched in GSC') }}
                         </span>
-                        <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Google Search Console · last 30 days</span>
+                        <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ __('Google Search Console · last 30 days') }}</span>
                     </div>
-                    <a href="{{ route('keywords.index') }}" wire:navigate class="text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-400">Open in Keywords →</a>
+                    <a href="{{ route('keywords.index') }}" wire:navigate class="text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-400">{{ __('Open in Keywords →') }}</a>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">GSC clicks</div>
+                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('GSC clicks') }}</div>
                         <div class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($gsc['totals']['clicks']) }}</div>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Impressions</div>
+                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Impressions') }}</div>
                         <div class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($gsc['totals']['impressions']) }}</div>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">CTR</div>
+                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('CTR') }}</div>
                         <div class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $gsc['totals']['ctr'] !== null ? $gsc['totals']['ctr'].'%' : '—' }}</div>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">GSC avg position</div>
+                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('GSC avg position') }}</div>
                         <div class="mt-1 flex items-baseline gap-2">
                             <div class="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $gscPos !== null ? '#'.$gscPos : '—' }}</div>
                             @if ($diff !== null)
                                 @if ($diff > 0.5)
-                                    <span class="text-[10px] font-semibold text-amber-600 dark:text-amber-400" title="GSC position is {{ abs($diff) }} lower than SERP API">vs SERP +{{ $diff }}</span>
+                                    <span class="text-[10px] font-semibold text-amber-600 dark:text-amber-400" title="{{ __('GSC position is') }} {{ abs($diff) }} {{ __('lower than SERP API') }}">{{ __('vs SERP') }} +{{ $diff }}</span>
                                 @elseif ($diff < -0.5)
-                                    <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400" title="GSC position is {{ abs($diff) }} higher than SERP API">vs SERP {{ $diff }}</span>
+                                    <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400" title="{{ __('GSC position is') }} {{ abs($diff) }} {{ __('higher than SERP API') }}">{{ __('vs SERP') }} {{ $diff }}</span>
                                 @else
-                                    <span class="text-[10px] font-semibold text-slate-500">vs SERP ≈</span>
+                                    <span class="text-[10px] font-semibold text-slate-500">{{ __('vs SERP ≈') }}</span>
                                 @endif
                             @endif
                         </div>
@@ -145,13 +145,13 @@
 
                 @if (! empty($gsc['by_device']))
                     <div class="mt-4">
-                        <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">By device</div>
+                        <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('By device') }}</div>
                         <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
                             @foreach ($gsc['by_device'] as $d)
                                 <div class="flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-900">
                                     <div>
                                         <div class="font-semibold capitalize text-slate-800 dark:text-slate-200">{{ strtolower($d['device']) }}</div>
-                                        <div class="text-[10px] text-slate-400">{{ number_format($d['clicks']) }} clicks · {{ number_format($d['impressions']) }} impr</div>
+                                        <div class="text-[10px] text-slate-400">{{ number_format($d['clicks']) }} {{ __('clicks') }} · {{ number_format($d['impressions']) }} {{ __('impr') }}</div>
                                     </div>
                                     <span class="rounded-full bg-slate-100 px-2 py-px text-[10px] font-semibold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $d['position'] !== null ? '#'.$d['position'] : '—' }}</span>
                                 </div>
@@ -162,14 +162,14 @@
 
                 @if (! empty($gsc['top_pages']))
                     <div class="mt-4">
-                        <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Top ranking pages (GSC)</div>
+                        <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Top ranking pages (GSC)') }}</div>
                         <ul class="space-y-1">
                             @foreach ($gsc['top_pages'] as $p)
                                 <li class="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-900">
                                     <a href="{{ $p['page'] }}" target="_blank" rel="noopener" class="min-w-0 flex-1 truncate text-emerald-700 hover:underline dark:text-emerald-400">{{ $p['page'] }}</a>
                                     <div class="flex shrink-0 items-center gap-2 text-[10px] text-slate-500">
                                         <span class="tabular-nums font-semibold text-slate-800 dark:text-slate-200">{{ number_format($p['clicks']) }}</span>
-                                        <span>clicks</span>
+                                        <span>{{ __('clicks') }}</span>
                                         <span class="rounded-full bg-slate-100 px-1.5 py-px font-semibold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $p['position'] !== null ? '#'.$p['position'] : '—' }}</span>
                                     </div>
                                 </li>
@@ -181,7 +181,7 @@
         @else
             <div class="mb-5 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
                 <svg class="h-4 w-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
-                <span>No Google Search Console match yet for <span class="font-semibold">"{{ $keyword->keyword }}"</span> in the last 30 days. Once GSC reports impressions for this exact query on this website, stats will appear here automatically.</span>
+                <span>{{ __('No Google Search Console match yet for') }} <span class="font-semibold">"{{ $keyword->keyword }}"</span> {{ __('in the last 30 days. Once GSC reports impressions for this exact query on this website, stats will appear here automatically.') }}</span>
             </div>
         @endif
 
@@ -222,13 +222,13 @@
             <div class="mb-5 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <div class="mb-2 flex items-center justify-between">
                     <div>
-                        <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Position history</div>
-                        <div class="text-[10px] text-slate-400">Lower = better · last {{ $count }} checks</div>
+                        <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">{{ __('Position history') }}</div>
+                        <div class="text-[10px] text-slate-400">{{ __('Lower = better · last') }} {{ $count }} {{ __('checks') }}</div>
                     </div>
                     <div class="flex items-center gap-2 text-[10px] text-slate-400">
-                        <span class="inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>Top 3</span>
-                        <span class="inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-blue-500"></span>Top 10</span>
-                        <span class="inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>Top 20</span>
+                        <span class="inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>{{ __('Top 3') }}</span>
+                        <span class="inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-blue-500"></span>{{ __('Top 10') }}</span>
+                        <span class="inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>{{ __('Top 20') }}</span>
                     </div>
                 </div>
                 <div class="relative w-full">
@@ -297,10 +297,10 @@
             <div class="mb-5 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <div class="mb-2 flex items-center justify-between">
                     <div>
-                        <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Search clicks (last 90d)</div>
-                        <div class="text-[10px] text-slate-400">From Google Search Console for "{{ $keyword->keyword }}"</div>
+                        <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">{{ __('Search clicks (last 90d)') }}</div>
+                        <div class="text-[10px] text-slate-400">{{ __('From Google Search Console for') }} "{{ $keyword->keyword }}"</div>
                     </div>
-                    <div class="text-[10px] text-slate-400">Peak: <span class="tabular-nums font-semibold text-slate-600 dark:text-slate-300">{{ number_format($maxClicks) }}</span>/day</div>
+                    <div class="text-[10px] text-slate-400">{{ __('Peak:') }} <span class="tabular-nums font-semibold text-slate-600 dark:text-slate-300">{{ number_format($maxClicks) }}</span>{{ __('/day') }}</div>
                 </div>
                 <div class="relative w-full">
                     <svg viewBox="0 0 {{ $cWidth }} {{ $cHeight }}" preserveAspectRatio="none" class="h-28 w-full">
@@ -314,7 +314,7 @@
                         <text x="{{ $cPad['l'] + $cPlotW }}" y="{{ $cHeight - 4 }}" text-anchor="end" class="fill-slate-400 text-[9px]">{{ $cLastLabel }}</text>
                     </svg>
                 </div>
-                <div class="mt-1 text-[10px] text-slate-400">Compare against the position history above — rank improvements without a corresponding clicks lift may signal a SERP-feature shift or a tracking mismatch.</div>
+                <div class="mt-1 text-[10px] text-slate-400">{{ __('Compare against the position history above — rank improvements without a corresponding clicks lift may signal a SERP-feature shift or a tracking mismatch.') }}</div>
             </div>
         @endif
 
@@ -323,14 +323,14 @@
             <div class="lg:col-span-2">
                 <div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-                        <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Check history</div>
-                        <span class="text-[10px] text-slate-400">{{ $snapshots->total() ?? 0 }} total</span>
+                        <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">{{ __('Check history') }}</div>
+                        <span class="text-[10px] text-slate-400">{{ $snapshots->total() ?? 0 }} {{ __('total') }}</span>
                     </div>
                     @if ($snapshots->isEmpty())
                         <div class="px-4 py-10 text-center">
                             <svg class="mx-auto h-8 w-8 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                            <p class="mt-2 text-xs font-medium text-slate-500">No checks yet</p>
-                            <p class="mt-1 text-[11px] text-slate-400">Hit "Force re-check" to run the first one.</p>
+                            <p class="mt-2 text-xs font-medium text-slate-500">{{ __('No checks yet') }}</p>
+                            <p class="mt-1 text-[11px] text-slate-400">{{ __('Hit "Force re-check" to run the first one.') }}</p>
                         </div>
                     @else
                         <ul class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -338,18 +338,18 @@
                                 <li wire:key="snap-{{ $snap->id }}">
                                     <button wire:click="selectSnapshot('{{ $snap->id }}')" type="button"
                                         @class([
-                                            'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-xs transition',
+                                            'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start text-xs transition',
                                             'bg-orange-50/60 dark:bg-orange-500/10' => $selected && $selected->id === $snap->id,
                                             'hover:bg-slate-50 dark:hover:bg-slate-800/50' => ! $selected || $selected->id !== $snap->id,
                                         ])>
                                         <div class="min-w-0">
                                             <div class="flex items-center gap-2">
                                                 <div class="font-medium text-slate-900 dark:text-slate-100">{{ $snap->checked_at->format('M d, H:i') }}</div>
-                                                @if ($snap->forced)<span class="rounded bg-amber-100 px-1 text-[9px] font-semibold uppercase text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">forced</span>@endif
+                                                @if ($snap->forced)<span class="rounded bg-amber-100 px-1 text-[9px] font-semibold uppercase text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">{{ __('forced') }}</span>@endif
                                             </div>
                                             <div class="mt-0.5 text-[10px] text-slate-500">{{ $snap->checked_at->diffForHumans() }}</div>
                                         </div>
-                                        <div class="shrink-0 text-right">
+                                        <div class="shrink-0 text-end">
                                             @if ($snap->status === 'ok')
                                                 @if ($snap->position)
                                                     <span @class([
@@ -360,10 +360,10 @@
                                                         'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' => $snap->position > 20,
                                                     ])>#{{ $snap->position }}</span>
                                                 @else
-                                                    <span class="text-[10px] text-slate-400">not in top {{ $keyword->depth }}</span>
+                                                    <span class="text-[10px] text-slate-400">{{ __('not in top') }} {{ $keyword->depth }}</span>
                                                 @endif
                                             @else
-                                                <span class="rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-red-600 dark:bg-red-500/10 dark:text-red-400">Failed</span>
+                                                <span class="rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-red-600 dark:bg-red-500/10 dark:text-red-400">{{ __('Failed') }}</span>
                                             @endif
                                         </div>
                                     </button>
@@ -378,7 +378,7 @@
             <div class="lg:col-span-3">
                 @if (! $selected)
                     <div class="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-900">
-                        <p class="text-xs text-slate-500">Pick a check on the left to see the SERP snapshot.</p>
+                        <p class="text-xs text-slate-500">{{ __('Pick a check on the left to see the SERP snapshot.') }}</p>
                     </div>
                 @else
                     @php
@@ -393,10 +393,10 @@
                         <div class="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-3.5 dark:border-slate-800">
                             <div>
                                 <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                                    SERP snapshot · {{ $selected->checked_at->format('M j, Y · H:i') }}
+                                    {{ __('SERP snapshot ·') }} {{ $selected->checked_at->format('M j, Y · H:i') }}
                                 </div>
                                 <div class="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
-                                    @if ($selected->total_results)<span>{{ number_format($selected->total_results) }} results</span>@endif
+                                    @if ($selected->total_results)<span>{{ number_format($selected->total_results) }} {{ __('results') }}</span>@endif
                                     @if ($selected->search_time)<span>· {{ $selected->search_time }}s</span>@endif
                                     @foreach ((array) ($selected->serp_features ?? []) as $feat)
                                         <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $feat }}</span>
@@ -404,7 +404,7 @@
                                 </div>
                             </div>
                             @if ($selected->forced)
-                                <span class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-semibold uppercase text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">Forced re-check</span>
+                                <span class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-semibold uppercase text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">{{ __('Forced re-check') }}</span>
                             @endif
                         </div>
 
@@ -413,8 +413,8 @@
                                 <div class="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
                                     <svg class="h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
                                     <div>
-                                        <div class="font-semibold">Check failed</div>
-                                        <div class="mt-0.5">{{ $selected->error ?? 'Unknown error' }}</div>
+                                        <div class="font-semibold">{{ __('Check failed') }}</div>
+                                        <div class="mt-0.5">{{ $selected->error ?? __('Unknown error') }}</div>
                                     </div>
                                 </div>
                             </div>
@@ -422,7 +422,7 @@
                             {{-- Your listing --}}
                             @if ($selected->position && $selected->url)
                                 <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-                                    <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Your listing</div>
+                                    <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Your listing') }}</div>
                                     <div class="flex items-start gap-3 rounded-lg border border-orange-200 bg-orange-50/50 p-3 dark:border-orange-500/30 dark:bg-orange-500/5">
                                         <span class="mt-0.5 inline-flex h-6 w-12 shrink-0 items-center justify-center rounded-full bg-orange-600 text-[11px] font-bold text-white">#{{ $selected->position }}</span>
                                         <div class="min-w-0 flex-1">
@@ -438,7 +438,7 @@
                                 <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
                                     <div class="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
                                         <svg class="h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.008v.008H12v-.008Z" /></svg>
-                                        Not ranked in the top {{ $keyword->depth }} for this check.
+                                        {{ __('Not ranked in the top') }} {{ $keyword->depth }} {{ __('for this check.') }}
                                     </div>
                                 </div>
                             @endif
@@ -447,8 +447,8 @@
                             @if (! empty($top))
                                 <div class="px-5 py-3">
                                     <div class="mb-2 flex items-center justify-between">
-                                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">All sites ranked for this keyword</div>
-                                        <span class="text-[10px] text-slate-400">Showing top {{ count($top) }}</span>
+                                        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('All sites ranked for this keyword') }}</div>
+                                        <span class="text-[10px] text-slate-400">{{ __('Showing top') }} {{ count($top) }}</span>
                                     </div>
                                     <ol class="space-y-1.5">
                                         @foreach ($top as $row)
@@ -479,8 +479,8 @@
                                                 <div class="min-w-0 flex-1">
                                                     <div class="flex flex-wrap items-center gap-1.5">
                                                         <span class="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{{ $row['title'] ?? '—' }}</span>
-                                                        @if ($isYou)<span class="rounded bg-orange-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">You</span>@endif
-                                                        @if ($isCompetitor)<span class="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">Competitor</span>@endif
+                                                        @if ($isYou)<span class="rounded bg-orange-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">{{ __('You') }}</span>@endif
+                                                        @if ($isCompetitor)<span class="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">{{ __('Competitor') }}</span>@endif
                                                     </div>
                                                     @if ($link)
                                                         <a href="{{ $link }}" target="_blank" rel="noopener" class="block truncate text-[10px] text-emerald-700 hover:underline dark:text-emerald-400">{{ $link }}</a>
@@ -498,7 +498,7 @@
                             {{-- Competitors --}}
                             @if (! empty($selected->competitor_positions))
                                 <div class="border-t border-slate-200 px-5 py-3 dark:border-slate-800">
-                                    <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Competitors you're tracking</div>
+                                    <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Competitors you\'re tracking') }}</div>
                                     <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         @foreach ((array) $selected->competitor_positions as $c)
                                             <div class="flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs dark:border-slate-800 dark:bg-slate-900">
@@ -506,7 +506,7 @@
                                                 @if (! empty($c['position']))
                                                     <span class="rounded-full bg-amber-50 px-2 py-px text-[10px] font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">#{{ $c['position'] }}</span>
                                                 @else
-                                                    <span class="text-[10px] text-slate-400">not ranked</span>
+                                                    <span class="text-[10px] text-slate-400">{{ __('not ranked') }}</span>
                                                 @endif
                                             </div>
                                         @endforeach
@@ -517,7 +517,7 @@
                             {{-- PAA --}}
                             @if (! empty($selected->people_also_ask))
                                 <div class="border-t border-slate-200 px-5 py-3 dark:border-slate-800">
-                                    <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">People also ask</div>
+                                    <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('People also ask') }}</div>
                                     <ul class="space-y-1 text-xs text-slate-700 dark:text-slate-300">
                                         @foreach ((array) $selected->people_also_ask as $paa)
                                             <li class="flex gap-2"><span class="text-slate-400">›</span>{{ $paa['question'] ?? ($paa['title'] ?? '—') }}</li>
@@ -529,7 +529,7 @@
                             {{-- Related --}}
                             @if (! empty($selected->related_searches))
                                 <div class="border-t border-slate-200 px-5 py-3 dark:border-slate-800">
-                                    <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Related searches</div>
+                                    <div class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Related searches') }}</div>
                                     <div class="flex flex-wrap gap-1.5">
                                         @foreach ((array) $selected->related_searches as $rel)
                                             <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $rel['query'] ?? '—' }}</span>

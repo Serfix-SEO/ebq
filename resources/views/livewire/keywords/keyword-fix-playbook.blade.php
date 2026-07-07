@@ -11,7 +11,7 @@
 
     {{-- Header --}}
     <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <p class="text-[11px] font-semibold uppercase tracking-wider text-orange-500">Fix this keyword</p>
+        <p class="text-[11px] font-semibold uppercase tracking-wider text-orange-500">{{ __('Fix this keyword') }}</p>
         <h1 class="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">{{ $keyword }}</h1>
         @if ($pageUrl !== '')
             <a href="{{ $pageUrl }}" target="_blank" rel="noopener"
@@ -27,7 +27,7 @@
             @if ($keyword !== '' && $pageUrl !== '')
                 <button type="button" wire:click="retry"
                     class="mt-3 inline-flex items-center gap-1 rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-500">
-                    Try again
+                    {{ __('Try again') }}
                 </button>
             @endif
         </div>
@@ -40,8 +40,8 @@
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path>
                 </svg>
                 <div>
-                    <p class="text-sm font-medium text-slate-800 dark:text-slate-200">Analysing this page for “{{ $keyword }}”…</p>
-                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Running a keyword-aware audit and benchmarking the SERP. This usually takes under a minute.</p>
+                    <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ __('Analysing this page for “:keyword”…', ['keyword' => $keyword]) }}</p>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Running a keyword-aware audit and benchmarking the SERP. This usually takes under a minute.') }}</p>
                 </div>
             </div>
             <div class="mt-5 space-y-3">
@@ -52,12 +52,12 @@
     @elseif ($status === 'ready')
         {{-- 1. On-page recommendations --}}
         <section class="mt-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">On-page fixes</h2>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">What to change on the page to push “{{ $keyword }}” onto page one.</p>
+            <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ __('On-page fixes') }}</h2>
+            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('What to change on the page to push “:keyword” onto page one.', ['keyword' => $keyword]) }}</p>
 
             {{-- Keyword presence + length summary --}}
             <div class="mt-3 flex flex-wrap gap-2">
-                @foreach (['in_title' => 'In title', 'in_h1' => 'In H1', 'in_meta' => 'In meta description'] as $field => $label)
+                @foreach (['in_title' => __('In title'), 'in_h1' => __('In H1'), 'in_meta' => __('In meta description')] as $field => $label)
                     @php $ok = (bool) ($onPageMetrics[$field] ?? false); @endphp
                     <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $ok ? $tones['good'] : $tones['critical'] }}">
                         {{ $ok ? '✓' : '✕' }} {{ $label }}
@@ -65,13 +65,13 @@
                 @endforeach
                 @if (! empty($onPageMetrics['competitor_word_count_median']))
                     <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold {{ ($onPageMetrics['word_count_gap'] ?? 0) > 0 ? $tones['warning'] : $tones['good'] }}">
-                        {{ number_format($onPageMetrics['word_count']) }} words · SERP median {{ number_format($onPageMetrics['competitor_word_count_median']) }}
+                        {{ __(':count words · SERP median :median', ['count' => number_format($onPageMetrics['word_count']), 'median' => number_format($onPageMetrics['competitor_word_count_median'])]) }}
                     </span>
                 @endif
             </div>
 
             @if (empty($recommendations))
-                <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No specific on-page issues detected — focus on the content depth and CTR levers below.</p>
+                <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">{{ __('No specific on-page issues detected — focus on the content depth and CTR levers below.') }}</p>
             @else
                 <ul class="mt-4 space-y-3">
                     @foreach ($recommendations as $rec)
@@ -98,13 +98,13 @@
             @if ($aiAllowed) wire:init="loadSnippetRewrites" @endif>
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Title &amp; meta rewrites</h2>
-                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Higher-CTR snippets with the keyword used verbatim — the fastest lever for a striking-distance keyword.</p>
+                    <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ __('Title & meta rewrites') }}</h2>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Higher-CTR snippets with the keyword used verbatim — the fastest lever for a striking-distance keyword.') }}</p>
                 </div>
                 @if ($aiAllowed)
                     <select wire:change="regenerateIntent($event.target.value)"
                         class="rounded-md border-slate-200 bg-white py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                        <option value="auto" @selected($intent === 'auto')>Auto (mixed angles)</option>
+                        <option value="auto" @selected($intent === 'auto')>{{ __('Auto (mixed angles)') }}</option>
                         @foreach ($intents as $key => $meta)
                             <option value="{{ $key }}" @selected($intent === $key)>{{ $meta['label'] }}</option>
                         @endforeach
@@ -114,23 +114,23 @@
 
             @if (! $aiAllowed)
                 <div class="mt-3 rounded-lg border border-dashed border-orange-200 bg-orange-50 p-4 text-sm text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
-                    AI rewrites are part of a higher plan. Upgrade to generate keyword-optimised titles and meta descriptions.
+                    {{ __('AI rewrites are part of a higher plan. Upgrade to generate keyword-optimised titles and meta descriptions.') }}
                 </div>
             @else
                 <div wire:loading.flex wire:target="loadSnippetRewrites,regenerateIntent" class="mt-3 items-center gap-2 text-sm text-slate-500">
                     <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
-                    Generating rewrites…
+                    {{ __('Generating rewrites…') }}
                 </div>
                 <div wire:loading.remove wire:target="loadSnippetRewrites,regenerateIntent">
                     @if ($snippetRewrites === null)
-                        <p class="mt-3 text-sm text-slate-400">Preparing…</p>
+                        <p class="mt-3 text-sm text-slate-400">{{ __('Preparing…') }}</p>
                     @elseif (! ($snippetRewrites['ok'] ?? false))
                         <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">
                             @switch($snippetRewrites['error'] ?? '')
-                                @case('content_too_short') Couldn't read enough page copy to rewrite the snippet. @break
-                                @case('llm_not_configured') AI is not configured on this server. @break
-                                @case('rewrites_invalid') The model couldn't produce in-spec rewrites for this keyword. Try a different angle. @break
-                                @default Couldn't generate rewrites right now. Try a different angle.
+                                @case('content_too_short') {{ __('Couldn\'t read enough page copy to rewrite the snippet.') }} @break
+                                @case('llm_not_configured') {{ __('AI is not configured on this server.') }} @break
+                                @case('rewrites_invalid') {{ __('The model couldn\'t produce in-spec rewrites for this keyword. Try a different angle.') }} @break
+                                @default {{ __('Couldn\'t generate rewrites right now. Try a different angle.') }}
                             @endswitch
                         </p>
                     @else
@@ -140,7 +140,7 @@
                                     <div class="flex items-start justify-between gap-2">
                                         <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $rw['title'] ?? '' }}</p>
                                         <button type="button" class="flex-none text-[11px] font-semibold text-orange-600 hover:underline dark:text-orange-400"
-                                            x-on:click="navigator.clipboard.writeText(@js(($rw['title'] ?? '')."\n".($rw['meta'] ?? '')))">Copy</button>
+                                            x-on:click="navigator.clipboard.writeText(@js(($rw['title'] ?? '')."\n".($rw['meta'] ?? '')))">{{ __('Copy') }}</button>
                                     </div>
                                     <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ $rw['meta'] ?? '' }}</p>
                                     @if (! empty($rw['rationale']))
@@ -157,35 +157,35 @@
         {{-- 3. Content brief / topical gaps --}}
         <section class="mt-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
             @if ($aiAllowed) wire:init="loadBrief" @endif>
-            <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Content brief &amp; topical gaps</h2>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Subtopics and depth the page needs to climb from page two.</p>
+            <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ __('Content brief & topical gaps') }}</h2>
+            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Subtopics and depth the page needs to climb from page two.') }}</p>
 
             @if (! $aiAllowed)
                 <div class="mt-3 rounded-lg border border-dashed border-orange-200 bg-orange-50 p-4 text-sm text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
-                    Content briefs are part of a higher plan.
+                    {{ __('Content briefs are part of a higher plan.') }}
                 </div>
             @else
                 <div wire:loading.flex wire:target="loadBrief,generateBrief" class="mt-3 items-center gap-2 text-sm text-slate-500">
                     <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
-                    Building brief…
+                    {{ __('Building brief…') }}
                 </div>
                 <div wire:loading.remove wire:target="loadBrief,generateBrief">
                     @if ($brief !== null && ($brief['ok'] ?? false))
                         @php $b = $brief['brief'] ?? []; @endphp
                         <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                             @if (! empty($b['recommended_word_count']))
-                                <span class="rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-800">Target {{ number_format($b['recommended_word_count']) }} words</span>
+                                <span class="rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-800">{{ __('Target :count words', ['count' => number_format($b['recommended_word_count'])]) }}</span>
                             @endif
                             @if (! empty($b['suggested_schema_type']))
-                                <span class="rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-800">Schema: {{ $b['suggested_schema_type'] }}</span>
+                                <span class="rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-800">{{ __('Schema: :type', ['type' => $b['suggested_schema_type']]) }}</span>
                             @endif
                         </div>
                         @if (! empty($b['suggested_h1']))
-                            <p class="mt-3 text-sm text-slate-700 dark:text-slate-300"><span class="font-semibold">Suggested H1:</span> {{ $b['suggested_h1'] }}</p>
+                            <p class="mt-3 text-sm text-slate-700 dark:text-slate-300"><span class="font-semibold">{{ __('Suggested H1:') }}</span> {{ $b['suggested_h1'] }}</p>
                         @endif
                         @if (! empty($b['subtopics']))
                             <div class="mt-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Subtopics to cover</p>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ __('Subtopics to cover') }}</p>
                                 <div class="mt-1.5 flex flex-wrap gap-1.5">
                                     @foreach ($b['subtopics'] as $st)
                                         <span class="rounded-md bg-orange-50 px-2 py-1 text-xs text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">{{ $st }}</span>
@@ -195,8 +195,8 @@
                         @endif
                         @if (! empty($b['people_also_ask']))
                             <div class="mt-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">People also ask</p>
-                                <ul class="mt-1 list-disc space-y-0.5 pl-5 text-xs text-slate-600 dark:text-slate-300">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ __('People also ask') }}</p>
+                                <ul class="mt-1 list-disc space-y-0.5 ps-5 text-xs text-slate-600 dark:text-slate-300">
                                     @foreach ($b['people_also_ask'] as $q)
                                         <li>{{ $q }}</li>
                                     @endforeach
@@ -205,15 +205,15 @@
                         @endif
                     @elseif ($brief !== null && ($brief['error'] ?? '') === 'not_generated')
                         <div class="mt-3">
-                            <p class="text-sm text-slate-500 dark:text-slate-400">No brief generated yet for this keyword.</p>
+                            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('No brief generated yet for this keyword.') }}</p>
                             <button type="button" wire:click="generateBrief"
                                 class="mt-2 inline-flex items-center gap-1 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-500">
-                                Generate brief
+                                {{ __('Generate brief') }}
                             </button>
                         </div>
                     @elseif ($brief !== null)
                         <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                            {{ ($brief['error'] ?? '') === 'no_serp_data' ? 'Couldn\'t pull a SERP for this keyword right now.' : 'Couldn\'t build a brief right now.' }}
+                            {{ ($brief['error'] ?? '') === 'no_serp_data' ? __('Couldn\'t pull a SERP for this keyword right now.') : __('Couldn\'t build a brief right now.') }}
                         </p>
                     @endif
                 </div>
@@ -222,26 +222,26 @@
 
         {{-- 4. Internal-link suggestions --}}
         <section class="mt-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Internal links to add</h2>
+            <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ __('Internal links to add') }}</h2>
             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                Add a link <span class="font-semibold">to</span>
-                <a href="{{ $pageUrl }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline dark:text-orange-400">your ranking page</a>
-                <span class="font-semibold">from</span> each page below — these already rank for related queries, so a contextual link (keyword as anchor) passes the most relevance.
+                {{ __('Add a link') }} <span class="font-semibold">{{ __('to') }}</span>
+                <a href="{{ $pageUrl }}" target="_blank" rel="noopener" class="text-orange-600 hover:underline dark:text-orange-400">{{ __('your ranking page') }}</a>
+                <span class="font-semibold">{{ __('from') }}</span> {{ __('each page below — these already rank for related queries, so a contextual link (keyword as anchor) passes the most relevance.') }}
             </p>
 
             @if (empty($internalLinks))
-                <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">No other pages on your site rank for related queries yet, so there are no internal-link sources to suggest.</p>
+                <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">{{ __('No other pages on your site rank for related queries yet, so there are no internal-link sources to suggest.') }}</p>
             @else
-                <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Add the link from these pages</p>
+                <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Add the link from these pages') }}</p>
                 <ul class="mt-1.5 divide-y divide-slate-100 dark:divide-slate-800">
                     @foreach ($internalLinks as $link)
                         <li class="flex items-center justify-between gap-3 py-2">
                             <div class="min-w-0">
                                 <a href="{{ $link['url'] }}" target="_blank" rel="noopener"
                                     class="block truncate text-sm text-orange-600 hover:underline dark:text-orange-400">{{ $link['url'] }}</a>
-                                <p class="truncate text-[11px] text-slate-400">anchor: “{{ $link['anchor_hint'] ?? $keyword }}”</p>
+                                <p class="truncate text-[11px] text-slate-400">{{ __('anchor: “:anchor”', ['anchor' => $link['anchor_hint'] ?? $keyword]) }}</p>
                             </div>
-                            <span class="flex-none text-[11px] font-semibold tabular-nums text-slate-500 dark:text-slate-400">{{ number_format($link['clicks_30d'] ?? 0) }} clicks</span>
+                            <span class="flex-none text-[11px] font-semibold tabular-nums text-slate-500 dark:text-slate-400">{{ __(':count clicks', ['count' => number_format($link['clicks_30d'] ?? 0)]) }}</span>
                         </li>
                     @endforeach
                 </ul>

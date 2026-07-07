@@ -27,7 +27,7 @@
             </tbody>
         </table>
         @if (! empty($res['truncated']))
-            <p class="bg-slate-50 px-2.5 py-1 text-[10px] text-slate-400 dark:bg-slate-800/50 dark:text-slate-500">Showing {{ count($res['rows']) }} of {{ $res['total'] }} resources</p>
+            <p class="bg-slate-50 px-2.5 py-1 text-[10px] text-slate-400 dark:bg-slate-800/50 dark:text-slate-500">{{ __('Showing') }} {{ count($res['rows']) }} {{ __('of') }} {{ $res['total'] }} {{ __('resources') }}</p>
         @endif
     </div>
 @endif

@@ -51,7 +51,7 @@
     @endif
 </div>
 
-<h1>{{ $branding->company_name }} {{ ucfirst($reportType) }} Report</h1>
+<h1>{{ $branding->company_name }} {{ ucfirst($reportType) }} {{ __('Report') }}</h1>
 <p class="meta"><strong>{{ $website->domain }}</strong> &mdash;
     @if ($startDate === $endDate)
         {{ format_user_date($startDate, 'l, F j, Y', $user) }}
@@ -60,7 +60,7 @@
     @endif
 </p>
 @if (! empty($report['period']['previous_label']))
-    <p class="compare-line">Compared to {{ $report['period']['previous_label'] }}
+    <p class="compare-line">{{ __('Compared to') }} {{ $report['period']['previous_label'] }}
         ({{ format_user_date($report['period']['prev_start'], 'M j', $user) }} &ndash; {{ format_user_date($report['period']['prev_end'], 'M j, Y', $user) }})</p>
 @endif
 
@@ -71,14 +71,14 @@
     $kpis = $report['analytics'] ?? [];
 @endphp
 @if (! empty($kpis))
-    <p class="section-badge badge-analytics">Analytics</p>
+    <p class="section-badge badge-analytics">{{ __('Analytics') }}</p>
     <table class="kpi-grid">
         <tr>
             @foreach (['sessions', 'users', 'pageviews', 'events'] as $key)
                 @if (isset($kpis[$key]))
                     <td>
                         <span class="kpi-value">{{ $kpis[$key]['current'] ?? '—' }}</span>
-                        <span class="kpi-label">{{ ucfirst($key) }}</span>
+                        <span class="kpi-label">{{ __(ucfirst($key)) }}</span>
                         @if (isset($kpis[$key]['change_pct']))
                             <span class="kpi-change">{{ $kpis[$key]['change_pct'] }}</span>
                         @endif
@@ -93,14 +93,14 @@
     $search = $report['search_console'] ?? [];
 @endphp
 @if (! empty($search))
-    <p class="section-badge badge-search">Search Console</p>
+    <p class="section-badge badge-search">{{ __('Search Console') }}</p>
     <table class="kpi-grid">
         <tr>
             @foreach (['clicks', 'impressions', 'ctr', 'position'] as $key)
                 @if (isset($search[$key]))
                     <td>
                         <span class="kpi-value">{{ $search[$key]['current'] ?? '—' }}</span>
-                        <span class="kpi-label">{{ ucfirst($key) }}</span>
+                        <span class="kpi-label">{{ __(ucfirst($key)) }}</span>
                         @if (isset($search[$key]['change_pct']))
                             <span class="kpi-change">{{ $search[$key]['change_pct'] }}</span>
                         @endif
@@ -114,9 +114,9 @@
 {{-- Insights: just the cannibalization + striking-distance lists since
      they're the most actionable pieces from the daily report. --}}
 @if (! empty($insights['cannibalization']))
-    <p class="section-title">Cannibalization (top 5)</p>
+    <p class="section-title">{{ __('Cannibalization (top 5)') }}</p>
     <table class="data-table">
-        <thead><tr><th>Query</th><th class="right">Page A</th><th class="right">Page B</th></tr></thead>
+        <thead><tr><th>{{ __('Query') }}</th><th class="right">{{ __('Page A') }}</th><th class="right">{{ __('Page B') }}</th></tr></thead>
         <tbody>
         @foreach ($insights['cannibalization'] as $row)
             <tr>
@@ -130,9 +130,9 @@
 @endif
 
 @if (! empty($insights['striking_distance']))
-    <p class="section-title">Striking-distance opportunities (top 5)</p>
+    <p class="section-title">{{ __('Striking-distance opportunities (top 5)') }}</p>
     <table class="data-table">
-        <thead><tr><th>Query</th><th class="right">Position</th><th class="right">Impressions</th></tr></thead>
+        <thead><tr><th>{{ __('Query') }}</th><th class="right">{{ __('Position') }}</th><th class="right">{{ __('Impressions') }}</th></tr></thead>
         <tbody>
         @foreach ($insights['striking_distance'] as $row)
             <tr>
@@ -147,10 +147,10 @@
 
 <div class="footer">
     @if ($branding->footer_text)<p>{{ $branding->footer_text }}</p>@endif
-    @if ($branding->contact_email)<p><strong>Email:</strong> {{ $branding->contact_email }}</p>@endif
-    @if ($branding->contact_phone)<p><strong>Phone:</strong> {{ $branding->contact_phone }}</p>@endif
+    @if ($branding->contact_email)<p><strong>{{ __('Email:') }}</strong> {{ $branding->contact_email }}</p>@endif
+    @if ($branding->contact_phone)<p><strong>{{ __('Phone:') }}</strong> {{ $branding->contact_phone }}</p>@endif
     @if ($branding->contact_address)<p>{{ $branding->contact_address }}</p>@endif
-    <p style="margin-top:6px;">{{ $branding->company_name }} &mdash; generated {{ format_user_now('M d, Y', $user) }}</p>
+    <p style="margin-top:6px;">{{ $branding->company_name }} &mdash; {{ __('generated') }} {{ format_user_now('M d, Y', $user) }}</p>
 </div>
 </body>
 </html>

@@ -1,12 +1,12 @@
 <x-mail::message>
-# Access granted
+# {{ __('Access granted') }}
 
-You now have access to **{{ $website->domain }}** in {{ config('app.name') }}.
+{{ __('You now have access to :domain in :app.', ['domain' => '**'.$website->domain.'**', 'app' => config('app.name')]) }}
 
 <x-mail::button :url="route('dashboard')">
-Open dashboard
+{{ __('Open dashboard') }}
 </x-mail::button>
 
-Thanks,<br>
+{{ __('Thanks,') }}<br>
 {{ config('app.name') }}
 </x-mail::message>

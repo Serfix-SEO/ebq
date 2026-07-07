@@ -5,25 +5,25 @@
             <a href="{{ route('keywords.index') }}" wire:navigate
                class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400">
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
-                Back to keywords
+                {{ __('Back to keywords') }}
             </a>
             <div class="mt-2 flex flex-wrap items-center gap-2">
                 <h1 class="min-w-0 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ $query ?: '—' }}</h1>
                 @if (filled($language ?? null))
                     <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600 ring-1 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600"
-                          title="Detected language">{{ strtoupper($language) }}</span>
+                          title="{{ __('Detected language') }}">{{ strtoupper($language) }}</span>
                 @endif
                 @if ($flags['striking_distance'])
-                    <span class="inline-flex rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 ring-1 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-900/40">Striking distance</span>
+                    <span class="inline-flex rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 ring-1 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-900/40">{{ __('Striking distance') }}</span>
                 @endif
                 @if ($flags['cannibalized'])
-                    <span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-900/40">Cannibalized</span>
+                    <span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-900/40">{{ __('Cannibalized') }}</span>
                 @endif
                 @if ($flags['quick_win'])
-                    <span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-900/40">Quick win</span>
+                    <span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-900/40">{{ __('Quick win') }}</span>
                 @endif
                 @if ($tracker)
-                    <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600">Tracked</span>
+                    <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600">{{ __('Tracked') }}</span>
                 @endif
             </div>
         </div>
@@ -32,21 +32,21 @@
             @if ($tracker)
                 <a href="{{ route('rank-tracking.show', $tracker->id) }}" wire:navigate
                    class="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
-                    Open in rank tracker
+                    {{ __('Open in rank tracker') }}
                 </a>
             @else
                 <button wire:click="addToRankTracker" wire:loading.attr="disabled" wire:target="addToRankTracker" type="button"
                         class="inline-flex h-9 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
                     <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                    <span wire:loading.remove wire:target="addToRankTracker">Track this keyword</span>
-                    <span wire:loading wire:target="addToRankTracker">Adding…</span>
+                    <span wire:loading.remove wire:target="addToRankTracker">{{ __('Track this keyword') }}</span>
+                    <span wire:loading wire:target="addToRankTracker">{{ __('Adding…') }}</span>
                 </button>
             @endif
 
             @php $_primaryPage = $top_pages[0]['page'] ?? null; @endphp
             <a href="{{ route('custom-audit.index') }}?{{ http_build_query(array_filter(['targetKeyword' => $query, 'pageUrl' => $_primaryPage])) }}"
                class="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
-                Run custom audit
+                {{ __('Run custom audit') }}
             </a>
         </div>
     </div>
@@ -59,39 +59,39 @@
 
     @if (! $has_access)
         <div class="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">
-            Select a website to view keyword details.
+            {{ __('Select a website to view keyword details.') }}
         </div>
     @else
         {{-- KPI cards: Volume · CPC · Competition · Value/mo --}}
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {{-- Volume --}}
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Volume / mo</p>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Volume / mo') }}</p>
                 <div class="mt-2 flex items-baseline gap-2">
                     @if ($metric && $metric->search_volume !== null)
                         <span class="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($metric->search_volume) }}</span>
                         @php $_trend = $metric->trend_class; @endphp
                         @if ($_trend === 'rising')
-                            <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400" title="Trend: rising over last 6 months">↑ rising</span>
+                            <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400" title="{{ __('Trend: rising over last 6 months') }}">↑ {{ __('rising') }}</span>
                         @elseif ($_trend === 'falling')
-                            <span class="text-xs font-bold text-rose-600 dark:text-rose-400" title="Trend: falling over last 6 months">↓ falling</span>
+                            <span class="text-xs font-bold text-rose-600 dark:text-rose-400" title="{{ __('Trend: falling over last 6 months') }}">↓ {{ __('falling') }}</span>
                         @elseif ($_trend === 'seasonal')
-                            <span class="text-xs font-bold text-amber-600 dark:text-amber-400" title="Seasonal pattern">◐ seasonal</span>
+                            <span class="text-xs font-bold text-amber-600 dark:text-amber-400" title="{{ __('Seasonal pattern') }}">◐ {{ __('seasonal') }}</span>
                         @endif
                     @else
                         <span class="text-2xl font-bold text-slate-400">—</span>
                     @endif
                 </div>
                 @if ($metric && $metric->fetched_at)
-                    <p class="mt-1.5 text-[10px] text-slate-400">updated {{ $metric->fetched_at->diffForHumans() }}</p>
+                    <p class="mt-1.5 text-[10px] text-slate-400">{{ __('updated :time', ['time' => $metric->fetched_at->diffForHumans()]) }}</p>
                 @else
-                    <p class="mt-1.5 text-[10px] text-slate-400">pending fetch</p>
+                    <p class="mt-1.5 text-[10px] text-slate-400">{{ __('pending fetch') }}</p>
                 @endif
             </div>
 
             {{-- CPC --}}
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">CPC</p>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('CPC') }}</p>
                 <div class="mt-2">
                     @if ($metric && $metric->cpc !== null)
                         <span class="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $metric->currency ?: 'USD' }} {{ number_format((float) $metric->cpc, 2) }}</span>
@@ -99,12 +99,12 @@
                         <span class="text-2xl font-bold text-slate-400">—</span>
                     @endif
                 </div>
-                <p class="mt-1.5 text-[10px] text-slate-400">advertiser bid (Google Ads)</p>
+                <p class="mt-1.5 text-[10px] text-slate-400">{{ __('advertiser bid (Google Ads)') }}</p>
             </div>
 
             {{-- Competition --}}
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Competition</p>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Competition') }}</p>
                 <div class="mt-2">
                     @if ($metric && $metric->competition !== null)
                         @php $_comp = round((float) $metric->competition * 100); @endphp
@@ -116,46 +116,46 @@
                         <span class="text-2xl font-bold text-slate-400">—</span>
                     @endif
                 </div>
-                <p class="mt-1.5 text-[10px] text-slate-400">lower is easier to win</p>
+                <p class="mt-1.5 text-[10px] text-slate-400">{{ __('lower is easier to win') }}</p>
             </div>
 
             {{-- Projected clicks (CTR curve x volume; dollar projections removed 2026-07-07) --}}
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Est. clicks / mo</p>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Est. clicks / mo') }}</p>
                 <div class="mt-2">
                     @if ($projections['projected_clicks'] !== null && $projections['projected_clicks'] > 0)
                         <span class="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($projections['projected_clicks']) }}</span>
-                        <span class="text-xs text-slate-500 dark:text-slate-400">clicks/mo</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">{{ __('clicks/mo') }}</span>
                     @else
                         <span class="text-2xl font-bold text-slate-400">—</span>
                     @endif
                 </div>
-                <p class="mt-1.5 text-[10px] text-slate-400">projected at current position</p>
+                <p class="mt-1.5 text-[10px] text-slate-400">{{ __('projected at current position') }}</p>
             </div>
         </div>
 
         {{-- GSC performance totals (28d) --}}
         <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Your performance · last 28 days</h2>
-                <span class="text-[11px] text-slate-400">Google Search Console</span>
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('Your performance · last 28 days') }}</h2>
+                <span class="text-[11px] text-slate-400">{{ __('Google Search Console') }}</span>
             </div>
             @if ($gsc_totals)
                 <dl class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Clicks</dt>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Clicks') }}</dt>
                         <dd class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($gsc_totals['clicks']) }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Impressions</dt>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Impressions') }}</dt>
                         <dd class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($gsc_totals['impressions']) }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">CTR</dt>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('CTR') }}</dt>
                         <dd class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $gsc_totals['ctr'] }}%</dd>
                     </div>
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Avg position</dt>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Avg position') }}</dt>
                         <dd class="mt-1 flex items-baseline gap-2">
                             <span @class([
                                 'inline-flex rounded-full px-2 py-0.5 text-base font-bold tabular-nums',
@@ -168,7 +168,7 @@
                     </div>
                 </dl>
             @else
-                <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No Search Console impressions on this query in the last 28 days.</p>
+                <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">{{ __('No Search Console impressions on this query in the last 28 days.') }}</p>
             @endif
         </div>
 
@@ -205,8 +205,8 @@
             <div class="grid gap-4 lg:grid-cols-2">
                 <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Daily clicks · 90d</h3>
-                        <span class="text-[11px] text-slate-400">peak {{ number_format($maxClicks) }}</span>
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('Daily clicks · 90d') }}</h3>
+                        <span class="text-[11px] text-slate-400">{{ __('peak :count', ['count' => number_format($maxClicks)]) }}</span>
                     </div>
                     <svg viewBox="0 0 {{ $width }} {{ $height }}" preserveAspectRatio="none" class="mt-3 h-24 w-full">
                         <path d="{{ $clicksPath }}" fill="none" stroke="#F26419" stroke-width="0.8" vector-effect="non-scaling-stroke" />
@@ -218,13 +218,13 @@
                 </div>
                 <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Daily avg position · 90d</h3>
-                        <span class="text-[11px] text-slate-400">best #{{ $bestPos ?: '—' }}</span>
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('Daily avg position · 90d') }}</h3>
+                        <span class="text-[11px] text-slate-400">{{ __('best #:pos', ['pos' => $bestPos ?: '—']) }}</span>
                     </div>
                     <svg viewBox="0 0 {{ $width }} {{ $height }}" preserveAspectRatio="none" class="mt-3 h-24 w-full">
                         <path d="{{ $posPath }}" fill="none" stroke="#06b6d4" stroke-width="0.8" vector-effect="non-scaling-stroke" />
                     </svg>
-                    <p class="mt-2 text-[10px] text-slate-400">Lower on the chart = worse rank. Y-axis range auto-fits observed positions.</p>
+                    <p class="mt-2 text-[10px] text-slate-400">{{ __('Lower on the chart = worse rank. Y-axis range auto-fits observed positions.') }}</p>
                 </div>
             </div>
         @endif
@@ -244,8 +244,8 @@
             @endphp
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between">
-                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Search volume · 12 months</h3>
-                    <span class="text-[11px] text-slate-400">peak {{ number_format($_maxVol) }}</span>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('Search volume · 12 months') }}</h3>
+                    <span class="text-[11px] text-slate-400">{{ __('peak :count', ['count' => number_format($_maxVol)]) }}</span>
                 </div>
                 <svg viewBox="0 0 100 30" preserveAspectRatio="none" class="mt-3 h-24 w-full">
                     <path d="{{ $_path }}" fill="none" stroke="#8b5cf6" stroke-width="0.8" vector-effect="non-scaling-stroke" />
@@ -262,21 +262,21 @@
             {{-- Top pages --}}
             <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Pages ranking for this query</h3>
-                    <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Last 90 days, ordered by impressions. 2+ rows = candidate for consolidation.</p>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('Pages ranking for this query') }}</h3>
+                    <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ __('Last 90 days, ordered by impressions. 2+ rows = candidate for consolidation.') }}</p>
                 </div>
                 @if (empty($top_pages))
-                    <p class="px-5 py-6 text-center text-sm text-slate-500 dark:text-slate-400">No pages of yours have served impressions for this query in the last 90 days.</p>
+                    <p class="px-5 py-6 text-center text-sm text-slate-500 dark:text-slate-400">{{ __('No pages of yours have served impressions for this query in the last 90 days.') }}</p>
                 @else
                     <div class="overflow-x-auto">
                         <table class="w-full text-xs">
                             <thead class="bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
                                 <tr>
-                                    <th class="px-3 py-2 text-left">Page</th>
-                                    <th class="px-3 py-2 text-right">Clicks</th>
-                                    <th class="px-3 py-2 text-right">Impr.</th>
-                                    <th class="px-3 py-2 text-right">CTR</th>
-                                    <th class="px-3 py-2 text-right">Pos</th>
+                                    <th class="px-3 py-2 text-start">{{ __('Page') }}</th>
+                                    <th class="px-3 py-2 text-end">{{ __('Clicks') }}</th>
+                                    <th class="px-3 py-2 text-end">{{ __('Impr.') }}</th>
+                                    <th class="px-3 py-2 text-end">{{ __('CTR') }}</th>
+                                    <th class="px-3 py-2 text-end">{{ __('Pos') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -285,10 +285,10 @@
                                         <td class="max-w-[260px] truncate px-3 py-2">
                                             <a href="{{ route('pages.show', ['id' => urlencode($p['page'])]) }}" wire:navigate class="text-orange-600 hover:underline dark:text-orange-400" title="{{ $p['page'] }}">{{ $p['page'] }}</a>
                                         </td>
-                                        <td class="px-3 py-2 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($p['clicks']) }}</td>
-                                        <td class="px-3 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">{{ number_format($p['impressions']) }}</td>
-                                        <td class="px-3 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">{{ $p['ctr'] }}%</td>
-                                        <td class="px-3 py-2 text-right tabular-nums font-semibold text-slate-900 dark:text-slate-100">{{ $p['position'] }}</td>
+                                        <td class="px-3 py-2 text-end tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($p['clicks']) }}</td>
+                                        <td class="px-3 py-2 text-end tabular-nums text-slate-500 dark:text-slate-400">{{ number_format($p['impressions']) }}</td>
+                                        <td class="px-3 py-2 text-end tabular-nums text-slate-500 dark:text-slate-400">{{ $p['ctr'] }}%</td>
+                                        <td class="px-3 py-2 text-end tabular-nums font-semibold text-slate-900 dark:text-slate-100">{{ $p['position'] }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -301,10 +301,10 @@
             <div class="space-y-4">
                 <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">By country · 90d</h3>
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('By country · 90d') }}</h3>
                     </div>
                     @if (empty($countries))
-                        <p class="px-5 py-4 text-center text-xs text-slate-500 dark:text-slate-400">No country data yet.</p>
+                        <p class="px-5 py-4 text-center text-xs text-slate-500 dark:text-slate-400">{{ __('No country data yet.') }}</p>
                     @else
                         <ul class="divide-y divide-slate-100 dark:divide-slate-800">
                             @foreach ($countries as $c)
@@ -315,7 +315,7 @@
                                         <span class="shrink-0 font-mono text-[10px] text-slate-400">{{ $c['country'] }}</span>
                                     </span>
                                     <span class="flex shrink-0 items-center gap-3 tabular-nums text-slate-600 dark:text-slate-400">
-                                        <span>{{ number_format($c['clicks']) }} clicks</span>
+                                        <span>{{ __(':count clicks', ['count' => number_format($c['clicks'])]) }}</span>
                                         <span class="text-slate-400">·</span>
                                         <span>#{{ $c['position'] }}</span>
                                     </span>
@@ -327,19 +327,19 @@
 
                 <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">By device · 90d</h3>
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('By device · 90d') }}</h3>
                     </div>
                     @if (empty($devices))
-                        <p class="px-5 py-4 text-center text-xs text-slate-500 dark:text-slate-400">No device data yet.</p>
+                        <p class="px-5 py-4 text-center text-xs text-slate-500 dark:text-slate-400">{{ __('No device data yet.') }}</p>
                     @else
                         <ul class="divide-y divide-slate-100 dark:divide-slate-800">
                             @foreach ($devices as $d)
                                 <li class="flex items-center justify-between gap-3 px-5 py-2 text-xs">
                                     <span class="font-medium capitalize text-slate-800 dark:text-slate-100">{{ strtolower($d['device']) }}</span>
                                     <span class="flex items-center gap-3 tabular-nums text-slate-600 dark:text-slate-400">
-                                        <span>{{ number_format($d['clicks']) }} clicks</span>
+                                        <span>{{ __(':count clicks', ['count' => number_format($d['clicks'])]) }}</span>
                                         <span class="text-slate-400">·</span>
-                                        <span>{{ number_format($d['impressions']) }} impr</span>
+                                        <span>{{ __(':count impr', ['count' => number_format($d['impressions'])]) }}</span>
                                         <span class="text-slate-400">·</span>
                                         <span>#{{ $d['position'] }}</span>
                                     </span>
@@ -356,22 +356,22 @@
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Rank tracker</h3>
-                        <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Checked every {{ $tracker->check_interval_hours }}h · market {{ strtoupper($tracker->country) }} / {{ $tracker->device }} / {{ $tracker->language }}</p>
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('Rank tracker') }}</h3>
+                        <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ __('Checked every :hoursh · market :country / :device / :language', ['hours' => $tracker->check_interval_hours, 'country' => strtoupper($tracker->country), 'device' => $tracker->device, 'language' => $tracker->language]) }}</p>
                     </div>
-                    <a href="{{ route('rank-tracking.show', $tracker->id) }}" wire:navigate class="text-[11px] font-semibold text-orange-600 hover:underline dark:text-orange-400">Open detail →</a>
+                    <a href="{{ route('rank-tracking.show', $tracker->id) }}" wire:navigate class="text-[11px] font-semibold text-orange-600 hover:underline dark:text-orange-400">{{ __('Open detail →') }}</a>
                 </div>
                 <dl class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Current</dt>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Current') }}</dt>
                         <dd class="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $tracker->current_position ? '#'.$tracker->current_position : '—' }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Best</dt>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Best') }}</dt>
                         <dd class="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $tracker->best_position ? '#'.$tracker->best_position : '—' }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Change</dt>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Change') }}</dt>
                         <dd class="mt-1 text-xl font-bold tabular-nums">
                             @if ($tracker->position_change > 0)
                                 <span class="text-emerald-600 dark:text-emerald-400">▲ {{ $tracker->position_change }}</span>
@@ -383,8 +383,8 @@
                         </dd>
                     </div>
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Last checked</dt>
-                        <dd class="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{{ $tracker->last_checked_at ? $tracker->last_checked_at->diffForHumans() : 'pending' }}</dd>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Last checked') }}</dt>
+                        <dd class="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{{ $tracker->last_checked_at ? $tracker->last_checked_at->diffForHumans() : __('pending') }}</dd>
                     </div>
                 </dl>
             </div>
@@ -396,8 +396,8 @@
                 @if (! empty($paa))
                     <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-                            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">People also ask</h3>
-                            <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">From the latest SERP snapshot. Strong candidates for H2 / FAQ additions.</p>
+                            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('People also ask') }}</h3>
+                            <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ __('From the latest SERP snapshot. Strong candidates for H2 / FAQ additions.') }}</p>
                         </div>
                         <ul class="divide-y divide-slate-100 dark:divide-slate-800">
                             @foreach ($paa as $q)
@@ -414,8 +414,8 @@
                 @if (! empty($related_searches))
                     <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-                            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Related searches</h3>
-                            <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Queries Google suggested on the latest SERP. Useful for cluster expansion.</p>
+                            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('Related searches') }}</h3>
+                            <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ __('Queries Google suggested on the latest SERP. Useful for cluster expansion.') }}</p>
                         </div>
                         <ul class="flex flex-wrap gap-1.5 p-4">
                             @foreach ($related_searches as $r)

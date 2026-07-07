@@ -17,7 +17,9 @@ class WebsiteAccessGrantedMail extends Mailable
     public function __construct(
         public Website $website,
         public User $member,
-    ) {}
+    ) {
+        $this->locale($member->locale ?? app()->getLocale());
+    }
 
     public function envelope(): Envelope
     {

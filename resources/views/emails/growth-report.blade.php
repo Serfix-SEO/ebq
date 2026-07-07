@@ -75,7 +75,7 @@
         @elseif (! $branding->isDefault())
             <div class="brand-header"><p class="brand-name">{{ $branding->company_name }}</p></div>
         @endif
-        <h1>{{ $branding->company_name }} {{ ucfirst($reportType) }} Report</h1>
+        <h1>{{ $branding->company_name }} {{ ucfirst($reportType) }} {{ __('Report') }}</h1>
         <p class="meta">
             <strong>{{ $website->domain }}</strong> &mdash;
             @if ($startDate === $endDate)
@@ -85,55 +85,55 @@
             @endif
         </p>
         <p class="compare-line">
-            Compared to {{ $report['period']['previous_label'] }}
+            {{ __('Compared to') }} {{ $report['period']['previous_label'] }}
             ({{ format_user_date($report['period']['prev_start'], 'M j', $user) }} &ndash; {{ format_user_date($report['period']['prev_end'], 'M j, Y', $user) }})
         </p>
         <p class="freshness">
-            <strong>Data through {{ format_user_date($endDate, 'M j, Y', $user) }}.</strong>
+            <strong>{{ __('Data through') }} {{ format_user_date($endDate, 'M j, Y', $user) }}.</strong>
             @if ($startDate === $endDate)
-                Google Search Console finalises numbers 1&ndash;3 days after the day ends, so this is the most recent fully&#8209;synced day for a fair comparison.
+                {{ __('Google Search Console finalises numbers 1–3 days after the day ends, so this is the most recent fully‑synced day for a fair comparison.') }}
             @else
-                Google Search Console finalises numbers 1&ndash;3 days after each day ends, so the period ends on the most recent fully&#8209;synced day for a fair comparison.
+                {{ __('Google Search Console finalises numbers 1–3 days after each day ends, so the period ends on the most recent fully‑synced day for a fair comparison.') }}
             @endif
         </p>
-        <p class="greeting">Hello {{ $user->name }}, here is the performance summary for your website.</p>
+        <p class="greeting">{{ __('Hello :name, here is the performance summary for your website.', ['name' => $user->name]) }}</p>
 
         {{-- ==================== GOOGLE ANALYTICS ==================== --}}
-        <span class="section-badge badge-analytics">Google Analytics</span>
-        <h2 class="section-title">Website Traffic</h2>
+        <span class="section-badge badge-analytics">{{ __('Google Analytics') }}</span>
+        <h2 class="section-title">{{ __('Website Traffic') }}</h2>
 
         <table class="kpi-grid" role="presentation">
             <tr>
                 <td>
                     <span class="kpi-value">{{ number_format($report['analytics']['users']['current']) }}</span>
-                    <span class="kpi-label">Users</span>
+                    <span class="kpi-label">{{ __('Users') }}</span>
                     @include('emails.partials.change-badge', ['metric' => $report['analytics']['users']])
-                    <span class="kpi-prev">was {{ number_format($report['analytics']['users']['previous']) }}</span>
+                    <span class="kpi-prev">{{ __('was') }} {{ number_format($report['analytics']['users']['previous']) }}</span>
                 </td>
                 <td>
                     <span class="kpi-value">{{ number_format($report['analytics']['sessions']['current']) }}</span>
-                    <span class="kpi-label">Sessions</span>
+                    <span class="kpi-label">{{ __('Sessions') }}</span>
                     @include('emails.partials.change-badge', ['metric' => $report['analytics']['sessions']])
-                    <span class="kpi-prev">was {{ number_format($report['analytics']['sessions']['previous']) }}</span>
+                    <span class="kpi-prev">{{ __('was') }} {{ number_format($report['analytics']['sessions']['previous']) }}</span>
                 </td>
                 <td>
                     <span class="kpi-value">{{ $report['analytics']['bounce_rate']['current'] }}%</span>
-                    <span class="kpi-label">Bounce Rate</span>
+                    <span class="kpi-label">{{ __('Bounce Rate') }}</span>
                     @include('emails.partials.change-badge', ['metric' => $report['analytics']['bounce_rate'], 'suffix' => 'pp'])
-                    <span class="kpi-prev">was {{ $report['analytics']['bounce_rate']['previous'] }}%</span>
+                    <span class="kpi-prev">{{ __('was') }} {{ $report['analytics']['bounce_rate']['previous'] }}%</span>
                 </td>
             </tr>
         </table>
 
         @if (count($report['analytics']['top_sources']) > 0)
-            <p class="sub-heading">Top Traffic Sources</p>
+            <p class="sub-heading">{{ __('Top Traffic Sources') }}</p>
             <table class="data-table" role="presentation">
                 <thead>
                     <tr>
-                        <th>Source</th>
-                        <th class="right">Users</th>
-                        <th class="right">Prev</th>
-                        <th class="right">Change</th>
+                        <th>{{ __('Source') }}</th>
+                        <th class="right">{{ __('Users') }}</th>
+                        <th class="right">{{ __('Prev') }}</th>
+                        <th class="right">{{ __('Change') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -148,20 +148,20 @@
                 </tbody>
             </table>
         @else
-            <p class="empty-note">No analytics data available for this period.</p>
+            <p class="empty-note">{{ __('No analytics data available for this period.') }}</p>
         @endif
 
         <table class="mini-grid" role="presentation">
             <tr>
                 <td>
-                    <p class="mini-label">Engagement Insight</p>
-                    <p class="mini-value">{{ $report['analytics']['sessions_per_user']['current'] ?? 0 }} sessions/user</p>
-                    <p class="mini-note">was {{ $report['analytics']['sessions_per_user']['previous'] ?? 0 }} in {{ $report['period']['previous_label'] }}</p>
+                    <p class="mini-label">{{ __('Engagement Insight') }}</p>
+                    <p class="mini-value">{{ __(':value sessions/user', ['value' => $report['analytics']['sessions_per_user']['current'] ?? 0]) }}</p>
+                    <p class="mini-note">{{ __('was :value in :period', ['value' => $report['analytics']['sessions_per_user']['previous'] ?? 0, 'period' => $report['period']['previous_label']]) }}</p>
                 </td>
                 <td>
-                    <p class="mini-label">Source Concentration</p>
-                    <p class="mini-value">{{ $report['analytics']['source_concentration_top3'] ?? 0 }}% from top 3 sources</p>
-                    <p class="mini-note">Higher values can indicate channel concentration risk.</p>
+                    <p class="mini-label">{{ __('Source Concentration') }}</p>
+                    <p class="mini-value">{{ __(':value% from top 3 sources', ['value' => $report['analytics']['source_concentration_top3'] ?? 0]) }}</p>
+                    <p class="mini-note">{{ __('Higher values can indicate channel concentration risk.') }}</p>
                 </td>
             </tr>
         </table>
@@ -170,7 +170,7 @@
             <table class="insight-cols" role="presentation">
                 <tr>
                     <td>
-                        <p class="sub-heading" style="margin-bottom:8px;color:#16a34a;">Source Gainers</p>
+                        <p class="sub-heading" style="margin-bottom:8px;color:#16a34a;">{{ __('Source Gainers') }}</p>
                         <ul class="insight-list">
                             @foreach (($report['analytics']['top_source_gainers'] ?? []) as $item)
                                 <li>
@@ -183,7 +183,7 @@
                         </ul>
                     </td>
                     <td>
-                        <p class="sub-heading" style="margin-bottom:8px;color:#dc2626;">Source Losers</p>
+                        <p class="sub-heading" style="margin-bottom:8px;color:#dc2626;">{{ __('Source Losers') }}</p>
                         <ul class="insight-list">
                             @foreach (($report['analytics']['top_source_losers'] ?? []) as $item)
                                 <li>
@@ -202,57 +202,57 @@
         <hr class="section-divider">
 
         {{-- ==================== GOOGLE SEARCH CONSOLE ==================== --}}
-        <span class="section-badge badge-search">Google Search Console</span>
-        <h2 class="section-title">Search Performance</h2>
+        <span class="section-badge badge-search">{{ __('Google Search Console') }}</span>
+        <h2 class="section-title">{{ __('Search Performance') }}</h2>
 
         <table class="kpi-grid" role="presentation">
             <tr>
                 <td>
                     <span class="kpi-value">{{ number_format($report['search_console']['clicks']['current']) }}</span>
-                    <span class="kpi-label">Clicks</span>
+                    <span class="kpi-label">{{ __('Clicks') }}</span>
                     @include('emails.partials.change-badge', ['metric' => $report['search_console']['clicks']])
-                    <span class="kpi-prev">was {{ number_format($report['search_console']['clicks']['previous']) }}</span>
+                    <span class="kpi-prev">{{ __('was') }} {{ number_format($report['search_console']['clicks']['previous']) }}</span>
                 </td>
                 <td>
                     <span class="kpi-value">{{ number_format($report['search_console']['impressions']['current']) }}</span>
-                    <span class="kpi-label">Impressions</span>
+                    <span class="kpi-label">{{ __('Impressions') }}</span>
                     @include('emails.partials.change-badge', ['metric' => $report['search_console']['impressions']])
-                    <span class="kpi-prev">was {{ number_format($report['search_console']['impressions']['previous']) }}</span>
+                    <span class="kpi-prev">{{ __('was') }} {{ number_format($report['search_console']['impressions']['previous']) }}</span>
                 </td>
                 <td>
                     <span class="kpi-value">{{ $report['search_console']['position']['current'] }}</span>
-                    <span class="kpi-label">Avg Position</span>
+                    <span class="kpi-label">{{ __('Avg Position') }}</span>
                     @include('emails.partials.change-badge', ['metric' => $report['search_console']['position']])
-                    <span class="kpi-prev">was {{ $report['search_console']['position']['previous'] }}</span>
+                    <span class="kpi-prev">{{ __('was') }} {{ $report['search_console']['position']['previous'] }}</span>
                 </td>
                 <td>
                     <span class="kpi-value">{{ $report['search_console']['ctr']['current'] }}%</span>
-                    <span class="kpi-label">Avg CTR</span>
+                    <span class="kpi-label">{{ __('Avg CTR') }}</span>
                     @include('emails.partials.change-badge', ['metric' => $report['search_console']['ctr'], 'suffix' => 'pp'])
-                    <span class="kpi-prev">was {{ $report['search_console']['ctr']['previous'] }}%</span>
+                    <span class="kpi-prev">{{ __('was') }} {{ $report['search_console']['ctr']['previous'] }}%</span>
                 </td>
             </tr>
         </table>
 
         @if (! empty($report['ppc_equivalent']))
             <p style="margin: 8px 0 0; font-size: 13px; color: #F26419;">
-                Your organic traffic is worth approximately
-                <strong>${{ number_format($report['ppc_equivalent']['value'], 0) }}/month</strong>
-                in PPC equivalent
-                <span style="color: #94a3b8; font-size: 11px;">(based on {{ number_format($report['ppc_equivalent']['keywords']) }} priced queries · Google Ads CPC rates)</span>.
+                {{ __('Your organic traffic is worth approximately') }}
+                <strong>${{ number_format($report['ppc_equivalent']['value'], 0) }}{{ __('/month') }}</strong>
+                {{ __('in PPC equivalent') }}
+                <span style="color: #94a3b8; font-size: 11px;">({{ __('based on :count priced queries · Google Ads CPC rates', ['count' => number_format($report['ppc_equivalent']['keywords'])]) }})</span>.
             </p>
         @endif
 
         @if (count($report['search_console']['top_queries']) > 0)
-            <p class="sub-heading">Top Search Queries</p>
+            <p class="sub-heading">{{ __('Top Search Queries') }}</p>
             <table class="data-table" role="presentation">
                 <thead>
                     <tr>
-                        <th>Query</th>
-                        <th class="right">Clicks</th>
-                        <th class="right">Prev</th>
-                        <th class="right">Pos</th>
-                        <th class="right">Change</th>
+                        <th>{{ __('Query') }}</th>
+                        <th class="right">{{ __('Clicks') }}</th>
+                        <th class="right">{{ __('Prev') }}</th>
+                        <th class="right">{{ __('Pos') }}</th>
+                        <th class="right">{{ __('Change') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -270,14 +270,14 @@
         @endif
 
         @if (count($report['search_console']['top_pages']) > 0)
-            <p class="sub-heading">Top Pages</p>
+            <p class="sub-heading">{{ __('Top Pages') }}</p>
             <table class="data-table" role="presentation">
                 <thead>
                     <tr>
-                        <th>Page</th>
-                        <th class="right">Clicks</th>
-                        <th class="right">Prev</th>
-                        <th class="right">Change</th>
+                        <th>{{ __('Page') }}</th>
+                        <th class="right">{{ __('Clicks') }}</th>
+                        <th class="right">{{ __('Prev') }}</th>
+                        <th class="right">{{ __('Change') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -294,47 +294,47 @@
         @endif
 
         @if (count($report['search_console']['top_queries']) === 0 && count($report['search_console']['top_pages']) === 0)
-            <p class="empty-note">No search console data available for this period.</p>
+            <p class="empty-note">{{ __('No search console data available for this period.') }}</p>
         @endif
 
         @if (! empty($report['search_console']['position_buckets']))
-            <p class="sub-heading">Position Buckets</p>
+            <p class="sub-heading">{{ __('Position Buckets') }}</p>
             <table class="mini-grid" role="presentation">
                 <tr>
                     <td>
-                        <p class="mini-label">Top 3</p>
+                        <p class="mini-label">{{ __('Top 3') }}</p>
                         <p class="mini-value">{{ number_format($report['search_console']['position_buckets']['top_3'] ?? 0) }}</p>
-                        <p class="mini-note">keywords</p>
+                        <p class="mini-note">{{ __('keywords') }}</p>
                     </td>
                     <td>
                         <p class="mini-label">4-10</p>
                         <p class="mini-value">{{ number_format($report['search_console']['position_buckets']['top_10'] ?? 0) }}</p>
-                        <p class="mini-note">keywords</p>
+                        <p class="mini-note">{{ __('keywords') }}</p>
                     </td>
                     <td>
                         <p class="mini-label">11-20</p>
                         <p class="mini-value">{{ number_format($report['search_console']['position_buckets']['near_page_1'] ?? 0) }}</p>
-                        <p class="mini-note">keywords</p>
+                        <p class="mini-note">{{ __('keywords') }}</p>
                     </td>
                     <td>
                         <p class="mini-label">20+</p>
                         <p class="mini-value">{{ number_format($report['search_console']['position_buckets']['beyond_20'] ?? 0) }}</p>
-                        <p class="mini-note">keywords</p>
+                        <p class="mini-note">{{ __('keywords') }}</p>
                     </td>
                 </tr>
             </table>
         @endif
 
         @if (count($report['search_console']['opportunities'] ?? []) > 0)
-            <p class="sub-heading">Optimization Opportunities</p>
+            <p class="sub-heading">{{ __('Optimization Opportunities') }}</p>
             <table class="data-table" role="presentation">
                 <thead>
                     <tr>
-                        <th>Query</th>
-                        <th class="right">Impr.</th>
-                        <th class="right">CTR</th>
-                        <th class="right">Pos</th>
-                        <th class="right">Score</th>
+                        <th>{{ __('Query') }}</th>
+                        <th class="right">{{ __('Impr.') }}</th>
+                        <th class="right">{{ __('CTR') }}</th>
+                        <th class="right">{{ __('Pos') }}</th>
+                        <th class="right">{{ __('Score') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -355,7 +355,7 @@
             <table class="insight-cols" role="presentation">
                 <tr>
                     <td>
-                        <p class="sub-heading" style="margin-bottom:8px;color:#16a34a;">Query Gainers</p>
+                        <p class="sub-heading" style="margin-bottom:8px;color:#16a34a;">{{ __('Query Gainers') }}</p>
                         <ul class="insight-list">
                             @foreach (($report['search_console']['top_query_gainers'] ?? []) as $item)
                                 <li>
@@ -368,7 +368,7 @@
                         </ul>
                     </td>
                     <td>
-                        <p class="sub-heading" style="margin-bottom:8px;color:#dc2626;">Query Losers</p>
+                        <p class="sub-heading" style="margin-bottom:8px;color:#dc2626;">{{ __('Query Losers') }}</p>
                         <ul class="insight-list">
                             @foreach (($report['search_console']['top_query_losers'] ?? []) as $item)
                                 <li>
@@ -393,34 +393,34 @@
              estate. Remove this comment block if the section is restored. --}}
 
         {{-- ==================== INDEXING STATUS ==================== --}}
-        <span class="section-badge" style="background:#0891b2">Indexing</span>
-        <h2 class="section-title">Latest Google Indexing Status</h2>
+        <span class="section-badge" style="background:#0891b2">{{ __('Indexing') }}</span>
+        <h2 class="section-title">{{ __('Latest Google Indexing Status') }}</h2>
 
         <table class="mini-grid" role="presentation">
             <tr>
                 <td>
-                    <p class="mini-label">Tracked Pages</p>
+                    <p class="mini-label">{{ __('Tracked Pages') }}</p>
                     <p class="mini-value">{{ number_format($report['indexing']['summary']['tracked_pages'] ?? 0) }}</p>
                 </td>
                 <td>
-                    <p class="mini-label">Checked Pages</p>
+                    <p class="mini-label">{{ __('Checked Pages') }}</p>
                     <p class="mini-value">{{ number_format($report['indexing']['summary']['checked_pages'] ?? 0) }}</p>
                 </td>
                 <td>
-                    <p class="mini-label">PASS Verdict</p>
+                    <p class="mini-label">{{ __('PASS Verdict') }}</p>
                     <p class="mini-value" style="color:#16a34a">{{ number_format($report['indexing']['summary']['pass_pages'] ?? 0) }}</p>
                 </td>
                 <td>
-                    <p class="mini-label">FAIL Verdict</p>
+                    <p class="mini-label">{{ __('FAIL Verdict') }}</p>
                     <p class="mini-value" style="color:#dc2626">{{ number_format($report['indexing']['summary']['fail_pages'] ?? 0) }}</p>
                 </td>
             </tr>
         </table>
 
         <p class="meta" style="margin-top:-6px; margin-bottom:12px;">
-            Last checked:
+            {{ __('Last checked:') }}
             <strong>
-                {{ !empty($report['indexing']['summary']['last_checked_at']) ? format_user_datetime($report['indexing']['summary']['last_checked_at'], 'M j, Y g:i A', $user) : 'Never' }}
+                {{ !empty($report['indexing']['summary']['last_checked_at']) ? format_user_datetime($report['indexing']['summary']['last_checked_at'], 'M j, Y g:i A', $user) : __('Never') }}
             </strong>
         </p>
 
@@ -428,11 +428,11 @@
             <table class="data-table" role="presentation">
                 <thead>
                     <tr>
-                        <th>Page</th>
-                        <th>Verdict</th>
-                        <th>Coverage</th>
-                        <th class="right">Last Crawl</th>
-                        <th class="right">Checked</th>
+                        <th>{{ __('Page') }}</th>
+                        <th>{{ __('Verdict') }}</th>
+                        <th>{{ __('Coverage') }}</th>
+                        <th class="right">{{ __('Last Crawl') }}</th>
+                        <th class="right">{{ __('Checked') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -452,18 +452,18 @@
                 </tbody>
             </table>
         @else
-            <p class="empty-note">No indexing status checks recorded yet.</p>
+            <p class="empty-note">{{ __('No indexing status checks recorded yet.') }}</p>
         @endif
 
         @if (! empty($insights['cannibalization']) || ! empty($insights['striking_distance']) || ! empty($insights['indexing_fails_with_traffic']))
             <hr class="section-divider">
 
-            <h2 class="section-title">Action Insights</h2>
+            <h2 class="section-title">{{ __('Action Insights') }}</h2>
 
             @if (! empty($insights['striking_distance']))
-                <h3 style="font-size:13px;margin:12px 0 6px;">Top striking-distance keywords</h3>
+                <h3 style="font-size:13px;margin:12px 0 6px;">{{ __('Top striking-distance keywords') }}</h3>
                 <table>
-                    <thead><tr><th>Query</th><th class="right">Pos</th><th class="right">Impr</th><th class="right">CTR</th></tr></thead>
+                    <thead><tr><th>{{ __('Query') }}</th><th class="right">{{ __('Pos') }}</th><th class="right">{{ __('Impr') }}</th><th class="right">{{ __('CTR') }}</th></tr></thead>
                     <tbody>
                         @foreach ($insights['striking_distance'] as $row)
                             <tr>
@@ -478,9 +478,9 @@
             @endif
 
             @if (! empty($insights['cannibalization']))
-                <h3 style="font-size:13px;margin:12px 0 6px;">Top cannibalization queries</h3>
+                <h3 style="font-size:13px;margin:12px 0 6px;">{{ __('Top cannibalization queries') }}</h3>
                 <table>
-                    <thead><tr><th>Query</th><th>Primary page</th><th class="right">Pages</th><th class="right">Impr</th></tr></thead>
+                    <thead><tr><th>{{ __('Query') }}</th><th>{{ __('Primary page') }}</th><th class="right">{{ __('Pages') }}</th><th class="right">{{ __('Impr') }}</th></tr></thead>
                     <tbody>
                         @foreach ($insights['cannibalization'] as $row)
                             <tr>
@@ -495,9 +495,9 @@
             @endif
 
             @if (! empty($insights['indexing_fails_with_traffic']))
-                <h3 style="font-size:13px;margin:12px 0 6px;">Indexing failures still getting traffic</h3>
+                <h3 style="font-size:13px;margin:12px 0 6px;">{{ __('Indexing failures still getting traffic') }}</h3>
                 <table>
-                    <thead><tr><th>Page</th><th>Verdict</th><th class="right">Clicks (14d)</th><th class="right">Impr (14d)</th></tr></thead>
+                    <thead><tr><th>{{ __('Page') }}</th><th>{{ __('Verdict') }}</th><th class="right">{{ __('Clicks (14d)') }}</th><th class="right">{{ __('Impr (14d)') }}</th></tr></thead>
                     <tbody>
                         @foreach ($insights['indexing_fails_with_traffic'] as $row)
                             <tr>
@@ -515,21 +515,21 @@
         <hr class="section-divider">
 
         <div style="text-align: center; padding-top: 8px;">
-            <a href="{{ route('reports.index') }}" class="btn">View Full Report in Dashboard</a>
+            <a href="{{ route('reports.index') }}" class="btn">{{ __('View Full Report in Dashboard') }}</a>
         </div>
     </div>
     @if (! $branding->isDefault())
         @if ($branding->footer_text || $branding->contact_email || $branding->contact_phone || $branding->contact_address)
             <div class="contact-block">
                 @if ($branding->footer_text)<p>{{ $branding->footer_text }}</p>@endif
-                @if ($branding->contact_email)<p><strong>Email:</strong> {{ $branding->contact_email }}</p>@endif
-                @if ($branding->contact_phone)<p><strong>Phone:</strong> {{ $branding->contact_phone }}</p>@endif
+                @if ($branding->contact_email)<p><strong>{{ __('Email:') }}</strong> {{ $branding->contact_email }}</p>@endif
+                @if ($branding->contact_phone)<p><strong>{{ __('Phone:') }}</strong> {{ $branding->contact_phone }}</p>@endif
                 @if ($branding->contact_address)<p>{{ $branding->contact_address }}</p>@endif
             </div>
         @endif
         <p class="footer">{{ $branding->company_name }} &mdash; {{ format_user_now('M d, Y', $user) }}</p>
     @else
-        <p class="footer">Sent by Serfix &mdash; {{ format_user_now('M d, Y', $user) }}</p>
+        <p class="footer">{{ __('Sent by Serfix') }} &mdash; {{ format_user_now('M d, Y', $user) }}</p>
     @endif
 </div>
 </body>

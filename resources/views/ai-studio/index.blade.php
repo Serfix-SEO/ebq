@@ -61,13 +61,13 @@
 
             headerTitle() {
                 if (this.view === 'tool' && this.activeTool) return this.activeTool.name;
-                if (this.view === 'brand-voice') return 'Brand voice';
-                return 'AI Studio';
+                if (this.view === 'brand-voice') return @js(__('Brand voice'));
+                return @js(__('AI Studio'));
             },
             headerSub() {
                 if (this.view === 'tool' && this.activeTool) return this.activeTool.description;
-                if (this.view === 'brand-voice') return 'Train every tool on your house voice.';
-                return `${this.catalog.tools.length} AI tools, grounded in your GSC data, rank tracking, and the Serfix network.`;
+                if (this.view === 'brand-voice') return @js(__('Train every tool on your house voice.'));
+                return `${this.catalog.tools.length} ${@js(__('AI tools, grounded in your GSC data, rank tracking, and the Serfix network.'))}`;
             },
 
             categoryLabel(id) {
@@ -166,12 +166,12 @@
                     let payload = null;
                     try { payload = await res.json(); } catch (e) { /* empty */ }
                     if (!payload) {
-                        this.result = { ok: false, error: 'network', message: `Server returned ${res.status}.` };
+                        this.result = { ok: false, error: 'network', message: `${@js(__('Server returned'))} ${res.status}.` };
                     } else {
                         this.result = payload;
                     }
                 } catch (err) {
-                    this.result = { ok: false, error: 'network', message: err.message || 'Request failed.' };
+                    this.result = { ok: false, error: 'network', message: err.message || @js(__('Request failed.')) };
                 } finally {
                     this.loading = false;
                 }
@@ -179,12 +179,12 @@
 
             errorTitle(r) {
                 switch (r.error) {
-                    case 'tier_required':    return `Available on ${(r.required_tier || 'Pro').toString()}`;
-                    case 'feature_disabled': return 'AI Studio is turned off for this site';
-                    case 'validation':       return 'Check your inputs';
-                    case 'rate_limited':     return 'Slow down a moment';
-                    case 'no_website':       return 'Pick a website first';
-                    default:                 return 'Something went wrong';
+                    case 'tier_required':    return `${@js(__('Available on'))} ${(r.required_tier || @js(__('Pro'))).toString()}`;
+                    case 'feature_disabled': return @js(__('AI Studio is turned off for this site'));
+                    case 'validation':       return @js(__('Check your inputs'));
+                    case 'rate_limited':     return @js(__('Slow down a moment'));
+                    case 'no_website':       return @js(__('Pick a website first'));
+                    default:                 return @js(__('Something went wrong'));
                 }
             },
 
@@ -208,7 +208,7 @@
                         text = (v || []).map(l => `${l.anchor || ''} — ${l.url}`).join('\n');
                         break;
                     case 'faq':
-                        text = (v || []).map(qa => `Q: ${qa.question}\nA: ${qa.answer}`).join('\n\n');
+                        text = (v || []).map(qa => `${@js(__('Q'))}: ${qa.question}\n${@js(__('A'))}: ${qa.answer}`).join('\n\n');
                         break;
                     case 'schema':
                         text = (v || []).map(s => `${s.type}:\n${JSON.stringify(s.json_ld, null, 2)}`).join('\n\n');
@@ -231,20 +231,20 @@
                 switch (toolId) {
                     case 'seo-meta':
                         return [
-                            `SEO Title: ${v.seo_title || ''}`,
-                            `Meta Description: ${v.seo_description || ''}`,
-                            `OG Title: ${v.og_title || ''}`,
-                            `OG Description: ${v.og_description || ''}`,
+                            `${@js(__('SEO Title'))}: ${v.seo_title || ''}`,
+                            `${@js(__('Meta Description'))}: ${v.seo_description || ''}`,
+                            `${@js(__('OG Title'))}: ${v.og_title || ''}`,
+                            `${@js(__('OG Description'))}: ${v.og_description || ''}`,
                         ].join('\n');
                     case 'ad-copy':
                         return [
-                            'Headlines:', ...(v.headlines || []).map(h => `- ${h}`),
-                            '', 'Descriptions:', ...(v.descriptions || []).map(d => `- ${d}`),
+                            `${@js(__('Headlines'))}:`, ...(v.headlines || []).map(h => `- ${h}`),
+                            '', `${@js(__('Descriptions'))}:`, ...(v.descriptions || []).map(d => `- ${d}`),
                         ].join('\n');
                     case 'email-copy':
                         return [
-                            'Subject lines:', ...(v.subject_lines || []).map(s => `- ${s}`),
-                            '', `Preview: ${v.preview_text || ''}`, '', v.body || '',
+                            `${@js(__('Subject lines'))}:`, ...(v.subject_lines || []).map(s => `- ${s}`),
+                            '', `${@js(__('Preview'))}: ${v.preview_text || ''}`, '', v.body || '',
                         ].join('\n');
                     case 'outline-generator':
                         return [
@@ -256,12 +256,12 @@
                         ].join('\n');
                     case 'content-brief':
                         return [
-                            `H1: ${v.suggested_h1 || ''}`,
-                            `Angle: ${v.angle || ''} | ~${v.recommended_word_count || 0} words | Schema: ${v.suggested_schema_type || ''}`,
-                            '', 'Outline:', ...(v.suggested_outline || []).map(h => `- ${typeof h === 'string' ? h : h.h2}`),
-                            '', 'Subtopics:', ...(v.subtopics || []).map(t => `- ${t}`),
-                            '', 'Must-have entities:', ...(v.must_have_entities || []).map(t => `- ${t}`),
-                            '', 'People also ask:', ...(v.people_also_ask || []).map(q => `- ${q}`),
+                            `${@js(__('H1'))}: ${v.suggested_h1 || ''}`,
+                            `${@js(__('Angle'))}: ${v.angle || ''} | ~${v.recommended_word_count || 0} ${@js(__('words'))} | ${@js(__('Schema'))}: ${v.suggested_schema_type || ''}`,
+                            '', `${@js(__('Outline'))}:`, ...(v.suggested_outline || []).map(h => `- ${typeof h === 'string' ? h : h.h2}`),
+                            '', `${@js(__('Subtopics'))}:`, ...(v.subtopics || []).map(t => `- ${t}`),
+                            '', `${@js(__('Must-have entities'))}:`, ...(v.must_have_entities || []).map(t => `- ${t}`),
+                            '', `${@js(__('People also ask'))}:`, ...(v.people_also_ask || []).map(q => `- ${q}`),
                         ].join('\n');
                     default:
                         return JSON.stringify(v, null, 2);
@@ -288,7 +288,7 @@
                 this.bvError = '';
                 const samples = this.bvSamples.map(s => (s || '').trim()).filter(s => s.length >= 200);
                 if (samples.length === 0) {
-                    this.bvError = 'Each sample needs at least 200 characters.';
+                    this.bvError = @js(__('Each sample needs at least 200 characters.'));
                     return;
                 }
                 this.bvSaving = true;
@@ -306,13 +306,13 @@
                     });
                     const payload = await res.json();
                     if (!res.ok || payload.configured === undefined) {
-                        this.bvError = payload.message || payload.error || 'Could not save voice.';
+                        this.bvError = payload.message || payload.error || @js(__('Could not save voice.'));
                     } else {
                         this.brandVoice = payload;
                         this.bvSamples = [''];
                     }
                 } catch (e) {
-                    this.bvError = e.message || 'Network error.';
+                    this.bvError = e.message || @js(__('Network error.'));
                 } finally {
                     this.bvSaving = false;
                 }
@@ -320,7 +320,7 @@
 
             async clearBrandVoice() {
                 if (this.bvSaving) return;
-                if (!confirm('Clear the brand voice fingerprint? Tools will revert to a generic style.')) return;
+                if (!confirm(@js(__('Clear the brand voice fingerprint? Tools will revert to a generic style.')))) return;
                 this.bvSaving = true;
                 try {
                     const res = await fetch(this.brandVoiceDestroyUrl, {
@@ -380,13 +380,13 @@
                     :class="brandVoice.configured
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-300'
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
-                    :title="brandVoice.configured ? 'Brand voice is active' : 'Brand voice not set'"
+                    :title="brandVoice.configured ? @js(__('Brand voice is active')) : @js(__('Brand voice not set'))"
                 >
                     <span
                         class="inline-block h-2 w-2 rounded-full"
                         :class="brandVoice.configured ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'"
                     ></span>
-                    <span x-text="brandVoice.configured ? 'Brand voice on' : 'Set brand voice'"></span>
+                    <span x-text="brandVoice.configured ? @js(__('Brand voice on')) : @js(__('Set brand voice'))"></span>
                 </button>
 
                 <template x-if="view !== 'launcher'">
@@ -398,7 +398,7 @@
                         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M15 18l-6-6 6-6"/>
                         </svg>
-                        Back to tools
+                        {{ __('Back to tools') }}
                     </button>
                 </template>
             </div>
@@ -413,10 +413,10 @@
                     </svg>
                     <div>
                         <p class="font-semibold">
-                            AI Studio is a <span x-text="(tierGate.required_tier || 'Pro')" class="capitalize"></span> feature.
+                            {{ __('AI Studio is a') }} <span x-text="(tierGate.required_tier || @js(__('Pro')))" class="capitalize"></span> {{ __('feature.') }}
                         </p>
                         <p class="mt-0.5 text-amber-800/90 dark:text-amber-200/80">
-                            You can browse the catalog. Upgrade to run any tool.
+                            {{ __('You can browse the catalog. Upgrade to run any tool.') }}
                         </p>
                     </div>
                 </div>
@@ -424,7 +424,7 @@
                     href="{{ route('billing.show') }}"
                     class="inline-flex items-center justify-center rounded-md bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 >
-                    See plans
+                    {{ __('See plans') }}
                 </a>
             </div>
         </template>
@@ -433,17 +433,17 @@
         <div x-show="view === 'launcher'" class="grid grid-cols-1 gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
             <aside class="space-y-3">
                 <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <label class="sr-only" for="ai-studio-search">Search tools</label>
+                    <label class="sr-only" for="ai-studio-search">{{ __('Search tools') }}</label>
                     <div class="relative">
-                        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <svg class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
                         </svg>
                         <input
                             id="ai-studio-search"
                             type="search"
                             x-model.debounce.150ms="search"
-                            placeholder="Search 47 tools…"
-                            class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                            placeholder="{{ __('Search 47 tools…') }}"
+                            class="w-full rounded-lg border border-slate-200 bg-white py-2 ps-9 pe-3 text-sm text-slate-700 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                         >
                     </div>
                 </div>
@@ -454,12 +454,12 @@
                             <button
                                 type="button"
                                 @click="activeCat = 'all'"
-                                class="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition"
+                                class="flex w-full items-center justify-between px-4 py-2.5 text-start text-sm transition"
                                 :class="activeCat === 'all'
                                     ? 'bg-orange-50 font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300'
                                     : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'"
                             >
-                                <span>All tools</span>
+                                <span>{{ __('All tools') }}</span>
                                 <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300" x-text="catalog.tools.length"></span>
                             </button>
                         </li>
@@ -469,7 +469,7 @@
                                     type="button"
                                     @click="activeCat = cat.id"
                                     :title="cat.description"
-                                    class="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition"
+                                    class="flex w-full items-center justify-between px-4 py-2.5 text-start text-sm transition"
                                     :class="activeCat === cat.id
                                         ? 'bg-orange-50 font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300'
                                         : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'"
@@ -486,8 +486,8 @@
             <section>
                 <template x-if="filteredTools().length === 0">
                     <div class="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-                        <p>No tools match your search.</p>
-                        <button type="button" @click="search = ''; activeCat = 'all'" class="mt-2 text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400">Reset</button>
+                        <p>{{ __('No tools match your search.') }}</p>
+                        <button type="button" @click="search = ''; activeCat = 'all'" class="mt-2 text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400">{{ __('Reset') }}</button>
                     </div>
                 </template>
 
@@ -497,7 +497,7 @@
                             <button
                                 type="button"
                                 @click="openTool(tool.id)"
-                                class="group flex h-full w-full flex-col rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/50"
+                                class="group flex h-full w-full flex-col rounded-xl border border-slate-200 bg-white p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/50"
                             >
                                 <div class="flex items-center justify-between gap-2">
                                     <span
@@ -505,7 +505,7 @@
                                         :class="categoryChipClass(tool.category)"
                                         x-text="categoryLabel(tool.category)"
                                     ></span>
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400" :title="`~${tool.est_credits} credits`">
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400" :title="`~${tool.est_credits} ${@js(__('credits'))}`">
                                         <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                             <circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/>
                                         </svg>
@@ -535,7 +535,7 @@
                                         x-text="categoryLabel(activeTool.category)"
                                     ></span>
                                     <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                        ~<span x-text="activeTool.est_credits"></span> credits
+                                        ~<span x-text="activeTool.est_credits"></span> {{ __('credits') }}
                                     </span>
                                 </div>
                                 <h2 class="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100" x-text="activeTool.name"></h2>
@@ -547,14 +547,14 @@
                     <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
                         {{-- Input form --}}
                         <form @submit.prevent="runActive()" class="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Inputs</h3>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Inputs') }}</h3>
 
                             <template x-for="field in (activeTool.inputs || [])" :key="field.key">
                                 <div>
                                     <label :for="`field-${field.key}`" class="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
                                         <span>
                                             <span x-text="field.label"></span>
-                                            <span x-show="field.required" class="ml-0.5 text-red-500">*</span>
+                                            <span x-show="field.required" class="ms-0.5 text-red-500">*</span>
                                         </span>
                                         <span x-show="field.max_length" class="text-[10px] font-normal text-slate-400" x-text="`${(formValues[field.key] || '').length}/${field.max_length}`"></span>
                                     </label>
@@ -602,7 +602,7 @@
                                             class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                         >
                                             <template x-if="!field.required">
-                                                <option value="">— Select —</option>
+                                                <option value="">{{ __('— Select —') }}</option>
                                             </template>
                                             <template x-for="opt in (field.options || [])" :key="opt.value">
                                                 <option :value="opt.value" x-text="opt.label"></option>
@@ -616,7 +616,7 @@
                                             <input
                                                 :id="`field-${field.key}`"
                                                 type="text"
-                                                :placeholder="field.placeholder || 'Comma-separated'"
+                                                :placeholder="field.placeholder || @js(__('Comma-separated'))"
                                                 x-model="formValuesRaw[field.key]"
                                                 @input="formValues[field.key] = ($event.target.value || '').split(',').map(s => s.trim()).filter(Boolean)"
                                                 class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
@@ -639,7 +639,7 @@
                                     @click="resetForm()"
                                     class="text-xs font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                                 >
-                                    Reset
+                                    {{ __('Reset') }}
                                 </button>
                                 <button
                                     type="submit"
@@ -656,7 +656,7 @@
                                             <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/>
                                         </svg>
                                     </template>
-                                    <span x-text="loading ? 'Generating…' : (featureLocked ? 'Upgrade to run' : 'Generate')"></span>
+                                    <span x-text="loading ? @js(__('Generating…')) : (featureLocked ? @js(__('Upgrade to run')) : @js(__('Generate')))"></span>
                                 </button>
                             </div>
                         </form>
@@ -664,12 +664,12 @@
                         {{-- Result --}}
                         <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             <div class="mb-3 flex items-center justify-between">
-                                <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Result</h3>
+                                <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Result') }}</h3>
                                 <div class="flex items-center gap-2" x-show="result && result.ok">
-                                    <span x-show="result?.cached" class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">Cached</span>
+                                    <span x-show="result?.cached" class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{{ __('Cached') }}</span>
                                     <span x-show="result?.model" class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300" x-text="result?.model"></span>
-                                    <span x-show="result?.usage?.total" class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300" x-text="`${result.usage.total} tok`"></span>
-                                    <button type="button" @click="copyResult()" class="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" :title="copied ? 'Copied' : 'Copy'">
+                                    <span x-show="result?.usage?.total" class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300" x-text="`${result.usage.total} ${@js(__('tok'))}`"></span>
+                                    <button type="button" @click="copyResult()" class="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" :title="copied ? @js(__('Copied')) : @js(__('Copy'))">
                                         <svg x-show="!copied" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                             <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/>
                                         </svg>
@@ -687,7 +687,7 @@
                                     <div class="h-3 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
                                     <div class="h-3 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
                                     <div class="h-3 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
-                                    <p class="pt-2 text-xs text-slate-400">This can take up to a minute on cold cache.</p>
+                                    <p class="pt-2 text-xs text-slate-400">{{ __('This can take up to a minute on cold cache.') }}</p>
                                 </div>
                             </template>
 
@@ -697,7 +697,7 @@
                                     <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                         <path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
                                     </svg>
-                                    <p>Fill in the inputs, hit Generate.</p>
+                                    <p>{{ __('Fill in the inputs, hit Generate.') }}</p>
                                 </div>
                             </template>
 
@@ -707,7 +707,7 @@
                                     <p class="font-semibold" x-text="errorTitle(result)"></p>
                                     <p class="mt-1 text-xs" x-text="result.message || result.error"></p>
                                     <template x-if="result.required_tier">
-                                        <a href="{{ route('billing.show') }}" class="mt-2 inline-flex rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">See plans</a>
+                                        <a href="{{ route('billing.show') }}" class="mt-2 inline-flex rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">{{ __('See plans') }}</a>
                                     </template>
                                 </div>
                             </template>
@@ -739,7 +739,7 @@
 
                                     {{-- list --}}
                                     <template x-if="result.output_type === 'list'">
-                                        <ul class="list-disc space-y-1 pl-5">
+                                        <ul class="list-disc space-y-1 ps-5">
                                             <template x-for="(t, i) in (result.value || [])" :key="i">
                                                 <li class="text-sm" x-text="t"></li>
                                             </template>
@@ -753,7 +753,7 @@
                                                 <thead class="bg-slate-50 dark:bg-slate-800/60">
                                                     <tr>
                                                         <template x-for="(h, i) in (result.value?.headers || [])" :key="i">
-                                                            <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="h"></th>
+                                                            <th class="px-3 py-2 text-start text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="h"></th>
                                                         </template>
                                                     </tr>
                                                 </thead>
@@ -798,7 +798,7 @@
                                     {{-- seo-meta: fixed 4-field json --}}
                                     <template x-if="result.output_type === 'json' && activeTool.id === 'seo-meta'">
                                         <dl class="space-y-3">
-                                            <template x-for="field in [['seo_title','SEO Title'],['seo_description','Meta Description'],['og_title','OG Title'],['og_description','OG Description']]" :key="field[0]">
+                                            <template x-for="field in [['seo_title',@js(__('SEO Title'))],['seo_description',@js(__('Meta Description'))],['og_title',@js(__('OG Title'))],['og_description',@js(__('OG Description'))]]" :key="field[0]">
                                                 <div class="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
                                                     <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="field[1]"></dt>
                                                     <dd class="mt-1 text-sm text-slate-800 dark:text-slate-100" x-text="result.value?.[field[0]] || ''"></dd>
@@ -811,7 +811,7 @@
                                     <template x-if="result.output_type === 'json' && activeTool.id === 'ad-copy'">
                                         <div class="space-y-4">
                                             <div>
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Headlines</p>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Headlines') }}</p>
                                                 <ul class="mt-1 space-y-1">
                                                     <template x-for="(h, i) in (result.value?.headlines || [])" :key="i">
                                                         <li class="rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800/60" x-text="h"></li>
@@ -819,7 +819,7 @@
                                                 </ul>
                                             </div>
                                             <div>
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Descriptions</p>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Descriptions') }}</p>
                                                 <ul class="mt-1 space-y-1">
                                                     <template x-for="(d, i) in (result.value?.descriptions || [])" :key="i">
                                                         <li class="rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800/60" x-text="d"></li>
@@ -833,7 +833,7 @@
                                     <template x-if="result.output_type === 'json' && activeTool.id === 'email-copy'">
                                         <div class="space-y-4">
                                             <div>
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Subject lines</p>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Subject lines') }}</p>
                                                 <ul class="mt-1 space-y-1">
                                                     <template x-for="(s, i) in (result.value?.subject_lines || [])" :key="i">
                                                         <li class="rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800/60" x-text="s"></li>
@@ -841,11 +841,11 @@
                                                 </ul>
                                             </div>
                                             <div>
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Preview text</p>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Preview text') }}</p>
                                                 <p class="mt-1 text-sm text-slate-800 dark:text-slate-100" x-text="result.value?.preview_text || ''"></p>
                                             </div>
                                             <div>
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Body</p>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Body') }}</p>
                                                 <div class="mt-1 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-relaxed dark:bg-slate-800/60" x-text="result.value?.body || ''"></div>
                                             </div>
                                         </div>
@@ -858,7 +858,7 @@
                                             <template x-for="(sec, i) in (result.value?.sections || [])" :key="i">
                                                 <div class="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
                                                     <p class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="sec.h2"></p>
-                                                    <ul class="mt-1 list-disc space-y-0.5 pl-5">
+                                                    <ul class="mt-1 list-disc space-y-0.5 ps-5">
                                                         <template x-for="(sub, j) in (sec.subtopics || [])" :key="j">
                                                             <li class="text-xs text-slate-600 dark:text-slate-300" x-text="sub"></li>
                                                         </template>
@@ -873,20 +873,20 @@
                                         <div class="space-y-4">
                                             <div class="flex flex-wrap gap-2">
                                                 <span class="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
-                                                    Angle: <span x-text="result.value?.angle"></span>
+                                                    {{ __('Angle') }}: <span x-text="result.value?.angle"></span>
                                                 </span>
                                                 <span class="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
-                                                    ~<span x-text="result.value?.recommended_word_count"></span> words
+                                                    ~<span x-text="result.value?.recommended_word_count"></span> {{ __('words') }}
                                                 </span>
                                                 <span class="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
-                                                    Schema: <span x-text="result.value?.suggested_schema_type"></span>
+                                                    {{ __('Schema') }}: <span x-text="result.value?.suggested_schema_type"></span>
                                                 </span>
                                             </div>
                                             <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100" x-text="result.value?.suggested_h1 || ''"></h3>
 
                                             <div x-show="(result.value?.suggested_outline || []).length">
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Suggested outline</p>
-                                                <ol class="mt-1 list-decimal space-y-0.5 pl-5">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Suggested outline') }}</p>
+                                                <ol class="mt-1 list-decimal space-y-0.5 ps-5">
                                                     <template x-for="(h, i) in (result.value?.suggested_outline || [])" :key="i">
                                                         <li class="text-sm text-slate-700 dark:text-slate-200" x-text="typeof h === 'string' ? h : h.h2"></li>
                                                     </template>
@@ -894,7 +894,7 @@
                                             </div>
 
                                             <div x-show="(result.value?.subtopics || []).length">
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Subtopics</p>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Subtopics') }}</p>
                                                 <div class="mt-1 flex flex-wrap gap-1.5">
                                                     <template x-for="(t, i) in (result.value?.subtopics || [])" :key="i">
                                                         <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200" x-text="t"></span>
@@ -903,7 +903,7 @@
                                             </div>
 
                                             <div x-show="(result.value?.must_have_entities || []).length">
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Must-have entities</p>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Must-have entities') }}</p>
                                                 <div class="mt-1 flex flex-wrap gap-1.5">
                                                     <template x-for="(t, i) in (result.value?.must_have_entities || [])" :key="i">
                                                         <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200" x-text="t"></span>
@@ -912,8 +912,8 @@
                                             </div>
 
                                             <div x-show="(result.value?.people_also_ask || []).length">
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">People also ask</p>
-                                                <ul class="mt-1 list-disc space-y-0.5 pl-5">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('People also ask') }}</p>
+                                                <ul class="mt-1 list-disc space-y-0.5 ps-5">
                                                     <template x-for="(q, i) in (result.value?.people_also_ask || [])" :key="i">
                                                         <li class="text-sm text-slate-700 dark:text-slate-200" x-text="q"></li>
                                                     </template>
@@ -921,7 +921,7 @@
                                             </div>
 
                                             <div x-show="(result.value?.internal_link_targets || []).length">
-                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Internal link targets</p>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Internal link targets') }}</p>
                                                 <ul class="mt-1 space-y-1">
                                                     <template x-for="(lnk, i) in (result.value?.internal_link_targets || [])" :key="i">
                                                         <li class="truncate text-xs text-orange-600 dark:text-orange-400" x-text="lnk.url || lnk"></li>
@@ -960,42 +960,42 @@
         {{-- Brand voice view --}}
         <div x-show="view === 'brand-voice'" class="mx-auto max-w-3xl">
             <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Brand voice</h2>
+                <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ __('Brand voice') }}</h2>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Paste 1–5 of your best posts (200+ characters each). We extract a private voice fingerprint that every tool uses so the output sounds like you, not generic AI.
+                    {{ __('Paste 1–5 of your best posts (200+ characters each). We extract a private voice fingerprint that every tool uses so the output sounds like you, not generic AI.') }}
                 </p>
 
                 <template x-if="brandVoice.configured">
                     <div class="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-500/10">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 text-sm text-emerald-900 dark:text-emerald-200">
-                                <p class="font-semibold">Voice active</p>
+                                <p class="font-semibold">{{ __('Voice active') }}</p>
                                 <p class="mt-0.5 text-xs">
-                                    <span x-text="brandVoice.samples_count"></span> sample<span x-show="brandVoice.samples_count !== 1">s</span>
-                                    <span x-show="brandVoice.last_extracted_at">, last extracted <span x-text="formatDate(brandVoice.last_extracted_at)"></span></span>
+                                    <span x-text="brandVoice.samples_count"></span> {{ __('sample') }}<span x-show="brandVoice.samples_count !== 1">s</span>
+                                    <span x-show="brandVoice.last_extracted_at">, {{ __('last extracted') }} <span x-text="formatDate(brandVoice.last_extracted_at)"></span></span>
                                 </p>
                                 <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                                     <template x-if="brandVoice.tone">
                                         <div>
-                                            <dt class="text-emerald-700/70 dark:text-emerald-300/70">Tone</dt>
+                                            <dt class="text-emerald-700/70 dark:text-emerald-300/70">{{ __('Tone') }}</dt>
                                             <dd class="font-semibold" x-text="brandVoice.tone"></dd>
                                         </div>
                                     </template>
                                     <template x-if="brandVoice.person">
                                         <div>
-                                            <dt class="text-emerald-700/70 dark:text-emerald-300/70">Person</dt>
+                                            <dt class="text-emerald-700/70 dark:text-emerald-300/70">{{ __('Person') }}</dt>
                                             <dd class="font-semibold" x-text="brandVoice.person"></dd>
                                         </div>
                                     </template>
                                     <template x-if="brandVoice.avg_sentence_words">
                                         <div>
-                                            <dt class="text-emerald-700/70 dark:text-emerald-300/70">Avg sentence</dt>
-                                            <dd class="font-semibold"><span x-text="brandVoice.avg_sentence_words"></span> words</dd>
+                                            <dt class="text-emerald-700/70 dark:text-emerald-300/70">{{ __('Avg sentence') }}</dt>
+                                            <dd class="font-semibold"><span x-text="brandVoice.avg_sentence_words"></span> {{ __('words') }}</dd>
                                         </div>
                                     </template>
                                     <template x-if="brandVoice.vocabulary_band">
                                         <div>
-                                            <dt class="text-emerald-700/70 dark:text-emerald-300/70">Vocabulary</dt>
+                                            <dt class="text-emerald-700/70 dark:text-emerald-300/70">{{ __('Vocabulary') }}</dt>
                                             <dd class="font-semibold" x-text="brandVoice.vocabulary_band"></dd>
                                         </div>
                                     </template>
@@ -1007,7 +1007,7 @@
                                 :disabled="bvSaving"
                                 class="rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-400/30 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-slate-800"
                             >
-                                Clear
+                                {{ __('Clear') }}
                             </button>
                         </div>
                     </div>
@@ -1017,17 +1017,17 @@
                     <template x-for="(_, i) in bvSamples" :key="i">
                         <div>
                             <label :for="`bv-sample-${i}`" class="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
-                                <span>Sample <span x-text="i + 1"></span></span>
-                                <button type="button" @click="removeBvSample(i)" x-show="bvSamples.length > 1" class="text-[11px] font-normal text-slate-400 hover:text-red-500">Remove</button>
+                                <span>{{ __('Sample') }} <span x-text="i + 1"></span></span>
+                                <button type="button" @click="removeBvSample(i)" x-show="bvSamples.length > 1" class="text-[11px] font-normal text-slate-400 hover:text-red-500">{{ __('Remove') }}</button>
                             </label>
                             <textarea
                                 :id="`bv-sample-${i}`"
                                 x-model="bvSamples[i]"
                                 rows="6"
-                                placeholder="Paste a full post (200+ characters). Plain text or HTML both work — we strip tags."
+                                placeholder="{{ __('Paste a full post (200+ characters). Plain text or HTML both work — we strip tags.') }}"
                                 class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                             ></textarea>
-                            <p class="mt-1 text-[11px] text-slate-400"><span x-text="(bvSamples[i] || '').length"></span> characters</p>
+                            <p class="mt-1 text-[11px] text-slate-400"><span x-text="(bvSamples[i] || '').length"></span> {{ __('characters') }}</p>
                         </div>
                     </template>
 
@@ -1039,7 +1039,7 @@
                             class="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400"
                         >
                             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                            Add another sample
+                            {{ __('Add another sample') }}
                         </button>
                         <button
                             type="button"
@@ -1050,7 +1050,7 @@
                             <template x-if="bvSaving">
                                 <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
                             </template>
-                            <span x-text="bvSaving ? 'Extracting…' : 'Save voice'"></span>
+                            <span x-text="bvSaving ? @js(__('Extracting…')) : @js(__('Save voice'))"></span>
                         </button>
                     </div>
                 </div>

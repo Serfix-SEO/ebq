@@ -15,26 +15,23 @@
             @endphp
             <div class="min-w-0 flex-1">
                 <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                    @if ($finalizing) We’re computing your results @else We’re crawling your website right now @endif
+                    @if ($finalizing) {{ __('We’re computing your results') }} @else {{ __('We’re crawling your website right now') }} @endif
                 </h3>
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
                     @if ($finalizing)
-                        The crawl finished — we’re scoring your pages and building Site Health,
-                        page-level issues and SEO scores. This page fills in automatically when it’s done.
+                        {{ __('The crawl finished — we’re scoring your pages and building Site Health, page-level issues and SEO scores. This page fills in automatically when it’s done.') }}
                     @else
-                        We’re fetching and analysing your pages to build Site Health, page-level
-                        issues and SEO scores. This usually takes a few minutes — the dashboard
-                        will fill in automatically as the crawl progresses.
+                        {{ __('We’re fetching and analysing your pages to build Site Health, page-level issues and SEO scores. This usually takes a few minutes — the dashboard will fill in automatically as the crawl progresses.') }}
                     @endif
                 </p>
                 @if (! $finalizing && $total > 0)
                     <p class="mt-2 text-xs font-medium text-orange-700 dark:text-orange-300">
-                        {{ number_format($crawled) }} / {{ number_format($total) }} pages crawled
+                        {{ number_format($crawled) }} / {{ number_format($total) }} {{ __('pages crawled') }}
                     </p>
                 @endif
                 @if ($remainingCap !== null)
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Plan allowance remaining: {{ number_format($remainingCap) }} of {{ number_format($cap) }}
+                        {{ __('Plan allowance remaining:') }} {{ number_format($remainingCap) }} {{ __('of') }} {{ number_format($cap) }}
                     </p>
                 @endif
             </div>

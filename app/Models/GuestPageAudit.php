@@ -32,6 +32,7 @@ class GuestPageAudit extends Model
         'keyword',
         'serp_gl',
         'name',
+        'locale',
         'status',
         'http_status',
         'response_time_ms',
@@ -68,6 +69,7 @@ class GuestPageAudit extends Model
             'serp_gl' => $gl,
             'email' => $email !== null && trim($email) !== '' ? mb_substr(trim($email), 0, 255) : null,
             'name' => $name !== null && trim($name) !== '' ? mb_substr(trim($name), 0, 255) : null,
+            'locale' => app()->getLocale(),
             'status' => self::STATUS_QUEUED,
             'ip' => $ip !== null ? mb_substr($ip, 0, 45) : null,
         ]);

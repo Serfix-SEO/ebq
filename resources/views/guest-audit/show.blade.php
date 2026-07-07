@@ -21,16 +21,16 @@
             {{-- ── Header ─────────────────────────────────────────── --}}
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Free SEO audit</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Free SEO audit') }}</p>
                     <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl" title="{{ $pageTitle !== '' ? $pageTitle : $audit->url }}">{{ $headingText }}</h1>
                     <p class="mt-1 truncate text-sm text-slate-500" title="{{ $audit->url }}">{{ $displayUrl }}</p>
                     <p class="mt-1 text-sm text-slate-600">
-                        Target keyword: <span class="font-medium text-slate-900">“{{ $audit->keyword }}”</span>
+                        {{ __('Target keyword:') }} <span class="font-medium text-slate-900">“{{ $audit->keyword }}”</span>
                     </p>
                 </div>
                 <a href="{{ route('landing') }}#main" class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 sm:self-auto">
                     <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    Audit another page
+                    {{ __('Audit another page') }}
                 </a>
             </div>
 
@@ -39,24 +39,23 @@
                 <div class="mt-8 overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6 shadow-sm sm:p-7">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div class="max-w-2xl">
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">This is just the surface</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">{{ __('This is just the surface') }}</p>
                             <h2 class="mt-2 text-balance text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                                See what Google actually knows about your site.
+                                {{ __('See what Google actually knows about your site.') }}
                             </h2>
                             <p class="mt-2 text-sm leading-6 text-slate-600">
-                                This free audit reads your page and benchmarks it against today’s top-ranking competitors. The
-                                <span class="font-semibold text-slate-900">full audit</span> connects your live
-                                <span class="font-semibold">Search Console</span> + <span class="font-semibold">Analytics</span> — your real keyword positions,
-                                click &amp; impression data, Core Web Vitals, and continuous tracking across every page you own.
+                                {{ __('This free audit reads your page and benchmarks it against today’s top-ranking competitors. The') }}
+                                <span class="font-semibold text-slate-900">{{ __('full audit') }}</span> {{ __('connects your live') }}
+                                <span class="font-semibold">{{ __('Search Console') }}</span> + <span class="font-semibold">{{ __('Analytics') }}</span> — {{ __('your real keyword positions, click & impression data, Core Web Vitals, and continuous tracking across every page you own.') }}
                             </p>
                         </div>
                         <div class="flex shrink-0 flex-col gap-2">
                             <a href="{{ route('register') }}" class="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                                Get the full audit — free
+                                {{ __('Get the full audit — free') }}
                                 <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5l7.5 7.5-7.5 7.5M21 12H3" /></svg>
                             </a>
                             <a href="{{ route('pricing') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
-                                See pricing
+                                {{ __('See pricing') }}
                             </a>
                         </div>
                     </div>
@@ -70,8 +69,8 @@
                     <div id="ga-working" class="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-20 text-center shadow-sm"
                          data-status-url="{{ route('guest-audit.status', $audit) }}">
                         <svg class="h-10 w-10 animate-spin text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <h2 class="mt-5 text-lg font-semibold text-slate-900">Auditing your page…</h2>
-                        <p class="mt-2 max-w-sm text-sm text-slate-600">We’re fetching your page, analyzing on-page SEO, checking your keyword, and comparing you against the top-ranking competitors. This usually takes up to a minute.</p>
+                        <h2 class="mt-5 text-lg font-semibold text-slate-900">{{ __('Auditing your page…') }}</h2>
+                        <p class="mt-2 max-w-sm text-sm text-slate-600">{{ __('We’re fetching your page, analyzing on-page SEO, checking your keyword, and comparing you against the top-ranking competitors. This usually takes up to a minute.') }}</p>
                     </div>
                     <script>
                         (function () {
@@ -100,10 +99,10 @@
                         <span class="flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 text-rose-600">
                             <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
                         </span>
-                        <h2 class="mt-5 text-lg font-semibold text-slate-900">We couldn’t complete this audit</h2>
-                        <p class="mt-2 max-w-md text-sm text-slate-600">{{ $audit->error_message ?? 'Something went wrong. Please check the URL and try again.' }}</p>
+                        <h2 class="mt-5 text-lg font-semibold text-slate-900">{{ __('We couldn’t complete this audit') }}</h2>
+                        <p class="mt-2 max-w-md text-sm text-slate-600">{{ $audit->error_message ?? __('Something went wrong. Please check the URL and try again.') }}</p>
                         <a href="{{ route('landing') }}#main" class="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                            Try another page
+                            {{ __('Try another page') }}
                         </a>
                     </div>
 
@@ -122,17 +121,16 @@
             {{-- ── Upsell (bottom) ────────────────────────────────── --}}
             @if ($isCompleted)
                 <div class="mt-10 rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm sm:px-12">
-                    <h2 class="text-balance text-2xl font-semibold tracking-tight text-slate-900">Ready for the full picture?</h2>
+                    <h2 class="text-balance text-2xl font-semibold tracking-tight text-slate-900">{{ __('Ready for the full picture?') }}</h2>
                     <p class="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-                        Connect Search Console + Analytics and Serfix turns this one-page snapshot into a continuous,
-                        site-wide growth engine — ranked action lists, anomaly alerts, rank tracking, and reports that prove what shipped.
+                        {{ __('Connect Search Console + Analytics and Serfix turns this one-page snapshot into a continuous, site-wide growth engine — ranked action lists, anomaly alerts, rank tracking, and reports that prove what shipped.') }}
                     </p>
                     <div class="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
                         <a href="{{ route('register') }}" class="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                            Start free — connect your data
+                            {{ __('Start free — connect your data') }}
                         </a>
                         <a href="{{ route('features') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
-                            Explore the product
+                            {{ __('Explore the product') }}
                         </a>
                     </div>
                 </div>

@@ -14,6 +14,6 @@
             <span class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ $websites[0]['domain'] }}</span>
         </div>
     @else
-        <a href="{{ route('websites.index') }}" class="text-sm font-medium text-orange-600 hover:text-orange-700 dark:text-orange-400">+ Add website</a>
+        <a href="{{ route('websites.index') }}" class="text-sm font-medium text-orange-600 hover:text-orange-700 dark:text-orange-400">+ {{ __('Add website') }}</a>
     @endif
 </div>

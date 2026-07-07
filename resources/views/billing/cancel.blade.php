@@ -8,19 +8,19 @@
             </svg>
         </div>
 
-        <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Checkout cancelled</h1>
+        <h1 class="text-3xl font-bold text-slate-900 tracking-tight">{{ __('Checkout cancelled') }}</h1>
         <p class="text-slate-600 mt-3 text-base leading-relaxed">
-            No charge was made and no subscription was started. You can pick a plan again whenever you're ready.
+            {{ __('No charge was made and no subscription was started. You can pick a plan again whenever you\'re ready.') }}
         </p>
 
         <div class="mt-8 flex items-center justify-center gap-3 flex-wrap">
             <a href="{{ route('pricing') }}"
                class="inline-flex items-center rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500">
-                Back to pricing
+                {{ __('Back to pricing') }}
             </a>
             <a href="{{ route('dashboard') }}"
                class="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Go to dashboard
+                {{ __('Go to dashboard') }}
             </a>
         </div>
     </div>

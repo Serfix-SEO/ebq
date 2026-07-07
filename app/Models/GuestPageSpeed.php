@@ -21,7 +21,7 @@ class GuestPageSpeed extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
-        'token', 'url', 'status', 'result', 'error_message', 'ip', 'email', 'name',
+        'token', 'url', 'status', 'result', 'error_message', 'ip', 'email', 'name', 'locale',
     ];
 
     protected $casts = [
@@ -42,6 +42,7 @@ class GuestPageSpeed extends Model
             'ip' => $ip !== null ? mb_substr($ip, 0, 45) : null,
             'email' => $email !== null && trim($email) !== '' ? mb_substr(trim($email), 0, 255) : null,
             'name' => $name !== null && trim($name) !== '' ? mb_substr(trim($name), 0, 255) : null,
+            'locale' => app()->getLocale(),
         ]);
     }
 

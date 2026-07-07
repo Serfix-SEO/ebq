@@ -3,7 +3,7 @@
      DomPDF lays it out reliably. Receives $website, $branding, $audit from
      CrawlReportService::auditExport(). --}}
 <!DOCTYPE html>
-<html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
     <style>
@@ -71,13 +71,13 @@
     @endif
 </div>
 
-<h1>Site Audit Report</h1>
+<h1>{{ __('Site Audit Report') }}</h1>
 <p class="meta">
     <strong>{{ $website->domain }}</strong>
     @if ($audit['crawled_at'])
-        &mdash; crawled {{ \Illuminate\Support\Carbon::parse($audit['crawled_at'])->format('F j, Y') }}
+        &mdash; {{ __('crawled') }} {{ \Illuminate\Support\Carbon::parse($audit['crawled_at'])->format('F j, Y') }}
     @endif
-    &mdash; generated {{ now()->format('F j, Y') }}
+    &mdash; {{ __('generated') }} {{ now()->format('F j, Y') }}
 </p>
 
 {{-- Executive summary: the 4 numbers a non-technical client actually reads. --}}
@@ -87,19 +87,19 @@
             <span class="kpi-value {{ $audit['health_grade'] ? 'grade-'.$audit['health_grade'] : '' }}">
                 {{ $audit['health_score'] ?? '—' }}@if ($audit['health_grade'])&nbsp;({{ $audit['health_grade'] }})@endif
             </span>
-            <span class="kpi-label">Health score</span>
+            <span class="kpi-label">{{ __('Health score') }}</span>
         </td>
         <td style="width:25%;">
             <span class="kpi-value">{{ $audit['pages_crawled'] !== null ? number_format($audit['pages_crawled']) : '—' }}</span>
-            <span class="kpi-label">Pages crawled</span>
+            <span class="kpi-label">{{ __('Pages crawled') }}</span>
         </td>
         <td style="width:25%;">
             <span class="kpi-value" style="color:#dc2626;">{{ array_sum(array_column($audit['errors'], 'count')) }}</span>
-            <span class="kpi-label">Errors</span>
+            <span class="kpi-label">{{ __('Errors') }}</span>
         </td>
         <td style="width:25%;">
             <span class="kpi-value" style="color:#d97706;">{{ array_sum(array_column($audit['warnings'], 'count')) }}</span>
-            <span class="kpi-label">Warnings</span>
+            <span class="kpi-label">{{ __('Warnings') }}</span>
         </td>
     </tr>
 </table>
@@ -109,29 +109,29 @@
      list and leaves prioritization to the reader. --}}
 @if ($audit['priority'] !== [])
     <div class="priority-box">
-        <p class="section-title">Start here — highest-impact fixes</p>
-        <p class="lede">Ranked by severity and how many pages each one hits. Fixing these first gives the best return before working through the full list below.</p>
+        <p class="section-title">{{ __('Start here — highest-impact fixes') }}</p>
+        <p class="lede">{{ __('Ranked by severity and how many pages each one hits. Fixing these first gives the best return before working through the full list below.') }}</p>
         @foreach ($audit['priority'] as $i => $item)
             <div class="priority-item">
                 <span class="priority-rank">{{ $i + 1 }}.</span>
-                <strong>{{ $item['label'] }}</strong> — {{ $item['count'] }} page{{ $item['count'] === 1 ? '' : 's' }}
-                @if ($item['new_count'] > 0)<span class="new-badge">+{{ $item['new_count'] }} new</span>@endif
+                <strong>{{ $item['label'] }}</strong> — {{ trans_choice(':count page|:count pages', $item['count'], ['count' => $item['count']]) }}
+                @if ($item['new_count'] > 0)<span class="new-badge">+{{ $item['new_count'] }} {{ __('new') }}</span>@endif
                 <br><span style="font-size:10px;color:#C44E0E;margin-left:20px;">{{ $item['fix'] }}</span>
             </div>
         @endforeach
     </div>
 @endif
 
-@include('pdf.partials.site-audit-section', ['key' => 'errors', 'heading' => 'Errors', 'lede' => 'Fix these now — they actively block indexing, break the user experience, or waste crawl budget.', 'cls' => 'count-errors', 'items' => $audit['errors']])
-@include('pdf.partials.site-audit-section', ['key' => 'warnings', 'heading' => 'Warnings', 'lede' => 'Fix these soon — they hold the site back from ranking as well as it could.', 'cls' => 'count-warnings', 'items' => $audit['warnings']])
-@include('pdf.partials.site-audit-section', ['key' => 'notices', 'heading' => 'Notices', 'lede' => 'Good to address when convenient — lower-impact polish.', 'cls' => 'count-notices', 'items' => $audit['notices']])
+@include('pdf.partials.site-audit-section', ['key' => 'errors', 'heading' => __('Errors'), 'lede' => __('Fix these now — they actively block indexing, break the user experience, or waste crawl budget.'), 'cls' => 'count-errors', 'items' => $audit['errors']])
+@include('pdf.partials.site-audit-section', ['key' => 'warnings', 'heading' => __('Warnings'), 'lede' => __('Fix these soon — they hold the site back from ranking as well as it could.'), 'cls' => 'count-warnings', 'items' => $audit['warnings']])
+@include('pdf.partials.site-audit-section', ['key' => 'notices', 'heading' => __('Notices'), 'lede' => __('Good to address when convenient — lower-impact polish.'), 'cls' => 'count-notices', 'items' => $audit['notices']])
 
 <div class="footer">
     @if ($branding->footer_text)<p>{{ $branding->footer_text }}</p>@endif
-    @if ($branding->contact_email)<p><strong>Email:</strong> {{ $branding->contact_email }}</p>@endif
-    @if ($branding->contact_phone)<p><strong>Phone:</strong> {{ $branding->contact_phone }}</p>@endif
+    @if ($branding->contact_email)<p><strong>{{ __('Email:') }}</strong> {{ $branding->contact_email }}</p>@endif
+    @if ($branding->contact_phone)<p><strong>{{ __('Phone:') }}</strong> {{ $branding->contact_phone }}</p>@endif
     @if ($branding->contact_address)<p>{{ $branding->contact_address }}</p>@endif
-    <p style="margin-top:6px;">{{ $branding->company_name }} &mdash; generated {{ now()->format('M d, Y') }}</p>
+    <p style="margin-top:6px;">{{ $branding->company_name }} &mdash; {{ __('generated') }} {{ now()->format('M d, Y') }}</p>
 </div>
 </body>
 </html>

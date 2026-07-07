@@ -2,16 +2,16 @@
     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex flex-1 items-center gap-2">
             <div class="relative flex-1 sm:max-w-xs">
-                <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
-                <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search keywords…"
-                    class="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs placeholder-slate-400 shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
+                <svg class="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                <input wire:model.live.debounce.300ms="search" type="text" placeholder="{{ __('Search keywords…') }}"
+                    class="h-8 w-full rounded-md border border-slate-200 bg-white ps-8 pe-2.5 text-xs placeholder-slate-400 shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
             </div>
             <select wire:model.live="device"
                 class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
-                <option value="">All devices</option>
-                <option value="DESKTOP">Desktop</option>
-                <option value="MOBILE">Mobile</option>
-                <option value="TABLET">Tablet</option>
+                <option value="">{{ __('All devices') }}</option>
+                <option value="DESKTOP">{{ __('Desktop') }}</option>
+                <option value="MOBILE">{{ __('Mobile') }}</option>
+                <option value="TABLET">{{ __('Tablet') }}</option>
             </select>
             <input wire:model.live="from" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
             <input wire:model.live="to" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
@@ -25,7 +25,7 @@
                     'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100' => $view === 'aggregated',
                     'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200' => $view !== 'aggregated',
                 ])>
-                Aggregated
+                {{ __('Aggregated') }}
             </button>
             <button wire:click="$set('view', 'daily')"
                 @class([
@@ -33,7 +33,7 @@
                     'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100' => $view === 'daily',
                     'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200' => $view !== 'daily',
                 ])>
-                By Date
+                {{ __('By Date') }}
             </button>
         </div>
     </div>
@@ -45,15 +45,15 @@
                     <thead>
                         <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
                             @if ($view === 'daily')
-                                <x-sort-header column="date" :sortBy="$sortBy" :sortDir="$sortDir">Date</x-sort-header>
+                                <x-sort-header column="date" :sortBy="$sortBy" :sortDir="$sortDir">{{ __('Date') }}</x-sort-header>
                             @endif
-                            <x-sort-header column="query" :sortBy="$sortBy" :sortDir="$sortDir">Keyword</x-sort-header>
-                            <x-sort-header column="clicks" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Clicks</x-sort-header>
-                            <x-sort-header column="impressions" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Impressions</x-sort-header>
-                            <x-sort-header column="ctr" :sortBy="$sortBy" :sortDir="$sortDir" align="right">CTR</x-sort-header>
-                            <x-sort-header column="position" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Position</x-sort-header>
-                            <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="Global monthly search volume">Volume</th>
-                            <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="Projected monthly organic value at your current position (volume × CTR × CPC)">Value/mo</th>
+                            <x-sort-header column="query" :sortBy="$sortBy" :sortDir="$sortDir">{{ __('Keyword') }}</x-sort-header>
+                            <x-sort-header column="clicks" :sortBy="$sortBy" :sortDir="$sortDir" align="right">{{ __('Clicks') }}</x-sort-header>
+                            <x-sort-header column="impressions" :sortBy="$sortBy" :sortDir="$sortDir" align="right">{{ __('Impressions') }}</x-sort-header>
+                            <x-sort-header column="ctr" :sortBy="$sortBy" :sortDir="$sortDir" align="right">{{ __('CTR') }}</x-sort-header>
+                            <x-sort-header column="position" :sortBy="$sortBy" :sortDir="$sortDir" align="right">{{ __('Position') }}</x-sort-header>
+                            <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="{{ __('Global monthly search volume') }}">{{ __('Volume') }}</th>
+                            <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="{{ __('Projected monthly organic value at your current position (volume × CTR × CPC)') }}">{{ __('Value/mo') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -67,10 +67,10 @@
                                     @php $qKey = mb_strtolower((string) $row->query); @endphp
                                     <x-keyword-language :language="($languages ?? [])[$qKey] ?? null" />
                                     @if (isset($cannibalized[$qKey]))
-                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="Multiple pages rank for this query">cannibalized</span>
+                                        <span class="ms-1.5 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="{{ __('Multiple pages rank for this query') }}">{{ __('cannibalized') }}</span>
                                     @endif
                                     @if (isset($tracked[$qKey]))
-                                        <span class="ml-1 inline-flex items-center rounded-full bg-orange-50 px-1.5 py-px text-[10px] font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-400" title="Tracked in Rank Tracking">tracked</span>
+                                        <span class="ms-1 inline-flex items-center rounded-full bg-orange-50 px-1.5 py-px text-[10px] font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-400" title="{{ __('Tracked in Rank Tracking') }}">{{ __('tracked') }}</span>
                                     @endif
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->clicks) }}</td>
@@ -91,9 +91,9 @@
                                         $_keTitle = '';
                                         $_trend = 'unknown';
                                         if ($ke) {
-                                            $_keTitle = 'Updated '.$ke->fetched_at->diffForHumans();
+                                            $_keTitle = __('Updated ').$ke->fetched_at->diffForHumans();
                                             if ($ke->cpc !== null) {
-                                                $_keTitle .= ' · CPC '.($ke->currency ?: 'USD').' '.number_format((float) $ke->cpc, 2);
+                                                $_keTitle .= __(' · CPC ').($ke->currency ?: 'USD').' '.number_format((float) $ke->cpc, 2);
                                             }
                                             $_trend = $ke->trend_class;
                                         }
@@ -102,11 +102,11 @@
                                         <span class="inline-flex items-center gap-1" title="{{ $_keTitle }}">
                                             {{ number_format($ke->search_volume) }}
                                             @if ($_trend === 'rising')
-                                                <span class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400" title="Trend: rising">↑</span>
+                                                <span class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400" title="{{ __('Trend: rising') }}">↑</span>
                                             @elseif ($_trend === 'falling')
-                                                <span class="text-[9px] font-bold text-rose-600 dark:text-rose-400" title="Trend: falling">↓</span>
+                                                <span class="text-[9px] font-bold text-rose-600 dark:text-rose-400" title="{{ __('Trend: falling') }}">↓</span>
                                             @elseif ($_trend === 'seasonal')
-                                                <span class="text-[9px] font-bold text-amber-600 dark:text-amber-400" title="Seasonal pattern">◐</span>
+                                                <span class="text-[9px] font-bold text-amber-600 dark:text-amber-400" title="{{ __('Seasonal pattern') }}">◐</span>
                                             @endif
                                         </span>
                                     @else
@@ -133,8 +133,8 @@
     @else
         <div class="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 dark:border-slate-800 dark:bg-slate-900">
             <svg class="h-12 w-12 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
-            <p class="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">No keyword data yet</p>
-            <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Data will appear after the daily sync runs.</p>
+            <p class="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('No keyword data yet') }}</p>
+            <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">{{ __('Data will appear after the daily sync runs.') }}</p>
         </div>
     @endif
 </div>

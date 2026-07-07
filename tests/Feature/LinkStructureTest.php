@@ -88,7 +88,7 @@ class LinkStructureTest extends TestCase
             ->call('analyze')
             ->assertSee('Page Health')
             ->assertSee('Broken internal')
-            ->assertSee("You're here", false)
+            ->assertSee("You're here")
             ->assertSee('Update or remove the link'); // start of the broken_internal guidance text
     }
 

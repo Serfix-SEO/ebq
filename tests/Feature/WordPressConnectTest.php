@@ -24,7 +24,7 @@ class WordPressConnectTest extends TestCase
                 'state' => str_repeat('a', 32),
             ]))
             ->assertOk()
-            ->assertSee('Connect WordPress to EBQ')
+            ->assertSee('Connect WordPress to Serfix')
             ->assertSee('example.com');
     }
 

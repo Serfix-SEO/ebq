@@ -26,7 +26,9 @@ class CrawlReportMail extends Mailable implements ShouldQueue
         public Website $website,
         public array $report,
         public ?string $recipientName = null,
-    ) {}
+    ) {
+        $this->locale($website->owner->locale ?? app()->getLocale());
+    }
 
     public function envelope(): Envelope
     {

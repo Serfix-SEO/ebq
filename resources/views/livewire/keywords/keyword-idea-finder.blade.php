@@ -9,35 +9,35 @@
                     'rounded-md px-3 py-1.5 transition',
                     'bg-orange-600 text-white' => $mode === 'seeds',
                     'text-slate-600 dark:text-slate-300' => $mode !== 'seeds',
-                ])>From seed keywords</button>
+                ])>{{ __('From seed keywords') }}</button>
             <button type="button" wire:click="$set('mode', 'website')"
                 @class([
                     'rounded-md px-3 py-1.5 transition',
                     'bg-orange-600 text-white' => $mode === 'website',
                     'text-slate-600 dark:text-slate-300' => $mode !== 'website',
-                ])>From a website</button>
+                ])>{{ __('From a website') }}</button>
         </div>
 
         <form wire:submit.prevent="run" class="space-y-4">
             @if ($mode === 'seeds')
                 <label class="block">
-                    <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Seed keywords (one per line or comma-separated)</span>
+                    <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ __('Seed keywords (one per line or comma-separated)') }}</span>
                     <textarea wire:model="seedsInput" rows="4" placeholder="running shoes&#10;trail running"
                         class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800"></textarea>
                 </label>
             @else
                 <div class="grid gap-3 sm:grid-cols-3">
                     <label class="block sm:col-span-2">
-                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Website or page URL</span>
+                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ __('Website or page URL') }}</span>
                         <input type="text" wire:model="url" placeholder="nike.com"
                             class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
                     </label>
                     <label class="block">
-                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Scope</span>
+                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ __('Scope') }}</span>
                         <select wire:model="scope"
                             class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
-                            <option value="site">Entire site</option>
-                            <option value="page">Single page</option>
+                            <option value="site">{{ __('Entire site') }}</option>
+                            <option value="page">{{ __('Single page') }}</option>
                         </select>
                     </label>
                 </div>
@@ -45,18 +45,18 @@
 
             <div class="grid gap-3 sm:grid-cols-2">
                 <label class="block">
-                    <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Location</span>
-                    <input type="text" wire:model="location" list="kif-locations" placeholder="Search a country…" autocomplete="off"
+                    <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ __('Location') }}</span>
+                    <input type="text" wire:model="location" list="kif-locations" placeholder="{{ __('Search a country…') }}" autocomplete="off"
                         class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
                     <datalist id="kif-locations">
                         @foreach ($locationNames as $name)
                             <option value="{{ $name }}"></option>
                         @endforeach
                     </datalist>
-                    <p class="mt-1 text-[10px] text-slate-400 dark:text-slate-500">Any country, region or city. Use “All” for worldwide.</p>
+                    <p class="mt-1 text-[10px] text-slate-400 dark:text-slate-500">{{ __('Any country, region or city. Use “All” for worldwide.') }}</p>
                 </label>
                 <label class="block">
-                    <span class="text-xs font-medium text-slate-600 dark:text-slate-300">Language</span>
+                    <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ __('Language') }}</span>
                     <select wire:model="language"
                         class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
                         @foreach ($languageOptions as $value => $label)
@@ -69,10 +69,10 @@
             <div class="flex items-center gap-3">
                 <button type="submit" wire:loading.attr="disabled" wire:target="run"
                     class="inline-flex items-center gap-2 rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
-                    <span wire:loading.remove wire:target="run">Find keywords</span>
-                    <span wire:loading wire:target="run">Submitting…</span>
+                    <span wire:loading.remove wire:target="run">{{ __('Find keywords') }}</span>
+                    <span wire:loading wire:target="run">{{ __('Submitting…') }}</span>
                 </button>
-                <span class="text-[11px] text-slate-400">A query typically takes 20–60 seconds.</span>
+                <span class="text-[11px] text-slate-400">{{ __('A query typically takes 20–60 seconds.') }}</span>
             </div>
         </form>
     </div>
@@ -88,7 +88,7 @@
     @if ($this->isPolling())
         <div class="mt-4 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-medium text-amber-800">
             <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-            Working on it — keyword ideas are being generated ({{ $status }}). This page will update automatically.
+            {{ __('Working on it — keyword ideas are being generated') }} ({{ $status }}). {{ __('This page will update automatically.') }}
         </div>
     @endif
 
@@ -97,7 +97,7 @@
         @if ($fromCache)
             <p class="mb-2 inline-flex items-center gap-1.5 rounded-md bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                Instant result — someone already searched this this month, so this came straight from cache.
+                {{ __('Instant result — someone already searched this this month, so this came straight from cache.') }}
             </p>
         @endif
         @php
@@ -108,47 +108,47 @@
                 'unknown' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
             ];
             $sortable = [
-                'keyword' => ['label' => 'Keyword', 'align' => 'text-left'],
-                'volume' => ['label' => 'Avg. searches', 'align' => 'text-right'],
-                'competitionIndex' => ['label' => 'Competition', 'align' => 'text-left'],
-                'cpc' => ['label' => 'Top-of-page bid', 'align' => 'text-right'],
+                'keyword' => ['label' => __('Keyword'), 'align' => 'text-left'],
+                'volume' => ['label' => __('Avg. searches'), 'align' => 'text-right'],
+                'competitionIndex' => ['label' => __('Competition'), 'align' => 'text-left'],
+                'cpc' => ['label' => __('Top-of-page bid'), 'align' => 'text-right'],
             ];
         @endphp
 
         {{-- Toolbar: filters + export --}}
         <div class="mt-4 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <label class="flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                <span class="font-medium">Filter keyword</span>
-                <input type="text" wire:model.live.debounce.400ms="filterText" placeholder="contains…"
+                <span class="font-medium">{{ __('Filter keyword') }}</span>
+                <input type="text" wire:model.live.debounce.400ms="filterText" placeholder="{{ __('contains…') }}"
                     class="w-44 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
             </label>
             <label class="flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                <span class="font-medium">Min volume</span>
+                <span class="font-medium">{{ __('Min volume') }}</span>
                 <input type="number" min="0" wire:model.live.debounce.400ms="minVolume" placeholder="0"
                     class="w-24 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
             </label>
             <label class="flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                <span class="font-medium">Max volume</span>
+                <span class="font-medium">{{ __('Max volume') }}</span>
                 <input type="number" min="0" wire:model.live.debounce.400ms="maxVolume" placeholder="∞"
                     class="w-24 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800" />
             </label>
             <label class="flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                <span class="font-medium">Competition</span>
+                <span class="font-medium">{{ __('Competition') }}</span>
                 <select wire:model.live="comp"
                     class="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
-                    <option value="all">All</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
+                    <option value="all">{{ __('All') }}</option>
+                    <option value="low">{{ __('Low') }}</option>
+                    <option value="medium">{{ __('Medium') }}</option>
+                    <option value="high">{{ __('High') }}</option>
                 </select>
             </label>
 
             <div class="ml-auto flex items-end gap-2">
-                <span class="pb-1.5 text-[11px] text-slate-400">{{ number_format($totalResults) }} keyword(s)</span>
+                <span class="pb-1.5 text-[11px] text-slate-400">{{ number_format($totalResults) }} {{ __('keyword(s)') }}</span>
                 <button type="button" wire:click="export"
                     class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                    Export CSV
+                    {{ __('Export CSV') }}
                 </button>
             </div>
         </div>
@@ -175,7 +175,7 @@
                                     </button>
                                 </th>
                             @endforeach
-                            <th class="px-4 py-2.5 text-right font-semibold">Actions</th>
+                            <th class="px-4 py-2.5 text-right font-semibold">{{ __('Actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -197,16 +197,16 @@
                                 </td>
                                 <td class="px-4 py-2.5 text-right whitespace-nowrap">
                                     <div class="inline-flex items-center gap-2 text-[11px]">
-                                        <button type="button" wire:click="sendToVolume(@js($row['keyword']))" class="text-orange-600 hover:underline dark:text-orange-400">Volume</button>
-                                        <button type="button" wire:click="track(@js($row['keyword']))" class="text-slate-600 hover:underline dark:text-slate-300">Track</button>
+                                        <button type="button" wire:click="sendToVolume(@js($row['keyword']))" class="text-orange-600 hover:underline dark:text-orange-400">{{ __('Volume') }}</button>
+                                        <button type="button" wire:click="track(@js($row['keyword']))" class="text-slate-600 hover:underline dark:text-slate-300">{{ __('Track') }}</button>
                                         @if (auth()->user()?->hasFeatureAccess('audits', (string) session('current_website_id', '')))
-                                            <a href="{{ route('keywords.fix', ['keyword' => $row['keyword']]) }}" class="text-slate-600 hover:underline dark:text-slate-300">Brief</a>
+                                            <a href="{{ route('keywords.fix', ['keyword' => $row['keyword']]) }}" class="text-slate-600 hover:underline dark:text-slate-300">{{ __('Brief') }}</a>
                                         @endif
                                     </div>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500">No keywords match your filters.</td></tr>
+                            <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500">{{ __('No keywords match your filters.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -215,7 +215,7 @@
             {{-- Pagination --}}
             <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
                 <div class="flex items-center gap-2">
-                    <span>Rows</span>
+                    <span>{{ __('Rows') }}</span>
                     <select wire:model.live="perPage" class="rounded border border-slate-300 px-1.5 py-0.5 text-[11px] dark:border-slate-700 dark:bg-slate-800">
                         <option value="25">25</option>
                         <option value="50">50</option>
@@ -224,16 +224,16 @@
                 </div>
                 <div class="flex items-center gap-1.5">
                     <button type="button" wire:click="setPage({{ $page - 1 }})" @disabled($page <= 1)
-                        class="rounded border border-slate-300 px-2 py-0.5 font-semibold disabled:opacity-40 dark:border-slate-700">Prev</button>
-                    <span>Page {{ $page }} of {{ $totalPages }}</span>
+                        class="rounded border border-slate-300 px-2 py-0.5 font-semibold disabled:opacity-40 dark:border-slate-700">{{ __('Prev') }}</button>
+                    <span>{{ __('Page') }} {{ $page }} {{ __('of') }} {{ $totalPages }}</span>
                     <button type="button" wire:click="setPage({{ $page + 1 }})" @disabled($page >= $totalPages)
-                        class="rounded border border-slate-300 px-2 py-0.5 font-semibold disabled:opacity-40 dark:border-slate-700">Next</button>
+                        class="rounded border border-slate-300 px-2 py-0.5 font-semibold disabled:opacity-40 dark:border-slate-700">{{ __('Next') }}</button>
                 </div>
             </div>
         </div>
     @elseif ($hasRun && ! $this->isPolling() && ! $errorMessage)
         <div class="mt-4 rounded-md border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">
-            No keyword ideas were returned. Try different seeds or a different URL.
+            {{ __('No keyword ideas were returned. Try different seeds or a different URL.') }}
         </div>
     @endif
 </div>

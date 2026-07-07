@@ -13,21 +13,35 @@
     $pageLocaleLabel = \App\Support\Audit\PageLocalePresentation::shortLabel($pageLocale);
 
     $skippedReasonLabel = fn (?string $reason) => match ($reason) {
-        'no_primary_keyword' => 'Benchmark unavailable: no Search Console primary keyword for this page yet.',
-        'serper_request_failed' => 'Benchmark unavailable: the SERP API did not respond.',
-        'no_organic_results' => 'Benchmark unavailable: the SERP API returned no organic results for this keyword.',
-        'no_competitor_pages_fetched' => 'Benchmark unavailable: none of the top-ranking pages could be fetched.',
-        'benchmark_error' => 'Benchmark unavailable: an unexpected error occurred while benchmarking.',
+        'no_primary_keyword' => __('Benchmark unavailable: no Search Console primary keyword for this page yet.'),
+        'serper_request_failed' => __('Benchmark unavailable: the SERP API did not respond.'),
+        'no_organic_results' => __('Benchmark unavailable: the SERP API returned no organic results for this keyword.'),
+        'no_competitor_pages_fetched' => __('Benchmark unavailable: none of the top-ranking pages could be fetched.'),
+        'benchmark_error' => __('Benchmark unavailable: an unexpected error occurred while benchmarking.'),
         null, '' => null,
-        default => 'Benchmark unavailable: ' . str_replace('_', ' ', $reason) . '.',
+        default => __('Benchmark unavailable:') . ' ' . str_replace('_', ' ', $reason) . '.',
     };
     $failed = $auditReport->status === 'failed';
+    $auditStatusLabelsExport = [
+        'queued' => __('Queued'),
+        'running' => __('Running'),
+        'completed' => __('Completed'),
+        'failed' => __('Failed'),
+    ];
+    $auditStatusLabelExport = $auditStatusLabelsExport[$auditReport->status] ?? ucfirst((string) $auditReport->status);
+    $sevLabelsExport = [
+        'critical' => __('Critical'),
+        'warning' => __('Warning'),
+        'serp_gap' => __('SERP gap'),
+        'info' => __('Info'),
+        'good' => __('Good'),
+    ];
 @endphp
 <!doctype html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
 <meta charset="utf-8">
-<title>Page Audit Report — {{ $auditReport->page }}</title>
+<title>{{ __('Page Audit Report') }} — {{ $auditReport->page }}</title>
 <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; background: #f8fafc; margin: 0; padding: 24px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -51,7 +65,7 @@
     .kv { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
     .kv:last-child { border-bottom: 0; }
     .kv dt { color: #64748b; }
-    .kv dd { margin: 0; font-weight: 600; color: #0f172a; text-align: right; word-break: break-all; }
+    .kv dd { margin: 0; font-weight: 600; color: #0f172a; text-align: end; word-break: break-all; }
     .list { list-style: none; padding: 0; margin: 6px 0 0; font-size: 11px; max-height: 280px; overflow: auto; }
     .list li { padding: 3px 0; border-bottom: 1px solid #f1f5f9; word-break: break-all; }
     .list li:last-child { border-bottom: 0; }
@@ -67,15 +81,15 @@
 <body>
 <div class="wrap">
     <div class="card">
-        <p class="muted">Page Audit Report</p>
+        <p class="muted">{{ __('Page Audit Report') }}</p>
         <h1 style="word-break: break-all;">{{ $auditReport->page }}</h1>
         <p class="muted">
-            Audited: <strong>{{ $auditReport->audited_at ? format_user_datetime($auditReport->audited_at, 'M j, Y g:i A', $timezoneContextUser ?? null) : '—' }}</strong>
-            &nbsp;·&nbsp; Status: <span class="badge {{ $failed ? 'bad' : 'ok' }}">{{ ucfirst($auditReport->status) }}</span>
+            {{ __('Audited:') }} <strong>{{ $auditReport->audited_at ? format_user_datetime($auditReport->audited_at, 'M j, Y g:i A', $timezoneContextUser ?? null) : '—' }}</strong>
+            &nbsp;·&nbsp; {{ __('Status:') }} <span class="badge {{ $failed ? 'bad' : 'ok' }}">{{ $auditStatusLabelExport }}</span>
         </p>
         @if ($pageLocaleLabel)
             <p style="margin-top: 8px; font-size: 11px; color: #475569;">
-                <strong>Detected market:</strong> {{ $pageLocaleLabel }}
+                <strong>{{ __('Detected market:') }}</strong> {{ $pageLocaleLabel }}
                 @if (! empty($pageLocale['source'] ?? null))
                     <span style="color: #94a3b8;"> · {{ str_replace('_', ' ', (string) $pageLocale['source']) }}</span>
                 @endif
@@ -83,12 +97,12 @@
         @endif
         @if (filled($auditReport->primary_keyword))
             <p style="margin-top: 8px; font-size: 12px;">
-                <strong>Primary keyword:</strong>
+                <strong>{{ __('Primary keyword:') }}</strong>
                 <span style="font-family: ui-monospace, monospace;">{{ $auditReport->primary_keyword }}</span>
                 @if (($auditReport->primary_keyword_source ?? null) === 'custom_audit')
-                    <span style="margin-left: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #5b21b6;">(custom)</span>
+                    <span style="margin-inline-start: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #5b21b6;">({{ __('custom') }})</span>
                 @elseif (($auditReport->primary_keyword_source ?? null) === 'gsc_primary')
-                    <span class="muted" style="margin-left: 6px; font-size: 10px;">(Search Console)</span>
+                    <span class="muted" style="margin-inline-start: 6px; font-size: 10px;">({{ __('Search Console') }})</span>
                 @endif
             </p>
         @endif
@@ -96,10 +110,10 @@
 
     @if ($failed)
         <div class="card">
-            <p class="bad"><strong>Audit failed:</strong> {{ $auditReport->error_message ?? 'Unknown error' }}</p>
+            <p class="bad"><strong>{{ __('Audit failed:') }}</strong> {{ $auditReport->error_message ?? __('Unknown error') }}</p>
             @if (filled($auditReport->primary_keyword))
                 <p class="muted" style="margin-top: 8px; font-size: 12px;">
-                    <strong>Intended primary keyword:</strong>
+                    <strong>{{ __('Intended primary keyword:') }}</strong>
                     <span style="font-family: ui-monospace, monospace;">{{ $auditReport->primary_keyword }}</span>
                 </p>
             @endif
@@ -109,11 +123,11 @@
         @if (! empty($recs))
             @php $counts = collect($recs)->groupBy('severity')->map->count(); @endphp
             <div class="card">
-                <h2>Recommendations</h2>
+                <h2>{{ __('Recommendations') }}</h2>
                 <p class="muted" style="margin-bottom: 10px;">
                     @foreach (['critical', 'warning', 'serp_gap', 'info', 'good'] as $sev)
                         @if (($counts[$sev] ?? 0) > 0)
-                            <span class="tag"><strong>{{ $counts[$sev] }}</strong> {{ $sev === 'serp_gap' ? 'SERP gap' : ucfirst($sev) }}</span>
+                            <span class="tag"><strong>{{ $counts[$sev] }}</strong> {{ $sevLabelsExport[$sev] ?? ucfirst($sev) }}</span>
                         @endif
                     @endforeach
                 </p>
@@ -136,14 +150,14 @@
                             default => '#f1f5f9',
                         };
                     @endphp
-                    <div style="border-left: 4px solid {{ $sevColor }}; background: {{ $sevBg }}; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px;">
+                    <div style="border-inline-start: 4px solid {{ $sevColor }}; background: {{ $sevBg }}; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px;">
                         <p style="margin: 0;">
-                            <span class="badge" style="background: #fff; color: {{ $sevColor }}; border: 1px solid {{ $sevColor }};">{{ strtoupper($r['severity']) }}</span>
-                            <span class="muted" style="margin-left: 6px;">{{ $r['section'] }}</span>
-                            <strong style="margin-left: 6px;">{{ $r['title'] }}</strong>
+                            <span class="badge" style="background: #fff; color: {{ $sevColor }}; border: 1px solid {{ $sevColor }};">{{ strtoupper($sevLabelsExport[$r['severity']] ?? $r['severity']) }}</span>
+                            <span class="muted" style="margin-inline-start: 6px;">{{ $r['section'] }}</span>
+                            <strong style="margin-inline-start: 6px;">{{ $r['title'] }}</strong>
                         </p>
-                        <p style="margin-top: 6px;"><strong>Why it matters:</strong> {{ $r['why'] }}</p>
-                        <p><strong>Fix:</strong> {{ $r['fix'] }}</p>
+                        <p style="margin-top: 6px;"><strong>{{ __('Why it matters:') }}</strong> {{ $r['why'] }}</p>
+                        <p><strong>{{ __('Fix:') }}</strong> {{ $r['fix'] }}</p>
                     </div>
                 @endforeach
             </div>
@@ -162,78 +176,78 @@
                 $covBg = $covScore >= 80 ? '#d1fae5' : ($covScore >= 50 ? '#fef3c7' : '#fee2e2');
             @endphp
             <div class="card">
-                <h2>Keyword Strategy</h2>
+                <h2>{{ __('Keyword Strategy') }}</h2>
 
                 @if ($primary)
                     <p>
-                        <strong>Primary keyword:</strong> "{{ $primary['query'] }}"
+                        <strong>{{ __('Primary keyword:') }}</strong> "{{ $primary['query'] }}"
                         @if (($keywordData['primary_source'] ?? null) === 'custom_audit')
-                            <span style="margin-left: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #5b21b6;">(custom audit)</span>
+                            <span style="margin-inline-start: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #5b21b6;">({{ __('custom audit') }})</span>
                         @else
-                            &nbsp;·&nbsp; {{ number_format($primary['clicks'] ?? 0) }} clicks · {{ number_format($primary['impressions'] ?? 0) }} impressions · position {{ number_format($primary['position'] ?? 0, 1) }}
+                            &nbsp;·&nbsp; {{ number_format($primary['clicks'] ?? 0) }} {{ __('clicks') }} · {{ number_format($primary['impressions'] ?? 0) }} {{ __('impressions') }} · {{ __('position') }} {{ number_format($primary['position'] ?? 0, 1) }}
                         @endif
                     </p>
                     <div class="row" style="margin-top: 8px;">
                         @foreach ([['in_title', 'Title'], ['in_h1', 'H1'], ['in_meta_description', 'Meta description']] as [$key, $label])
                             @php $present = (bool) ($pp[$key] ?? false); @endphp
                             <div class="kpi" style="border-color: {{ $present ? '#a7f3d0' : '#fecaca' }}; background: {{ $present ? '#ecfdf5' : '#fef2f2' }};">
-                                <div class="label" style="color: {{ $present ? '#047857' : '#b91c1c' }};">{{ $label }}</div>
-                                <div class="value" style="color: {{ $present ? '#047857' : '#b91c1c' }}; font-size: 14px;">{{ $present ? 'Present' : 'Missing' }}</div>
+                                <div class="label" style="color: {{ $present ? '#047857' : '#b91c1c' }};">{{ $label === 'H1' ? $label : __($label) }}</div>
+                                <div class="value" style="color: {{ $present ? '#047857' : '#b91c1c' }}; font-size: 14px;">{{ $present ? __('Present') : __('Missing') }}</div>
                             </div>
                         @endforeach
                     </div>
                 @endif
 
-                <h3 style="margin-top: 14px;">Topical coverage</h3>
+                <h3 style="margin-top: 14px;">{{ __('Topical coverage') }}</h3>
                 <p>
                     <span style="display: inline-block; background: {{ $covBg }}; color: {{ $covColor }}; border-radius: 6px; padding: 4px 10px; font-weight: 700;">
                         {{ $cov['found_count'] ?? 0 }} / {{ $cov['total'] ?? 0 }} · {{ $covScore }}%
                     </span>
-                    <span class="muted" style="margin-left: 8px;">
-                        @if ($covScore >= 80) High topical authority
-                        @elseif ($covScore < 50) Expansion needed
-                        @else Partial coverage @endif
+                    <span class="muted" style="margin-inline-start: 8px;">
+                        @if ($covScore >= 80) {{ __('High topical authority') }}
+                        @elseif ($covScore < 50) {{ __('Expansion needed') }}
+                        @else {{ __('Partial coverage') }} @endif
                     </span>
                 </p>
 
                 @if (! empty($cov['missing']))
-                    <h3 style="margin-top: 12px;">Missing from body ({{ $cov['missing_count'] ?? count($cov['missing']) }})</h3>
+                    <h3 style="margin-top: 12px;">{{ __('Missing from body') }} ({{ $cov['missing_count'] ?? count($cov['missing']) }})</h3>
                     <ul class="list">
                         @foreach (array_slice($cov['missing'], 0, 30) as $m)
-                            <li><strong>{{ $m['query'] }}</strong> <span class="muted">— {{ number_format($m['impressions'] ?? 0) }} impressions · position {{ number_format($m['position'] ?? 0, 1) }}</span></li>
+                            <li><strong>{{ $m['query'] }}</strong> <span class="muted">— {{ number_format($m['impressions'] ?? 0) }} {{ __('impressions') }} · {{ __('position') }} {{ number_format($m['position'] ?? 0, 1) }}</span></li>
                         @endforeach
                     </ul>
                 @endif
 
-                <h3 style="margin-top: 14px;">Search intent</h3>
+                <h3 style="margin-top: 14px;">{{ __('Search intent') }}</h3>
                 @php
                     $domExport = $intent['dominant'] ?? 'unclear';
                     $intentDominantLabelsExport = [
-                        'informational' => 'Informational',
-                        'utility' => 'Tool / app',
-                        'commercial' => 'Commercial',
-                        'transactional' => 'Transactional',
-                        'navigational' => 'Navigational',
-                        'local' => 'Local',
-                        'support' => 'Support',
-                        'commercial_utility' => 'Commercial + tool / app',
-                        'commercial_informational' => 'Commercial + informational',
-                        'commercial_transactional' => 'Commercial + transactional',
-                        'informational_utility' => 'Informational + tool / app',
-                        'mixed' => 'Mixed (3+ tied top scores)',
-                        'unclear' => 'Unclear',
+                        'informational' => __('Informational'),
+                        'utility' => __('Tool / app'),
+                        'commercial' => __('Commercial'),
+                        'transactional' => __('Transactional'),
+                        'navigational' => __('Navigational'),
+                        'local' => __('Local'),
+                        'support' => __('Support'),
+                        'commercial_utility' => __('Commercial + tool / app'),
+                        'commercial_informational' => __('Commercial + informational'),
+                        'commercial_transactional' => __('Commercial + transactional'),
+                        'informational_utility' => __('Informational + tool / app'),
+                        'mixed' => __('Mixed (3+ tied top scores)'),
+                        'unclear' => __('Unclear'),
                     ];
                     $dominantLabelExport = $intentDominantLabelsExport[$domExport] ?? collect(explode('_', $domExport))->map(function (string $part) {
-                        return $part === 'utility' ? 'Tool / app' : ucfirst($part);
+                        return $part === 'utility' ? __('Tool / app') : ucfirst($part);
                     })->implode(' + ');
                     $intentBucketsExport = [
-                        'Informational' => (int) ($intent['informational_count'] ?? 0),
-                        'Tool / app' => (int) ($intent['utility_count'] ?? 0),
-                        'Commercial' => (int) ($intent['commercial_count'] ?? 0),
-                        'Transactional' => (int) ($intent['transactional_count'] ?? 0),
-                        'Navigational' => (int) ($intent['navigational_count'] ?? 0),
-                        'Local' => (int) ($intent['local_count'] ?? 0),
-                        'Support' => (int) ($intent['support_count'] ?? 0),
+                        __('Informational') => (int) ($intent['informational_count'] ?? 0),
+                        __('Tool / app') => (int) ($intent['utility_count'] ?? 0),
+                        __('Commercial') => (int) ($intent['commercial_count'] ?? 0),
+                        __('Transactional') => (int) ($intent['transactional_count'] ?? 0),
+                        __('Navigational') => (int) ($intent['navigational_count'] ?? 0),
+                        __('Local') => (int) ($intent['local_count'] ?? 0),
+                        __('Support') => (int) ($intent['support_count'] ?? 0),
                     ];
                     $intentSummaryPartsExport = [];
                     foreach ($intentBucketsExport as $label => $n) {
@@ -241,14 +255,14 @@
                             $intentSummaryPartsExport[] = $label . ': ' . $n;
                         }
                     }
-                    $intentSummaryExport = $intentSummaryPartsExport !== [] ? implode(' · ', $intentSummaryPartsExport) : 'No trigger matches';
+                    $intentSummaryExport = $intentSummaryPartsExport !== [] ? implode(' · ', $intentSummaryPartsExport) : __('No trigger matches');
                     $scorePartsExport = [];
                     foreach ($intent['intent_scores'] ?? [] as $esk => $esv) {
                         if ((float) $esv > 0) {
                             $scorePartsExport[] = $esk . ': ' . $esv;
                         }
                     }
-                    $intentScoreLineExport = $scorePartsExport !== [] ? 'Weighted: ' . implode(' · ', $scorePartsExport) : '';
+                    $intentScoreLineExport = $scorePartsExport !== [] ? __('Weighted:') . ' ' . implode(' · ', $scorePartsExport) : '';
                 @endphp
                 <p>
                     <strong>{{ $dominantLabelExport }}</strong>
@@ -259,7 +273,7 @@
                 </p>
 
                 @if (! empty($accidental))
-                    <h3 style="margin-top: 14px;">Accidental authority candidates</h3>
+                    <h3 style="margin-top: 14px;">{{ __('Accidental authority candidates') }}</h3>
                     <div>
                         @foreach ($accidental as $a)
                             <span class="tag" style="background: #fef3c7; color: #b45309;"><strong>{{ $a['term'] }}</strong> — {{ $a['density'] }}%</span>
@@ -279,15 +293,15 @@
                                 ->keyBy('keyword_hash')
                                 ->all();
                     @endphp
-                    <h3 style="margin-top: 14px;">Target keywords from Search Console ({{ count($keywordData['target_keywords']) }})</h3>
+                    <h3 style="margin-top: 14px;">{{ __('Target keywords from Search Console') }} ({{ count($keywordData['target_keywords']) }})</h3>
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                         <thead>
                             <tr style="background: #f1f5f9;">
-                                <th style="text-align: left; padding: 4px 6px;">Keyword</th>
-                                <th style="text-align: right; padding: 4px 6px;">Clicks</th>
-                                <th style="text-align: right; padding: 4px 6px;">Impr.</th>
-                                <th style="text-align: right; padding: 4px 6px;">Pos</th>
-                                <th style="text-align: right; padding: 4px 6px;">Vol/mo</th>
+                                <th style="text-align: start; padding: 4px 6px;">{{ __('Keyword') }}</th>
+                                <th style="text-align: end; padding: 4px 6px;">{{ __('Clicks') }}</th>
+                                <th style="text-align: end; padding: 4px 6px;">{{ __('Impr.') }}</th>
+                                <th style="text-align: end; padding: 4px 6px;">{{ __('Pos') }}</th>
+                                <th style="text-align: end; padding: 4px 6px;">{{ __('Vol/mo') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -295,10 +309,10 @@
                                 @php $_exportKe = $_exportTargetKe[\App\Models\KeywordMetric::hashKeyword((string) $t['query'])] ?? null; @endphp
                                 <tr style="border-top: 1px solid #e2e8f0;">
                                     <td style="padding: 4px 6px;">{{ $t['query'] }}</td>
-                                    <td style="padding: 4px 6px; text-align: right;">{{ number_format($t['clicks']) }}</td>
-                                    <td style="padding: 4px 6px; text-align: right;">{{ number_format($t['impressions']) }}</td>
-                                    <td style="padding: 4px 6px; text-align: right;">{{ number_format($t['position'], 1) }}</td>
-                                    <td style="padding: 4px 6px; text-align: right;">{{ ($_exportKe && $_exportKe->search_volume !== null) ? number_format($_exportKe->search_volume) : '—' }}</td>
+                                    <td style="padding: 4px 6px; text-align: end;">{{ number_format($t['clicks']) }}</td>
+                                    <td style="padding: 4px 6px; text-align: end;">{{ number_format($t['impressions']) }}</td>
+                                    <td style="padding: 4px 6px; text-align: end;">{{ number_format($t['position'], 1) }}</td>
+                                    <td style="padding: 4px 6px; text-align: end;">{{ ($_exportKe && $_exportKe->search_volume !== null) ? number_format($_exportKe->search_volume) : '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -315,16 +329,16 @@
             $countryTotalClicks = $countryData['total_clicks'];
         @endphp
         <div class="card">
-            <h2>Traffic by country</h2>
-            <p class="muted" style="margin-top: -6px;">Search Console data for this URL, last 30 days.</p>
+            <h2>{{ __('Traffic by country') }}</h2>
+            <p class="muted" style="margin-top: -6px;">{{ __('Search Console data for this URL, last 30 days.') }}</p>
             @if (empty($countryRows))
-                <p class="muted" style="margin-top: 10px;">No Search Console country data yet for this page.</p>
+                <p class="muted" style="margin-top: 10px;">{{ __('No Search Console country data yet for this page.') }}</p>
             @else
                 @php $primaryCountry = $countryRows[0]; @endphp
                 <p style="margin-top: 8px; font-size: 12px; color: #334155;">
-                    <strong>{{ count($countryRows) }}</strong> {{ \Illuminate\Support\Str::plural('market', count($countryRows)) }}
-                    &nbsp;·&nbsp; <strong>{{ number_format($countryTotalClicks) }}</strong> clicks
-                    &nbsp;·&nbsp; top:
+                    <strong>{{ count($countryRows) }}</strong> {{ count($countryRows) === 1 ? __('market') : __('markets') }}
+                    &nbsp;·&nbsp; <strong>{{ number_format($countryTotalClicks) }}</strong> {{ __('clicks') }}
+                    &nbsp;·&nbsp; {{ __('top:') }}
                     @if (! empty($primaryCountry['flag']))
                         {{ $primaryCountry['flag'] }}
                     @endif
@@ -334,12 +348,12 @@
                 <table style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 11px;">
                     <thead>
                         <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                            <th style="padding: 6px 8px; text-align: left; width: 28px; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">#</th>
-                            <th style="padding: 6px 8px; text-align: left; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Market</th>
-                            <th style="padding: 6px 8px; text-align: left; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Share</th>
-                            <th style="padding: 6px 8px; text-align: right; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Clicks</th>
-                            <th style="padding: 6px 8px; text-align: right; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Impressions</th>
-                            <th style="padding: 6px 8px; text-align: right; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Avg pos</th>
+                            <th style="padding: 6px 8px; text-align: start; width: 28px; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">#</th>
+                            <th style="padding: 6px 8px; text-align: start; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Market') }}</th>
+                            <th style="padding: 6px 8px; text-align: start; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Share') }}</th>
+                            <th style="padding: 6px 8px; text-align: end; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Clicks') }}</th>
+                            <th style="padding: 6px 8px; text-align: end; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Impressions') }}</th>
+                            <th style="padding: 6px 8px; text-align: end; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Avg pos') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -361,13 +375,13 @@
                                                     <div style="background: {{ $i === 0 ? '#F26419' : '#F8B18B' }}; width: {{ $row['width_pct'] }}%; height: 100%;"></div>
                                                 </div>
                                             </td>
-                                            <td style="padding: 0 0 0 8px; width: 38px; text-align: right; font-weight: 700; color: #475569; font-variant-numeric: tabular-nums;">{{ $row['share_pct'] }}%</td>
+                                            <td style="padding: 0 0 0 8px; width: 38px; text-align: end; font-weight: 700; color: #475569; font-variant-numeric: tabular-nums;">{{ $row['share_pct'] }}%</td>
                                         </tr>
                                     </table>
                                 </td>
-                                <td style="padding: 6px 8px; text-align: right; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums;">{{ number_format($row['clicks']) }}</td>
-                                <td style="padding: 6px 8px; text-align: right; color: #475569; font-variant-numeric: tabular-nums;">{{ number_format($row['impressions']) }}</td>
-                                <td style="padding: 6px 8px; text-align: right; color: #475569; font-variant-numeric: tabular-nums;">
+                                <td style="padding: 6px 8px; text-align: end; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums;">{{ number_format($row['clicks']) }}</td>
+                                <td style="padding: 6px 8px; text-align: end; color: #475569; font-variant-numeric: tabular-nums;">{{ number_format($row['impressions']) }}</td>
+                                <td style="padding: 6px 8px; text-align: end; color: #475569; font-variant-numeric: tabular-nums;">
                                     @if ($row['position'] !== null)
                                         {{ $row['position'] }}
                                     @else
@@ -383,40 +397,40 @@
 
         {{-- 1. Metadata --}}
         <div class="card">
-            <h2>1. Metadata</h2>
+            <h2>{{ __('1. Metadata') }}</h2>
             <div class="row">
                 <div class="kpi" style="flex: 1 1 100%;">
-                    <div class="label">Title ({{ $meta['title_length'] ?? 0 }} chars)</div>
+                    <div class="label">{{ __('Title') }} ({{ $meta['title_length'] ?? 0 }} {{ __('chars') }})</div>
                     <p>{{ $meta['title'] ?? '—' }}</p>
                 </div>
                 <div class="kpi" style="flex: 1 1 100%;">
-                    <div class="label">Meta description ({{ $meta['meta_description_length'] ?? 0 }} chars)</div>
+                    <div class="label">{{ __('Meta description') }} ({{ $meta['meta_description_length'] ?? 0 }} {{ __('chars') }})</div>
                     <p>{{ $meta['meta_description'] ?? '—' }}</p>
                 </div>
-                <div class="kpi"><div class="label">Canonical</div><p style="word-break: break-all;">{{ $meta['canonical'] ?? '—' }}</p><p class="{{ ($meta['canonical_matches'] ?? false) ? 'ok' : 'warn' }}">{{ ($meta['canonical_matches'] ?? false) ? 'Matches' : 'Does not match' }}</p></div>
-                <div class="kpi"><div class="label">OpenGraph tags</div><div class="value">{{ $meta['og_tag_count'] ?? 0 }}</div></div>
-                <div class="kpi"><div class="label">Twitter tags</div><div class="value">{{ $meta['twitter_tag_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Canonical') }}</div><p style="word-break: break-all;">{{ $meta['canonical'] ?? '—' }}</p><p class="{{ ($meta['canonical_matches'] ?? false) ? 'ok' : 'warn' }}">{{ ($meta['canonical_matches'] ?? false) ? __('Matches') : __('Does not match') }}</p></div>
+                <div class="kpi"><div class="label">{{ __('OpenGraph tags') }}</div><div class="value">{{ $meta['og_tag_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Twitter tags') }}</div><div class="value">{{ $meta['twitter_tag_count'] ?? 0 }}</div></div>
             </div>
         </div>
 
         {{-- 2. Content & Structure --}}
         <div class="card">
-            <h2>2. Content &amp; Structure</h2>
+            <h2>{{ __('2. Content & Structure') }}</h2>
             <div class="row">
-                <div class="kpi"><div class="label">H1 count</div><div class="value {{ ($content['h1_count'] ?? 0) === 1 ? 'ok' : 'warn' }}">{{ $content['h1_count'] ?? 0 }}</div></div>
-                <div class="kpi"><div class="label">Heading order</div><div class="value {{ ($content['heading_order_ok'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($content['heading_order_ok'] ?? false) ? 'Logical' : 'Skipped levels' }}</div></div>
-                <div class="kpi"><div class="label">Word count</div><div class="value">{{ number_format($content['word_count'] ?? 0) }}</div></div>
-                <div class="kpi"><div class="label">Headings total</div><div class="value">{{ count($content['headings'] ?? []) }}</div></div>
+                <div class="kpi"><div class="label">{{ __('H1 count') }}</div><div class="value {{ ($content['h1_count'] ?? 0) === 1 ? 'ok' : 'warn' }}">{{ $content['h1_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Heading order') }}</div><div class="value {{ ($content['heading_order_ok'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($content['heading_order_ok'] ?? false) ? __('Logical') : __('Skipped levels') }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Word count') }}</div><div class="value">{{ number_format($content['word_count'] ?? 0) }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Headings total') }}</div><div class="value">{{ count($content['headings'] ?? []) }}</div></div>
             </div>
             @if (! empty($content['first_150_words']))
                 <div class="section">
-                    <h3>Answer readiness (first 150 words)</h3>
+                    <h3>{{ __('Answer readiness (first 150 words)') }}</h3>
                     <p>{{ $content['first_150_words'] }}</p>
                 </div>
             @endif
             @if (! empty($content['keyword_density']))
                 <div class="section">
-                    <h3>Keyword density (top 20)</h3>
+                    <h3>{{ __('Keyword density (top 20)') }}</h3>
                     <div>
                         @foreach ($content['keyword_density'] as $kw)
                             <span class="tag"><strong>{{ $kw['term'] }}</strong> ×{{ $kw['count'] }} · {{ $kw['density'] }}%</span>
@@ -426,10 +440,10 @@
             @endif
             @if (! empty($content['headings']))
                 <div class="section">
-                    <h3>Heading outline ({{ count($content['headings']) }})</h3>
+                    <h3>{{ __('Heading outline') }} ({{ count($content['headings']) }})</h3>
                     <ul class="list">
                         @foreach ($content['headings'] as $h)
-                            <li style="padding-left: {{ ($h['level'] - 1) * 14 }}px;"><span class="muted">H{{ $h['level'] }}</span> {{ $h['text'] }}</li>
+                            <li style="padding-inline-start: {{ ($h['level'] - 1) * 14 }}px;"><span class="muted">H{{ $h['level'] }}</span> {{ $h['text'] }}</li>
                         @endforeach
                     </ul>
                 </div>
@@ -438,18 +452,18 @@
 
         {{-- 3. Images & Links --}}
         <div class="card">
-            <h2>3. Image &amp; Link Analysis</h2>
+            <h2>{{ __('3. Image & Link Analysis') }}</h2>
             <div class="row">
-                <div class="kpi"><div class="label">Images total</div><div class="value">{{ $images['total'] ?? 0 }}</div></div>
-                <div class="kpi"><div class="label">Missing alt</div><div class="value {{ ($images['missing_alt_count'] ?? 0) > 0 ? 'bad' : 'ok' }}">{{ $images['missing_alt_count'] ?? 0 }}</div></div>
-                <div class="kpi"><div class="label">Modern formats (webp/avif)</div><div class="value">{{ $images['modern_format_count'] ?? 0 }}</div></div>
-                <div class="kpi"><div class="label">Broken links</div><div class="value {{ count($links['broken'] ?? []) > 0 ? 'bad' : 'ok' }}">{{ count($links['broken'] ?? []) }}</div></div>
-                <div class="kpi"><div class="label">Internal links</div><div class="value">{{ $links['internal_count'] ?? 0 }}</div></div>
-                <div class="kpi"><div class="label">External links</div><div class="value">{{ $links['external_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Images total') }}</div><div class="value">{{ $images['total'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Missing alt') }}</div><div class="value {{ ($images['missing_alt_count'] ?? 0) > 0 ? 'bad' : 'ok' }}">{{ $images['missing_alt_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Modern formats (webp/avif)') }}</div><div class="value">{{ $images['modern_format_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Broken links') }}</div><div class="value {{ count($links['broken'] ?? []) > 0 ? 'bad' : 'ok' }}">{{ count($links['broken'] ?? []) }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Internal links') }}</div><div class="value">{{ $links['internal_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">{{ __('External links') }}</div><div class="value">{{ $links['external_count'] ?? 0 }}</div></div>
             </div>
             @if (! empty($images['missing_alt']))
                 <div class="section">
-                    <h3>Images missing alt</h3>
+                    <h3>{{ __('Images missing alt') }}</h3>
                     <ul class="list">
                         @foreach ($images['missing_alt'] as $src)
                             <li>{{ $src }}</li>
@@ -459,7 +473,7 @@
             @endif
             @if (! empty($links['broken']))
                 <div class="section">
-                    <h3 class="bad">Broken links ({{ count($links['broken']) }})</h3>
+                    <h3 class="bad">{{ __('Broken links') }} ({{ count($links['broken']) }})</h3>
                     <ul class="list">
                         @foreach ($links['broken'] as $b)
                             <li><span class="badge bad">{{ $b['status'] ?? 'ERR' }}</span> <a href="{{ $b['href'] }}">{{ $b['href'] }}</a></li>
@@ -485,22 +499,22 @@
             }
             $deltaKindExp = $stackGapRowExp['delta_kind'] ?? null;
             $gapChipColorExp = match ($deltaKindExp) {
-                'moat' => ['bg' => '#d1fae5', 'fg' => '#047857', 'label' => 'Moat vs Top 3'],
-                'disadvantage' => ['bg' => '#fee2e2', 'fg' => '#b91c1c', 'label' => 'Gap vs Top 3'],
-                'parity' => ['bg' => '#f1f5f9', 'fg' => '#334155', 'label' => 'Parity vs Top 3'],
+                'moat' => ['bg' => '#d1fae5', 'fg' => '#047857', 'label' => __('Moat vs Top 3')],
+                'disadvantage' => ['bg' => '#fee2e2', 'fg' => '#b91c1c', 'label' => __('Gap vs Top 3')],
+                'parity' => ['bg' => '#f1f5f9', 'fg' => '#334155', 'label' => __('Parity vs Top 3')],
                 default => null,
             };
         @endphp
         <div class="card">
-            <h2>4. Technical Performance</h2>
+            <h2>{{ __('4. Technical Performance') }}</h2>
             <div class="row">
-                <div class="kpi"><div class="label">HTTP status</div><div class="value {{ ($technical['http_status'] ?? 0) < 400 ? 'ok' : 'bad' }}">{{ $technical['http_status'] ?? '—' }}</div></div>
-                <div class="kpi"><div class="label">Response time (TTFB)</div><div class="value">{{ isset($technical['ttfb_ms']) ? $technical['ttfb_ms'].' ms' : '—' }}</div></div>
-                <div class="kpi"><div class="label">Page size</div><div class="value">{{ isset($technical['page_size_bytes']) ? number_format($technical['page_size_bytes'] / 1024, 1).' KB' : '—' }}</div></div>
-                <div class="kpi"><div class="label">Compression</div><div class="value" style="font-size: 14px;">{{ $technical['compression'] ?? 'none' }}</div></div>
-                <div class="kpi"><div class="label">HTTPS</div><div class="value {{ ($technical['is_https'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($technical['is_https'] ?? false) ? 'Yes' : 'No' }}</div></div>
+                <div class="kpi"><div class="label">{{ __('HTTP status') }}</div><div class="value {{ ($technical['http_status'] ?? 0) < 400 ? 'ok' : 'bad' }}">{{ $technical['http_status'] ?? '—' }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Response time (TTFB)') }}</div><div class="value">{{ isset($technical['ttfb_ms']) ? $technical['ttfb_ms'].' ms' : '—' }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Page size') }}</div><div class="value">{{ isset($technical['page_size_bytes']) ? number_format($technical['page_size_bytes'] / 1024, 1).' KB' : '—' }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Compression') }}</div><div class="value" style="font-size: 14px;">{{ $technical['compression'] ?? __('none') }}</div></div>
+                <div class="kpi"><div class="label">{{ __('HTTPS') }}</div><div class="value {{ ($technical['is_https'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($technical['is_https'] ?? false) ? __('Yes') : __('No') }}</div></div>
                 <div class="kpi">
-                    <div class="label">Tech stack</div>
+                    <div class="label">{{ __('Tech stack') }}</div>
                     <div class="value {{ $stackToneClassExp }}" style="font-size: 14px;">{{ $stackLabelExp }}</div>
                     @if ($gapChipColorExp)
                         <span class="badge" style="margin-top: 4px; background: {{ $gapChipColorExp['bg'] }}; color: {{ $gapChipColorExp['fg'] }};">{{ $gapChipColorExp['label'] }}</span>
@@ -511,25 +525,25 @@
 
         {{-- 5. Advanced --}}
         <div class="card">
-            <h2>5. Advanced Data</h2>
+            <h2>{{ __('5. Advanced Data') }}</h2>
             <div class="row">
-                <div class="kpi"><div class="label">Schema (JSON-LD)</div><div class="value">{{ $advanced['schema_blocks'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Schema (JSON-LD)') }}</div><div class="value">{{ $advanced['schema_blocks'] ?? 0 }}</div></div>
                 @php
                     $fleschExp = data_get($advanced, 'readability.flesch');
                     $fleschExp = is_numeric($fleschExp) ? (float) $fleschExp : null;
                 @endphp
                 <div class="kpi">
-                    <div class="label">Readability (Flesch)</div>
+                    <div class="label">{{ __('Readability (Flesch)') }}</div>
                     <div class="value">{{ $fleschExp !== null ? $fleschExp : '—' }}</div>
                     <p class="muted">{{ data_get($advanced, 'readability.grade') ?? '' }}</p>
                 </div>
-                <div class="kpi"><div class="label">Favicon</div><div class="value {{ ($advanced['has_favicon'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($advanced['has_favicon'] ?? false) ? 'Present' : 'Missing' }}</div></div>
+                <div class="kpi"><div class="label">{{ __('Favicon') }}</div><div class="value {{ ($advanced['has_favicon'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($advanced['has_favicon'] ?? false) ? __('Present') : __('Missing') }}</div></div>
             </div>
         </div>
 
         @if (is_array($benchmark))
             <div class="card">
-                <h2>6. SERP readability benchmark</h2>
+                <h2>{{ __('6. SERP readability benchmark') }}</h2>
                 @if (! empty($benchmark['your_serp']) && is_array($benchmark['your_serp']))
                     @php
                         $ys = $benchmark['your_serp'];
@@ -549,50 +563,50 @@
                             <table style="width: 100%; border-collapse: collapse;">
                                 <tr>
                                     <td style="width: 160px; vertical-align: middle; text-align: center; padding: 8px 16px 8px 0;">
-                                        <p style="margin: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.15em; color: #64748b; text-transform: uppercase;">Organic rank</p>
+                                        <p style="margin: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.15em; color: #64748b; text-transform: uppercase;">{{ __('Organic rank') }}</p>
                                         <p style="margin: 6px 0 0; font-size: 42px; font-weight: 900; line-height: 1; letter-spacing: -0.02em; color: {{ $ysFirst === true ? '#059669' : '#d97706' }};">#{{ $ysPos }}</p>
                                         <p style="margin: 8px 0 0;">
-                                            <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 9px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; background: {{ $ysFirst === true ? '#059669' : '#d97706' }};">{{ $ysFirst === true ? 'First page' : 'Page 2+' }}</span>
+                                            <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 9px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; background: {{ $ysFirst === true ? '#059669' : '#d97706' }};">{{ $ysFirst === true ? __('First page') : __('Page 2+') }}</span>
                                         </p>
                                     </td>
-                                    <td style="vertical-align: middle; padding-left: 12px; border-left: 1px solid rgba(148,163,184,0.5); font-size: 12px; line-height: 1.55; color: #334155;">
-                                        <strong style="color: #0f172a;">Search position (live SERP snapshot)</strong><br>
+                                    <td style="vertical-align: middle; padding-inline-start: 12px; border-inline-start: 1px solid rgba(148,163,184,0.5); font-size: 12px; line-height: 1.55; color: #334155;">
+                                        <strong style="color: #0f172a;">{{ __('Search position (live SERP snapshot)') }}</strong><br>
                                         @if ($ysFirst === true)
-                                            Your site (same domain in this sample) appears in the <strong>top 10</strong> organic results — the listing URL may differ from the page you audited. Use Search Console for official average position.
+                                            {{ __('Your site (same domain in this sample) appears in the') }} <strong>{{ __('top 10') }}</strong> {{ __('organic results — the listing URL may differ from the page you audited. Use Search Console for official average position.') }}
                                         @else
-                                            Your site at position <strong>#{{ $ysPos }}</strong> in this sample — <strong>outside the first page</strong> (positions 1–10).
+                                            {{ __('Your site at position') }} <strong>#{{ $ysPos }}</strong> {{ __('in this sample —') }} <strong>{{ __('outside the first page') }}</strong> {{ __('(positions 1–10).') }}
                                         @endif
-                                        <br><span class="muted" style="font-size: 10px;">{{ $ysN }} organic listings in sample.</span>
+                                        <br><span class="muted" style="font-size: 10px;">{{ $ysN }} {{ __('organic listings in sample.') }}</span>
                                     </td>
                                 </tr>
                             </table>
                         @elseif ($ysN === 0)
-                            <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Search position</p>
-                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Rank could not be checked — no organic links in the SERP response.</p>
+                            <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">{{ __('Search position') }}</p>
+                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">{{ __('Rank could not be checked — no organic links in the SERP response.') }}</p>
                         @else
-                            <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Not in top {{ $ysN }} of this sample</p>
-                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Your site’s domain did not match any of the {{ $ysN }} organic results in this snapshot (domain match, not full URL path). Check Search Console for your real average position.</p>
+                            <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">{{ __('Not in top') }} {{ $ysN }} {{ __('of this sample') }}</p>
+                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">{{ __('Your site’s domain did not match any of the') }} {{ $ysN }} {{ __('organic results in this snapshot (domain match, not full URL path). Check Search Console for your real average position.') }}</p>
                         @endif
                         @include('partials.serp-vs-audited-snippet-export', ['ys' => $ys])
                     </div>
                 @endif
                 <p class="muted" style="margin-bottom: 10px;">
-                    Organic URLs pulled live from Google at audit time. Flesch scores are from HTML we fetched ourselves; rankings are approximate and not identical to live Google.
+                    {{ __('Organic URLs pulled live from Google at audit time. Flesch scores are from HTML we fetched ourselves; rankings are approximate and not identical to live Google.') }}
                     @if (\App\Support\Audit\PageLocalePresentation::shouldShowSerpLocationNote($benchmark['serp_locale'] ?? null))
                         @php $exportSerpLoc = \App\Support\Audit\PageLocalePresentation::serpParamsLine($benchmark['serp_locale'] ?? null); @endphp
                         @if ($exportSerpLoc)
-                            <br><span style="display: inline-block; margin-top: 4px;">SERP sample region: <span style="font-family: ui-monospace, monospace;">{{ $exportSerpLoc }}</span></span>
+                            <br><span style="display: inline-block; margin-top: 4px;">{{ __('SERP sample region:') }} <span style="font-family: ui-monospace, monospace;">{{ $exportSerpLoc }}</span></span>
                         @endif
                     @endif
                 </p>
                 @if (! empty($benchmark['keyword']))
                     <p>
-                        <strong>SERP keyword:</strong>
+                        <strong>{{ __('SERP keyword:') }}</strong>
                         <span style="font-family: ui-monospace, monospace;">{{ $benchmark['keyword'] }}</span>
                         @if (($benchmark['keyword_source'] ?? null) === 'manual')
-                            <span style="margin-left: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #5b21b6;">(custom audit)</span>
+                            <span style="margin-inline-start: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #5b21b6;">({{ __('custom audit') }})</span>
                         @elseif (($benchmark['keyword_source'] ?? null) === 'gsc_primary')
-                            <span class="muted" style="margin-left: 6px; font-size: 10px;">(Search Console)</span>
+                            <span class="muted" style="margin-inline-start: 6px; font-size: 10px;">({{ __('Search Console') }})</span>
                         @endif
                     </p>
                 @endif
@@ -604,15 +618,15 @@
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px;">
                         <thead>
                             <tr style="background: #f1f5f9;">
-                                <th style="text-align: left; padding: 4px 6px;">Page</th>
-                                <th style="text-align: right; padding: 4px 6px;">Flesch</th>
-                                <th style="text-align: left; padding: 4px 6px;">Grade</th>
+                                <th style="text-align: start; padding: 4px 6px;">{{ __('Page') }}</th>
+                                <th style="text-align: end; padding: 4px 6px;">{{ __('Flesch') }}</th>
+                                <th style="text-align: start; padding: 4px 6px;">{{ __('Grade') }}</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr style="border-top: 1px solid #e2e8f0; background: #FEF0E7;">
-                                <td style="padding: 4px 6px; font-weight: 700;">This page (audited)</td>
-                                <td style="padding: 4px 6px; text-align: right; font-weight: 700;">{{ is_numeric($benchmark['your_flesch'] ?? null) ? $benchmark['your_flesch'] : '—' }}</td>
+                                <td style="padding: 4px 6px; font-weight: 700;">{{ __('This page (audited)') }}</td>
+                                <td style="padding: 4px 6px; text-align: end; font-weight: 700;">{{ is_numeric($benchmark['your_flesch'] ?? null) ? $benchmark['your_flesch'] : '—' }}</td>
                                 <td style="padding: 4px 6px;">{{ data_get($advanced, 'readability.grade') ?? '—' }}</td>
                             </tr>
                             @foreach ($benchmark['competitors'] as $row)
@@ -623,7 +637,7 @@
                                             <span class="muted"> #{{ $row['position'] }}</span>
                                         @endif
                                     </td>
-                                    <td style="padding: 4px 6px; text-align: right;">{{ is_numeric($row['flesch'] ?? null) ? $row['flesch'] : '—' }}</td>
+                                    <td style="padding: 4px 6px; text-align: end;">{{ is_numeric($row['flesch'] ?? null) ? $row['flesch'] : '—' }}</td>
                                     <td style="padding: 4px 6px;">{{ $row['grade'] ?? '—' }}</td>
                                 </tr>
                             @endforeach
@@ -631,15 +645,15 @@
                     </table>
                 @endif
                 @if (! empty($benchmark['gap_table']['rows']))
-                    <h3 style="margin: 18px 0 6px; font-size: 13px;">You vs. market average</h3>
-                    <p class="muted" style="margin: 0 0 10px; font-size: 11px;">Mean of competitor pages fetched for this benchmark. Image counts reflect visual engagement gaps that word count misses.</p>
+                    <h3 style="margin: 18px 0 6px; font-size: 13px;">{{ __('You vs. market average') }}</h3>
+                    <p class="muted" style="margin: 0 0 10px; font-size: 11px;">{{ __('Mean of competitor pages fetched for this benchmark. Image counts reflect visual engagement gaps that word count misses.') }}</p>
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
                         <thead>
                             <tr style="background: #f1f5f9;">
-                                <th style="text-align: left; padding: 6px 8px;">Metric</th>
-                                <th style="text-align: right; padding: 6px 8px;">Your page</th>
-                                <th style="text-align: right; padding: 6px 8px;">Market avg</th>
-                                <th style="text-align: left; padding: 6px 8px;">Status</th>
+                                <th style="text-align: start; padding: 6px 8px;">{{ __('Metric') }}</th>
+                                <th style="text-align: end; padding: 6px 8px;">{{ __('Your page') }}</th>
+                                <th style="text-align: end; padding: 6px 8px;">{{ __('Market avg') }}</th>
+                                <th style="text-align: start; padding: 6px 8px;">{{ __('Status') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -669,8 +683,8 @@
                                 @endphp
                                 <tr style="border-top: 1px solid #e2e8f0;">
                                     <td style="padding: 6px 8px; font-weight: 600;">{{ $g['metric'] ?? '' }}</td>
-                                    <td style="padding: 6px 8px; text-align: right;">{{ $yoursFmt }}</td>
-                                    <td style="padding: 6px 8px; text-align: right;">{{ $avgFmt }}</td>
+                                    <td style="padding: 6px 8px; text-align: end;">{{ $yoursFmt }}</td>
+                                    <td style="padding: 6px 8px; text-align: end;">{{ $avgFmt }}</td>
                                     <td style="padding: 6px 8px;">{{ $deltaFmt }} <span class="muted">({{ $g['status'] ?? '' }})</span></td>
                                 </tr>
                             @endforeach
@@ -684,7 +698,7 @@
                     @endphp
                     @if ($gapHasFleschOutOfRangeExp)
                         <p class="muted" style="margin-top: 8px; font-size: 11px; font-style: italic;">
-                            Some competitor pages in the SERP sample were not long-form articles (Flesch outside the 10–95 prose range) and were excluded from the readability average.
+                            {{ __('Some competitor pages in the SERP sample were not long-form articles (Flesch outside the 10–95 prose range) and were excluded from the readability average.') }}
                         </p>
                     @endif
                 @endif
@@ -692,7 +706,7 @@
         @endif
     @endif
 
-    <p class="muted" style="text-align: center; margin-top: 24px;">Generated by Serfix · {{ format_user_now('M j, Y g:i A', $timezoneContextUser ?? null) }}</p>
+    <p class="muted" style="text-align: center; margin-top: 24px;">{{ __('Generated by Serfix') }} · {{ format_user_now('M j, Y g:i A', $timezoneContextUser ?? null) }}</p>
 </div>
 </body>
 </html>

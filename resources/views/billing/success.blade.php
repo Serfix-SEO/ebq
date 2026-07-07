@@ -13,28 +13,28 @@
             </svg>
         </div>
 
-        <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Subscription active</h1>
+        <h1 class="text-3xl font-bold text-slate-900 tracking-tight">{{ __('Subscription active') }}</h1>
         <p class="text-slate-600 mt-3 text-base leading-relaxed">
             @if ($isTrialing && $trialEnd)
-                Your free trial is running. Your card won't be charged until it ends {{ $trialEnd }}, and you can cancel any time before then from Billing.
+                {{ __('Your free trial is running. Your card won\'t be charged until it ends :trialEnd, and you can cancel any time before then from Billing.', ['trialEnd' => $trialEnd]) }}
             @else
-                Thanks for subscribing. Your account is fully unlocked.
+                {{ __('Thanks for subscribing. Your account is fully unlocked.') }}
             @endif
         </p>
 
         <div class="mt-8 flex items-center justify-center gap-3 flex-wrap">
             <a href="{{ route('dashboard') }}"
                class="inline-flex items-center rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500">
-                Go to dashboard
+                {{ __('Go to dashboard') }}
             </a>
             <a href="{{ route('billing.show') }}"
                class="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Manage subscription
+                {{ __('Manage subscription') }}
             </a>
         </div>
 
         <p class="text-xs text-slate-500 mt-10">
-            Receipt and invoice are emailed automatically. You can change your card or cancel from the Billing page at any time.
+            {{ __('Receipt and invoice are emailed automatically. You can change your card or cancel from the Billing page at any time.') }}
         </p>
     </div>
 </x-layouts.app>

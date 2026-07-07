@@ -18,7 +18,10 @@ class GuestAuditLinkMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public GuestPageAudit $audit) {}
+    public function __construct(public GuestPageAudit $audit)
+    {
+        $this->locale($audit->locale ?? app()->getLocale());
+    }
 
     public function envelope(): Envelope
     {

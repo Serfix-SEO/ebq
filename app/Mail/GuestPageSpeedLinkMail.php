@@ -18,7 +18,10 @@ class GuestPageSpeedLinkMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public GuestPageSpeed $report) {}
+    public function __construct(public GuestPageSpeed $report)
+    {
+        $this->locale($report->locale ?? app()->getLocale());
+    }
 
     public function envelope(): Envelope
     {

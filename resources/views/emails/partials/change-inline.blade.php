@@ -8,7 +8,7 @@
         $text = '—';
     } elseif ($dir === 'up') {
         $color = $isPos ? '#16a34a' : '#dc2626';
-        $text = $pct !== null ? "↑ +{$pct}%" : '↑ New';
+        $text = $pct !== null ? "↑ +{$pct}%" : '↑ '.__('New');
     } else {
         $color = $isPos ? '#16a34a' : '#dc2626';
         $text = $pct !== null ? "↓ {$pct}%" : '↓';

@@ -13,19 +13,19 @@
         role="status"
     >
         <div class="flex-1">
-            <div class="font-semibold">Plan limit reached</div>
-            <div class="mt-1">{{ $quotaNotice['message'] ?? 'You have reached your plan limit.' }}</div>
+            <div class="font-semibold">{{ __('Plan limit reached') }}</div>
+            <div class="mt-1">{{ $quotaNotice['message'] ?? __('You have reached your plan limit.') }}</div>
         </div>
         <div class="flex items-center gap-2">
             <a
                 href="{{ $quotaNotice['upgrade_url'] ?? url('/billing') }}"
                 class="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white hover:bg-amber-700"
-            >Upgrade plan</a>
+            >{{ __('Upgrade plan') }}</a>
             <button
                 type="button"
                 x-on:click="open = false"
                 class="rounded-md p-1 text-amber-700 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
-                aria-label="Dismiss"
+                aria-label="{{ __('Dismiss') }}"
             >&times;</button>
         </div>
     </div>
