@@ -109,6 +109,7 @@ class ActionQueueService
                 'metric' => number_format($r['recent_clicks']).' clicks · '.number_format($r['recent_impressions']).' impr (14d)',
                 'fix_url' => $this->pageUrl($r['page']),
                 'fix_feature' => 'pages',
+                'open_url' => $r['page'] ?? null,
             ], $this->reports->indexingFailsWithTraffic($websiteId, 14, self::COUNT_LIMIT, $country)),
 
             'cannibalization' => array_map(fn (array $r): array => [
@@ -117,6 +118,7 @@ class ActionQueueService
                 'metric' => $this->upsideLabel($r['upside_value'] ?? null) ?? number_format($r['total_clicks']).' clicks',
                 'fix_url' => $this->pageUrl($r['primary_page']),
                 'fix_feature' => 'pages',
+                'open_url' => $r['primary_page'] ?? null,
             ], $this->reports->cannibalizationReport($websiteId, null, null, self::COUNT_LIMIT, $country)),
 
             'content_decay' => array_map(fn (array $r): array => [
@@ -125,6 +127,7 @@ class ActionQueueService
                 'metric' => round((float) $r['clicks_change_percent']).'% (28d)',
                 'fix_url' => $this->pageUrl($r['page']),
                 'fix_feature' => 'pages',
+                'open_url' => $r['page'] ?? null,
             ], $this->reports->contentDecay($websiteId, self::COUNT_LIMIT, $country)['pages'] ?? []),
 
             'rank_drops' => array_map(fn (array $r): array => [
@@ -141,6 +144,7 @@ class ActionQueueService
                 'metric' => number_format($r['clicks']).' clicks · '.number_format($r['impressions']).' impr',
                 'fix_url' => $this->pageUrl($r['page']),
                 'fix_feature' => 'pages',
+                'open_url' => $r['page'] ?? null,
             ], $this->audit->underperformingPages($websiteId, 28, self::COUNT_LIMIT, $country)),
 
             'striking_distance' => array_map(fn (array $r): array => [
@@ -153,6 +157,7 @@ class ActionQueueService
                     'country' => $country,
                 ])),
                 'fix_feature' => 'audits',
+                'open_url' => $r['page'] ?? null,
             ], $this->reports->strikingDistance($websiteId, null, null, self::COUNT_LIMIT, $country)),
 
             'quick_wins' => array_map(fn (array $r): array => [
@@ -161,6 +166,7 @@ class ActionQueueService
                 'metric' => $this->upsideLabel($r['upside_value'] ?? null),
                 'fix_url' => $r['current_page'] ? $this->pageUrl($r['current_page']) : route('keywords.show', ['query' => $r['keyword']]),
                 'fix_feature' => $r['current_page'] ? 'pages' : 'keywords',
+                'open_url' => $r['current_page'] ?? null,
             ], $this->reports->quickWins($websiteId, self::COUNT_LIMIT)),
 
             default => str_starts_with($key, 'crawl_')

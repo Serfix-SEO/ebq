@@ -423,6 +423,7 @@ class CrawlReportService
                 // same as every other finding, instead of opening the live site.
                 'fix_url' => $source ? route('link-structure.index', ['url' => $source, 'issue' => $f->type]) : null,
                 'fix_feature' => 'link_structure',
+                'open_url' => $f->affected_url,
             ];
         }
 
@@ -444,6 +445,7 @@ class CrawlReportService
             'metric' => $impact > 0 ? number_format($impact).' clicks (28d)' : null,
             'fix_url' => route('link-structure.index', ['url' => $f->affected_url, 'issue' => $f->type]),
             'fix_feature' => 'link_structure',
+            'open_url' => $f->affected_url,
         ];
     }
 

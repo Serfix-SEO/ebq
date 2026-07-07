@@ -156,7 +156,16 @@
                 @forelse ($rows as $row)
                     <li class="flex items-center gap-3 px-5 py-3.5">
                         <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{{ $row['title'] }}</p>
+                            <p class="flex items-center gap-1.5 truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                                <span class="truncate">{{ $row['title'] }}</span>
+                                @if (! empty($row['open_url']))
+                                    <a href="{{ $row['open_url'] }}" target="_blank" rel="noopener"
+                                        title="Open {{ $row['open_url'] }} in a new tab"
+                                        class="flex-none text-slate-400 transition hover:text-orange-600 dark:text-slate-500 dark:hover:text-orange-400">
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                                    </a>
+                                @endif
+                            </p>
                             <p class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{{ $row['subtitle'] }}</p>
                             @if (! empty($row['metric']))
                                 <p class="mt-0.5 text-[11px] font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{{ $row['metric'] }}</p>
