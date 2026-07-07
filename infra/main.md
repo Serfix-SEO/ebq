@@ -142,9 +142,11 @@ marketing crawl-report sends, proxies, keyword servers, platform settings. (Craw
 crawler/operations; Plugin/Plan/Billing panels → their own subsystem docs.)
 
 ### Frontend / UI ✅
-[frontend/](./frontend/README.md) → livewire-patterns — Livewire 3 + Alpine + Tailwind 4 +
-Vite 7. **No full-page Livewire routes** (Blade `Route::view` embeds `<livewire:…>`); the
-**active website is session state** (`current_website_id`, propagated via `website-changed`).
+[frontend/](./frontend/README.md) → livewire-patterns · [i18n-and-rtl](./frontend/i18n-and-rtl.md)
+— Livewire 3 + Alpine + Tailwind 4 + Vite 7. **No full-page Livewire routes** (Blade
+`Route::view` embeds `<livewire:…>`); the **active website is session state**
+(`current_website_id`, propagated via `website-changed`). App-wide English/Arabic (RTL) i18n
+complete as of 2026-07-07 — admin panel stays English-only.
 
 ### Cross-cutting reference ✅ (the horizontal layer — `infra/reference/`)
 | Doc | Covers |
@@ -253,6 +255,21 @@ known gaps were flagged during the sweep:
 ---
 
 ## Knowledge changelog
+
+- **2026-07-07 (app-wide English/Arabic i18n + RTL — complete)** — Full translation +
+  RTL layout across marketing, auth/onboarding, the entire customer dashboard, guest
+  lead-gen tools, transactional emails, and PDF exports (~180 files). Admin panel stays
+  English-only (excluded at the `SetLocale` middleware level). New doc:
+  [frontend/i18n-and-rtl.md](./frontend/i18n-and-rtl.md). Two structural fixes worth
+  knowing about beyond the blade-wrapping itself: (1) queued Mailables don't inherit
+  the recipient's locale by default (`app()->getLocale()` on a worker reflects nothing
+  useful) — fixed via `Mailable::locale()` + a new `locale` column on the 4 guest_*
+  tables, captured at request time; (2) `plans.features` / `BacklinkType::label()` /
+  `CrawlReportService::typeLabel()` are dynamically-built strings invisible to the
+  `__()` harvest script — their full known value sets are manually seeded into
+  `lang/*.json`. Full MT-pipeline gotcha list (placeholder-token corruption at scale,
+  recurring mistranslations, stale-Tailwind-build trap) lives in project memory
+  (`i18n-mt-pipeline-gotchas.md`), kept current after every batch.
 
 - **2026-07-07 (DB was on the 128MB stock buffer pool — tuned + covering index; 27×
   on the heavy aggregates)** — User asked if Apache/MariaDB had headroom. MariaDB was
