@@ -20,6 +20,15 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // Test suite: plain index, no online-DDL syntax.
+            Schema::table('search_console_data', function ($table): void {
+                $table->index(['website_id', 'date', 'country', 'clicks', 'impressions'], 'scd_wid_date_cov');
+            });
+
+            return;
+        }
+
         // Raw statement to force the online algorithm on MariaDB.
         DB::statement('ALTER TABLE search_console_data
             ADD INDEX scd_wid_date_cov (website_id, date, country, clicks, impressions),

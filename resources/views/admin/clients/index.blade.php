@@ -61,12 +61,14 @@
         @endif
 
         {{-- Summary stats --}}
-        <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div class="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             @foreach ([
                 ['label' => 'Total clients',  'value' => $summary['total'],    'tone' => 'slate'],
                 ['label' => 'Admins',         'value' => $summary['admins'],   'tone' => 'orange'],
                 ['label' => 'Disabled',       'value' => $summary['disabled'], 'tone' => 'rose'],
                 ['label' => 'New this week',  'value' => $summary['new_7d'],   'tone' => 'emerald'],
+                ['label' => 'Trial → paid',   'value' => $summary['converted_paid'],  'tone' => 'emerald'],
+                ['label' => 'Trial + card added', 'value' => $summary['trial_with_card'], 'tone' => 'sky'],
             ] as $s)
                 <div class="rounded-md border border-slate-200 bg-white px-3 py-2.5">
                     <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $s['label'] }}</p>
@@ -77,6 +79,7 @@
                         'text-rose-700' => $s['tone'] === 'rose' && $s['value'] > 0,
                         'text-slate-400' => $s['tone'] === 'rose' && $s['value'] === 0,
                         'text-emerald-700' => $s['tone'] === 'emerald',
+                        'text-sky-700' => $s['tone'] === 'sky',
                     ])>{{ $fmtN($s['value']) }}</p>
                 </div>
             @endforeach
@@ -129,7 +132,7 @@
         <form method="GET" class="flex flex-wrap items-center gap-2">
             <div class="relative min-w-[260px] flex-1">
                 <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
-                <input type="text" name="q" value="{{ $q }}" placeholder="Search by name or email…" autocomplete="off"
+                <input type="text" name="q" value="{{ $q }}" placeholder="Search by name, email or website domain…" autocomplete="off"
                        class="w-full rounded-md border border-slate-300 pl-8 pr-3 py-1.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
             </div>
             <input type="hidden" name="status" value="{{ $status }}" id="status-input" />

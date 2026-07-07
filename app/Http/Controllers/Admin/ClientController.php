@@ -23,12 +23,28 @@ class ClientController extends Controller
         $status = (string) $request->query('status', 'all');
         $sort = (string) $request->query('sort', 'recent');
 
-        // ─── Compact summary cards: total / admins / disabled / new this week ─
+        // ─── Compact summary cards ────────────────────────────────────────
+        $activeSub = fn ($q) => $q->from('subscriptions')
+            ->whereColumn('subscriptions.user_id', 'users.id')
+            ->where('stripe_status', 'active');
+
         $summary = [
             'total' => User::query()->count(),
             'admins' => User::query()->where('is_admin', true)->count(),
             'disabled' => User::query()->where('is_disabled', true)->count(),
             'new_7d' => User::query()->where('created_at', '>=', Carbon::now()->subDays(7))->count(),
+            // Trial → paid: users holding an ACTIVE Stripe subscription (every
+            // account starts as trial, so an active sub = a conversion). Uses
+            // the Cashier subscriptions table, not current_plan_slug — comped
+            // plans (admin force-apply) also set the slug and must not count.
+            'converted_paid' => User::query()->whereExists($activeSub)->count(),
+            // Trial users who added a card but haven't subscribed: Cashier
+            // stamps pm_type/pm_last_four when a payment method is saved.
+            // High-intent segment worth chasing.
+            'trial_with_card' => User::query()
+                ->whereNotNull('pm_type')
+                ->whereNotExists($activeSub)
+                ->count(),
         ];
 
         $monthStart = Carbon::now()->startOfMonth();
@@ -69,7 +85,13 @@ class ClientController extends Controller
                 'serp_units_mtd'
             )
             ->when($q !== '', fn ($query) => $query->where(function ($w) use ($q) {
-                $w->where('name', 'like', '%'.$q.'%')->orWhere('email', 'like', '%'.$q.'%');
+                $w->where('name', 'like', '%'.$q.'%')
+                    ->orWhere('email', 'like', '%'.$q.'%')
+                    // Find the client that owns a website — admins usually know
+                    // the domain, not the owner's email.
+                    ->orWhereExists(fn ($sub) => $sub->from('websites')
+                        ->whereColumn('websites.user_id', 'users.id')
+                        ->where('websites.domain', 'like', '%'.$q.'%'));
             }))
             ->when($status === 'admins', fn ($query) => $query->where('is_admin', true))
             ->when($status === 'active', fn ($query) => $query->where('is_disabled', false))
