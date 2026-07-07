@@ -254,6 +254,29 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-07 (DB was on the 128MB stock buffer pool — tuned + covering index; 27×
+  on the heavy aggregates)** — User asked if Apache/MariaDB had headroom. MariaDB was
+  running the **out-of-box 128MB `innodb_buffer_pool_size`** while serving a 2.2GB
+  dataset (98.4% hit rate but 67M disk reads/19 days — every big GROUP BY stormed
+  disk). New `/etc/mysql/mariadb.conf.d/60-ebq-tuning.cnf`: `innodb_buffer_pool_size=2G`
+  (whole dataset resident; box has 7.6GB, co-hosted Postal/Jitsi/FPM accounted),
+  `innodb_log_file_size=512M` (nightly upsert bursts), `tmp_table_size`/
+  `max_heap_table_size=64M`. **`innodb_flush_log_at_trx_commit` left at 1 on purpose —
+  no backups on this server, durability is not tradeable.** That fixed the disk half;
+  EXPLAIN showed the remaining seconds were plan-shaped: the aggregate indexes weren't
+  covering, so ~650K matched rows each did a PK lookup. Added
+  `scd_wid_date_cov (website_id, date, country, clicks, impressions)`
+  (migration, `ALGORITHM=INPLACE, LOCK=NONE`, 25s build) — KPI sums / country GROUP BY /
+  traffic chart now run index-only. Cold-path results on the largest account:
+  country group-by **98s → 3.6s**, KPI sums **26s → 0.97s**, traffic chart
+  **17s → 0.92s**. Users still read the 24h warmed cache (~25ms); this makes the warm
+  job + all ad-hoc reads cheap. Apache assessed: mpm_event + FPM max_children=40 fine.
+  ⚠ Noted, not changed: Jitsi's two JVMs allow `-Xmx3072m` each — if a big conference
+  ever spikes them concurrently with the now-2G buffer pool, the box can overcommit;
+  revisit if meet.ebq.io usage grows. Octane/Swoole evaluated and rejected — the
+  bottlenecks are query work not framework boot, and per-request singletons
+  (`ShardContext` shard routing!) make long-lived workers a tenant-bleed hazard.
+
 - **2026-07-06 (latest — statistics windows were lag-blind; anchored to real data
   days)** — User: statistics counts look wrong for namesforfreefire.com. Verified the
   math was exact for its window — the WINDOW was wrong: GSC finalizes ~3 days late,
