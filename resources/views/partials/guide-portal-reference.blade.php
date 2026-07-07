@@ -422,7 +422,7 @@
         <div class="mt-8 space-y-8 text-[13px] leading-6 text-slate-700">
             <div>
                 <h3 class="text-lg font-semibold text-slate-900">Cannibalizations</h3>
-                <p class="mt-2">Columns: Query, Primary page, Pages (count), Clicks, Impr., At stake (rough upside if the query consolidated), Competing pages with click share. Use this to pick a keeper URL and merge or redirect the rest.</p>
+                <p class="mt-2">Columns: Query, Primary page, Pages (count), Clicks, Impr., Volume/mo (monthly search volume), Competing pages with click share. Use this to pick a keeper URL and merge or redirect the rest.</p>
             </div>
             <div>
                 <h3 class="text-lg font-semibold text-slate-900">Striking distance</h3>

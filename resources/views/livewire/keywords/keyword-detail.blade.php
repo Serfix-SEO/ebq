@@ -119,23 +119,18 @@
                 <p class="mt-1.5 text-[10px] text-slate-400">lower is easier to win</p>
             </div>
 
-            {{-- Projected value --}}
+            {{-- Projected clicks (CTR curve x volume; dollar projections removed 2026-07-07) --}}
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Value / mo</p>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Est. clicks / mo</p>
                 <div class="mt-2">
-                    @if ($projections['current_value'] !== null)
-                        <span class="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">${{ number_format($projections['current_value'], 0) }}</span>
+                    @if ($projections['projected_clicks'] !== null && $projections['projected_clicks'] > 0)
+                        <span class="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($projections['projected_clicks']) }}</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">clicks/mo</span>
                     @else
                         <span class="text-2xl font-bold text-slate-400">—</span>
                     @endif
                 </div>
-                @if ($projections['upside_value'] !== null && $projections['upside_value'] > 0)
-                    <p class="mt-1.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                        +${{ number_format($projections['upside_value'], 0) }}/mo upside at top of page 1
-                    </p>
-                @else
-                    <p class="mt-1.5 text-[10px] text-slate-400">projected at current position</p>
-                @endif
+                <p class="mt-1.5 text-[10px] text-slate-400">projected at current position</p>
             </div>
         </div>
 

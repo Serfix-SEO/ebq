@@ -62,7 +62,7 @@ class ActionQueueService
                 self::SEV_CRITICAL, count($indexing), 0.0, 'Fix'),
             $this->summary('cannibalization', 'Keyword cannibalization',
                 'Multiple pages competing for the same query and splitting clicks.',
-                self::SEV_HIGH, count($cannibalization), $this->sumUpside($cannibalization), 'View'),
+                self::SEV_HIGH, count($cannibalization), 0.0, 'View'),
             $this->summary('content_decay', 'Decaying pages',
                 'Pages losing clicks fast that still earn impressions — recoverable.',
                 self::SEV_HIGH, count($decay), 0.0, 'View'),
@@ -74,10 +74,10 @@ class ActionQueueService
                 self::SEV_HIGH, count($auditPerf), 0.0, 'View'),
             $this->summary('striking_distance', 'Striking-distance keywords',
                 'Ranking positions 5–20 with traffic — small pushes reach page one.',
-                self::SEV_GROWTH, count($striking), $this->sumUpside($striking), 'View'),
+                self::SEV_GROWTH, count($striking), 0.0, 'View'),
             $this->summary('quick_wins', 'Quick-win keywords',
                 'High-volume, low-competition terms you don’t yet rank for.',
-                self::SEV_GROWTH, count($quickWins), $this->sumUpside($quickWins), 'View'),
+                self::SEV_GROWTH, count($quickWins), 0.0, 'View'),
         ];
 
         // Merge crawl-derived issues (broken links, orphans, on-page, etc.).
@@ -115,7 +115,7 @@ class ActionQueueService
             'cannibalization' => array_map(fn (array $r): array => [
                 'title' => $r['query'],
                 'subtitle' => $r['page_count'].' pages competing · primary '.$this->shortenUrl($r['primary_page']),
-                'metric' => $this->upsideLabel($r['upside_value'] ?? null) ?? number_format($r['total_clicks']).' clicks',
+                'metric' => number_format($r['total_clicks']).' clicks',
                 'fix_url' => $this->pageUrl($r['primary_page']),
                 'fix_feature' => 'pages',
                 'open_url' => $r['primary_page'] ?? null,
@@ -150,7 +150,7 @@ class ActionQueueService
             'striking_distance' => array_map(fn (array $r): array => [
                 'title' => $r['query'],
                 'subtitle' => 'Position '.$r['page_position'].' · '.$this->shortenUrl($r['page']),
-                'metric' => $this->upsideLabel($r['upside_value'] ?? null) ?? number_format($r['impressions']).' impr',
+                'metric' => number_format($r['impressions']).' impr',
                 'fix_url' => route('keywords.fix', array_filter([
                     'keyword' => $r['query'],
                     'page' => $r['page'],
@@ -163,7 +163,7 @@ class ActionQueueService
             'quick_wins' => array_map(fn (array $r): array => [
                 'title' => $r['keyword'],
                 'subtitle' => 'Volume '.number_format((int) $r['search_volume']).' · '.($r['current_position'] !== null ? 'position '.$r['current_position'] : 'not ranking'),
-                'metric' => $this->upsideLabel($r['upside_value'] ?? null),
+                'metric' => 'Volume '.number_format((int) $r['search_volume']),
                 'fix_url' => $r['current_page'] ? $this->pageUrl($r['current_page']) : route('keywords.show', ['query' => $r['keyword']]),
                 'fix_feature' => $r['current_page'] ? 'pages' : 'keywords',
                 'open_url' => $r['current_page'] ?? null,
@@ -210,8 +210,11 @@ class ActionQueueService
             'severity' => $severity,
             // Dollar upside ranks groups when available; otherwise fall back to
             // the count so busier groups float up within the same severity tier.
-            'impact' => $upside > 0 ? $upside : (float) $count,
-            'impact_label' => $this->upsideLabel($upside > 0 ? $upside : null),
+            // Dollar-upside projections were removed from the UI 2026-07-07
+            // (bucketed volumes x generic head terms produced absurd figures
+            // like "$2.1M/mo"); groups rank by finding count within severity.
+            'impact' => (float) $count,
+            'impact_label' => null,
             'action_label' => $actionLabel,
         ];
     }

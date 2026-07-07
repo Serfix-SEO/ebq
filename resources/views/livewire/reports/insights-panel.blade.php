@@ -86,7 +86,7 @@
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Pages</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Impr.</th>
-                                        <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Full market value of this keyword at position 1 (volume × top-CTR × CPC). This is what the split is costing.">At stake</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Monthly search volume for this query">Volume/mo</th>
                                         <th scope="col" class="py-2 font-semibold">Competing pages (share %)</th>
                                     </tr>
                                 </thead>
@@ -99,8 +99,8 @@
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['total_clicks']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['total_impressions']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">
-                                                @if (! empty($row['addressable_value']))
-                                                    <span class="font-semibold text-amber-600 dark:text-amber-400">${{ number_format($row['addressable_value'], 0) }}</span>
+                                                @if (! empty($row['search_volume']))
+                                                    <span class="font-semibold text-amber-600 dark:text-amber-400">{{ number_format($row['search_volume']) }}</span>
                                                 @else
                                                     <span class="text-slate-400">—</span>
                                                 @endif
@@ -138,7 +138,7 @@
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Impressions</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">CTR</th>
-                                        <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Estimated monthly value if this keyword reached position 3">Upside/mo</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Opportunity score: impressions weighted by how close the position is to page one">Score</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold"><span class="sr-only">Fix</span></th>
                                     </tr>
                                 </thead>
@@ -166,11 +166,7 @@
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['clicks']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ $row['ctr'] }}%</td>
                                             <td class="py-2 pr-3 text-right tabular-nums font-semibold text-orange-600 dark:text-orange-400">
-                                                @if (! empty($row['upside_value']))
-                                                    ${{ number_format($row['upside_value'], 0) }}
-                                                @else
-                                                    <span class="text-slate-400">score {{ $row['score'] }}</span>
-                                                @endif
+                                                {{ $row['score'] }}
                                             </td>
                                             <td class="py-2 pr-3 text-right">
                                                 @if (! empty($row['page']))
@@ -288,7 +284,7 @@
                     @endif
                 </x-insights.card>
             @elseif ($tab === 'quick_wins')
-                <x-insights.card title="Quick wins" description="Low-competition keywords with real search volume where you either don't rank or rank outside the top 10. Sorted by the dollar upside of reaching position 3.">
+                <x-insights.card title="Quick wins" description="Low-competition keywords with real search volume where you either don't rank or rank outside the top 10. Sorted by search volume and how winnable they look.">
                     @if (empty($data['quick_wins']))
                         <x-insights.empty-state title="No quick wins surfaced yet" body="Either our keyword intelligence hasn't filled in for your queries yet, or everything with real volume is already in your top 10. Check back in a day or two as the cache warms up." />
                     @else
@@ -301,7 +297,7 @@
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Volume/mo</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold hidden md:table-cell">Comp.</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Current pos</th>
-                                        <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Projected monthly value if this keyword reached position 3">Upside/mo</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Projected monthly clicks if this keyword reached position 3 (CTR curve x volume)">Est. clicks @#3</th>
                                         <th scope="col" class="py-2 font-semibold">Action</th>
                                     </tr>
                                 </thead>
@@ -335,7 +331,7 @@
                                                 @endif
                                             </td>
                                             <td class="py-2 pr-3 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
-                                                ${{ number_format($row['upside_value'], 0) }}
+                                                {{ number_format((int) round($row['search_volume'] * 0.11)) }}
                                             </td>
                                             <td class="py-2">
                                                 @php

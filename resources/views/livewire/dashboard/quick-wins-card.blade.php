@@ -43,7 +43,7 @@
                                 </div>
                             </div>
                             <span class="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold tabular-nums text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
-                                +${{ number_format($row['upside_value'], 0) }}/mo
+                                {{ number_format((int) $row['search_volume']) }} vol/mo
                             </span>
                         </a>
                     </li>

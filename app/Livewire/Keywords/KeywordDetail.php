@@ -124,8 +124,7 @@ class KeywordDetail extends Component
                 'quick_win' => false,
             ],
             'projections' => [
-                'current_value' => null,
-                'upside_value' => null,
+                'projected_clicks' => null,
             ],
             'language' => null,
         ];
@@ -334,28 +333,25 @@ class KeywordDetail extends Component
     }
 
     /**
+     * Dollar projections (volume x CTR x CPC) were removed from the UI
+     * 2026-07-07 — bucketed volumes on generic head terms produced absurd
+     * "$5.8M/mo" figures. Only the CTR-curve click projection remains.
+     *
      * @param  array<string, mixed>|null  $totals
-     * @return array{current_value: ?float, upside_value: ?float}
+     * @return array{projected_clicks: ?int}
      */
     private function projections(?KeywordMetric $metric, ?array $totals): array
     {
         if (! $metric) {
-            return ['current_value' => null, 'upside_value' => null];
+            return ['projected_clicks' => null];
         }
 
         $position = $totals['position'] ?? null;
 
         return [
-            'current_value' => KeywordValueCalculator::projectedMonthlyValue(
+            'projected_clicks' => KeywordValueCalculator::projectedMonthlyClicks(
                 $metric->search_volume,
                 $position !== null ? (float) $position : null,
-                $metric->cpc !== null ? (float) $metric->cpc : null,
-            ),
-            'upside_value' => KeywordValueCalculator::upsideValue(
-                $metric->search_volume,
-                $position !== null ? (float) $position : null,
-                3,
-                $metric->cpc !== null ? (float) $metric->cpc : null,
             ),
         ];
     }
