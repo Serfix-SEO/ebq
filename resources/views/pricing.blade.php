@@ -13,6 +13,14 @@
     };
     $registerUrl   = route('register');
     $featuresUrl   = route('features');
+
+    // Trial-winback: logged-in expired users see the same strikethrough
+    // pricing as the billing page (checkout auto-applies the discount, so
+    // the numbers shown here are exactly what Stripe charges).
+    $winbackCode    = (string) config('services.stripe.winback_promo_code');
+    $winbackPercent = (int) config('services.stripe.winback_promo_percent');
+    $winbackActive  = $winbackCode !== '' && $authed && \App\Support\TrialStatus::isExpired(auth()->user());
+    $fmtMoney       = fn (float $v) => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
     $contactUrl    = route('contact');
     $refundUrl     = route('refund-policy');
 
@@ -104,7 +112,7 @@
             : (int) $p->max_websites . ' connected websites';
     };
 
-    $plans = $planRows->map(function (\App\Models\Plan $p) use ($ctaForPlan, $registerUrl, $contactUrl, $featureCopy, $apiLimitCopy, $planStyleFor, $websitesBullet) {
+    $plans = $planRows->map(function (\App\Models\Plan $p) use ($ctaForPlan, $registerUrl, $contactUrl, $featureCopy, $apiLimitCopy, $planStyleFor, $websitesBullet, $winbackActive, $winbackCode, $winbackPercent, $fmtMoney) {
         $slug    = (string) $p->slug;
         $monthly = (int) $p->price_monthly_usd;
         $yearly  = (int) $p->price_yearly_usd;
@@ -187,6 +195,18 @@
             ? (int) round(($monthly - $annualMonthly) / $monthly * 100)
             : 0;
 
+        // Winback (duration=once → first payment only): discounted strings
+        // for paid plans; null keeps the normal render path.
+        $winback = null;
+        if ($winbackActive && $monthly > 0 && ! in_array($slug, ['trial', 'enterprise'], true)) {
+            $winback = [
+                'annual'          => '$' . $fmtMoney($yearly * (100 - $winbackPercent) / 100 / 12),
+                'monthly'         => '$' . $fmtMoney($monthly * (100 - $winbackPercent) / 100),
+                'caption_annual'  => '$' . number_format($yearly) . ' → $' . $fmtMoney($yearly * (100 - $winbackPercent) / 100) . ' first year with ' . $winbackCode,
+                'caption_monthly' => 'First month with ' . $winbackCode . ', then $' . number_format($monthly) . '/mo.',
+            ];
+        }
+
         return [
             'slug'            => $slug,
             'name'            => (string) $p->name,
@@ -207,6 +227,7 @@
             'cta_url_monthly'  => $ctaUrlMonthly,
             'cta_style'        => $style['cta_style'],
             'highlight'       => (bool) $p->is_highlighted,
+            'winback'         => $winback,
         ];
     })->all();
 
@@ -380,6 +401,15 @@
         {{-- ── Plan cards ───────────────────────────────────────── --}}
         <section id="plans" class="bg-white pb-16 pt-6 sm:pt-8">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                @if ($winbackActive)
+                    <div class="mb-6 flex flex-col items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 px-6 py-4 text-white shadow-lg sm:flex-row">
+                        <div>
+                            <p class="text-[11px] font-bold uppercase tracking-widest text-orange-100">Limited-time offer</p>
+                            <p class="text-xl font-extrabold sm:text-2xl">{{ $winbackPercent }}% OFF any plan — applied automatically at checkout</p>
+                        </div>
+                        <span class="inline-block shrink-0 rounded-xl border-2 border-dashed border-white/70 bg-white/15 px-4 py-2 text-base font-extrabold tracking-widest">{{ $winbackCode }}</span>
+                    </div>
+                @endif
                 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     @foreach ($plans as $plan)
                         <div @class([
@@ -393,20 +423,39 @@
 
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ $plan['name'] }}</p>
 
-                            <div class="mt-4 flex items-baseline gap-1.5">
-                                {{-- Annual price (default) --}}
-                                <span class="text-4xl font-semibold tracking-tight text-slate-900"
-                                      x-show="billing === 'annual'">{{ $plan['price_annual'] }}</span>
-                                {{-- Monthly price --}}
-                                <span class="text-4xl font-semibold tracking-tight text-slate-900"
-                                      x-show="billing === 'monthly'" style="display:none">{{ $plan['price_monthly'] }}</span>
-                                <span class="text-sm text-slate-500">{{ $plan['suffix'] }}</span>
-                            </div>
+                            @if ($plan['winback'])
+                                <div class="mt-4 flex items-baseline gap-1.5">
+                                    <span x-show="billing === 'annual'" class="flex items-baseline gap-1.5">
+                                        <span class="text-lg font-semibold text-slate-400 line-through">{{ $plan['price_annual'] }}</span>
+                                        <span class="text-4xl font-semibold tracking-tight text-orange-600">{{ $plan['winback']['annual'] }}</span>
+                                    </span>
+                                    <span x-show="billing === 'monthly'" style="display:none" class="flex items-baseline gap-1.5">
+                                        <span class="text-lg font-semibold text-slate-400 line-through">{{ $plan['price_monthly'] }}</span>
+                                        <span class="text-4xl font-semibold tracking-tight text-orange-600">{{ $plan['winback']['monthly'] }}</span>
+                                    </span>
+                                    <span class="text-sm text-slate-500">{{ $plan['suffix'] }}</span>
+                                </div>
 
-                            <p class="mt-1 text-xs text-slate-500"
-                               x-show="billing === 'annual'">{{ $plan['caption_annual'] }}</p>
-                            <p class="mt-1 text-xs text-slate-500"
-                               x-show="billing === 'monthly'" style="display:none">{{ $plan['caption_monthly'] }}</p>
+                                <p class="mt-1 text-xs font-semibold text-orange-700"
+                                   x-show="billing === 'annual'">{{ $plan['winback']['caption_annual'] }}</p>
+                                <p class="mt-1 text-xs font-semibold text-orange-700"
+                                   x-show="billing === 'monthly'" style="display:none">{{ $plan['winback']['caption_monthly'] }}</p>
+                            @else
+                                <div class="mt-4 flex items-baseline gap-1.5">
+                                    {{-- Annual price (default) --}}
+                                    <span class="text-4xl font-semibold tracking-tight text-slate-900"
+                                          x-show="billing === 'annual'">{{ $plan['price_annual'] }}</span>
+                                    {{-- Monthly price --}}
+                                    <span class="text-4xl font-semibold tracking-tight text-slate-900"
+                                          x-show="billing === 'monthly'" style="display:none">{{ $plan['price_monthly'] }}</span>
+                                    <span class="text-sm text-slate-500">{{ $plan['suffix'] }}</span>
+                                </div>
+
+                                <p class="mt-1 text-xs text-slate-500"
+                                   x-show="billing === 'annual'">{{ $plan['caption_annual'] }}</p>
+                                <p class="mt-1 text-xs text-slate-500"
+                                   x-show="billing === 'monthly'" style="display:none">{{ $plan['caption_monthly'] }}</p>
+                            @endif
 
                             <p class="mt-4 text-sm text-slate-600">{{ $plan['tagline'] }}</p>
 

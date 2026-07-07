@@ -120,7 +120,11 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
   1. **h24 expiry email** — offer box, CTA lands on `/billing?promo=SAVE30`;
      `BillingController::show()` parks it in `session('billing_promo')`.
   2. **Billing page banner** — `SubscriptionPanel` shows a large gradient offer banner to any
-     `TrialStatus::isExpired()` user ("auto-applied, no code needed").
+     `TrialStatus::isExpired()` user ("auto-applied, no code needed"); plan cards render
+     strikethrough originals + discounted first-payment prices. The **public /pricing page**
+     does the same for logged-in expired users (banner + strikethrough cards; `pricing` is
+     allowlisted in `EnsureTrialNotExpired` so locked users can browse it — its CTAs land on
+     billing.checkout which auto-applies).
   3. **checkout()** — trial-EXPIRED users get the campaign discount auto-applied
      unconditionally; otherwise the ?promo=/session code applies; the campaign code (and only
      it) resolves to its promotion-code ID (cached 1h) → `withPromotionCode()`; any other/absent

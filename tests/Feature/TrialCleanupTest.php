@@ -201,6 +201,18 @@ class TrialCleanupTest extends TestCase
             ->assertSee('$30.8')                     // 44 * 0.7 (monthly)
             ->assertSee('first month with SAVE30');
 
+        // Public pricing page: same discount for the expired user (route is
+        // middleware-allowlisted so locked users can browse it), untouched
+        // for guests.
+        $this->actingAs($expired)->get(route('pricing'))
+            ->assertOk()
+            ->assertSee('OFF any plan')
+            ->assertSee('line-through')
+            ->assertSee('$310.8')
+            ->assertSee('first year with SAVE30');
+        auth()->logout();
+        $this->get(route('pricing'))->assertOk()->assertDontSee('line-through');
+
         $active = $this->trialUser(5 * 24);
         $this->actingAs($active)->get(route('billing.show'))
             ->assertOk()
