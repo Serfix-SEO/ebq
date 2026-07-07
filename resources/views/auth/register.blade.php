@@ -1,7 +1,7 @@
 <x-layouts.guest>
     <div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900">Create your account</h1>
-        <p class="mt-2 text-sm text-slate-600">Start tracking your SEO performance today</p>
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900">{{ __('Create your account') }}</h1>
+        <p class="mt-2 text-sm text-slate-600">{{ __('Start tracking your SEO performance today') }}</p>
     </div>
 
     @php
@@ -18,12 +18,12 @@
             <path fill="#4A90E2" d="M6.9 13.7c-.2-.6-.3-1.1-.3-1.7s.1-1.2.3-1.7l-3.1-2.4C3.3 8.9 3 10.4 3 12s.3 3.1.8 4.1l3.1-2.4z"/>
             <path fill="#FBBC05" d="M12 6.5c1.3 0 2.5.5 3.5 1.4l2.6-2.6C16.5 3.8 14.4 3 12 3 8.3 3 5.2 5 3.8 7.9l3.1 2.4c.7-2.2 2.7-3.8 5.1-3.8z"/>
         </svg>
-        Continue with Google
+        {{ __('Continue with Google') }}
     </a>
 
     <div class="mt-6 flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-slate-400">
         <span class="h-px flex-1 bg-slate-200"></span>
-        <span>or continue with email</span>
+        <span>{{ __('or continue with email') }}</span>
         <span class="h-px flex-1 bg-slate-200"></span>
     </div>
 
@@ -35,12 +35,12 @@
 
         @if (! empty($invitationEmail))
             <div class="rounded-lg bg-orange-50 px-4 py-3 text-sm text-orange-900">
-                You are registering to accept access to a website. Use the email address this invitation was sent to.
+                {{ __('You are registering to accept access to a website. Use the email address this invitation was sent to.') }}
             </div>
         @endif
 
         <div>
-            <label for="name" class="mb-1.5 block text-xs font-medium text-slate-700">Full name</label>
+            <label for="name" class="mb-1.5 block text-xs font-medium text-slate-700">{{ __('Full name') }}</label>
             <input id="name" name="name" type="text" value="{{ old('name') }}" required autofocus autocomplete="name"
                 class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
             @error('name')
@@ -49,7 +49,7 @@
         </div>
 
         <div>
-            <label for="email" class="mb-1.5 block text-xs font-medium text-slate-700">Email address</label>
+            <label for="email" class="mb-1.5 block text-xs font-medium text-slate-700">{{ __('Email address') }}</label>
             <input id="email" name="email" type="email" value="{{ old('email', $invitationEmail ?? '') }}" required autocomplete="username"
                 @if(! empty($invitationEmail)) readonly @endif
                 class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
@@ -59,7 +59,7 @@
         </div>
 
         <div>
-            <label for="password" class="mb-1.5 block text-xs font-medium text-slate-700">Password</label>
+            <label for="password" class="mb-1.5 block text-xs font-medium text-slate-700">{{ __('Password') }}</label>
             <input id="password" name="password" type="password" required autocomplete="new-password"
                 class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
             @error('password')
@@ -68,7 +68,7 @@
         </div>
 
         <div>
-            <label for="password_confirmation" class="mb-1.5 block text-xs font-medium text-slate-700">Confirm password</label>
+            <label for="password_confirmation" class="mb-1.5 block text-xs font-medium text-slate-700">{{ __('Confirm password') }}</label>
             <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password"
                 class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
         </div>
@@ -85,12 +85,12 @@
 
         <button type="submit"
             class="flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
-            Create account
+            {{ __('Create account') }}
         </button>
     </form>
 
     <p class="mt-8 text-center text-sm text-slate-600">
-        Already have an account?
-        <a href="{{ route('login') }}" class="font-semibold text-slate-900 underline-offset-2 hover:underline">Sign in</a>
+        {{ __('Already have an account?') }}
+        <a href="{{ route('login') }}" class="font-semibold text-slate-900 underline-offset-2 hover:underline">{{ __('Sign in') }}</a>
     </p>
 </x-layouts.guest>

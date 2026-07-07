@@ -5,9 +5,9 @@
     <article class="bg-white">
         <header class="border-b border-slate-200">
             <div class="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-20">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Legal</p>
-                <h1 class="mt-3 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">Refund Policy</h1>
-                <p class="mt-3 text-sm text-slate-500">Last updated: {{ \Illuminate\Support\Carbon::create(2026, 4, 28)->format('F j, Y') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('Legal') }}</p>
+                <h1 class="mt-3 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">{{ __('Refund Policy') }}</h1>
+                <p class="mt-3 text-sm text-slate-500">{{ __('Last updated') }}: {{ \Illuminate\Support\Carbon::create(2026, 4, 28)->format('F j, Y') }}</p>
                 <p class="mt-6 text-[16px] leading-7 text-slate-600">
                     We want you to be confident trying Serfix. Here's exactly how refunds work — fair, clear, no fine print.
                 </p>

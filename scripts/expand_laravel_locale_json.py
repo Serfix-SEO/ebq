@@ -42,11 +42,40 @@ def should_scan(path: Path) -> bool:
     return path.suffix in EXTENSIONS or name.endswith(".blade.php")
 
 
+# Only unescape the handful of sequences PHP single/double-quoted strings
+# actually use inside these calls. `unicode_escape` looks tempting but is
+# unsafe here: it treats the string as latin-1-with-escapes, so any real
+# UTF-8 multibyte character (em dashes, Arabic, accents...) gets mangled
+# byte-by-byte (found 2026-07-07 after em dashes in wrapped strings turned
+# into "\x80\x94"-style mojibake in lang/*.json).
+_ESCAPES = {
+    "\\'": "'",
+    '\\"': '"',
+    "\\\\": "\\",
+    "\\n": "\n",
+    "\\t": "\t",
+}
+
+
+def _unescape(match: str) -> str:
+    out = []
+    i = 0
+    while i < len(match):
+        two = match[i:i + 2]
+        if two in _ESCAPES:
+            out.append(_ESCAPES[two])
+            i += 2
+        else:
+            out.append(match[i])
+            i += 1
+    return "".join(out)
+
+
 def extract_keys(text: str) -> set[str]:
     keys: set[str] = set()
     for pattern in PATTERNS:
         for match in pattern.findall(text):
-            key = bytes(match, "utf-8").decode("unicode_escape").strip()
+            key = _unescape(match).strip()
             if key:
                 keys.add(key)
     return keys
