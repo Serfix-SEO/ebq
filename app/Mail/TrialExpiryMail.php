@@ -30,7 +30,7 @@ class TrialExpiryMail extends Mailable
             'expired' => 'Your Serfix trial has ended — your data will be deleted in 3 days',
             'h48' => 'Reminder: your Serfix data will be deleted in 2 days',
             'h24' => $this->promoCode() !== null
-                ? 'Last day: 20% off any plan — your Serfix data is deleted tomorrow'
+                ? 'Last day: '.config('services.stripe.winback_promo_percent').'% off any plan — your Serfix data is deleted tomorrow'
                 : 'Last day: your Serfix data will be deleted tomorrow',
             default => 'Final notice: your Serfix data will be deleted in 12 hours',
         };
@@ -56,6 +56,7 @@ class TrialExpiryMail extends Mailable
         $name = e($this->user->name ?: 'there');
 
         $promo = $this->promoCode();
+        $percent = (int) config('services.stripe.winback_promo_percent');
         $offerHtml = '';
         if ($promo !== null) {
             // Link lands on /billing?promo=… so checkout auto-applies the
@@ -63,7 +64,7 @@ class TrialExpiryMail extends Mailable
             $upgradeUrl .= '?promo='.rawurlencode($promo);
             $offerHtml = <<<HTML
     <div style="background:#FFF3EA;border:1px solid #F26419;border-radius:8px;padding:16px 20px;margin:20px 0;">
-        <p style="margin:0;line-height:1.6;"><strong>Before you go — take 20% off any plan.</strong><br>
+        <p style="margin:0;line-height:1.6;"><strong>Before you go — take {$percent}% off any plan.</strong><br>
         Use code <strong style="color:#C44E0E;">{$promo}</strong> at checkout (applied automatically via the button below). Valid on every plan, monthly or yearly.</p>
     </div>
 HTML;

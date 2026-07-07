@@ -40,6 +40,32 @@
         </div>
     @endif
 
+    {{-- Trial-expired winback offer: discount is auto-applied at checkout --}}
+    @if ($showWinback)
+        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 px-5 py-5 text-white shadow-lg sm:px-7">
+            <div class="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10"></div>
+            <div class="pointer-events-none absolute -bottom-12 right-24 h-32 w-32 rounded-full bg-white/10"></div>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-orange-100">Limited-time offer</p>
+                    <p class="mt-1 text-2xl font-extrabold leading-tight sm:text-3xl">
+                        {{ $winbackPercent }}% OFF any plan
+                    </p>
+                    <p class="mt-1 max-w-xl text-sm text-orange-50">
+                        Your trial has ended — subscribe now and we'll take {{ $winbackPercent }}% off your first payment.
+                        The discount is <strong>applied automatically at checkout</strong>, no code needed.
+                    </p>
+                </div>
+                <div class="shrink-0 text-center">
+                    <span class="inline-block rounded-xl border-2 border-dashed border-white/70 bg-white/15 px-5 py-2.5 text-lg font-extrabold tracking-widest">
+                        {{ $winbackCode }}
+                    </span>
+                    <p class="mt-1.5 text-[11px] font-medium text-orange-100">auto-applied for you</p>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Frozen-sites banner --}}
     @if ($frozenSites->isNotEmpty())
         <div class="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">

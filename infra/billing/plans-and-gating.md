@@ -110,15 +110,21 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
   full app access (works under those owners' plans) while their own sites still expire.
   Locked users are confined to `billing.*`/`cashier.*`/logout/impersonation-stop; everything
   else redirects to /billing with an explanatory flash. Impersonating admins pass through.
-- **Winback offer (2026-07-07)**: the h24 (second-to-last) email carries **20% off any plan**
-  — Stripe coupon `TRIAL-WINBACK-20` (percent_off 20, duration `once`) exposed as promotion
-  code **`SAVE20`** (`promo_1TqNhdETsnSIf8R5NY1N9icH`). Config:
-  `services.stripe.winback_promo_code` (env `STRIPE_WINBACK_PROMO_CODE`, default `SAVE20`;
-  empty disables offer + auto-apply). Email CTA lands on `/billing?promo=SAVE20`;
-  `BillingController::show()` parks it in `session('billing_promo')`, `checkout()` resolves
-  it to the promotion-code ID (cached 1h, campaign code only) and calls
-  `withPromotionCode()`; any other/absent code falls back to `allowPromotionCodes()`
-  (Stripe forbids combining the two).
+- **Winback offer (2026-07-07, 30% since same day)**: **30% off any plan** — Stripe coupon
+  `TRIAL-WINBACK-30` (percent_off 30, duration `once`) exposed as promotion code **`SAVE30`**
+  (`promo_1TqNrMETsnSIf8R5LDCYCIDu`; the earlier 20% `SAVE20`/`TRIAL-WINBACK-20` campaign is
+  deactivated/deleted). Config: `services.stripe.winback_promo_code` (env
+  `STRIPE_WINBACK_PROMO_CODE`, default `SAVE30`; empty disables the offer everywhere) +
+  `winback_promo_percent` (display copy only — the REAL discount lives on the Stripe coupon,
+  keep them in sync). Three surfaces:
+  1. **h24 expiry email** — offer box, CTA lands on `/billing?promo=SAVE30`;
+     `BillingController::show()` parks it in `session('billing_promo')`.
+  2. **Billing page banner** — `SubscriptionPanel` shows a large gradient offer banner to any
+     `TrialStatus::isExpired()` user ("auto-applied, no code needed").
+  3. **checkout()** — trial-EXPIRED users get the campaign discount auto-applied
+     unconditionally; otherwise the ?promo=/session code applies; the campaign code (and only
+     it) resolves to its promotion-code ID (cached 1h) → `withPromotionCode()`; any other/absent
+     code falls back to `allowPromotionCodes()` (Stripe forbids combining the two).
 - Tests: `tests/Feature/TrialCleanupTest.php` (stages, anchor, dedupe, shared-crawl safety,
   exemptions, lockout, team-member exemptions, re-add countdown restart, stale anchor,
   h24 winback offer).

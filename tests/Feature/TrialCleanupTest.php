@@ -163,21 +163,37 @@ class TrialCleanupTest extends TestCase
 
     public function test_h24_email_carries_winback_promo_offer(): void
     {
-        config(['services.stripe.winback_promo_code' => 'SAVE20']);
+        config(['services.stripe.winback_promo_code' => 'SAVE30', 'services.stripe.winback_promo_percent' => 30]);
         $user = $this->trialUser(15 * 24);
 
         $h24 = (new TrialExpiryMail($user, 'h24', now()->addHours(20)))->render();
-        $this->assertStringContainsString('SAVE20', $h24);
-        $this->assertStringContainsString('promo=SAVE20', $h24); // auto-apply link
-        $this->assertStringContainsString('20% off', $h24);
+        $this->assertStringContainsString('SAVE30', $h24);
+        $this->assertStringContainsString('promo=SAVE30', $h24); // auto-apply link
+        $this->assertStringContainsString('30% off', $h24);
 
         // Offer is h24-only, and disabled entirely when the code is unset.
         $expired = (new TrialExpiryMail($user, 'expired', now()->addHours(72)))->render();
-        $this->assertStringNotContainsString('SAVE20', $expired);
+        $this->assertStringNotContainsString('SAVE30', $expired);
 
         config(['services.stripe.winback_promo_code' => '']);
         $h24Off = (new TrialExpiryMail($user, 'h24', now()->addHours(20)))->render();
-        $this->assertStringNotContainsString('20% off', $h24Off);
+        $this->assertStringNotContainsString('30% off', $h24Off);
+    }
+
+    public function test_billing_page_shows_winback_banner_only_for_expired_users(): void
+    {
+        config(['services.stripe.winback_promo_code' => 'SAVE30', 'services.stripe.winback_promo_percent' => 30]);
+
+        $expired = $this->trialUser(15 * 24);
+        $this->actingAs($expired)->get(route('billing.show'))
+            ->assertOk()
+            ->assertSee('30% OFF any plan')
+            ->assertSee('SAVE30');
+
+        $active = $this->trialUser(5 * 24);
+        $this->actingAs($active)->get(route('billing.show'))
+            ->assertOk()
+            ->assertDontSee('30% OFF any plan');
     }
 
     public function test_stale_anchor_resets_for_readded_site(): void

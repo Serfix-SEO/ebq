@@ -115,6 +115,12 @@ class SubscriptionPanel extends Component
         // config('app.free').
         $isFreePromo = (bool) config('app.free');
 
+        // Trial-expired winback: loud discount banner + the checkout()
+        // auto-apply (BillingController) — same TrialStatus rule as the
+        // lockout middleware, same config knobs as the h24 expiry email.
+        $winbackCode = (string) config('services.stripe.winback_promo_code');
+        $showWinback = $winbackCode !== '' && \App\Support\TrialStatus::isExpired($user);
+
         return view('livewire.billing.subscription-panel', [
             'user' => $user,
             'subscription' => $subscription,
@@ -131,6 +137,9 @@ class SubscriptionPanel extends Component
             'totalWebsites' => $totalWebsites,
             'websiteLimit' => $websiteLimit,
             'frozenSites' => $frozenSites,
+            'showWinback' => $showWinback,
+            'winbackCode' => $winbackCode,
+            'winbackPercent' => (int) config('services.stripe.winback_promo_percent'),
         ]);
     }
 }

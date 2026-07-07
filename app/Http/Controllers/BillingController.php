@@ -110,13 +110,16 @@ class BillingController extends Controller
                 ? $builder->trialDays($plan->trial_days)
                 : $builder->skipTrial();
 
-            // Trial-winback offer: ?promo=SAVE20 (from the h24 expiry email,
-            // also parked in the session by show() so it survives the billing
-            // page hop) auto-applies the discount. Otherwise let the user type
-            // a code — Stripe forbids combining discounts with the code field.
-            $promoId = $this->winbackPromotionCodeId(
-                $request->input('promo', $request->session()->get('billing_promo'))
-            );
+            // Trial-winback offer: trial-EXPIRED users always get the campaign
+            // discount auto-applied (matches the banner on their billing page —
+            // no code entry, no link needed). Otherwise honour ?promo= from the
+            // expiry email (parked in the session by show() so it survives the
+            // billing-page hop). Anything else falls back to Stripe's own code
+            // field — Stripe forbids combining discounts with that field.
+            $promo = \App\Support\TrialStatus::isExpired($user)
+                ? (string) config('services.stripe.winback_promo_code')
+                : $request->input('promo', $request->session()->get('billing_promo'));
+            $promoId = $this->winbackPromotionCodeId($promo);
             $promoId !== null
                 ? $builder->withPromotionCode($promoId)
                 : $builder->allowPromotionCodes();
@@ -257,7 +260,7 @@ class BillingController extends Controller
             return redirect()->route('login');
         }
 
-        // Winback-email landing: /billing?promo=SAVE20 — remember it so the
+        // Winback-email landing: /billing?promo=<code> — remember it so the
         // discount survives the click through a plan card into checkout().
         if ($request->filled('promo')) {
             $request->session()->put('billing_promo', $request->string('promo')->toString());

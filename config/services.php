@@ -34,11 +34,14 @@ return [
             'secret' => env('STRIPE_WEBHOOK_SECRET'),
             'tolerance' => env('STRIPE_WEBHOOK_TOLERANCE', 300),
         ],
-        // Trial-winback promotion code (20% off, duration=once) offered in the
-        // h24 trial-expiry email. The code must exist and be active in Stripe
-        // (coupon TRIAL-WINBACK-20 / promo SAVE20, created 2026-07-07).
-        // Empty string disables both the checkout auto-apply and the email offer.
-        'winback_promo_code' => env('STRIPE_WINBACK_PROMO_CODE', 'SAVE20'),
+        // Trial-winback promotion code (duration=once) offered in the h24
+        // trial-expiry email, on the billing page for expired users, and
+        // auto-applied at their checkout. Must exist and be active in Stripe
+        // (coupon TRIAL-WINBACK-30 / promo SAVE30, created 2026-07-07).
+        // Empty code disables the offer everywhere. The percent is display
+        // copy only — the real discount lives on the Stripe coupon; keep in sync.
+        'winback_promo_code' => env('STRIPE_WINBACK_PROMO_CODE', 'SAVE30'),
+        'winback_promo_percent' => (int) env('STRIPE_WINBACK_PROMO_PERCENT', 30),
     ],
 
     'resend' => [
