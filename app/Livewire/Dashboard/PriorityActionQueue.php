@@ -100,6 +100,8 @@ class PriorityActionQueue extends Component
      * WarmDashboardCaches. Mixes BOTH data versions into the key: ReportCache
      * covers crawl + GSC/GA syncs; RankCache covers the hourly rank checks
      * (since the 2026-06-28 split rank syncs no longer bump ReportCache).
+     * Locale is in the key too — titles/descriptions are __() output, so an
+     * en-first warm must never freeze Arabic viewers for the 24h TTL.
      */
     public static function payload(string $websiteId, ?string $country = null): array
     {
@@ -107,7 +109,7 @@ class PriorityActionQueue extends Component
         $rankVersion = \App\Services\RankCache::version($websiteId);
 
         return Cache::remember(
-            sprintf('action-queue:v2:%s:%d:%d:%s', $websiteId, $version, $rankVersion, $country ?? 'all'),
+            sprintf('action-queue:v3:%s:%d:%d:%s:%s', $websiteId, $version, $rankVersion, $country ?? 'all', app()->getLocale()),
             86400,
             fn (): array => app(ActionQueueService::class)->groupedActions($websiteId, $country),
         );

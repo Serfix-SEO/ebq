@@ -25,19 +25,28 @@ use Illuminate\Support\Facades\DB;
  */
 class CrawlReportService
 {
-    /** Display metadata + dashboard severity per finding category. */
-    private const CATEGORIES = [
-        CrawlFinding::CATEGORY_CRAWLABILITY => ['title' => 'Crawler blocked', 'desc' => 'Bot-walled by the site (CAPTCHA/403/429) or blocked by robots.txt on a page that earns traffic.', 'sev' => 'critical'],
-        CrawlFinding::CATEGORY_BROKEN_LINK => ['title' => 'Broken links', 'desc' => 'Internal or external links returning 4xx/5xx errors.', 'sev' => 'high'],
-        CrawlFinding::CATEGORY_INDEXABILITY => ['title' => 'Indexability issues', 'desc' => 'noindex on traffic pages, canonical mismatches and similar.', 'sev' => 'high'],
-        CrawlFinding::CATEGORY_INTERNAL_LINKS => ['title' => 'Internal-link issues', 'desc' => 'Orphan pages and pages buried too deep in the site.', 'sev' => 'high'],
-        CrawlFinding::CATEGORY_REDIRECT => ['title' => 'Redirects', 'desc' => 'Redirecting URLs and redirect chains.', 'sev' => 'growth'],
-        CrawlFinding::CATEGORY_ONPAGE => ['title' => 'On-page SEO issues', 'desc' => 'Missing/duplicate titles, meta, H1s, thin content, alt text.', 'sev' => 'growth'],
-        CrawlFinding::CATEGORY_SITEMAP => ['title' => 'Sitemap issues', 'desc' => 'Sitemap coverage gaps and invalid sitemap URLs.', 'sev' => 'growth'],
-        CrawlFinding::CATEGORY_SCHEMA => ['title' => 'Structured data', 'desc' => 'Pages missing or with invalid schema.org structured data.', 'sev' => 'growth'],
-        CrawlFinding::CATEGORY_PERFORMANCE => ['title' => 'Slow pages', 'desc' => 'Pages with high fetch latency.', 'sev' => 'growth'],
-        CrawlFinding::CATEGORY_SECURITY => ['title' => 'Mixed content', 'desc' => 'HTTPS pages loading plain-http resources — browsers block or warn on these.', 'sev' => 'high'],
-    ];
+    /**
+     * Display metadata + dashboard severity per finding category. A method,
+     * not a const array — __() is a runtime call and can't appear inside a
+     * PHP class constant expression.
+     *
+     * @return array<string,array{title:string,desc:string,sev:string}>
+     */
+    private static function categories(): array
+    {
+        return [
+            CrawlFinding::CATEGORY_CRAWLABILITY => ['title' => __('Crawler blocked'), 'desc' => __('Bot-walled by the site (CAPTCHA/403/429) or blocked by robots.txt on a page that earns traffic.'), 'sev' => 'critical'],
+            CrawlFinding::CATEGORY_BROKEN_LINK => ['title' => __('Broken links'), 'desc' => __('Internal or external links returning 4xx/5xx errors.'), 'sev' => 'high'],
+            CrawlFinding::CATEGORY_INDEXABILITY => ['title' => __('Indexability issues'), 'desc' => __('noindex on traffic pages, canonical mismatches and similar.'), 'sev' => 'high'],
+            CrawlFinding::CATEGORY_INTERNAL_LINKS => ['title' => __('Internal-link issues'), 'desc' => __('Orphan pages and pages buried too deep in the site.'), 'sev' => 'high'],
+            CrawlFinding::CATEGORY_REDIRECT => ['title' => __('Redirects'), 'desc' => __('Redirecting URLs and redirect chains.'), 'sev' => 'growth'],
+            CrawlFinding::CATEGORY_ONPAGE => ['title' => __('On-page SEO issues'), 'desc' => __('Missing/duplicate titles, meta, H1s, thin content, alt text.'), 'sev' => 'growth'],
+            CrawlFinding::CATEGORY_SITEMAP => ['title' => __('Sitemap issues'), 'desc' => __('Sitemap coverage gaps and invalid sitemap URLs.'), 'sev' => 'growth'],
+            CrawlFinding::CATEGORY_SCHEMA => ['title' => __('Structured data'), 'desc' => __('Pages missing or with invalid schema.org structured data.'), 'sev' => 'growth'],
+            CrawlFinding::CATEGORY_PERFORMANCE => ['title' => __('Slow pages'), 'desc' => __('Pages with high fetch latency.'), 'sev' => 'growth'],
+            CrawlFinding::CATEGORY_SECURITY => ['title' => __('Mixed content'), 'desc' => __('HTTPS pages loading plain-http resources — browsers block or warn on these.'), 'sev' => 'high'],
+        ];
+    }
 
     /**
      * Finding types whose EXISTENCE requires GSC data (not just severity) — every
@@ -123,7 +132,10 @@ class CrawlReportService
      */
     private function remember(string $tag, string $websiteId, \Closure $compute): mixed
     {
-        $key = "crawl-rpt:{$tag}:{$websiteId}:v".ReportCache::version($websiteId);
+        // Locale in the key: cached payloads carry translated strings
+        // (__() output), so an en-first warm must never freeze Arabic
+        // viewers (and vice versa) for the 24h TTL.
+        $key = "crawl-rpt:{$tag}:{$websiteId}:".app()->getLocale().":v".ReportCache::version($websiteId);
 
         return Cache::remember($key, now()->addHours(24), $compute);
     }
@@ -278,7 +290,7 @@ class CrawlReportService
 
         $groups = [];
         foreach ($rows as $row) {
-            $meta = self::CATEGORIES[$row->category] ?? ['title' => ucfirst($row->category), 'desc' => '', 'sev' => 'growth'];
+            $meta = self::categories()[$row->category] ?? ['title' => ucfirst($row->category), 'desc' => '', 'sev' => 'growth'];
             $sev = $meta['sev'];
             if ((int) $row->crit > 0) {
                 $sev = 'critical';

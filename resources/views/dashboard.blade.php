@@ -43,7 +43,7 @@
                     type="button"
                     x-on:click="open = false"
                     class="absolute right-4 top-4 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-                    aria-label="Close"
+                    aria-label="{{ __('Close') }}"
                 >
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -59,10 +59,10 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <h2 id="onboarded-title" class="text-lg font-semibold text-slate-900 dark:text-white">
-                                Your dashboard will fill in shortly
+                                {{ __('Your dashboard will fill in shortly') }}
                             </h2>
                             <p class="mt-1.5 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                                We're pulling the last 12 months of data from Google Search Console and Google Analytics. Most accounts finish in <strong>5 to 15 minutes</strong>; larger sites with extensive history can take up to an hour.
+                                {{ __("We're pulling the last 12 months of data from Google Search Console and Google Analytics. Most accounts finish in") }} <strong>{{ __('5 to 15 minutes') }}</strong>; {{ __('larger sites with extensive history can take up to an hour.') }}
                             </p>
                         </div>
                     </div>
@@ -72,30 +72,30 @@
                             <svg class="mt-0.5 h-4 w-4 flex-none text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                             </svg>
-                            <span><strong class="font-medium text-slate-900 dark:text-white">Search Console:</strong> queries, clicks, impressions, average position, and indexing status.</span>
+                            <span><strong class="font-medium text-slate-900 dark:text-white">{{ __('Search Console:') }}</strong> {{ __('queries, clicks, impressions, average position, and indexing status.') }}</span>
                         </li>
                         <li class="flex gap-2.5">
                             <svg class="mt-0.5 h-4 w-4 flex-none text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                             </svg>
-                            <span><strong class="font-medium text-slate-900 dark:text-white">Google Analytics 4:</strong> sessions, users, conversions, and traffic sources for the same window.</span>
+                            <span><strong class="font-medium text-slate-900 dark:text-white">{{ __('Google Analytics 4:') }}</strong> {{ __('sessions, users, conversions, and traffic sources for the same window.') }}</span>
                         </li>
                         <li class="flex gap-2.5">
                             <svg class="mt-0.5 h-4 w-4 flex-none text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                             </svg>
-                            <span>You can leave this page and come back. Data fills in automatically as it lands.</span>
+                            <span>{{ __('You can leave this page and come back. Data fills in automatically as it lands.') }}</span>
                         </li>
                         <li class="flex gap-2.5">
                             <svg class="mt-0.5 h-4 w-4 flex-none text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                             </svg>
-                            <span>Live numbers appear on the <strong class="font-medium text-slate-900 dark:text-white">Statistics</strong> page once the initial pull completes.</span>
+                            <span>{{ __('Live numbers appear on the') }} <strong class="font-medium text-slate-900 dark:text-white">{{ __('Statistics') }}</strong> {{ __('page once the initial pull completes.') }}</span>
                         </li>
                     </ul>
 
                     <div class="mt-6 rounded-lg bg-slate-50 p-3.5 text-xs leading-5 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400">
-                        Empty cards or zeroes you see right now are normal during the first sync. Refresh in a few minutes to see live numbers.
+                        {{ __('Empty cards or zeroes you see right now are normal during the first sync. Refresh in a few minutes to see live numbers.') }}
                     </div>
 
                     <div class="mt-6 flex items-center justify-end gap-2">
@@ -104,7 +104,7 @@
                             x-on:click="open = false"
                             class="inline-flex items-center rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
                         >
-                            Got it
+                            {{ __('Got it') }}
                         </button>
                     </div>
                 </div>
@@ -116,9 +116,9 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <div class="flex items-center gap-2">
-                    <h1 class="text-2xl font-bold tracking-tight">Dashboard</h1>
+                    <h1 class="text-2xl font-bold tracking-tight">{{ __('Dashboard') }}</h1>
                 </div>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Your highest-impact SEO actions, ranked</p>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Your highest-impact SEO actions, ranked') }}</p>
             </div>
             <livewire:dashboard.country-filter />
         </div>

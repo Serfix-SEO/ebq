@@ -62,7 +62,7 @@ if (! function_exists('format_user_datetime')) {
             return '';
         }
 
-        return Carbon::parse($value)->timezone(display_timezone($user))->format($format);
+        return Carbon::parse($value)->timezone(display_timezone($user))->translatedFormat($format);
     }
 }
 
@@ -76,14 +76,14 @@ if (! function_exists('format_user_date')) {
             return '';
         }
 
-        return Carbon::parse($ymd, display_timezone($user))->format($format);
+        return Carbon::parse($ymd, display_timezone($user))->translatedFormat($format);
     }
 }
 
 if (! function_exists('format_user_now')) {
     function format_user_now(string $format = 'M j, Y g:i A', ?User $user = null): string
     {
-        return Carbon::now(display_timezone($user))->format($format);
+        return Carbon::now(display_timezone($user))->translatedFormat($format);
     }
 }
 

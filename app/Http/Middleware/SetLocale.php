@@ -43,6 +43,12 @@ class SetLocale
         }
 
         App::setLocale($locale);
+        // Carbon's locale is a SEPARATE global from Laravel's app locale —
+        // ->translatedFormat() (month/day names, AM/PM) silently stays
+        // English forever unless this is set too (found 2026-07-07: every
+        // format_user_date()/format_user_datetime() call site was rendering
+        // English month names under the Arabic locale).
+        \Illuminate\Support\Carbon::setLocale($locale);
 
         // Picker shows only when NOBODY has ever made an explicit choice —
         // not the user column, not the cookie. A guest who already picked

@@ -75,7 +75,7 @@ class SitemapPrompt extends Component
 
         $this->reset('newSitemapUrl');
         $this->added = true;
-        $this->status = 'Sitemap added — we’re crawling your pages now. Data will appear shortly.';
+        $this->status = __('Sitemap added — we’re crawling your pages now. Data will appear shortly.');
     }
 
     public function render()

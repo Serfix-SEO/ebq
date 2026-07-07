@@ -117,7 +117,7 @@ class SeasonalityCard extends Component
                 'keyword' => $m->keyword,
                 'language' => app(\App\Services\LanguageDetectorService::class)->detect((string) $m->keyword),
                 'peak_month' => $peak,
-                'peak_month_name' => Carbon::create(null, $peak, 1)->format('F'),
+                'peak_month_name' => Carbon::create(null, $peak, 1)->locale(app()->getLocale())->translatedFormat('F'),
                 'months_until' => $monthsUntil,
                 'search_volume' => $m->search_volume,
             ];
@@ -139,7 +139,7 @@ class SeasonalityCard extends Component
         $self->websiteId = $websiteId;
 
         return Cache::remember(
-            'seasonality_card:'.$websiteId.':v'.ReportCache::version($websiteId),
+            'seasonality_card:'.$websiteId.':'.app()->getLocale().':v'.ReportCache::version($websiteId),
             86400,
             fn () => $self->computeRows(),
         );

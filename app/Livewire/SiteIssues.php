@@ -97,14 +97,14 @@ class SiteIssues extends Component
     {
         $version = \App\Services\ReportCache::version($this->websiteId);
         $groups = Cache::remember(
-            sprintf('action-queue:%s:%d:all', $this->websiteId, $version),
+            sprintf('action-queue:%s:%d:all:%s', $this->websiteId, $version, app()->getLocale()),
             600,
             fn (): array => app(ActionQueueService::class)->groupedActions($this->websiteId, null),
         );
         $item = collect($groups)->firstWhere('key', $this->issueKey);
 
         return [
-            'title' => $item['title'] ?? 'Issue detail',
+            'title' => $item['title'] ?? __('Issue detail'),
             'description' => $item['description'] ?? '',
             'severity' => $item['severity'] ?? 'high',
             'count' => (int) ($item['count'] ?? 0),

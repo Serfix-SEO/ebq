@@ -103,13 +103,14 @@ class TrafficChart extends Component
         // days inside this fixed window invalidates the cache (date range alone
         // doesn't change after a same-window correction).
         $cacheKey = sprintf(
-            'traffic_chart:v3:%s:%s:%s:%s:%s:%d',
+            'traffic_chart:v4:%s:%s:%s:%s:%s:%d:%s',
             $websiteId,
             (string) $user->id,
             str_replace('/', '_', $tz),
             $start->toDateString(),
             $end->toDateString(),
-            ReportCache::version($websiteId)
+            ReportCache::version($websiteId),
+            app()->getLocale()
         );
 
         return Cache::remember($cacheKey, 86400, function () use ($websiteId, $start, $end, $user) {

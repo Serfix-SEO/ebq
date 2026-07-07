@@ -49,8 +49,8 @@ class WarmDashboardCachesTest extends TestCase
         $this->assertNotNull(Cache::get("country_filter:{$website->id}:v{$version}"));
         $this->assertNotNull(Cache::get("top_countries:{$website->id}:v{$version}"));
         $this->assertNotNull(Cache::get(sprintf(
-            'action-queue:%s:%d:%d:%s',
-            $website->id, $version, \App\Services\RankCache::version($website->id), 'all'
+            'action-queue:v3:%s:%d:%d:%s:%s',
+            $website->id, $version, \App\Services\RankCache::version($website->id), 'all', app()->getLocale()
         )));
     }
 
