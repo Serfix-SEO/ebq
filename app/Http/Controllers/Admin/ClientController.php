@@ -68,6 +68,15 @@ class ClientController extends Controller
                     ->whereColumn('client_activities.user_id', 'users.id'),
                 'last_activity_at'
             )
+            // Trial-days-left badge: EXISTS is cheap and avoids a Cashier
+            // subscribed() call (one query) per row.
+            ->selectSub(
+                fn ($q) => $q->from('subscriptions')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('subscriptions.user_id', 'users.id')
+                    ->where('stripe_status', 'active'),
+                'active_subs_count'
+            )
             ->selectSub(
                 fn ($q) => $q->from('client_activities')
                     ->selectRaw('COALESCE(SUM(units_consumed), 0)')

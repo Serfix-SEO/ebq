@@ -264,6 +264,34 @@
                                                   title="Current plan ({{ $planSlug === 'trial' ? 'trial / no comp' : 'comped or paid' }})">
                                                 {{ $planSlug }}
                                             </span>
+                                            {{-- Trial countdown: only meaningful for trial-tier non-admins
+                                                 without an active subscription (mirrors TrialStatus rules). --}}
+                                            @php
+                                                $trialDaysTotal = \App\Support\TrialStatus::trialDays();
+                                                $showTrialClock = $trialDaysTotal > 0
+                                                    && ! $client->is_admin
+                                                    && $planSlug === 'trial'
+                                                    && (int) $client->active_subs_count === 0;
+                                                $trialDaysLeft = $showTrialClock
+                                                    ? (int) ceil(now()->diffInDays($client->created_at->copy()->addDays($trialDaysTotal), false))
+                                                    : 0;
+                                            @endphp
+                                            @if ($showTrialClock)
+                                                @if ($trialDaysLeft > 0)
+                                                    <span @class([
+                                                        'inline-flex flex-shrink-0 items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide border',
+                                                        'border-amber-300 bg-amber-50 text-amber-700' => $trialDaysLeft <= 3,
+                                                        'border-sky-200 bg-sky-50 text-sky-700' => $trialDaysLeft > 3,
+                                                    ]) title="Trial ends {{ $client->created_at->copy()->addDays($trialDaysTotal)->toFormattedDateString() }}">
+                                                        {{ $trialDaysLeft }}d left
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex flex-shrink-0 items-center rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-rose-700"
+                                                          title="Trial ended {{ $client->created_at->copy()->addDays($trialDaysTotal)->toFormattedDateString() }}{{ $client->trial_data_deleted_at ? ' — data deleted' : ' — in deletion countdown' }}">
+                                                        {{ $client->trial_data_deleted_at ? 'expired · data deleted' : 'expired' }}
+                                                    </span>
+                                                @endif
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
