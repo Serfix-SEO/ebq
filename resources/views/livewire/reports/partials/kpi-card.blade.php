@@ -36,11 +36,11 @@
     };
 
     if ($dir === 'flat') {
-        $changeText = 'No change';
+        $changeText = __('No change');
     } elseif ($pct !== null) {
         $changeText = ($dir === 'up' ? '+' : '') . $pct . $changeSuffix;
     } else {
-        $changeText = 'New';
+        $changeText = __('New');
     }
 @endphp
 
@@ -48,5 +48,5 @@
     <p class="truncate text-[10px] font-medium uppercase tracking-wider text-slate-400">{{ $label }}</p>
     <p class="mt-0.5 truncate text-base font-bold tabular-nums leading-tight text-slate-900 dark:text-slate-100">{{ $formattedValue }}</p>
     <span class="mt-0.5 inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[10px] font-semibold {{ $changeBg }} {{ $changeColor }}">{{ $arrow }} {{ $changeText }}</span>
-    <p class="mt-0.5 text-[10px] text-slate-400">was {{ $formattedPrev }}</p>
+    <p class="mt-0.5 text-[10px] text-slate-400">{{ __('was') }} {{ $formattedPrev }}</p>
 </div>

@@ -3,10 +3,10 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <div class="flex items-center gap-2">
-                    <h1 class="text-2xl font-bold tracking-tight">Statistics</h1>
+                    <h1 class="text-2xl font-bold tracking-tight">{{ __('Statistics') }}</h1>
                     <x-guide-link anchor="dashboard" />
                 </div>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Overview of your website performance</p>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Overview of your website performance') }}</p>
             </div>
             <livewire:dashboard.sync-and-report-panel />
         </div>

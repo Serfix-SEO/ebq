@@ -1,8 +1,13 @@
 @props([
     'anchor' => '',
-    'label' => 'Guide',
-    'title' => 'Open the matching section of the product guide in a new tab',
+    'label' => null,
+    'title' => null,
 ])
+
+@php
+    $label = $label ?? __('Guide');
+    $title = $title ?? __('Open the matching section of the product guide in a new tab');
+@endphp
 
 @php
     $href = route('guide').($anchor ? '#'.$anchor : '');

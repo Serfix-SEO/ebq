@@ -20,7 +20,7 @@
     } elseif ($pct !== null) {
         $text = $arrow . ' ' . ($dir === 'up' ? '+' : '') . $pct . '%';
     } else {
-        $text = $arrow . ' New';
+        $text = $arrow . ' ' . __('New');
     }
 @endphp
 <span class="whitespace-nowrap text-xs font-semibold {{ $color }}">{{ $text }}</span>
