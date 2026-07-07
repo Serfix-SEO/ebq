@@ -40,11 +40,18 @@ class WarmDashboardCaches implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 1;
+    /**
+     * 2, not 1: the whole job is idempotent Cache::remember writes, and a
+     * worker restart / deploy --force-recreate mid-warm kills attempt #1 —
+     * with tries=1 that surfaced as MaxAttemptsExceeded and left the site's
+     * caches half-cold until the next sync (2026-07-07 digest alert).
+     */
+    public int $tries = 2;
 
     public int $timeout = 900;
 
-    public int $uniqueFor = 300;
+    /** Covers the longest observed warm (~8min on the largest account). */
+    public int $uniqueFor = 1800;
 
     public function __construct(public string $websiteId)
     {
