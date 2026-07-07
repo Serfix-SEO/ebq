@@ -241,7 +241,8 @@ class CrawlReportService
      */
     public function actionGroups(string $websiteId): array
     {
-        return $this->remember('actionGroups', $websiteId, fn (): array => $this->computeActionGroups($websiteId));
+        // tag v2: payload gained the per-type 'types' breakdown (2026-07-07)
+        return $this->remember('actionGroups2', $websiteId, fn (): array => $this->computeActionGroups($websiteId));
     }
 
     private function computeActionGroups(string $websiteId): array
@@ -251,6 +252,19 @@ class CrawlReportService
                 DB::raw("SUM(CASE WHEN severity='critical' THEN 1 ELSE 0 END) as crit"),
                 DB::raw("SUM(CASE WHEN severity='high' THEN 1 ELSE 0 END) as high"))
             ->groupBy('category')->get();
+
+        // Per-type breakdown per category ("Missing H1 × 197 · Alt text × 320")
+        // — one grouped query for the whole card, labels via typeLabel().
+        $typesByCategory = [];
+        foreach ($this->findingsBase($websiteId)
+            ->select('category', 'type', DB::raw('COUNT(*) as c'))
+            ->groupBy('category', 'type')->orderByDesc('c')->get() as $t) {
+            $typesByCategory[$t->category][] = [
+                'type' => $t->type,
+                'label' => $this->typeLabel($t->type),
+                'count' => (int) $t->c,
+            ];
+        }
 
         // Per-user impact per category: sum this user's clicks over the category's
         // affected URLs (bounded fetch of category + url_hash for open in-window findings).
@@ -280,6 +294,7 @@ class CrawlReportService
                 'impact' => (float) ($impactByCategory[$row->category] ?? 0),
                 'impact_label' => null,
                 'action_label' => 'View',
+                'types' => $typesByCategory[$row->category] ?? [],
             ];
         }
 

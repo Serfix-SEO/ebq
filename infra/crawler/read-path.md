@@ -32,7 +32,7 @@ Every `impactFor()` reads this map — so impact/severity differ per user with z
 | Method | Returns / purpose | Scope notes |
 |---|---|---|
 | `summary($websiteId)` | Site health overview: pages, indexables, orphans, findings-by-severity, health, run status. **health/last-crawled come from the last `completed` run** (a later failed/aborted recrawl can't wipe a good score or show `blocked` over valid data); `run_status` reflects the latest run for the live UI | window + overlay |
-| `actionGroups($websiteId)` | Open findings grouped by category, summed per-user impact (chunked 2000) | window + overlay + impact |
+| `actionGroups($websiteId)` | Open findings grouped by category, summed per-user impact (chunked 2000); each group carries a per-type `types` breakdown (label + count via `typeLabel()`) rendered as chips on the dashboard Priority Action Queue. Cache tag `actionGroups2` (2026-07-07: payload gained `types`) | window + overlay + impact |
 | `issuesQuery($websiteId, $category, …filters)` | Base builder for paginated category issues | window + overlay, severity+recency order |
 | `issueRows($websiteId, $category)` | Detail rows (≤100) via `mapFinding` | as above |
 | `typeCounts($websiteId, $category)` | Type breakdown within a category | window + overlay |

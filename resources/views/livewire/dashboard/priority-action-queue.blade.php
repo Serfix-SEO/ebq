@@ -59,9 +59,27 @@
                                 <span class="rounded-full px-2 py-px text-[10px] font-bold tabular-nums {{ $tone['tag'] }}">{{ $item['count'] }}</span>
                                 <span class="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide {{ $tone['tag'] }}">{{ $tone['label'] }}</span>
                             </div>
-                            <p class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
-                                {{ $item['description'] }}@if ($item['impact_label']) <span class="font-medium text-emerald-600 dark:text-emerald-400">· {{ $item['impact_label'] }}</span>@endif
-                            </p>
+                            @if (! empty($item['types']))
+                                {{-- Per-type breakdown with counts (crawl categories) --}}
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    @foreach (array_slice($item['types'], 0, 6) as $t)
+                                        <span class="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-px text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                            {{ $t['label'] }}
+                                            <span class="font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($t['count']) }}</span>
+                                        </span>
+                                    @endforeach
+                                    @if (count($item['types']) > 6)
+                                        <span class="inline-flex items-center rounded px-1 py-px text-[10px] text-slate-400">+{{ count($item['types']) - 6 }} more</span>
+                                    @endif
+                                    @if ($item['impact_label'])
+                                        <span class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">· {{ $item['impact_label'] }}</span>
+                                    @endif
+                                </div>
+                            @else
+                                <p class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                                    {{ $item['description'] }}@if ($item['impact_label']) <span class="font-medium text-emerald-600 dark:text-emerald-400">· {{ $item['impact_label'] }}</span>@endif
+                                </p>
+                            @endif
                         </div>
                         <a href="{{ route('issues.show', ['key' => $item['key']]) }}" wire:navigate
                             class="inline-flex flex-none items-center gap-1 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
