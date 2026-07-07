@@ -167,9 +167,9 @@ class Plan extends Model
     public function maxWebsitesLabel(): string
     {
         if ($this->max_websites === null) {
-            return 'Unlimited';
+            return __('Unlimited');
         }
-        return $this->max_websites === 1 ? '1 website' : ($this->max_websites.' websites');
+        return $this->max_websites === 1 ? __('1 website') : __(':n websites', ['n' => $this->max_websites]);
     }
 
     /**
@@ -178,9 +178,9 @@ class Plan extends Model
     public function maxSeatsLabel(): string
     {
         if ($this->max_seats === null) {
-            return 'Unlimited';
+            return __('Unlimited');
         }
-        return $this->max_seats === 1 ? '1 seat' : ($this->max_seats.' seats');
+        return $this->max_seats === 1 ? __('1 seat') : __(':n seats', ['n' => $this->max_seats]);
     }
 
     /**

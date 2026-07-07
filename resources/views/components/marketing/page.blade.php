@@ -128,38 +128,38 @@
                 <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="Serfix home">
                     <img src="{{ asset('serfix-logo.png') }}" alt="Serfix" width="101" height="36" class="h-9 w-auto object-contain">
                 </a>
-                <p class="mt-4 max-w-xs text-slate-500">The SEO command center for teams that ship every week. Discover, prioritize, execute, measure.</p>
+                <p class="mt-4 max-w-xs text-slate-500">{{ __('The SEO command center for teams that ship every week. Discover, prioritize, execute, measure.') }}</p>
             </div>
             <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Product</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Product') }}</p>
                 <ul class="mt-3 space-y-2.5">
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('features') }}">Features</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('guide') }}">Guide</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}">Pricing</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('website-revamp') }}">Website revamp</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('wordpress-plugin') }}">WordPress plugin</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('features') }}">{{ __('Features') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('guide') }}">{{ __('Guide') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}">{{ __('Pricing') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('website-revamp') }}">{{ __('Website revamp') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('wordpress-plugin') }}">{{ __('WordPress plugin') }}</a></li>
                 </ul>
             </div>
             <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Company</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Company') }}</p>
                 <ul class="mt-3 space-y-2.5">
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('landing') }}#faq">FAQ</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('contact') }}">Contact</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('landing') }}#faq">{{ __('FAQ') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('contact') }}">{{ __('Contact') }}</a></li>
                 </ul>
             </div>
             <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Legal</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Legal') }}</p>
                 <ul class="mt-3 space-y-2.5">
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('terms-conditions') }}">Terms</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('privacy-policy') }}">Privacy</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('refund-policy') }}">Refunds</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('terms-conditions') }}">{{ __('Terms') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('privacy-policy') }}">{{ __('Privacy') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('refund-policy') }}">{{ __('Refunds') }}</a></li>
                 </ul>
             </div>
         </div>
         <div class="border-t border-slate-200">
             <div class="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-                <p>&copy; {{ date('Y') }} Serfix. All rights reserved.</p>
-                <p>Built for SEO teams that ship weekly.</p>
+                <p>&copy; {{ date('Y') }} Serfix. {{ __('All rights reserved.') }}</p>
+                <p>{{ __('Built for SEO teams that ship weekly.') }}</p>
             </div>
         </div>
     </footer>

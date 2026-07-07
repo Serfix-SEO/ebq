@@ -148,7 +148,7 @@
         foreach ($rawBullets as $i => $bullet) {
             $videoUrl = $bulletVideos[(string) $i] ?? ($bulletVideos[$i] ?? null);
             $featureItems[] = [
-                'text'     => $bullet,
+                'text'     => __($bullet),
                 'video_id' => \App\Models\Plan::youtubeId($videoUrl),
             ];
         }

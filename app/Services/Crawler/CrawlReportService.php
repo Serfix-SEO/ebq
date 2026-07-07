@@ -415,7 +415,11 @@ class CrawlReportService
     /** Human label for a finding type, e.g. 'missing_image_alt' → 'Missing image alt'. */
     public function typeLabel(string $type): string
     {
-        return ucfirst(str_replace('_', ' ', $type));
+        // ucfirst(str_replace()) output isn't discoverable by the __()
+        // harvest regex (it's a runtime-built string, not a literal), so the
+        // full type list is seeded into lang/en.json + lang/ar.json manually
+        // — see infra/crawler docs / i18n memory for the seeding script.
+        return __(ucfirst(str_replace('_', ' ', $type)));
     }
 
     /** Normalize one finding into the uniform detail-row shape used by the UI. */
