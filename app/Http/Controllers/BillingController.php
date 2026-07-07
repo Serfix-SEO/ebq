@@ -83,6 +83,27 @@ class BillingController extends Controller
 
         $priceId = $plan->stripePriceIdFor($interval);
 
+        // SELF-HEAL: a stripe_id minted under a previous Stripe account (the
+        // business account was replaced 2026-07-06) 500s with "No such
+        // customer" at checkout. Verify the stored customer still exists and
+        // drop it if not — Cashier then creates a fresh one in the current
+        // account. Verified once per user (only runs while stripe_id is set
+        // and no local subscription exists, so steady-state cost is nil).
+        if ($user->hasStripeId() && ! $user->subscribed('default')) {
+            try {
+                $user->asStripeCustomer();
+            } catch (\Stripe\Exception\InvalidRequestException $e) {
+                if (str_contains($e->getMessage(), 'No such customer')) {
+                    \Illuminate\Support\Facades\Log::warning(
+                        "Billing: dropping stale Stripe customer {$user->stripe_id} for {$user->email} (old account)"
+                    );
+                    $user->forceFill(['stripe_id' => null, 'pm_type' => null, 'pm_last_four' => null])->save();
+                } else {
+                    throw $e;
+                }
+            }
+        }
+
         try {
             $builder = $user->newSubscription('default', $priceId);
             $plan->trial_days > 0

@@ -123,6 +123,15 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
   exemptions, lockout, team-member exemptions, re-add countdown restart, stale anchor,
   h24 winback offer).
 
+## Stale Stripe customers (account switch 2026-07-06)
+
+The Stripe business account was replaced 2026-07-06 — `cus_*` IDs minted under the old
+account don't exist under the new keys and 500 checkout with "No such customer".
+`BillingController::checkout()` self-heals: while `stripe_id` is set and no local
+subscription exists, it verifies the customer and clears `stripe_id`/`pm_*` on
+"No such customer" so Cashier mints a fresh customer. The 3 known stale users were swept
+2026-07-07 (old IDs in the git log / laravel.log).
+
 ## Resolving the user's plan (`User::effectivePlan()`, line 291)
 
 Resolution order:
