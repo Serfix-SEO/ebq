@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" x-data="{ dark: localStorage.getItem('dark') === 'true', sidebarOpen: false }" x-bind:class="{ 'dark': dark }" x-init="$watch('dark', v => localStorage.setItem('dark', v))">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" x-data="{ dark: localStorage.getItem('dark') === 'true', sidebarOpen: false }" x-bind:class="{ 'dark': dark }" x-init="$watch('dark', v => localStorage.setItem('dark', v))">
 <head>
     <meta charset="utf-8">
     @include('partials.clarity')
@@ -13,13 +13,14 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
-<body class="bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
+<body class="bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100 {{ app()->getLocale() === 'ar' ? 'font-arabic' : '' }}">
+    @include('partials.locale-picker')
     {{-- Mobile overlay --}}
     <div x-show="sidebarOpen" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition-opacity duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="sidebarOpen = false" class="fixed inset-0 z-30 bg-slate-900/40 md:hidden" style="display:none"></div>
 
     <div class="min-h-screen md:flex">
         {{-- Sidebar --}}
-        <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:sticky md:top-0 md:h-screen md:translate-x-0 dark:border-slate-800 dark:bg-slate-950">
+        <aside :class="sidebarOpen ? 'translate-x-0' : (document.documentElement.dir === 'rtl' ? 'translate-x-full' : '-translate-x-full')" class="fixed inset-y-0 start-0 z-40 flex w-64 flex-col border-e border-slate-200 bg-white transition-transform duration-200 md:sticky md:top-0 md:h-screen md:translate-x-0 dark:border-slate-800 dark:bg-slate-950">
             <div class="flex h-16 items-center justify-center border-b border-slate-200 px-5 dark:border-slate-800">
                 <img src="{{ asset('serfix-logo.png') }}" alt="Serfix" width="90" height="32" class="h-8 w-auto object-contain dark:hidden">
                 <img src="{{ asset('serfix-logo-dark.png') }}" alt="Serfix" width="90" height="32" class="hidden h-8 w-auto object-contain dark:block">
@@ -151,7 +152,7 @@
                             'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200' => !$active,
                         ])>
                         @if ($active)
-                            <span aria-hidden="true" class="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-orange-600 dark:bg-orange-400"></span>
+                            <span aria-hidden="true" class="absolute start-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-e-full bg-orange-600 dark:bg-orange-400"></span>
                         @endif
                         <svg @class(['h-[17px] w-[17px] flex-shrink-0', 'text-slate-900 dark:text-slate-100' => $active, 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300' => !$active]) xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}" /></svg>
                         {{ $item['label'] }}
@@ -183,7 +184,7 @@
                                'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200' => !$active,
                            ])>
                             @if ($active)
-                                <span aria-hidden="true" class="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-orange-600 dark:bg-orange-400"></span>
+                                <span aria-hidden="true" class="absolute start-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-e-full bg-orange-600 dark:bg-orange-400"></span>
                             @endif
                             {{ $item['label'] }}
                         </a>
@@ -218,18 +219,23 @@
                         <svg x-show="dark" class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="display:none"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>
                     </button>
                     {{-- User menu --}}
-                    <div class="relative ml-1" x-data="{ userMenu: false }" @keydown.escape.window="userMenu = false" @click.outside="userMenu = false">
+                    <div class="relative ms-1" x-data="{ userMenu: false }" @keydown.escape.window="userMenu = false" @click.outside="userMenu = false">
                         <button type="button" @click="userMenu = !userMenu"
                             class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
                             :aria-expanded="userMenu" aria-haspopup="true" :title="'{{ addslashes(auth()->user()->name ?? '') }}'">
                             {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
                         </button>
                         <div x-show="userMenu" x-cloak x-transition.opacity.duration.100ms
-                            class="absolute right-0 z-50 mt-2 w-60 origin-top-right rounded-lg border border-slate-200 bg-white py-1 shadow-lg ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-900 dark:ring-white/10"
+                            class="absolute end-0 z-50 mt-2 w-60 origin-top-right rtl:origin-top-left rounded-lg border border-slate-200 bg-white py-1 shadow-lg ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-900 dark:ring-white/10"
                             role="menu" style="display:none">
                             <div class="border-b border-slate-100 px-3 py-2.5 dark:border-slate-800">
                                 <p class="truncate text-[13px] font-semibold text-slate-800 dark:text-slate-100">{{ auth()->user()->name }}</p>
                                 <p class="truncate text-[11px] text-slate-500 dark:text-slate-400">{{ auth()->user()->email }}</p>
+                            </div>
+                            <div class="flex items-center gap-1 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+                                <span class="text-[11px] text-slate-400">{{ __('Language') }}</span>
+                                <a href="{{ route('locale.set', 'en') }}" @class(['ms-auto rounded px-1.5 py-0.5 text-[11px] font-semibold', 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400' => app()->getLocale() === 'en', 'text-slate-500 hover:text-slate-700 dark:text-slate-400' => app()->getLocale() !== 'en'])>EN</a>
+                                <a href="{{ route('locale.set', 'ar') }}" @class(['rounded px-1.5 py-0.5 text-[11px] font-semibold', 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400' => app()->getLocale() === 'ar', 'text-slate-500 hover:text-slate-700 dark:text-slate-400' => app()->getLocale() !== 'ar'])>AR</a>
                             </div>
                             <a href="{{ route('settings.index') }}" role="menuitem"
                                 class="flex items-center gap-2.5 px-3 py-2 text-[13px] text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">

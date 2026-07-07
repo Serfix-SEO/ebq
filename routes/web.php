@@ -39,6 +39,8 @@ Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
 Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');
 Route::view('/guide', 'guide')->name('guide');
 
+Route::get('/locale/{locale}', [\App\Http\Controllers\LocaleController::class, 'set'])->name('locale.set');
+
 // Public, no-signup SEO audit launched from the landing-page hero. Anonymous —
 // no GSC/GA, no paid SERP/CWV — and rate-limited + reCAPTCHA-gated in the
 // controller. POST keeps default `web` CSRF protection (the form ships a token).

@@ -31,7 +31,7 @@
     $jsonFlags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full scroll-smooth">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" class="h-full scroll-smooth">
 <head>
     <meta charset="utf-8">
     @include('partials.google-analytics')
@@ -80,8 +80,9 @@
         @vite(['resources/css/app.css', 'resources/js/marketing.js'])
     @endif
 </head>
-<body class="min-h-full bg-white font-sans text-slate-900 antialiased selection:bg-slate-900 selection:text-white">
-    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">Skip to content</a>
+<body class="min-h-full bg-white font-sans text-slate-900 antialiased selection:bg-slate-900 selection:text-white {{ app()->getLocale() === 'ar' ? 'font-arabic' : '' }}">
+    @include('partials.locale-picker')
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">{{ __('Skip to content') }}</a>
 
     <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
@@ -90,24 +91,28 @@
             </a>
 
             <nav aria-label="Primary" class="hidden items-center gap-7 text-sm text-slate-600 md:flex">
-                <a href="{{ route('features') }}" class="transition hover:text-slate-900 {{ $active === 'features' ? 'text-slate-900' : '' }}">Features</a>
-                <a href="{{ route('guide') }}" class="transition hover:text-slate-900 {{ $active === 'guide' ? 'text-slate-900' : '' }}">Guide</a>
-                <a href="{{ route('pricing') }}" class="transition hover:text-slate-900 {{ $active === 'pricing' ? 'text-slate-900' : '' }}">Pricing</a>
-                <a href="{{ route('contact') }}" class="transition hover:text-slate-900 {{ $active === 'contact' ? 'text-slate-900' : '' }}">Contact</a>
-                <a href="{{ route('wordpress-plugin') }}" class="transition hover:text-slate-900 {{ $active === 'wordpress' ? 'text-slate-900' : '' }}">WordPress</a>
-                <a href="{{ route('landing') }}#faq" class="transition hover:text-slate-900">FAQ</a>
+                <a href="{{ route('features') }}" class="transition hover:text-slate-900 {{ $active === 'features' ? 'text-slate-900' : '' }}">{{ __('Features') }}</a>
+                <a href="{{ route('guide') }}" class="transition hover:text-slate-900 {{ $active === 'guide' ? 'text-slate-900' : '' }}">{{ __('Guide') }}</a>
+                <a href="{{ route('pricing') }}" class="transition hover:text-slate-900 {{ $active === 'pricing' ? 'text-slate-900' : '' }}">{{ __('Pricing') }}</a>
+                <a href="{{ route('contact') }}" class="transition hover:text-slate-900 {{ $active === 'contact' ? 'text-slate-900' : '' }}">{{ __('Contact') }}</a>
+                <a href="{{ route('wordpress-plugin') }}" class="transition hover:text-slate-900 {{ $active === 'wordpress' ? 'text-slate-900' : '' }}">{{ __('WordPress') }}</a>
+                <a href="{{ route('landing') }}#faq" class="transition hover:text-slate-900">{{ __('FAQ') }}</a>
             </nav>
 
             <div class="flex items-center gap-2">
+                <a href="{{ route('locale.set', app()->getLocale() === 'ar' ? 'en' : 'ar') }}"
+                    class="hidden rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 transition hover:text-slate-900 sm:inline-flex">
+                    {{ app()->getLocale() === 'ar' ? 'EN' : 'AR' }}
+                </a>
                 @auth
                     <form method="POST" action="{{ route('logout') }}" class="hidden sm:inline-flex">
                         @csrf
-                        <button type="submit" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900">Log out</button>
+                        <button type="submit" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900">{{ __('Log out') }}</button>
                     </form>
-                    <a href="{{ route('dashboard') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Dashboard</a>
+                    <a href="{{ route('dashboard') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Dashboard') }}</a>
                 @else
-                    <a href="{{ route('login') }}" class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900 sm:inline-flex">Sign in</a>
-                    <a href="{{ route('register') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Get started</a>
+                    <a href="{{ route('login') }}" class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900 sm:inline-flex">{{ __('Sign in') }}</a>
+                    <a href="{{ route('register') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Get started') }}</a>
                 @endauth
             </div>
         </div>

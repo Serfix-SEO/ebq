@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" class="h-full">
 <head>
     <meta charset="utf-8">
     @include('partials.google-analytics')
@@ -15,40 +15,41 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
-<body class="h-full bg-white text-slate-900 antialiased">
+<body class="h-full bg-white text-slate-900 antialiased {{ app()->getLocale() === 'ar' ? 'font-arabic' : '' }}">
+    @include('partials.locale-picker')
     <div class="flex min-h-full">
         {{-- Brand panel --}}
-        <div class="hidden w-1/2 flex-col justify-between border-r border-slate-200 bg-slate-50 p-12 lg:flex">
+        <div class="hidden w-1/2 flex-col justify-between border-e border-slate-200 bg-slate-50 p-12 lg:flex">
             <a href="{{ route('landing') }}" class="inline-flex items-center">
                 <img src="{{ asset('serfix-logo.png') }}" alt="Serfix" width="112" height="40" class="h-10 w-auto object-contain">
             </a>
 
             <div class="max-w-md">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">SEO command center</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('SEO command center') }}</p>
                 <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
-                    The clearest way to run SEO across every site you own.
+                    {{ __('The clearest way to run SEO across every site you own.') }}
                 </h2>
                 <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                    Connect Search Console and Analytics. Get prioritized actions, ranking trends, audits, and reporting in one workspace.
+                    {{ __('Connect Search Console and Analytics. Get prioritized actions, ranking trends, audits, and reporting in one workspace.') }}
                 </p>
 
                 <dl class="mt-10 grid grid-cols-3 gap-4 text-center">
                     <div class="rounded-xl border border-slate-200 bg-white p-4">
-                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Sources</dt>
+                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Sources') }}</dt>
                         <dd class="mt-1.5 text-base font-semibold text-slate-900">GA4 · GSC</dd>
                     </div>
                     <div class="rounded-xl border border-slate-200 bg-white p-4">
-                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Insights</dt>
-                        <dd class="mt-1.5 text-base font-semibold text-slate-900">6 boards</dd>
+                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Insights') }}</dt>
+                        <dd class="mt-1.5 text-base font-semibold text-slate-900">6 {{ __('boards') }}</dd>
                     </div>
                     <div class="rounded-xl border border-slate-200 bg-white p-4">
-                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Setup</dt>
-                        <dd class="mt-1.5 text-base font-semibold text-slate-900">&lt; 10 min</dd>
+                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Setup') }}</dt>
+                        <dd class="mt-1.5 text-base font-semibold text-slate-900">&lt; 10 {{ __('min') }}</dd>
                     </div>
                 </dl>
             </div>
 
-            <p class="text-xs text-slate-500">&copy; {{ date('Y') }} Serfix. All rights reserved.</p>
+            <p class="text-xs text-slate-500">&copy; {{ date('Y') }} Serfix. {{ __('All rights reserved.') }}</p>
         </div>
 
         {{-- Form panel --}}

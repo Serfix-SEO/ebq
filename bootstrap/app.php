@@ -42,6 +42,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // hosting the active website's tenant/crawl data. No-op (default
         // connection) until a website carries a node anchor.
         $middleware->web(append: [
+            // i18n (2026-07-07): resolves + sets the request locale (en/ar).
+            // Guards itself off for admin* paths — admin stays English-only,
+            // no separate admin layout exists so this is the exclusion point.
+            \App\Http\Middleware\SetLocale::class,
             \App\Http\Middleware\ResolveShardContext::class,
             // Expired-trial lockout: confines trial-expired users to the
             // billing surface (no-op for guests/admins/subscribers/comped).
