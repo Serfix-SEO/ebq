@@ -273,7 +273,11 @@ known gaps were flagged during the sweep:
   Note: the Settings → "Search Console window" (28d) is the PAGE-AUDIT keyword
   window by design, not the statistics window — statistics is fixed 30-data-day.
   Verified live: 30/30 data days in window, payload == ground-truth sums, chart tail
-  real. Test-suite gotcha fixed along the way: computing expected cache keys AFTER
+  real. **Extended to the dashboard page (07-07)**: `resolveRange()`'s default end
+  (drives cannibalization + striking-distance → InsightCards counts AND the Priority
+  Action Queue) and `CrawlReportService::userClicks()` (28d per-user impact ranking)
+  now use the same anchor. CountryFilter's 90d distinct-country window deliberately
+  left on "now" — 3 lag days out of 90 can't change a country list. Test-suite gotcha fixed along the way: computing expected cache keys AFTER
   `travel(30)->minutes()` crosses UTC midnight near 00:00 and shifts derived dates —
   compute keys before travelling. Docs: [reports/README.md](./reports/README.md).
 

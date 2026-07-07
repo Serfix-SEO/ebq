@@ -83,7 +83,12 @@ class CrawlReportService
     private function userClicks(string $websiteId): array
     {
         return $this->clicks[$websiteId] ??= (function () use ($websiteId): array {
-            $since = Carbon::now()->subDays(28)->toDateString();
+            // Anchor to the last finalized GSC day, not "now" — the raw
+            // 28d-from-now window held 2-3 empty lag days (see
+            // ReportDataService::statsWindowEnd), understating per-user impact.
+            $anchor = app(\App\Services\ReportDataService::class)->lastSafeReportDate($websiteId)
+                ?? Carbon::now()->subDay();
+            $since = $anchor->copy()->subDays(27)->toDateString();
             $clicks = [];
             SearchConsoleData::query()
                 ->where('website_id', $websiteId)

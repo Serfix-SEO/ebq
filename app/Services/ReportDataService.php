@@ -744,7 +744,7 @@ class ReportDataService
      */
     public function cannibalizationReport(string $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null, bool $cacheOnly = false): array
     {
-        [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
+        [$start, $end] = $this->resolveRange($startDate, $endDate, 28, $websiteId);
 
         $key = sprintf(
             'report:cannibalization:v1:%s:%s:%s:%d:%s:%d',
@@ -847,7 +847,7 @@ class ReportDataService
      */
     public function strikingDistance(string $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null): array
     {
-        [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
+        [$start, $end] = $this->resolveRange($startDate, $endDate, 28, $websiteId);
         $country = $this->normalizeCountry($country);
 
         return Cache::remember(
@@ -1519,10 +1519,16 @@ class ReportDataService
     /**
      * @return array{0: Carbon, 1: Carbon}
      */
-    private function resolveRange(?string $startDate, ?string $endDate, int $defaultDays): array
+    private function resolveRange(?string $startDate, ?string $endDate, int $defaultDays, ?string $websiteId = null): array
     {
-        $tz = config('app.timezone');
-        $end = $endDate ? Carbon::parse($endDate)->endOfDay() : Carbon::yesterday($tz)->endOfDay();
+        // Default end anchors to the last day WITH GSC data when the caller
+        // gives us a website — a bare "yesterday" window silently includes
+        // 2-3 empty GSC-lag days (see statsWindowEnd docblock).
+        $end = $endDate
+            ? Carbon::parse($endDate)->endOfDay()
+            : ($websiteId !== null
+                ? $this->statsWindowEnd($websiteId)->endOfDay()
+                : Carbon::yesterday(config('app.timezone'))->endOfDay());
         $start = $startDate
             ? Carbon::parse($startDate)->startOfDay()
             : $end->copy()->subDays($defaultDays - 1)->startOfDay();
