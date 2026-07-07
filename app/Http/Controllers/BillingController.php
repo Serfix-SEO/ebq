@@ -124,10 +124,30 @@ class BillingController extends Controller
                 ? $builder->withPromotionCode($promoId)
                 : $builder->allowPromotionCodes();
 
-            return $builder->checkout([
-                'success_url' => $successUrl,
-                'cancel_url' => $cancelUrl,
-            ]);
+            try {
+                return $builder->checkout([
+                    'success_url' => $successUrl,
+                    'cancel_url' => $cancelUrl,
+                ]);
+            } catch (\Stripe\Exception\InvalidRequestException $e) {
+                // A dead/expired promotion (e.g. its coupon was deleted) must
+                // never block a purchase: drop the cached id and retry the
+                // same checkout at full price with the manual code field.
+                if ($promoId === null || ! str_contains(strtolower($e->getMessage()), 'coupon')) {
+                    throw $e;
+                }
+                \Illuminate\Support\Facades\Log::warning("Billing: winback promo {$promoId} rejected by Stripe, checking out without it: {$e->getMessage()}");
+                cache()->forget('stripe-winback-promo-id:'.(string) config('services.stripe.winback_promo_code'));
+
+                $retry = $user->newSubscription('default', $priceId);
+                $plan->trial_days > 0 ? $retry->trialDays($plan->trial_days) : $retry->skipTrial();
+
+                return $retry->allowPromotionCodes()
+                    ->checkout([
+                        'success_url' => $successUrl,
+                        'cancel_url' => $cancelUrl,
+                    ]);
+            }
         } catch (IncompletePayment $exception) {
             return redirect()->route(
                 'cashier.payment',
@@ -149,7 +169,7 @@ class BillingController extends Controller
             return null;
         }
 
-        return cache()->remember('stripe-winback-promo-id', 3600, function () use ($campaign): string {
+        return cache()->remember('stripe-winback-promo-id:'.$campaign, 3600, function () use ($campaign): string {
             try {
                 $found = \Laravel\Cashier\Cashier::stripe()->promotionCodes->all([
                     'code' => $campaign, 'active' => true, 'limit' => 1,
