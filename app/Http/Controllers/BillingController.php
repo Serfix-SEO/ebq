@@ -49,6 +49,7 @@ class BillingController extends Controller
             'plan'     => 'required|string|max:32',
             'interval' => 'nullable|in:monthly,annual',
             'return_to' => 'nullable|string|max:2048',
+            'promo'    => 'nullable|string|max:32',
         ]);
 
         $interval = $request->input('interval', 'annual');
@@ -88,6 +89,17 @@ class BillingController extends Controller
                 ? $builder->trialDays($plan->trial_days)
                 : $builder->skipTrial();
 
+            // Trial-winback offer: ?promo=SAVE20 (from the h24 expiry email,
+            // also parked in the session by show() so it survives the billing
+            // page hop) auto-applies the discount. Otherwise let the user type
+            // a code — Stripe forbids combining discounts with the code field.
+            $promoId = $this->winbackPromotionCodeId(
+                $request->input('promo', $request->session()->get('billing_promo'))
+            );
+            $promoId !== null
+                ? $builder->withPromotionCode($promoId)
+                : $builder->allowPromotionCodes();
+
             return $builder->checkout([
                 'success_url' => $successUrl,
                 'cancel_url' => $cancelUrl,
@@ -98,6 +110,34 @@ class BillingController extends Controller
                 [$exception->payment->id, 'redirect' => $cancelUrl]
             );
         }
+    }
+
+    /**
+     * Resolve the trial-winback promo (services.stripe.winback_promo_code) to
+     * its Stripe promotion-code ID. Only that one campaign code is accepted —
+     * anything else returns null (checkout then falls back to Stripe's own
+     * promo-code field). Cached 1h; an inactive/deleted code resolves null.
+     */
+    private function winbackPromotionCodeId(?string $code): ?string
+    {
+        $campaign = (string) config('services.stripe.winback_promo_code');
+        if ($campaign === '' || $code === null || strcasecmp(trim($code), $campaign) !== 0) {
+            return null;
+        }
+
+        return cache()->remember('stripe-winback-promo-id', 3600, function () use ($campaign): string {
+            try {
+                $found = \Laravel\Cashier\Cashier::stripe()->promotionCodes->all([
+                    'code' => $campaign, 'active' => true, 'limit' => 1,
+                ]);
+
+                return $found->data[0]->id ?? '';
+            } catch (\Throwable $e) {
+                report($e);
+
+                return '';
+            }
+        }) ?: null;
     }
 
     /**
@@ -194,6 +234,12 @@ class BillingController extends Controller
         $user = $request->user();
         if (! $user) {
             return redirect()->route('login');
+        }
+
+        // Winback-email landing: /billing?promo=SAVE20 — remember it so the
+        // discount survives the click through a plan card into checkout().
+        if ($request->filled('promo')) {
+            $request->session()->put('billing_promo', $request->string('promo')->toString());
         }
 
         // Webhook-race safety net: if the user has a Stripe customer

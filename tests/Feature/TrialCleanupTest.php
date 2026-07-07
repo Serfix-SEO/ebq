@@ -161,6 +161,25 @@ class TrialCleanupTest extends TestCase
         $this->actingAs($member->fresh())->get(route('dashboard'))->assertOk();
     }
 
+    public function test_h24_email_carries_winback_promo_offer(): void
+    {
+        config(['services.stripe.winback_promo_code' => 'SAVE20']);
+        $user = $this->trialUser(15 * 24);
+
+        $h24 = (new TrialExpiryMail($user, 'h24', now()->addHours(20)))->render();
+        $this->assertStringContainsString('SAVE20', $h24);
+        $this->assertStringContainsString('promo=SAVE20', $h24); // auto-apply link
+        $this->assertStringContainsString('20% off', $h24);
+
+        // Offer is h24-only, and disabled entirely when the code is unset.
+        $expired = (new TrialExpiryMail($user, 'expired', now()->addHours(72)))->render();
+        $this->assertStringNotContainsString('SAVE20', $expired);
+
+        config(['services.stripe.winback_promo_code' => '']);
+        $h24Off = (new TrialExpiryMail($user, 'h24', now()->addHours(20)))->render();
+        $this->assertStringNotContainsString('20% off', $h24Off);
+    }
+
     public function test_stale_anchor_resets_for_readded_site(): void
     {
         // User was warned, self-deleted everything, later re-adds a site:

@@ -110,8 +110,18 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
   full app access (works under those owners' plans) while their own sites still expire.
   Locked users are confined to `billing.*`/`cashier.*`/logout/impersonation-stop; everything
   else redirects to /billing with an explanatory flash. Impersonating admins pass through.
+- **Winback offer (2026-07-07)**: the h24 (second-to-last) email carries **20% off any plan**
+  — Stripe coupon `TRIAL-WINBACK-20` (percent_off 20, duration `once`) exposed as promotion
+  code **`SAVE20`** (`promo_1TqNhdETsnSIf8R5NY1N9icH`). Config:
+  `services.stripe.winback_promo_code` (env `STRIPE_WINBACK_PROMO_CODE`, default `SAVE20`;
+  empty disables offer + auto-apply). Email CTA lands on `/billing?promo=SAVE20`;
+  `BillingController::show()` parks it in `session('billing_promo')`, `checkout()` resolves
+  it to the promotion-code ID (cached 1h, campaign code only) and calls
+  `withPromotionCode()`; any other/absent code falls back to `allowPromotionCodes()`
+  (Stripe forbids combining the two).
 - Tests: `tests/Feature/TrialCleanupTest.php` (stages, anchor, dedupe, shared-crawl safety,
-  exemptions, lockout, team-member exemptions, re-add countdown restart, stale anchor).
+  exemptions, lockout, team-member exemptions, re-add countdown restart, stale anchor,
+  h24 winback offer).
 
 ## Resolving the user's plan (`User::effectivePlan()`, line 291)
 
