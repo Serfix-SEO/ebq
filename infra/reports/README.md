@@ -114,6 +114,16 @@ comparisons, fake chart cliff). New date-windowed aggregates MUST use the same a
 The Settings "Search Console window" (`gsc_keyword_lookback_days`, default 28) is the
 page-audit keyword window only — statistics windows are fixed 30-data-day by design.
 
+**GA4-matched user counts (2026-07-07):** the KPI "Active users" + "New users" cards use
+`GoogleAnalyticsService::fetchRangeUserTotals()` — range-DEDUPLICATED `activeUsers`/
+`newUsers` for the current+previous windows in ONE Data API call, computed inside the
+cached KpiCards payload (1 call/site/day thanks to the 24h cache + warmer). Summing our
+daily rows counts a person once per active day — structurally higher than the GA4 UI and
+with different deltas (user-reported mismatch). Falls back to the daily sum with a
+"Users · daily sum" label when the API/account is unavailable. Sessions stay DB-summed
+(sessions are summable). Remaining GA4-UI delta is window choice only: GA4 ends at
+yesterday, our cards share the GSC-anchored window.
+
 ## Gotchas (cross-cutting)
 
 - **`keyword_metrics` is shared across all tenants** — `quickWins` and the upside

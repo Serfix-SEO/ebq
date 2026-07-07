@@ -56,9 +56,11 @@ class KpiCards extends Component
     {
         $data = [
             '_window' => null,
+            '_users_source' => 'daily_sum',
             'clicks' => $this->emptyMetric(),
             'impressions' => $this->emptyMetric(),
             'users' => $this->emptyMetric(),
+            'new_users' => null,
             'sessions' => $this->emptyMetric(),
         ];
 
@@ -114,11 +116,44 @@ class KpiCards extends Component
                 ->where('website_id', $websiteId)
                 ->whereBetween('date', [$previousStart->toDateString(), $previousEnd->toDateString()]);
 
+            // Users: range-DEDUPLICATED activeUsers + newUsers straight from the
+            // GA4 Data API (one call, both windows) so the card matches what the
+            // user sees in GA4 — summing daily rows counts a person once per
+            // active day and runs structurally high (user-reported mismatch,
+            // 2026-07-07). Falls back to the daily sum (labeled) when the API/
+            // account is unavailable so the card never blanks. Cached 24h with
+            // everything else, so this is 1 API call per site per day.
+            $rangeUsers = null;
+            $website = \App\Models\Website::find($websiteId);
+            $account = $website?->gaAccountResolved();
+            if ($website && $account && $website->ga_property_id) {
+                try {
+                    $rangeUsers = app(\App\Services\Google\GoogleAnalyticsService::class)->fetchRangeUserTotals(
+                        $account,
+                        $website->ga_property_id,
+                        $currentStart->toDateString(),
+                        $currentEnd->toDateString(),
+                        $previousStart->toDateString(),
+                        $previousEnd->toDateString(),
+                    );
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::info("KpiCards: GA range totals unavailable for {$websiteId}: {$e->getMessage()}");
+                }
+            }
+
+            $users = $rangeUsers !== null
+                ? self::buildMetric($rangeUsers['current']['active_users'], $rangeUsers['previous']['active_users'])
+                : self::buildMetric((int) (clone $currentGa)->sum('users'), (int) (clone $previousGa)->sum('users'));
+            $newUsers = $rangeUsers !== null
+                ? self::buildMetric($rangeUsers['current']['new_users'], $rangeUsers['previous']['new_users'])
+                : null;
+
             return [
                 '_window' => [
                     'start' => $currentStart->toDateString(),
                     'end' => $currentEnd->toDateString(),
                 ],
+                '_users_source' => $rangeUsers !== null ? 'ga4_range' : 'daily_sum',
                 'clicks' => self::buildMetric(
                     (int) (clone $currentSc)->sum('clicks'),
                     (int) (clone $previousSc)->sum('clicks')
@@ -127,10 +162,8 @@ class KpiCards extends Component
                     (int) (clone $currentSc)->sum('impressions'),
                     (int) (clone $previousSc)->sum('impressions')
                 ),
-                'users' => self::buildMetric(
-                    (int) (clone $currentGa)->sum('users'),
-                    (int) (clone $previousGa)->sum('users')
-                ),
+                'users' => $users,
+                'new_users' => $newUsers,
                 'sessions' => self::buildMetric(
                     (int) (clone $currentGa)->sum('sessions'),
                     (int) (clone $previousGa)->sum('sessions')

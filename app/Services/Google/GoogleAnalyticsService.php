@@ -97,4 +97,56 @@ class GoogleAnalyticsService
 
         return $rows;
     }
+
+    /**
+     * Range-DEDUPLICATED user totals for two windows in ONE API call (the
+     * Data API accepts multiple dateRanges). This is what the GA4 UI shows:
+     * "active users" counts a person once per range, whereas summing our
+     * daily rows counts them once per active day — structurally higher and
+     * with a different period-over-period delta (user-reported mismatch,
+     * 2026-07-07). Also brings in newUsers, which daily rows never had.
+     *
+     * @return array{current: array{active_users:int,new_users:int}, previous: array{active_users:int,new_users:int}}|null
+     */
+    public function fetchRangeUserTotals(
+        GoogleAccount $account,
+        string $propertyId,
+        string $currentStart,
+        string $currentEnd,
+        string $previousStart,
+        string $previousEnd,
+    ): ?array {
+        $client = $this->clientFactory->make($account);
+        $data = new AnalyticsData($client);
+
+        $request = new RunReportRequest();
+        $request->setDateRanges([
+            new DateRange(['startDate' => $currentStart, 'endDate' => $currentEnd, 'name' => 'current']),
+            new DateRange(['startDate' => $previousStart, 'endDate' => $previousEnd, 'name' => 'previous']),
+        ]);
+        $request->setMetrics([
+            new Metric(['name' => 'activeUsers']),
+            new Metric(['name' => 'newUsers']),
+        ]);
+
+        $response = $data->properties->runReport($propertyId, $request);
+
+        $out = [
+            'current' => ['active_users' => 0, 'new_users' => 0],
+            'previous' => ['active_users' => 0, 'new_users' => 0],
+        ];
+        foreach ($response->getRows() ?? [] as $row) {
+            // With multiple dateRanges and no dimensions, each row carries the
+            // range name as an implicit dimension value.
+            $range = $row->getDimensionValues()[0]?->getValue() ?? '';
+            $key = $range === 'date_range_1' || $range === 'previous' ? 'previous' : 'current';
+            $metrics = $row->getMetricValues();
+            $out[$key] = [
+                'active_users' => (int) ($metrics[0]->getValue() ?? 0),
+                'new_users' => (int) ($metrics[1]->getValue() ?? 0),
+            ];
+        }
+
+        return $out;
+    }
 }
