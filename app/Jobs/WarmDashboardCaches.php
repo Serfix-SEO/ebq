@@ -65,6 +65,17 @@ class WarmDashboardCaches implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
+        // The site's GSC sync is mid-flight: every 7-day window it upserts
+        // bumps the cache version, so anything we warm now gets orphaned
+        // minutes later — wasted minutes of heavy aggregates per round
+        // (observed 2026-07-07). Skip; the sync dispatches its own warm on
+        // completion, which is the one that sticks for the next 24h.
+        if (\Illuminate\Support\Facades\Cache::get('gsc-sync-inflight:'.$this->websiteId)) {
+            Log::info("WarmDashboardCaches: skipped {$this->websiteId} — GSC sync in flight (end-of-sync warm will cover).");
+
+            return;
+        }
+
         app(ShardContext::class)->forWebsite($this->websiteId);
         $website = Website::find($this->websiteId);
         if (! $website || $website->isFrozen()) {

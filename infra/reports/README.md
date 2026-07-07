@@ -78,12 +78,20 @@ Two version-integer classes underpin all caching (full detail in [insights.md](.
   (crawl finalize). **Not** flushed by rank checks — see below.
 
   **Auto-warming (2026-07-06):** every flusher above also dispatches
-  `App\Jobs\WarmDashboardCaches` (sync queue, `ShouldBeUnique` 5min), which recomputes all
-  /dashboard + /statistics card payloads under the new version so the first visitor never
-  pays the cold aggregate (~2min on the largest accounts). Zero-drift rule: each card's
-  cached payload is a `public static payload()` on its Livewire component — render() and
-  the warmer call the SAME method. Adding a new dashboard card cache? Follow that pattern
+  `App\Jobs\WarmDashboardCaches` (sync queue, `ShouldBeUnique` 30min, `tries=2` — a
+  worker-restart-killed attempt self-heals), which recomputes all /dashboard +
+  /statistics card payloads under the new version so the first visitor never pays the
+  cold aggregate (~2min on the largest accounts). Zero-drift rule: each card's cached
+  payload is a `public static payload()` on its Livewire component — render() and the
+  warmer call the SAME method. Adding a new dashboard card cache? Follow that pattern
   and register it in `WarmDashboardCaches::handle()`.
+
+  **Mid-sync suppression (2026-07-07):** `SyncSearchConsoleData` sets
+  `gsc-sync-inflight:{websiteId}` (TTL 7200 safety net; cleared on completion AND in
+  `failed()`) for its whole run, and `WarmDashboardCaches` skips a flagged site —
+  each 7-day window the sync upserts bumps the version, so a mid-sync warm is minutes
+  of heavy aggregates that get orphaned immediately (observed: 3 warms stacked during
+  one large-account sync). Only the end-of-sync warm sticks.
 - **`RankCache::version($websiteId)`** (`app/Services/RankCache.php`) — same integer mechanic,
   but tracks rank-tracker freshness only. **Flushed by**: `TrackKeywordRankJob` on each
   successful rank check. Mixed into `PluginHqController::overview`'s cache key (that payload

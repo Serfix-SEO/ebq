@@ -95,6 +95,14 @@ class SyncSearchConsoleData implements ShouldQueue
         $end = Carbon::now();
         $cursor = Carbon::now()->subDays($this->days);
 
+        // Mark the sync in flight so WarmDashboardCaches SKIPS this site until
+        // we finish: each 7-day window below bumps the cache version, and on a
+        // large account that orphans/rewarns the dashboard caches over and over
+        // for the whole sync (observed 2026-07-07: 3 warms stacked mid-sync).
+        // The single end-of-run warm below is the one that matters. TTL is a
+        // safety net so a killed sync can't suppress warming forever.
+        \Illuminate\Support\Facades\Cache::put('gsc-sync-inflight:'.$this->websiteId, true, 7200);
+
         Log::info("SyncSearchConsoleData: starting website {$this->websiteId} ({$this->days}d window)");
 
         while ($cursor->lt($end)) {
@@ -125,13 +133,21 @@ class SyncSearchConsoleData implements ShouldQueue
 
         Log::info("SyncSearchConsoleData: completed website {$this->websiteId}");
 
+        \Illuminate\Support\Facades\Cache::forget('gsc-sync-inflight:'.$this->websiteId);
+
         $this->queueKeywordMetricsRefresh();
 
         // Fresh rows just orphaned every version-keyed dashboard cache — warm
         // them now so the first dashboard/statistics visit is instant instead
         // of paying the cold aggregate (~2min on the largest accounts).
-        // ShouldBeUnique(5min) collapses this with the GA sync's dispatch.
+        // ShouldBeUnique collapses this with the GA sync's dispatch.
         \App\Jobs\WarmDashboardCaches::dispatch((string) $this->websiteId);
+    }
+
+    /** Clear the in-flight flag if the sync dies — otherwise warms stay suppressed for the TTL. */
+    public function failed(?\Throwable $e): void
+    {
+        \Illuminate\Support\Facades\Cache::forget('gsc-sync-inflight:'.$this->websiteId);
     }
 
     /**

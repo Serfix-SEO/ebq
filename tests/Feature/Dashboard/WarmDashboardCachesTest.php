@@ -67,6 +67,26 @@ class WarmDashboardCachesTest extends TestCase
         $this->assertArrayHasKey('clicks', $first);
     }
 
+    public function test_warm_is_skipped_while_gsc_sync_is_in_flight(): void
+    {
+        $owner = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'mid-sync.com']);
+
+        cache()->put('gsc-sync-inflight:'.$website->id, true, 7200);
+        Bus::dispatchSync(new WarmDashboardCaches((string) $website->id));
+
+        $version = ReportCache::version($website->id);
+        $this->assertNull(
+            Cache::get("country_filter:{$website->id}:v{$version}"),
+            'mid-sync warm must skip — the end-of-sync warm covers it'
+        );
+
+        // Flag cleared (what the sync does on completion) → warm proceeds.
+        cache()->forget('gsc-sync-inflight:'.$website->id);
+        Bus::dispatchSync(new WarmDashboardCaches((string) $website->id));
+        $this->assertNotNull(Cache::get("country_filter:{$website->id}:v{$version}"));
+    }
+
     public function test_frozen_website_is_skipped(): void
     {
         config(['app.free' => false]);
