@@ -44,7 +44,9 @@ class PlanSeeder extends Seeder
                 'tagline'            => 'Get started — no credit card required.',
                 'price_monthly_usd'  => 0,
                 'price_yearly_usd'   => 0,
-                'trial_days'         => 0,
+                // Trial length for ebq:trial-cleanup (expiry emails + data
+                // deletion 3 days after expiry). 0 disables the cleanup.
+                'trial_days'         => 14,
                 'max_websites'       => 1,
                 'max_seats'          => 1,
                 'extra_seat_price_usd' => null,

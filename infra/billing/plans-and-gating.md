@@ -82,6 +82,28 @@ the two platform-only flags), and the WP plugin's `EBQ_Feature_Flags::KNOWN_FEAT
 added to `Website::FEATURE_KEYS` or the WP plugin. `scheduled_reports` is seeded but
 not yet enforced (no Scheduled Reports feature exists to gate).
 
+## Trial expiry & data cleanup (2026-07-07)
+
+Trial length = the Trial plan's **`trial_days`** (admin-editable at /admin/plans; **0 disables
+the whole system**; currently 14). `App\Support\TrialStatus` is the single source of truth for
+"expired" — used by BOTH the cleanup command and the lockout middleware so they can't disagree.
+Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = a paid slug).
+
+- **`ebq:trial-cleanup`** (hourly): countdown emails `expired → 48h → 24h → 12h`
+  (`TrialExpiryMail`, one email per user per run), then deletes the user's **websites**
+  (tenant data cascades via the existing `Website::deleted` wiring — shared crawl_sites are
+  GC'd only when the LAST subscriber leaves, so another client on the same domain is safe).
+  **The 72h countdown anchors to the first 'expired' email actually sent**, not the
+  theoretical schedule — accounts predating the feature get the full 3-day buffer from first
+  contact (dry-run caught 3 users who'd otherwise have had 12h). Login survives; expiry
+  derives from `created_at`, so no second trial; `trial_data_deleted_at` makes deletion
+  one-shot. `--dry-run` prints without sending/deleting.
+- **`EnsureTrialNotExpired`** (web middleware): expired users are confined to `billing.*`/
+  `cashier.*`/logout/impersonation-stop; everything else redirects to /billing with an
+  explanatory flash. Impersonating admins pass through.
+- Tests: `tests/Feature/TrialCleanupTest.php` (stages, anchor, dedupe, shared-crawl safety,
+  exemptions, lockout).
+
 ## Resolving the user's plan (`User::effectivePlan()`, line 291)
 
 Resolution order:

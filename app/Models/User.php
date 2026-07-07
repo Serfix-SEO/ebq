@@ -123,6 +123,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_disabled' => 'boolean',
             'password' => 'hashed',
             'trial_ends_at' => 'datetime',
+            'trial_deletion_notices' => 'array',
+            'trial_data_deleted_at' => 'datetime',
         ];
     }
 

@@ -17,6 +17,11 @@ Schedule::command('ebq:track-rankings')->hourly();
 Schedule::command('ebq:auto-discover-prospects')->dailyAt('03:30');
 Schedule::command('ebq:publish-scheduled-plugin-releases')->everyMinute();
 
+// Trial expiry: countdown emails (expiry/48h/24h/12h) + data deletion 3 days
+// after the Trial plan's trial_days. Hourly — the 12h stage needs sub-daily
+// resolution. Disabled entirely while trial_days = 0.
+Schedule::command('ebq:trial-cleanup')->hourly()->withoutOverlapping();
+
 // Failed-job visibility (2026-07-06 incident: crawl jobs died on the worker for
 // 3 days, seen only in failed_jobs). Queue::failing() on every box buffers into
 // shared Redis; this drains + mails admins a digest. Empty buffer = no mail.

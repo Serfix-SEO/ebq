@@ -43,6 +43,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // connection) until a website carries a node anchor.
         $middleware->web(append: [
             \App\Http\Middleware\ResolveShardContext::class,
+            // Expired-trial lockout: confines trial-expired users to the
+            // billing surface (no-op for guests/admins/subscribers/comped).
+            \App\Http\Middleware\EnsureTrialNotExpired::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
