@@ -61,18 +61,18 @@
                             </div>
                             @if (! empty($item['types']))
                                 {{-- Per-type breakdown with counts (crawl categories) --}}
-                                <div class="mt-1 flex flex-wrap gap-1">
+                                <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
                                     @foreach (array_slice($item['types'], 0, 6) as $t)
-                                        <span class="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-px text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                        <span class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white py-0.5 pl-2 pr-1 text-[11px] font-medium text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
                                             {{ $t['label'] }}
-                                            <span class="font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($t['count']) }}</span>
+                                            <span class="inline-flex min-w-[1.4rem] items-center justify-center rounded px-1 py-px text-[11px] font-bold tabular-nums {{ $tone['tag'] }}">{{ number_format($t['count']) }}</span>
                                         </span>
                                     @endforeach
                                     @if (count($item['types']) > 6)
-                                        <span class="inline-flex items-center rounded px-1 py-px text-[10px] text-slate-400">+{{ count($item['types']) - 6 }} more</span>
+                                        <span class="inline-flex items-center rounded px-1 py-0.5 text-[11px] font-medium text-slate-400">+{{ count($item['types']) - 6 }} more</span>
                                     @endif
                                     @if ($item['impact_label'])
-                                        <span class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">· {{ $item['impact_label'] }}</span>
+                                        <span class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">· {{ $item['impact_label'] }}</span>
                                     @endif
                                 </div>
                             @else
