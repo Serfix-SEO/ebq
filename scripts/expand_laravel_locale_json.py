@@ -72,11 +72,18 @@ def _unescape(match: str) -> str:
 
 
 def extract_keys(text: str) -> set[str]:
+    # No .strip(): Laravel's __() does an EXACT string lookup, so a harvested
+    # key must byte-for-byte match what's inside the quotes — including any
+    # deliberate leading/trailing space used to join a rendered number and a
+    # unit, e.g. `number_format($x) . __(' tracked keywords')`. Stripping
+    # here silently desyncs the harvested key from the runtime lookup key,
+    # so the string always falls back to English regardless of locale
+    # (found 2026-07-07 on pricing.blade.php's per-plan bullet builders).
     keys: set[str] = set()
     for pattern in PATTERNS:
         for match in pattern.findall(text):
-            key = _unescape(match).strip()
-            if key:
+            key = _unescape(match)
+            if key.strip():
                 keys.add(key)
     return keys
 

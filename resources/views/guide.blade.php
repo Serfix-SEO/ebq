@@ -6,16 +6,16 @@
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-slate-200 bg-white">
         <div class="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-20">
-            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">User guide · full reference</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('User guide · full reference') }}</p>
             <h1 class="mt-4 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-                The complete Serfix guide.
+                {{ __('The complete Serfix guide.') }}
             </h1>
             <p class="mt-5 text-balance text-[17px] leading-8 text-slate-600">
-                Start with the product reference for dashboard, keywords, pages, rank tracking, audits, and reports—real UI layouts with every column explained—then follow the numbered setup path for integrations, tracking, and publishing workflows.
+                {{ __('Start with the product reference for dashboard, keywords, pages, rank tracking, audits, and reports—real UI layouts with every column explained—then follow the numbered setup path for integrations, tracking, and publishing workflows.') }}
             </p>
             <div class="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-                <a href="#step-1" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start with step 1</a>
-                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">Create a free account</a>
+                <a href="#step-1" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Start with step 1') }}</a>
+                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">{{ __('Create a free account') }}</a>
             </div>
         </div>
     </section>
@@ -26,36 +26,36 @@
 
             {{-- Sticky TOC --}}
             <aside class="lg:sticky lg:top-24 lg:self-start">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">In this guide</p>
-                <nav aria-label="Guide sections" class="mt-3 flex flex-col gap-1 text-sm">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('In this guide') }}</p>
+                <nav aria-label="{{ __('Guide sections') }}" class="mt-3 flex flex-col gap-1 text-sm">
                     @php
                         $tocWorkspace = [
-                            ['#dashboard', 'Dashboard overview'],
-                            ['#insight-cards', 'Action insights cards'],
-                            ['#keywords', 'Keywords workspace'],
-                            ['#pages', 'Pages workspace'],
-                            ['#rank-tracking', 'Rank tracking'],
-                            ['#custom-audit', 'Custom page audit'],
-                            ['#audit-report-sections', 'Page audit report sections'],
-                            ['#insights-panel', 'Reports insights panel'],
-                            ['#growth-reports', 'Custom growth reports'],
-                            ['#wordpress-plugin', 'WordPress plugin'],
+                            ['#dashboard', __('Dashboard overview')],
+                            ['#insight-cards', __('Action insights cards')],
+                            ['#keywords', __('Keywords workspace')],
+                            ['#pages', __('Pages workspace')],
+                            ['#rank-tracking', __('Rank tracking')],
+                            ['#custom-audit', __('Custom page audit')],
+                            ['#audit-report-sections', __('Page audit report sections')],
+                            ['#insights-panel', __('Reports insights panel')],
+                            ['#growth-reports', __('Custom growth reports')],
+                            ['#wordpress-plugin', __('WordPress plugin')],
                         ];
                         $tocSetup = [
-                            ['#step-1', '01', 'Add your first website'],
-                            ['#step-2', '02', 'Connect search and analytics'],
-                            ['#step-3', '03', 'Track keywords + competitors'],
-                            ['#step-4', '04', 'Run a page audit'],
-                            ['#step-5', '05', 'Import or track backlinks'],
-                            ['#step-6', '06', 'Review the insight boards'],
-                            ['#step-7', '07', 'Schedule reports + alerts'],
-                            ['#step-8', '08', 'Install the WordPress plugin'],
+                            ['#step-1', '01', __('Add your first website')],
+                            ['#step-2', '02', __('Connect search and analytics')],
+                            ['#step-3', '03', __('Track keywords + competitors')],
+                            ['#step-4', '04', __('Run a page audit')],
+                            ['#step-5', '05', __('Import or track backlinks')],
+                            ['#step-6', '06', __('Review the insight boards')],
+                            ['#step-7', '07', __('Schedule reports + alerts')],
+                            ['#step-8', '08', __('Install the WordPress plugin')],
                         ];
                         $tocReference = [
-                            ['#metric-glossary', 'Metric glossary'],
-                            ['#troubleshooting', 'Troubleshooting'],
-                            ['#faq', 'FAQ'],
-                            ['#weekly-rhythm', 'A weekly rhythm'],
+                            ['#metric-glossary', __('Metric glossary')],
+                            ['#troubleshooting', __('Troubleshooting')],
+                            ['#faq', __('FAQ')],
+                            ['#weekly-rhythm', __('A weekly rhythm')],
                         ];
                     @endphp
                     @foreach ($tocWorkspace as [$href, $label])
@@ -93,50 +93,50 @@
                         <span class="font-mono text-sm font-semibold text-slate-400">01</span>
                         <span class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">~ 1 min</span>
                     </div>
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Add your first website</h2>
+                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Add your first website') }}</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Every signal in Serfix — clicks, ranks, audits, backlinks, alerts — is scoped to a website. Before anything else syncs, Serfix needs to know which property it should hold.
+                        {{ __('Every signal in Serfix — clicks, ranks, audits, backlinks, alerts — is scoped to a website. Before anything else syncs, Serfix needs to know which property it should hold.') }}
                     </p>
 
                     {{-- Mockup: add website form --}}
                     <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="flex items-center justify-between border-b border-slate-200 pb-3">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Websites · Add website</p>
-                            <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">New</span>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Websites · Add website') }}</p>
+                            <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{{ __('New') }}</span>
                         </div>
                         <div class="mt-4 space-y-3 text-[12px]">
                             <div>
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Canonical URL</p>
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Canonical URL') }}</p>
                                 <div class="mt-1.5 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 font-mono text-slate-700">https://example.com</div>
                             </div>
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Default country</p>
-                                    <div class="mt-1.5 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-slate-700">United States</div>
+                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Default country') }}</p>
+                                    <div class="mt-1.5 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-slate-700">{{ __('United States') }}</div>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Timezone</p>
+                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Timezone') }}</p>
                                     <div class="mt-1.5 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-slate-700">America/New_York</div>
                                 </div>
                             </div>
                             <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-[12px] text-emerald-800">
-                                <span class="font-semibold">robots.txt found</span> · sitemap.xml: 4 indices, 1,284 URLs · canonical scheme matches
+                                <span class="font-semibold">{{ __('robots.txt found') }}</span> · {{ __('sitemap.xml: 4 indices, 1,284 URLs · canonical scheme matches') }}
                             </div>
                         </div>
                     </div>
 
                     <div class="mt-6 grid gap-4 sm:grid-cols-3">
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">What you'll see</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">A live probe of robots.txt, sitemaps, and canonical configuration appears below the form.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('What you\'ll see') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('A live probe of robots.txt, sitemaps, and canonical configuration appears below the form.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">What to do</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Use the exact protocol and host registered in Search Console — trailing slashes and <code>www</code> matter for property matching.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('What to do') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Use the exact protocol and host registered in Search Console — trailing slashes and') }} <code>www</code> {{ __('matter for property matching.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pitfall</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Mismatched protocol (http vs https) or host (with vs without www) is the #1 reason search sync returns zero rows.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Pitfall') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Mismatched protocol (http vs https) or host (with vs without www) is the #1 reason search sync returns zero rows.') }}</p>
                         </div>
                     </div>
                 </section>
@@ -149,9 +149,9 @@
                         <span class="font-mono text-sm font-semibold text-slate-400">02</span>
                         <span class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">~ 2 min</span>
                     </div>
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Connect search and analytics</h2>
+                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Connect search and analytics') }}</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        In one authorization step you grant read access to your connected search and analytics properties, plus permission to request indexing when you use that workflow. Credentials are encrypted at rest and rotated automatically, and you can revoke access from the same screen.
+                        {{ __('In one authorization step you grant read access to your connected search and analytics properties, plus permission to request indexing when you use that workflow. Credentials are encrypted at rest and rotated automatically, and you can revoke access from the same screen.') }}
                     </p>
 
                     {{-- Mockup: authorization consent --}}
@@ -160,15 +160,15 @@
                             <span class="h-2 w-2 rounded-full bg-rose-400"></span>
                             <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                             <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                            <span class="ml-2 text-[11px] font-medium text-slate-500">Authorization — grant access for Serfix</span>
+                            <span class="ml-2 text-[11px] font-medium text-slate-500">{{ __('Authorization — grant access for Serfix') }}</span>
                         </div>
                         <div class="px-5 py-5">
-                            <p class="text-[13px] text-slate-700">Serfix would like to:</p>
+                            <p class="text-[13px] text-slate-700">{{ __('Serfix would like to:') }}</p>
                             <ul class="mt-3 space-y-2.5 text-[12px]">
                                 @foreach ([
-                                    ['Read-only access to your connected analytics property', 'sensitive'],
-                                    ['Read-only access to your verified search property', 'standard'],
-                                    ['Permission to request indexing for URLs you choose', 'standard'],
+                                    [__('Read-only access to your connected analytics property'), 'sensitive'],
+                                    [__('Read-only access to your verified search property'), 'standard'],
+                                    [__('Permission to request indexing for URLs you choose'), 'standard'],
                                 ] as [$desc, $tone])
                                     <li class="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5">
                                         <span @class([
@@ -183,30 +183,30 @@
                                 @endforeach
                             </ul>
                             <div class="mt-4 flex items-center gap-2">
-                                <span class="rounded-md bg-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-700">Cancel</span>
-                                <span class="rounded-md bg-orange-600 px-3 py-1.5 text-[11px] font-semibold text-white">Allow</span>
+                                <span class="rounded-md bg-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-700">{{ __('Cancel') }}</span>
+                                <span class="rounded-md bg-orange-600 px-3 py-1.5 text-[11px] font-semibold text-white">{{ __('Allow') }}</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="mt-6 grid gap-4 sm:grid-cols-3">
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Why three permissions</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Analytics for sessions and users, search property data for queries and positions, and indexing so you can request a URL refresh from audit workflows.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Why three permissions') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Analytics for sessions and users, search property data for queries and positions, and indexing so you can request a URL refresh from audit workflows.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Token safety</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Integration credentials stay on Serfix servers and are encrypted; short-lived access is rotated automatically.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Token safety') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Integration credentials stay on Serfix servers and are encrypted; short-lived access is rotated automatically.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Partial grants</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">If you decline part of the access, Serfix keeps working with reduced coverage. You can approve more later from the same screen.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Partial grants') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('If you decline part of the access, Serfix keeps working with reduced coverage. You can approve more later from the same screen.') }}</p>
                         </div>
                     </div>
 
                     <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50/60 px-5 py-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">Heads up</p>
-                        <p class="mt-1 text-[14px] leading-6 text-slate-700">Use the same account that owns the search property and analytics view you want to connect. If the right sites do not appear in the picker after consent, you are usually signed in with a different account.</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">{{ __('Heads up') }}</p>
+                        <p class="mt-1 text-[14px] leading-6 text-slate-700">{{ __('Use the same account that owns the search property and analytics view you want to connect. If the right sites do not appear in the picker after consent, you are usually signed in with a different account.') }}</p>
                     </div>
                 </section>
 
@@ -216,25 +216,25 @@
                         <span class="font-mono text-sm font-semibold text-slate-400">03</span>
                         <span class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">~ 2 min</span>
                     </div>
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Track keywords and competitors</h2>
+                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Track keywords and competitors') }}</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Live results pages are captured per device, country, language, and optional city. Serfix overlays search clicks for the same query when available so a rank gain is judged on traffic, not only position.
+                        {{ __('Live results pages are captured per device, country, language, and optional city. Serfix overlays search clicks for the same query when available so a rank gain is judged on traffic, not only position.') }}
                     </p>
 
                     {{-- Mockup: keyword grid --}}
                     <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div class="border-b border-slate-200 px-5 py-3">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Keywords · example.com</p>
-                            <p class="mt-0.5 text-sm font-semibold text-slate-900">Targeting · United States · Mobile</p>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Keywords · example.com') }}</p>
+                            <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('Targeting · United States · Mobile') }}</p>
                         </div>
                         <table class="min-w-full text-[12px]">
                             <thead class="bg-slate-50/60 text-[10px] uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th class="px-4 py-2 text-left font-semibold">Query</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Pos</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Δ 7d</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Clicks 30d</th>
-                                    <th class="px-3 py-2 text-left font-semibold">SERP features</th>
+                                    <th class="px-4 py-2 text-left font-semibold">{{ __('Query') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('Pos') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('Δ 7d') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('Clicks 30d') }}</th>
+                                    <th class="px-3 py-2 text-left font-semibold">{{ __('SERP features') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -267,27 +267,27 @@
                         </table>
                     </div>
 
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">How to add keywords</h3>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">{{ __('How to add keywords') }}</h3>
                     <ol class="mt-3 space-y-2 text-[14px] leading-7 text-slate-700">
-                        <li><span class="font-mono text-slate-400">1.</span> Open <strong>Keywords</strong>. Click <em>Add keywords</em>.</li>
-                        <li><span class="font-mono text-slate-400">2.</span> Paste one per line, or upload a CSV with columns <code>query, country, device, language</code>.</li>
-                        <li><span class="font-mono text-slate-400">3.</span> Set the default targeting. Override per-row if you operate in multiple regions.</li>
-                        <li><span class="font-mono text-slate-400">4.</span> (Optional) Add up to three competitor domains. Serfix will record their position on every check.</li>
-                        <li><span class="font-mono text-slate-400">5.</span> First SERP capture starts within minutes. Subsequent captures run on your plan's interval.</li>
+                        <li><span class="font-mono text-slate-400">1.</span> {{ __('Open') }} <strong>{{ __('Keywords') }}</strong>. {{ __('Click') }} <em>{{ __('Add keywords') }}</em>.</li>
+                        <li><span class="font-mono text-slate-400">2.</span> {{ __('Paste one per line, or upload a CSV with columns') }} <code>query, country, device, language</code>.</li>
+                        <li><span class="font-mono text-slate-400">3.</span> {{ __('Set the default targeting. Override per-row if you operate in multiple regions.') }}</li>
+                        <li><span class="font-mono text-slate-400">4.</span> {{ __('(Optional) Add up to three competitor domains. Serfix will record their position on every check.') }}</li>
+                        <li><span class="font-mono text-slate-400">5.</span> {{ __('First SERP capture starts within minutes. Subsequent captures run on your plan\'s interval.') }}</li>
                     </ol>
 
                     <div class="mt-6 grid gap-4 sm:grid-cols-3">
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Start with intent</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">20–40 high-intent terms beat 500 head terms. You can add more later — empty rows aren't penalized.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Start with intent') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('20–40 high-intent terms beat 500 head terms. You can add more later — empty rows aren\'t penalized.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Re-check after publish</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">After shipping a content update, hit <em>Re-check now</em> to capture rank movement faster than the daily cycle.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Re-check after publish') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('After shipping a content update, hit') }} <em>{{ __('Re-check now') }}</em> {{ __('to capture rank movement faster than the daily cycle.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">SERP features matter</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">A #2 below an AI overview earns less than a #4 with sitelinks. Serfix flags the feature so the rank number isn't read in isolation.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('SERP features matter') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('A #2 below an AI overview earns less than a #4 with sitelinks. Serfix flags the feature so the rank number isn\'t read in isolation.') }}</p>
                         </div>
                     </div>
                 </section>
@@ -299,9 +299,9 @@
                         <span class="font-mono text-sm font-semibold text-slate-400">04</span>
                         <span class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">~ 1 min</span>
                     </div>
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Run a page audit</h2>
+                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Run a page audit') }}</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Audits combine Core Web Vitals, on-page SEO, and content review in a single pass and finish in under 60 seconds. After you ship a fix, request indexing for the URL without leaving the audit view.
+                        {{ __('Audits combine Core Web Vitals, on-page SEO, and content review in a single pass and finish in under 60 seconds. After you ship a fix, request indexing for the URL without leaving the audit view.') }}
                     </p>
 
                     {{-- Mockup: audit scorecard --}}
@@ -311,7 +311,7 @@
                                 <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Audit · /blog/saas-seo-guide</p>
                                 <p class="mt-0.5 text-sm font-semibold text-slate-900">Mobile · Score 72 · Target: "saas seo guide"</p>
                             </div>
-                            <span class="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-100">Needs work</span>
+                            <span class="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-100">{{ __('Needs work') }}</span>
                         </div>
                         <div class="mt-4 grid grid-cols-3 gap-2.5">
                             @foreach ([
@@ -334,7 +334,7 @@
                             @endforeach
                         </div>
                         <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Top recommendations</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Top recommendations') }}</p>
                             <ul class="mt-3 space-y-2 text-[12px]">
                                 @foreach ([
                                     ['rose', 'Render-blocking CSS — split into critical + async (180KB)'],
@@ -355,35 +355,35 @@
                             </ul>
                         </div>
                         <div class="mt-4 flex flex-wrap gap-2">
-                            <span class="rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Request indexing</span>
-                            <span class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">Re-audit</span>
-                            <span class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">Download PDF</span>
+                            <span class="rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">{{ __('Request indexing') }}</span>
+                            <span class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">{{ __('Re-audit') }}</span>
+                            <span class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">{{ __('Download PDF') }}</span>
                         </div>
                     </div>
 
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Reading the score</h3>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">{{ __('Reading the score') }}</h3>
                     <div class="mt-3 grid gap-3 sm:grid-cols-3">
                         <div class="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">90–100 · Good</p>
-                            <p class="mt-1.5 text-[13px] leading-6 text-slate-700">Ship-ready. Re-audit after the next deploy to detect regressions.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">{{ __('90–100 · Good') }}</p>
+                            <p class="mt-1.5 text-[13px] leading-6 text-slate-700">{{ __('Ship-ready. Re-audit after the next deploy to detect regressions.') }}</p>
                         </div>
                         <div class="rounded-xl border border-amber-100 bg-amber-50/40 p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">60–89 · Needs work</p>
-                            <p class="mt-1.5 text-[13px] leading-6 text-slate-700">Pick the top two recommendations from the prioritized list.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">{{ __('60–89 · Needs work') }}</p>
+                            <p class="mt-1.5 text-[13px] leading-6 text-slate-700">{{ __('Pick the top two recommendations from the prioritized list.') }}</p>
                         </div>
                         <div class="rounded-xl border border-rose-100 bg-rose-50/40 p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-700">0–59 · Poor</p>
-                            <p class="mt-1.5 text-[13px] leading-6 text-slate-700">Treat as a sprint goal. Often a CWV regression or schema break.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-700">{{ __('0–59 · Poor') }}</p>
+                            <p class="mt-1.5 text-[13px] leading-6 text-slate-700">{{ __('Treat as a sprint goal. Often a CWV regression or schema break.') }}</p>
                         </div>
                     </div>
 
                     <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50/60 px-5 py-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Pro tip</p>
-                        <p class="mt-1 text-[14px] leading-6 text-slate-700">Always provide a <em>target keyword</em>. Without it the keyword-strategy review and topical-gap analysis are skipped, and you lose half the value of an audit.</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('Pro tip') }}</p>
+                        <p class="mt-1 text-[14px] leading-6 text-slate-700">{{ __('Always provide a') }} <em>{{ __('target keyword') }}</em>. {{ __('Without it the keyword-strategy review and topical-gap analysis are skipped, and you lose half the value of an audit.') }}</p>
                     </div>
 
                     <p class="mt-6 text-[14px] leading-7 text-slate-700">
-                        The <strong>Page audit report layout</strong> section above matches the live audit detail screen—the same panels appear in the same order as the in-app <em>Guide to this report</em> link.
+                        {{ __('The') }} <strong>{{ __('Page audit report layout') }}</strong> {{ __('section above matches the live audit detail screen—the same panels appear in the same order as the in-app') }} <em>{{ __('Guide to this report') }}</em> {{ __('link.') }}
                     </p>
                 </section>
 
@@ -394,25 +394,25 @@
                         <span class="font-mono text-sm font-semibold text-slate-400">05</span>
                         <span class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">~ 2 min</span>
                     </div>
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Import or track backlinks</h2>
+                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Import or track backlinks') }}</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Serfix verifies presence, anchor, and rel on every check, then measures the 28-day click delta on the target page so you can prove which links actually lifted traffic.
+                        {{ __('Serfix verifies presence, anchor, and rel on every check, then measures the 28-day click delta on the target page so you can prove which links actually lifted traffic.') }}
                     </p>
 
                     {{-- Mockup: backlinks table --}}
                     <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div class="border-b border-slate-200 px-5 py-3">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Backlinks · example.com</p>
-                            <p class="mt-0.5 text-sm font-semibold text-slate-900">Verified · 28-day click delta</p>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Backlinks · example.com') }}</p>
+                            <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('Verified · 28-day click delta') }}</p>
                         </div>
                         <table class="min-w-full text-[12px]">
                             <thead class="bg-slate-50/60 text-[10px] uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th class="px-4 py-2 text-left font-semibold">Source → target</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Anchor</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Rel</th>
-                                    <th class="px-3 py-2 text-right font-semibold">DA</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Δ clicks</th>
+                                    <th class="px-4 py-2 text-left font-semibold">{{ __('Source → target') }}</th>
+                                    <th class="px-3 py-2 text-left font-semibold">{{ __('Anchor') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('Rel') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('DA') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('Δ clicks') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -438,30 +438,30 @@
                         </table>
                     </div>
 
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Two ways to add</h3>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">{{ __('Two ways to add') }}</h3>
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">CSV upload</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Columns: <code>source_url, target_url, anchor</code>. Anchor is optional — Serfix extracts it on first verify.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('CSV upload') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Columns:') }} <code>source_url, target_url, anchor</code>. {{ __('Anchor is optional — Serfix extracts it on first verify.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Manual entry</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Paste up to 50 source URLs at once. Useful for tracking outreach campaigns as they land.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Manual entry') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Paste up to 50 source URLs at once. Useful for tracking outreach campaigns as they land.') }}</p>
                         </div>
                     </div>
 
                     <div class="mt-6 grid gap-4 sm:grid-cols-3">
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Status icons</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700"><span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span> live · <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span> anchor changed · <span class="inline-block h-2 w-2 rounded-full bg-rose-500"></span> removed</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Status icons') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700"><span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span> {{ __('live') }} · <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span> {{ __('anchor changed') }} · <span class="inline-block h-2 w-2 rounded-full bg-rose-500"></span> {{ __('removed') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Click delta</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Compares 28 days <em>after</em> first-seen against 28 days <em>before</em>, on the target page only.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Click delta') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Compares 28 days') }} <em>{{ __('after') }}</em> {{ __('first-seen against 28 days') }} <em>{{ __('before') }}</em>, {{ __('on the target page only.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pro+ only</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Competitor backlink prospecting surfaces sources linking to rivals but not to you.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Pro+ only') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Competitor backlink prospecting surfaces sources linking to rivals but not to you.') }}</p>
                         </div>
                     </div>
                 </section>
@@ -473,20 +473,20 @@
                         <span class="font-mono text-sm font-semibold text-slate-400">06</span>
                         <span class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">~ 2 min</span>
                     </div>
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Review the insight boards</h2>
+                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Review the insight boards') }}</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Six pre-built reports combine synced search and analytics signals with audits and backlinks into a ranked action list. Each row links straight to the offending page so the next move is one click away.
+                        {{ __('Six pre-built reports combine synced search and analytics signals with audits and backlinks into a ranked action list. Each row links straight to the offending page so the next move is one click away.') }}
                     </p>
 
                     {{-- Mockup: 6 boards --}}
                     <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
                         @foreach ([
-                            ['Cannibalizations', '14', 'Two pages competing for one query', 'amber'],
-                            ['Striking distance', '27', 'Keywords at pos 5–20 with below-curve CTR', 'orange'],
-                            ['Content decay', '8', '90-day click decline beyond seasonality', 'slate'],
-                            ['Indexing fails', '3', 'URLs earning impressions but not indexed', 'rose'],
-                            ['Audit vs traffic', '11', 'High-traffic pages with poor audit scores', 'slate'],
-                            ['Backlink impact', '9', 'Links with measurable lift on the target', 'emerald'],
+                            [__('Cannibalizations'), '14', __('Two pages competing for one query'), 'amber'],
+                            [__('Striking distance'), '27', __('Keywords at pos 5–20 with below-curve CTR'), 'orange'],
+                            [__('Content decay'), '8', __('90-day click decline beyond seasonality'), 'slate'],
+                            [__('Indexing fails'), '3', __('URLs earning impressions but not indexed'), 'rose'],
+                            [__('Audit vs traffic'), '11', __('High-traffic pages with poor audit scores'), 'slate'],
+                            [__('Backlink impact'), '9', __('Links with measurable lift on the target'), 'emerald'],
                         ] as [$lbl, $val, $help, $tone])
                             <div class="rounded-xl border border-slate-200 bg-white p-4">
                                 <div class="flex items-baseline justify-between">
@@ -505,21 +505,21 @@
                         @endforeach
                     </div>
 
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">How to triage</h3>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">{{ __('How to triage') }}</h3>
                     <ol class="mt-3 space-y-2 text-[14px] leading-7 text-slate-700">
-                        <li><span class="font-mono text-slate-400">1.</span> Open <strong>Striking distance</strong> first — these are the fastest wins (small content tweak, internal link, FAQ addition).</li>
-                        <li><span class="font-mono text-slate-400">2.</span> Then <strong>Cannibalization</strong> — usually a merge/redirect or canonical fix.</li>
-                        <li><span class="font-mono text-slate-400">3.</span> <strong>Indexing fails</strong> for pages that already earn impressions: validate canonical, then resubmit.</li>
-                        <li><span class="font-mono text-slate-400">4.</span> <strong>Content decay</strong> last — these are bigger rewrites and need a sprint allocation.</li>
+                        <li><span class="font-mono text-slate-400">1.</span> {{ __('Open') }} <strong>{{ __('Striking distance') }}</strong> {{ __('first — these are the fastest wins (small content tweak, internal link, FAQ addition).') }}</li>
+                        <li><span class="font-mono text-slate-400">2.</span> {{ __('Then') }} <strong>{{ __('Cannibalization') }}</strong> {{ __('— usually a merge/redirect or canonical fix.') }}</li>
+                        <li><span class="font-mono text-slate-400">3.</span> <strong>{{ __('Indexing fails') }}</strong> {{ __('for pages that already earn impressions: validate canonical, then resubmit.') }}</li>
+                        <li><span class="font-mono text-slate-400">4.</span> <strong>{{ __('Content decay') }}</strong> {{ __('last — these are bigger rewrites and need a sprint allocation.') }}</li>
                     </ol>
 
                     <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50/60 px-5 py-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Tip</p>
-                        <p class="mt-1 text-[14px] leading-6 text-slate-700">Most teams ship 1–3 wins from striking-distance in the first week. If you see fewer than 5 candidates total, your keyword set is too narrow — go back to step 3 and broaden.</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('Tip') }}</p>
+                        <p class="mt-1 text-[14px] leading-6 text-slate-700">{{ __('Most teams ship 1–3 wins from striking-distance in the first week. If you see fewer than 5 candidates total, your keyword set is too narrow — go back to step 3 and broaden.') }}</p>
                     </div>
 
                     <p class="mt-6 text-[14px] leading-7 text-slate-700">
-                        For the dashboard insight row and what each card counts, see <strong>Dashboard</strong> and <strong>Action insight cards</strong> in the product reference at the top of this guide.
+                        {{ __('For the dashboard insight row and what each card counts, see') }} <strong>{{ __('Dashboard') }}</strong> {{ __('and') }} <strong>{{ __('Action insight cards') }}</strong> {{ __('in the product reference at the top of this guide.') }}
                     </p>
                 </section>
 
@@ -531,35 +531,35 @@
                         <span class="font-mono text-sm font-semibold text-slate-400">07</span>
                         <span class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">~ 2 min</span>
                     </div>
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Schedule reports + turn on alerts</h2>
+                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Schedule reports + turn on alerts') }}</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Reports and alerts share one recipient list per website. Reports run on a fixed cadence; alerts fire only when Serfix detects an unusual change against your recent baseline—so normal volatility does not spam your inbox.
+                        {{ __('Reports and alerts share one recipient list per website. Reports run on a fixed cadence; alerts fire only when Serfix detects an unusual change against your recent baseline—so normal volatility does not spam your inbox.') }}
                     </p>
 
                     <div class="mt-6 grid gap-5 lg:grid-cols-2">
                         {{-- Mockup: schedule form --}}
                         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Reports · New schedule</p>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Reports · New schedule') }}</p>
                             <div class="mt-3 space-y-3 text-[12px]">
                                 <div>
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Recipients</p>
+                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Recipients') }}</p>
                                     <div class="mt-1.5 flex flex-wrap gap-1.5">
                                         <span class="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700">you@example.com</span>
                                         <span class="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700">cmo@example.com</span>
-                                        <span class="rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-slate-500">+ add</span>
+                                        <span class="rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-slate-500">{{ __('+ add') }}</span>
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
-                                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Cadence</p>
-                                        <div class="mt-1.5 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-slate-700">Weekly · Monday</div>
+                                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Cadence') }}</p>
+                                        <div class="mt-1.5 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-slate-700">{{ __('Weekly · Monday') }}</div>
                                     </div>
                                     <div>
-                                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Time (website TZ)</p>
+                                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Time (website TZ)') }}</p>
                                         <div class="mt-1.5 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-slate-700">09:00</div>
                                     </div>
                                 </div>
-                                <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-emerald-800">Anomaly alerts · ON for the same recipients</div>
+                                <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-emerald-800">{{ __('Anomaly alerts · ON for the same recipients') }}</div>
                             </div>
                         </div>
 
@@ -567,29 +567,29 @@
                         <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                             <div class="border-b border-slate-200 px-5 py-3">
                                 <div class="flex items-center justify-between">
-                                    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Alert · example.com</p>
-                                    <span class="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-100">Anomaly</span>
+                                    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Alert · example.com') }}</p>
+                                    <span class="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-100">{{ __('Anomaly') }}</span>
                                 </div>
-                                <p class="mt-1 text-sm font-semibold text-slate-900">Search clicks dropped 74.9%</p>
+                                <p class="mt-1 text-sm font-semibold text-slate-900">{{ __('Search clicks dropped 74.9%') }}</p>
                             </div>
                             <div class="px-5 py-5 text-[12px] text-slate-700">
-                                <p>An unusual drop was detected on 2026-04-20.</p>
+                                <p>{{ __('An unusual drop was detected on 2026-04-20.') }}</p>
                                 <ul class="mt-3 space-y-1.5">
-                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Search clicks</span><span class="font-mono text-rose-600">212 vs typical 820</span></li>
-                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Sessions</span><span class="font-mono text-rose-600">480 vs typical 1,540</span></li>
-                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Avg position</span><span class="font-mono text-amber-600">14.2 vs typical 11.4</span></li>
+                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>{{ __('Search clicks') }}</span><span class="font-mono text-rose-600">212 vs typical 820</span></li>
+                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>{{ __('Sessions') }}</span><span class="font-mono text-rose-600">480 vs typical 1,540</span></li>
+                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>{{ __('Avg position') }}</span><span class="font-mono text-amber-600">14.2 vs typical 11.4</span></li>
                                 </ul>
-                                <div class="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Open Serfix →</div>
+                                <div class="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">{{ __('Open Serfix →') }}</div>
                             </div>
                         </div>
                     </div>
 
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">When alerts fire</h3>
-                    <p class="mt-3 text-[14px] leading-7 text-slate-700">Serfix compares recent daily totals to your rolling baseline and only notifies you when the drop is both material and unusual for that metric. Alerts are deduplicated so you do not get repeated noise for the same issue.</p>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">{{ __('When alerts fire') }}</h3>
+                    <p class="mt-3 text-[14px] leading-7 text-slate-700">{{ __('Serfix compares recent daily totals to your rolling baseline and only notifies you when the drop is both material and unusual for that metric. Alerts are deduplicated so you do not get repeated noise for the same issue.') }}</p>
 
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Reports and scheduled email</h3>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">{{ __('Reports and scheduled email') }}</h3>
                     <p class="mt-3 text-[13px] leading-6 text-slate-700">
-                        For the Insights tab (every column per category) and the custom growth report email builder, see <strong>Reports → Insights</strong> and <strong>Custom growth reports (email)</strong> in the product reference at the top of this guide.
+                        {{ __('For the Insights tab (every column per category) and the custom growth report email builder, see') }} <strong>{{ __('Reports → Insights') }}</strong> {{ __('and') }} <strong>{{ __('Custom growth reports (email)') }}</strong> {{ __('in the product reference at the top of this guide.') }}
                     </p>
                 </section>
 
@@ -599,109 +599,109 @@
                         <span class="font-mono text-sm font-semibold text-slate-400">08</span>
                         <span class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">~ 3 min</span>
                     </div>
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Install the WordPress plugin</h2>
+                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Install the WordPress plugin') }}</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        The Serfix SEO plugin adds HQ, the block-editor panel, the posts-list Serfix column, and the dashboard widget. Full layouts and column-by-column notes for each surface are in <strong><a href="#wordpress-plugin" class="text-orange-600 underline decoration-orange-600/30 underline-offset-2 hover:text-orange-800">WordPress plugin</a></strong> at the top of this guide.
+                        {{ __('The Serfix SEO plugin adds HQ, the block-editor panel, the posts-list Serfix column, and the dashboard widget. Full layouts and column-by-column notes for each surface are in') }} <strong><a href="#wordpress-plugin" class="text-orange-600 underline decoration-orange-600/30 underline-offset-2 hover:text-orange-800">{{ __('WordPress plugin') }}</a></strong> {{ __('at the top of this guide.') }}
                     </p>
 
                     {{-- ── 8.1 Plugin settings ───────────────────── --}}
-                    <h3 class="mt-10 text-lg font-semibold text-slate-900">8.1 Plugin settings — connection, sync, and updates</h3>
+                    <h3 class="mt-10 text-lg font-semibold text-slate-900">{{ __('8.1 Plugin settings — connection, sync, and updates') }}</h3>
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Connection</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Connection') }}</p>
                             <ul class="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-700">
-                                <li>One-click <em>Connect to Serfix</em> using a short verification step—no secrets to copy.</li>
-                                <li>Live status badge (Connected / Reconnect needed / Revoked).</li>
-                                <li><em>Disconnect</em> ends the link for this site in Serfix right away.</li>
+                                <li>{{ __('One-click') }} <em>{{ __('Connect to Serfix') }}</em> {{ __('using a short verification step—no secrets to copy.') }}</li>
+                                <li>{{ __('Live status badge (Connected / Reconnect needed / Revoked).') }}</li>
+                                <li><em>{{ __('Disconnect') }}</em> {{ __('ends the link for this site in Serfix right away.') }}</li>
                             </ul>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Sync controls</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Sync controls') }}</p>
                             <ul class="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-700">
-                                <li>Force-refresh sidebar data for the current post.</li>
-                                <li>Toggle posts list column on/off.</li>
-                                <li>Toggle dashboard widget on/off per user role.</li>
+                                <li>{{ __('Force-refresh sidebar data for the current post.') }}</li>
+                                <li>{{ __('Toggle posts list column on/off.') }}</li>
+                                <li>{{ __('Toggle dashboard widget on/off per user role.') }}</li>
                             </ul>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Auto-updates</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Auto-updates') }}</p>
                             <ul class="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-700">
-                                <li>The plugin checks Serfix for new releases on a routine schedule.</li>
-                                <li>Optional auto-install for security/patch releases.</li>
-                                <li>Manual update from <strong>Plugins</strong> at any time.</li>
+                                <li>{{ __('The plugin checks Serfix for new releases on a routine schedule.') }}</li>
+                                <li>{{ __('Optional auto-install for security/patch releases.') }}</li>
+                                <li>{{ __('Manual update from') }} <strong>{{ __('Plugins') }}</strong> {{ __('at any time.') }}</li>
                             </ul>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Permissions</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Permissions') }}</p>
                             <ul class="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-700">
-                                <li>Sidebar visible to Editors+; widget configurable per role.</li>
-                                <li>Connect and disconnect require administrator access.</li>
-                                <li>Posts column respects post-type capabilities.</li>
+                                <li>{{ __('Sidebar visible to Editors+; widget configurable per role.') }}</li>
+                                <li>{{ __('Connect and disconnect require administrator access.') }}</li>
+                                <li>{{ __('Posts column respects post-type capabilities.') }}</li>
                             </ul>
                         </div>
                     </div>
 
                     {{-- ── 8.2 Install in 4 steps ───────────────── --}}
-                    <h3 class="mt-12 text-lg font-semibold text-slate-900">8.2 Install in four steps</h3>
+                    <h3 class="mt-12 text-lg font-semibold text-slate-900">{{ __('8.2 Install in four steps') }}</h3>
                     <ol class="mt-3 space-y-2 text-[14px] leading-7 text-slate-700">
-                        <li><span class="font-mono text-slate-400">1.</span> In Serfix, open <strong>Settings → WordPress</strong>. Click <em>Download plugin</em> — you'll get the latest packaged ZIP.</li>
-                        <li><span class="font-mono text-slate-400">2.</span> In WordPress, go to <strong>Plugins → Add New → Upload Plugin</strong>. Upload the ZIP, then activate.</li>
-                        <li><span class="font-mono text-slate-400">3.</span> In the WP plugin settings, click <em>Connect to Serfix</em>. You'll be redirected back to Serfix, pick the matching website, and approve.</li>
-                        <li><span class="font-mono text-slate-400">4.</span> Open any post — the Serfix panel appears in the block editor sidebar. The dashboard widget and posts-list column fill in shortly after.</li>
+                        <li><span class="font-mono text-slate-400">1.</span> {{ __('In Serfix, open') }} <strong>{{ __('Settings → WordPress') }}</strong>. {{ __('Click') }} <em>{{ __('Download plugin') }}</em> — {{ __('you\'ll get the latest packaged ZIP.') }}</li>
+                        <li><span class="font-mono text-slate-400">2.</span> {{ __('In WordPress, go to') }} <strong>{{ __('Plugins → Add New → Upload Plugin') }}</strong>. {{ __('Upload the ZIP, then activate.') }}</li>
+                        <li><span class="font-mono text-slate-400">3.</span> {{ __('In the WP plugin settings, click') }} <em>{{ __('Connect to Serfix') }}</em>. {{ __('You\'ll be redirected back to Serfix, pick the matching website, and approve.') }}</li>
+                        <li><span class="font-mono text-slate-400">4.</span> {{ __('Open any post — the Serfix panel appears in the block editor sidebar. The dashboard widget and posts-list column fill in shortly after.') }}</li>
                     </ol>
 
                     {{-- ── 8.3 Security ──────────────────────────── --}}
-                    <h3 class="mt-12 text-lg font-semibold text-slate-900">8.3 Security model</h3>
+                    <h3 class="mt-12 text-lg font-semibold text-slate-900">{{ __('8.3 Security model') }}</h3>
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Scoped to one site</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Each plugin connection applies to a single website in your Serfix account. A compromised site-specific link could only reach that site’s data—not your other properties or full account.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Scoped to one site') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Each plugin connection applies to a single website in your Serfix account. A compromised site-specific link could only reach that site’s data—not your other properties or full account.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Stored on your server</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Connection credentials stay on your server. They are not embedded in public pages or exposed to visitors—only Serfix’s plugin uses them to fetch your workspace data.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Stored on your server') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Connection credentials stay on your server. They are not embedded in public pages or exposed to visitors—only Serfix’s plugin uses them to fetch your workspace data.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Verified connect flow</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Connecting runs through a short, signed verification step so stray links cannot complete pairing. Someone without access to your site admin cannot bind your install to another workspace.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Verified connect flow') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Connecting runs through a short, signed verification step so stray links cannot complete pairing. Someone without access to your site admin cannot bind your install to another workspace.') }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Instant revoke</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Choose <em>Disconnect</em> in either your site admin or Serfix. The link stops working immediately on the next request.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Instant revoke') }}</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">{{ __('Choose') }} <em>{{ __('Disconnect') }}</em> {{ __('in either your site admin or Serfix. The link stops working immediately on the next request.') }}</p>
                         </div>
                     </div>
                 </section>
 
                 {{-- ── METRIC GLOSSARY ──────────────────────── --}}
                 <section id="metric-glossary" class="not-prose mt-24 scroll-mt-24">
-                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">Metric glossary</h2>
-                    <p class="mt-4 text-[16px] leading-7 text-slate-600">Quick definitions for the metrics you'll see across Serfix. Open the table for the source and exact window.</p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">{{ __('Metric glossary') }}</h2>
+                    <p class="mt-4 text-[16px] leading-7 text-slate-600">{{ __('Quick definitions for the metrics you\'ll see across Serfix. Open the table for the source and exact window.') }}</p>
 
                     <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
                         <table class="min-w-full text-[13px]">
                             <thead class="bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th class="px-4 py-2.5 text-left font-semibold">Metric</th>
-                                    <th class="px-4 py-2.5 text-left font-semibold">Source</th>
-                                    <th class="px-4 py-2.5 text-left font-semibold">Definition</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold">{{ __('Metric') }}</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold">{{ __('Source') }}</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold">{{ __('Definition') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
                                 @foreach ([
-                                    ['Clicks', 'Search sync', 'Times people clicked your listing in search results in the selected scope.'],
-                                    ['Impressions', 'Search sync', 'Times your URL was shown for queries in scope.'],
-                                    ['CTR', 'Search sync', 'Share of impressions that resulted in a click.'],
-                                    ['Avg position', 'Search sync', 'Average rank where your URL appeared for queries in scope.'],
-                                    ['Sessions', 'Analytics sync', 'Visit sessions from your connected analytics property.'],
-                                    ['Users', 'Analytics sync', 'Distinct visitors from your connected analytics property.'],
-                                    ['LCP', 'Lab / field', 'Largest Contentful Paint — when the main content renders.'],
-                                    ['CLS', 'Lab / field', 'Cumulative Layout Shift — visual stability.'],
-                                    ['INP', 'Lab / field', 'Interaction to Next Paint — input responsiveness.'],
-                                    ['TBT', 'Lab', 'Total Blocking Time — main-thread blocking from scripts.'],
-                                    ['FCP', 'Lab / field', 'First Contentful Paint — first paint of text or image.'],
-                                    ['TTFB', 'Lab / field', 'Time To First Byte — server response latency.'],
-                                    ['Δ clicks (28d)', 'Serfix', 'Backlink view: change in target-page clicks around when the link was first seen.'],
-                                    ['Anomaly signal', 'Serfix', 'Indicates how far a daily metric sits from its usual range for your site (used for alerts).'],
+                                    [__('Clicks'), __('Search sync'), __('Times people clicked your listing in search results in the selected scope.')],
+                                    [__('Impressions'), __('Search sync'), __('Times your URL was shown for queries in scope.')],
+                                    ['CTR', __('Search sync'), __('Share of impressions that resulted in a click.')],
+                                    [__('Avg position'), __('Search sync'), __('Average rank where your URL appeared for queries in scope.')],
+                                    [__('Sessions'), __('Analytics sync'), __('Visit sessions from your connected analytics property.')],
+                                    [__('Users'), __('Analytics sync'), __('Distinct visitors from your connected analytics property.')],
+                                    ['LCP', __('Lab / field'), __('Largest Contentful Paint — when the main content renders.')],
+                                    ['CLS', __('Lab / field'), __('Cumulative Layout Shift — visual stability.')],
+                                    ['INP', __('Lab / field'), __('Interaction to Next Paint — input responsiveness.')],
+                                    ['TBT', __('Lab'), __('Total Blocking Time — main-thread blocking from scripts.')],
+                                    ['FCP', __('Lab / field'), __('First Contentful Paint — first paint of text or image.')],
+                                    ['TTFB', __('Lab / field'), __('Time To First Byte — server response latency.')],
+                                    ['Δ clicks (28d)', 'Serfix', __('Backlink view: change in target-page clicks around when the link was first seen.')],
+                                    [__('Anomaly signal'), 'Serfix', __('Indicates how far a daily metric sits from its usual range for your site (used for alerts).')],
                                 ] as [$m, $src, $def])
                                     <tr>
                                         <td class="px-4 py-2.5 font-semibold text-slate-800">{{ $m }}</td>
@@ -718,39 +718,39 @@
 
                 {{-- ── TROUBLESHOOTING ──────────────────────── --}}
                 <section id="troubleshooting" class="not-prose mt-24 scroll-mt-24">
-                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">Troubleshooting</h2>
-                    <p class="mt-4 text-[16px] leading-7 text-slate-600">The handful of issues that account for almost every support ticket — and the fastest way to resolve each.</p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">{{ __('Troubleshooting') }}</h2>
+                    <p class="mt-4 text-[16px] leading-7 text-slate-600">{{ __('The handful of issues that account for almost every support ticket — and the fastest way to resolve each.') }}</p>
 
                     <div class="mt-6 space-y-4">
                         @foreach ([
                             [
-                                'Search sync returns zero rows',
-                                'Property mismatch — the URL prefix for your connected search property must exactly match the canonical URL in Serfix (protocol, host, trailing slash).',
+                                __('Search sync returns zero rows'),
+                                __('Property mismatch — the URL prefix for your connected search property must exactly match the canonical URL in Serfix (protocol, host, trailing slash).'),
                                 'Open <strong>Settings → Integrations</strong>, click <em>Reselect property</em>, and pick the correct prefix. Force a sync from the same screen.',
                             ],
                             [
-                                'Analytics property dropdown is empty after consent',
-                                'The signed-in account does not have access to the analytics view you need, or the wrong account was used.',
+                                __('Analytics property dropdown is empty after consent'),
+                                __('The signed-in account does not have access to the analytics view you need, or the wrong account was used.'),
                                 'Sign out of the provider, sign back in with the account that owns the property, then reconnect from <strong>Settings → Integrations</strong>.',
                             ],
                             [
-                                'Audit fails with "fetch blocked"',
-                                'robots.txt or an edge firewall / bot challenge is blocking the Serfix audit fetch.',
+                                __('Audit fails with "fetch blocked"'),
+                                __('robots.txt or an edge firewall / bot challenge is blocking the Serfix audit fetch.'),
                                 'Allow <code>EBQAuditBot</code> in robots.txt and whitelist the Serfix IP range listed in <strong>Settings → Audit access</strong>.',
                             ],
                             [
-                                'URL resubmit returns "permission denied"',
-                                'Indexing permission was not granted, or the search property is not verified for the connected account.',
+                                __('URL resubmit returns "permission denied"'),
+                                __('Indexing permission was not granted, or the search property is not verified for the connected account.'),
                                 'Re-run the connection flow from <strong>Settings → Integrations</strong> and confirm indexing permission is enabled. Verify site ownership for the search property if needed.',
                             ],
                             [
-                                'Backlink shows "removed" but the link is live',
-                                'The source page renders the link via client-side script, which the default verifier does not execute.',
+                                __('Backlink shows "removed" but the link is live'),
+                                __('The source page renders the link via client-side script, which the default verifier does not execute.'),
                                 'In <strong>Backlinks → Edit</strong>, switch the verifier to the <em>enhanced</em> mode that loads the page the way a visitor would. It may use a small per-link credit on your plan.',
                             ],
                             [
-                                'No anomaly alerts despite a clear drop',
-                                'The site may still be building a baseline window, or the change did not meet the anomaly thresholds.',
+                                __('No anomaly alerts despite a clear drop'),
+                                __('The site may still be building a baseline window, or the change did not meet the anomaly thresholds.'),
                                 'Check <strong>Reports → Alerts</strong> for the last evaluation. Alerts strengthen as more history accumulates.',
                             ],
                         ] as [$title, $cause, $fix])
@@ -760,8 +760,8 @@
                                     <span class="text-slate-400 transition group-open:rotate-180">⌄</span>
                                 </summary>
                                 <div class="border-t border-slate-200 px-5 py-4 text-[13px] leading-6 text-slate-700">
-                                    <p><span class="font-semibold text-slate-900">Likely cause:</span> {{ $cause }}</p>
-                                    <p class="mt-2"><span class="font-semibold text-slate-900">Fix:</span> {!! $fix !!}</p>
+                                    <p><span class="font-semibold text-slate-900">{{ __('Likely cause:') }}</span> {{ $cause }}</p>
+                                    <p class="mt-2"><span class="font-semibold text-slate-900">{{ __('Fix:') }}</span> {!! $fix !!}</p>
                                 </div>
                             </details>
                         @endforeach
@@ -770,36 +770,36 @@
 
                 {{-- ── FAQ ──────────────────────────────────── --}}
                 <section id="faq" class="not-prose mt-24 scroll-mt-24">
-                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">FAQ</h2>
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">{{ __('FAQ') }}</h2>
 
                     <div class="mt-6 space-y-3">
                         @foreach ([
                             [
-                                'How often does data refresh?',
-                                'Connected search and analytics data sync daily. Rank checks follow your plan interval. On-demand re-checks are available from keywords and audits.',
+                                __('How often does data refresh?'),
+                                __('Connected search and analytics data sync daily. Rank checks follow your plan interval. On-demand re-checks are available from keywords and audits.'),
                             ],
                             [
-                                'Can I add multiple websites?',
+                                __('Can I add multiple websites?'),
                                 'Yes. Each plan includes a website allowance; add more in <strong>Settings → Plan</strong>. Each website has its own integrations, recipients, and timezone.',
                             ],
                             [
-                                'Is my account data shared externally?',
-                                'Integration credentials stay on Serfix servers and are encrypted at rest. Delivered reports are generated inside Serfix.',
+                                __('Is my account data shared externally?'),
+                                __('Integration credentials stay on Serfix servers and are encrypted at rest. Delivered reports are generated inside Serfix.'),
                             ],
                             [
-                                'How accurate are the ranks?',
-                                'Checks use your chosen market (country, device, language, optional location). Position reflects where your URL appears in the live results for that market.',
+                                __('How accurate are the ranks?'),
+                                __('Checks use your chosen market (country, device, language, optional location). Position reflects where your URL appears in the live results for that market.'),
                             ],
                             [
-                                'Can I export raw data?',
+                                __('Can I export raw data?'),
                                 'Yes. Every board offers spreadsheet export. Reports support printable summaries on eligible plans; advanced export options appear in <strong>Settings</strong> where your plan allows.',
                             ],
                             [
-                                'What happens if I disconnect integrations?',
-                                'Existing data is preserved. New syncs pause until you reconnect. Scheduled reports can use cached data; alerts pause to avoid false signals.',
+                                __('What happens if I disconnect integrations?'),
+                                __('Existing data is preserved. New syncs pause until you reconnect. Scheduled reports can use cached data; alerts pause to avoid false signals.'),
                             ],
                             [
-                                'Do you support team access?',
+                                __('Do you support team access?'),
                                 'Yes — invite teammates with role-based permissions (Owner / Editor / Viewer / Reports-only). Configure in <strong>Team</strong>.',
                             ],
                         ] as [$q, $a])
@@ -816,17 +816,17 @@
 
                 {{-- ── WEEKLY RHYTHM ────────────────────────── --}}
                 <section id="weekly-rhythm" class="not-prose mt-24 scroll-mt-24">
-                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">A repeatable weekly rhythm</h2>
-                    <p class="mt-4 text-[16px] leading-7 text-slate-600">Once setup is done, the loop is what produces compounding gains. Most teams run this in 30–45 minutes a week.</p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">{{ __('A repeatable weekly rhythm') }}</h2>
+                    <p class="mt-4 text-[16px] leading-7 text-slate-600">{{ __('Once setup is done, the loop is what produces compounding gains. Most teams run this in 30–45 minutes a week.') }}</p>
 
                     <ol class="mt-6 space-y-3 text-[14px]">
                         @foreach ([
-                            ['Mon · 5 min', 'Open the dashboard. Read the action insights panel and yesterday\'s anomaly alerts (if any).'],
-                            ['Mon · 10 min', 'Triage striking-distance and cannibalization. Pick 1–3 actions with one-click ticket export.'],
-                            ['Tue–Thu', 'Ship fixes. Re-audit each page and request indexing from the audit view when you publish.'],
-                            ['Thu · 5 min', 'Check new backlinks landed this week — verify and check the 28-day click delta on the target page.'],
-                            ['Fri · 10 min', 'Read the scheduled weekly report. Note YoY direction and which actions actually moved the needle.'],
-                            ['Fri · 5 min', 'Update the rolling SEO log with what shipped and the result. Builds a reviewable history.'],
+                            [__('Mon · 5 min'), __('Open the dashboard. Read the action insights panel and yesterday\'s anomaly alerts (if any).')],
+                            [__('Mon · 10 min'), __('Triage striking-distance and cannibalization. Pick 1–3 actions with one-click ticket export.')],
+                            [__('Tue–Thu'), __('Ship fixes. Re-audit each page and request indexing from the audit view when you publish.')],
+                            [__('Thu · 5 min'), __('Check new backlinks landed this week — verify and check the 28-day click delta on the target page.')],
+                            [__('Fri · 10 min'), __('Read the scheduled weekly report. Note YoY direction and which actions actually moved the needle.')],
+                            [__('Fri · 5 min'), __('Update the rolling SEO log with what shipped and the result. Builds a reviewable history.')],
                         ] as [$when, $what])
                             <li class="flex items-start gap-4 rounded-xl border border-slate-200 bg-white px-5 py-3.5">
                                 <span class="mt-0.5 inline-flex w-28 flex-none rounded-md bg-slate-900 px-2 py-1 text-center text-[11px] font-semibold text-white">{{ $when }}</span>
@@ -842,11 +842,11 @@
     {{-- ── CTA ──────────────────────────────────────────────── --}}
     <section class="bg-slate-50/60 py-20 sm:py-24">
         <div class="mx-auto max-w-3xl px-6 text-center lg:px-8">
-            <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Ready to run the loop on your data?</h2>
-            <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">Connect your first website and complete the eight steps in under twenty minutes.</p>
+            <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{{ __('Ready to run the loop on your data?') }}</h2>
+            <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">{{ __('Connect your first website and complete the eight steps in under twenty minutes.') }}</p>
             <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start free</a>
-                <a href="{{ route('features') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">See features</a>
+                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Start free') }}</a>
+                <a href="{{ route('features') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">{{ __('See features') }}</a>
             </div>
         </div>
     </section>

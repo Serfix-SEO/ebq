@@ -6,29 +6,29 @@
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-slate-200 bg-white">
         <div class="mx-auto max-w-6xl px-6 py-20 text-center lg:px-8 lg:py-24">
-            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Product features</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('Product features') }}</p>
             <h1 class="mx-auto mt-4 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                Every signal, every action, in one workspace.
+                {{ __('Every signal, every action, in one workspace.') }}
             </h1>
             <p class="mx-auto mt-5 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
-                Serfix joins Search Console, Analytics, ranking, audits, and backlinks into a single decision surface. Each module is built to answer: what should we ship next, and what changed after we did?
+                {{ __('Serfix joins Search Console, Analytics, ranking, audits, and backlinks into a single decision surface. Each module is built to answer: what should we ship next, and what changed after we did?') }}
             </p>
             <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start free trial</a>
-                <a href="#insights" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">Explore features</a>
+                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Start free trial') }}</a>
+                <a href="#insights" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">{{ __('Explore features') }}</a>
             </div>
 
             {{-- Anchor pill nav --}}
-            <nav aria-label="Feature sections" class="mx-auto mt-12 flex max-w-4xl flex-wrap items-center justify-center gap-2 text-xs font-medium">
+            <nav aria-label="{{ __('Feature sections') }}" class="mx-auto mt-12 flex max-w-4xl flex-wrap items-center justify-center gap-2 text-xs font-medium">
                 @foreach ([
-                    ['#insights', 'Insights'],
-                    ['#rank-tracking', 'Rank tracking'],
-                    ['#audits', 'Page audits'],
-                    ['#backlinks', 'Backlinks'],
-                    ['#alerts', 'Alerts'],
-                    ['#reporting', 'Reporting'],
-                    ['#wordpress', 'WordPress'],
-                    ['#integrations', 'Integrations'],
+                    ['#insights', __('Insights')],
+                    ['#rank-tracking', __('Rank tracking')],
+                    ['#audits', __('Page audits')],
+                    ['#backlinks', __('Backlinks')],
+                    ['#alerts', __('Alerts')],
+                    ['#reporting', __('Reporting')],
+                    ['#wordpress', __('WordPress')],
+                    ['#integrations', __('Integrations')],
                 ] as [$href, $label])
                     <a href="{{ $href }}" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-600 transition hover:border-slate-300 hover:text-slate-900">{{ $label }}</a>
                 @endforeach
@@ -41,16 +41,16 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Cross-signal insights</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Six insight boards that produce action lists.</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Cross-signal insights') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Six insight boards that produce action lists.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Cannibalization, striking distance, content decay, indexing fails with traffic, audit-vs-traffic, and backlink impact. Each report ranks the highest-impact items so your sprint stays focused.
+                        {{ __('Cannibalization, striking distance, content decay, indexing fails with traffic, audit-vs-traffic, and backlink impact. Each report ranks the highest-impact items so your sprint stays focused.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Joins GSC × GA4 × audits × backlinks per page</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Per-country and per-device segmentation</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Daily refresh with anomaly callouts</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>One-click export to CSV or weekly report</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Joins GSC × GA4 × audits × backlinks per page') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Per-country and per-device segmentation') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Daily refresh with anomaly callouts') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('One-click export to CSV or weekly report') }}</li>
                     </ul>
                 </div>
 
@@ -58,12 +58,12 @@
                 <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="grid grid-cols-2 gap-3">
                         @foreach ([
-                            ['Cannibalizations', '14', 'amber'],
-                            ['Striking distance', '27', 'orange'],
-                            ['Content decay', '8', 'slate'],
-                            ['Indexing fails', '3', 'rose'],
-                            ['Audit vs traffic', '11', 'slate'],
-                            ['Backlink impact', '9', 'emerald'],
+                            [__('Cannibalizations'), '14', 'amber'],
+                            [__('Striking distance'), '27', 'orange'],
+                            [__('Content decay'), '8', 'slate'],
+                            [__('Indexing fails'), '3', 'rose'],
+                            [__('Audit vs traffic'), '11', 'slate'],
+                            [__('Backlink impact'), '9', 'emerald'],
                         ] as [$lbl, $val, $tone])
                             <div class="rounded-xl border border-slate-200 bg-white p-4">
                                 <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ $lbl }}</p>
@@ -92,8 +92,8 @@
                     <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">"best seo tools" · United States</p>
-                                <p class="mt-0.5 text-sm font-semibold text-slate-900">Position over 90 days</p>
+                                <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('"best seo tools" · United States') }}</p>
+                                <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('Position over 90 days') }}</p>
                             </div>
                             <span class="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">#9 → #2</span>
                         </div>
@@ -108,12 +108,12 @@
                             <path d="M0 80 L40 75 L80 78 L120 60 L160 55 L200 42 L240 30 L280 22 L320 14 L320 110 L0 110 Z" fill="url(#rk-fill)"/>
                         </svg>
                         <div class="mt-2 flex items-center justify-between text-[10px] text-slate-400">
-                            <span>90 days ago</span>
-                            <span>Today</span>
+                            <span>{{ __('90 days ago') }}</span>
+                            <span>{{ __('Today') }}</span>
                         </div>
 
                         <div class="mt-5 grid grid-cols-3 gap-2">
-                            @foreach ([['Position', '#2'], ['Avg CTR', '11.4%'], ['Clicks 30d', '1,284']] as [$l, $v])
+                            @foreach ([[__('Position'), '#2'], [__('Avg CTR'), '11.4%'], [__('Clicks 30d'), '1,284']] as [$l, $v])
                                 <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 text-center">
                                     <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $l }}</p>
                                     <p class="mt-0.5 text-base font-semibold tabular-nums text-slate-900">{{ $v }}</p>
@@ -124,16 +124,16 @@
                 </div>
 
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Rank tracking</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">SERP-accurate ranks with click overlays.</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Rank tracking') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('SERP-accurate ranks with click overlays.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Real positions captured per device and country. Serfix overlays GSC clicks for the same query so you instantly see when a rank gain stops producing traffic — and which SERP feature is to blame.
+                        {{ __('Real positions captured per device and country. Serfix overlays GSC clicks for the same query so you instantly see when a rank gain stops producing traffic — and which SERP feature is to blame.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Country, device, language, and city targeting</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Competitor positions captured every check</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>SERP-feature flags and PAA capture</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Custom intervals + on-demand re-checks</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Country, device, language, and city targeting') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Competitor positions captured every check') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('SERP-feature flags and PAA capture') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Custom intervals + on-demand re-checks') }}</li>
                     </ul>
                 </div>
             </div>
@@ -145,35 +145,35 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Page audits</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Core Web Vitals, on-page, and content in one pass.</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Page audits') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Core Web Vitals, on-page, and content in one pass.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        On-demand audits combine mobile + desktop CWV with a deep HTML analyzer and keyword-strategy review tailored to the page's target query. Output is a prioritized recommendation list — not a 200-row spreadsheet.
+                        {{ __('On-demand audits combine mobile + desktop CWV with a deep HTML analyzer and keyword-strategy review tailored to the page\'s target query. Output is a prioritized recommendation list — not a 200-row spreadsheet.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Full CWV: LCP, CLS, INP, TBT, FCP, TTFB</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>SEO checks: meta, headings, schema, hreflang, alt</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Content: word count, reading grade, top keywords</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>One-click resubmit via Google Indexing API</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Full CWV: LCP, CLS, INP, TBT, FCP, TTFB') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('SEO checks: meta, headings, schema, hreflang, alt') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Content: word count, reading grade, top keywords') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('One-click resubmit via Google Indexing API') }}</li>
                     </ul>
                 </div>
 
                 <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Audit · /blog/saas-seo-guide</p>
-                            <p class="mt-0.5 text-sm font-semibold text-slate-900">Mobile · Score 72</p>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Audit · /blog/saas-seo-guide') }}</p>
+                            <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('Mobile · Score 72') }}</p>
                         </div>
-                        <span class="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-100">Needs work</span>
+                        <span class="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-100">{{ __('Needs work') }}</span>
                     </div>
                     <div class="mt-4 grid grid-cols-3 gap-2.5">
                         @foreach ([
-                            ['LCP', '2.8s', 'amber'],
-                            ['CLS', '0.04', 'emerald'],
-                            ['INP', '180ms', 'emerald'],
-                            ['TBT', '410ms', 'amber'],
-                            ['FCP', '1.6s', 'emerald'],
-                            ['TTFB', '720ms', 'amber'],
+                            [__('LCP'), '2.8s', 'amber'],
+                            [__('CLS'), '0.04', 'emerald'],
+                            [__('INP'), '180ms', 'emerald'],
+                            [__('TBT'), '410ms', 'amber'],
+                            [__('FCP'), '1.6s', 'emerald'],
+                            [__('TTFB'), '720ms', 'amber'],
                         ] as [$l, $v, $tone])
                             <div class="rounded-lg border border-slate-200 bg-white p-3">
                                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $l }}</p>
@@ -187,13 +187,13 @@
                         @endforeach
                     </div>
                     <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Top recommendations</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Top recommendations') }}</p>
                         <ul class="mt-3 space-y-2 text-[12px]">
                             @foreach ([
-                                ['rose', 'Render-blocking CSS — split into critical + async (180KB)'],
-                                ['amber', 'Image alt missing on 7 images'],
-                                ['amber', 'Canonical tag missing'],
-                                ['slate', 'Add 2 internal links from /pricing'],
+                                ['rose', __('Render-blocking CSS — split into critical + async (180KB)')],
+                                ['amber', __('Image alt missing on 7 images')],
+                                ['amber', __('Canonical tag missing')],
+                                ['slate', __('Add 2 internal links from /pricing')],
                             ] as [$tone, $text])
                                 <li class="flex items-start gap-2.5">
                                     <span @class([
@@ -219,16 +219,16 @@
                 <div class="order-last lg:order-first">
                     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div class="border-b border-slate-200 px-5 py-3">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Backlink impact · 28d</p>
-                            <p class="mt-0.5 text-sm font-semibold text-slate-900">Sorted by Δ clicks</p>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Backlink impact · 28d') }}</p>
+                            <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('Sorted by Δ clicks') }}</p>
                         </div>
                         <table class="min-w-full text-[12px]">
                             <thead class="bg-slate-50/60 text-[10px] uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th class="px-4 py-2 text-left font-semibold">Target page</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Links</th>
-                                    <th class="px-3 py-2 text-right font-semibold">DA</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Δ clicks</th>
+                                    <th class="px-4 py-2 text-left font-semibold">{{ __('Target page') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('Links') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('DA') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('Δ clicks') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -256,16 +256,16 @@
                 </div>
 
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Backlinks</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Track every link, prove every lift.</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Backlinks') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Track every link, prove every lift.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Bulk import or manual entry. Serfix verifies presence, anchor, and rel — then measures click delta on the target page in the 28 days after the link goes live.
+                        {{ __('Bulk import or manual entry. Serfix verifies presence, anchor, and rel — then measures click delta on the target page in the 28 days after the link goes live.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Live verification of presence + anchor + rel</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Pre/post 28-day click delta per target page</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Filters: DA, spam, dofollow, anchor, date</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Competitor backlink prospecting (Pro+)</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Live verification of presence + anchor + rel') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Pre/post 28-day click delta per target page') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Filters: DA, spam, dofollow, anchor, date') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Competitor backlink prospecting (Pro+)') }}</li>
                     </ul>
                 </div>
             </div>
@@ -277,15 +277,15 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Anomaly alerts</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Know within hours when something breaks.</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Anomaly alerts') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Know within hours when something breaks.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Statistical detection compares yesterday against a 28-day baseline on clicks, sessions, and average tracked-keyword position. Two gates — relative drop and z-score — keep the inbox quiet.
+                        {{ __('Statistical detection compares yesterday against a 28-day baseline on clicks, sessions, and average tracked-keyword position. Two gates — relative drop and z-score — keep the inbox quiet.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Per-metric diagnosis with current value, baseline, stddev</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>24-hour deduplication — one alert per anomaly</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Notifies all report recipients automatically</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Per-metric diagnosis with current value, baseline, stddev') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('24-hour deduplication — one alert per anomaly') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Notifies all report recipients automatically') }}</li>
                     </ul>
                 </div>
 
@@ -293,19 +293,19 @@
                 <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div class="border-b border-slate-200 px-5 py-3">
                         <div class="flex items-center justify-between">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Alert · example.com</p>
-                            <span class="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-100">Anomaly</span>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Alert · example.com') }}</p>
+                            <span class="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-100">{{ __('Anomaly') }}</span>
                         </div>
-                        <p class="mt-1 text-sm font-semibold text-slate-900">Search clicks dropped 74.9%</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900">{{ __('Search clicks dropped 74.9%') }}</p>
                     </div>
                     <div class="px-5 py-5 text-[12px] text-slate-700">
-                        <p>An unusual drop was detected on 2026-04-20.</p>
+                        <p>{{ __('An unusual drop was detected on 2026-04-20.') }}</p>
                         <ul class="mt-3 space-y-1.5">
-                            <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Search clicks</span><span class="font-mono text-rose-600">212 vs 844 (z=-3.2)</span></li>
-                            <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Sessions</span><span class="font-mono text-rose-600">480 vs 1,610 (z=-2.8)</span></li>
-                            <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Avg position</span><span class="font-mono text-amber-600">14.2 vs 11.6 (z=-1.9)</span></li>
+                            <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>{{ __('Search clicks') }}</span><span class="font-mono text-rose-600">212 vs 844 (z=-3.2)</span></li>
+                            <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>{{ __('Sessions') }}</span><span class="font-mono text-rose-600">480 vs 1,610 (z=-2.8)</span></li>
+                            <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>{{ __('Avg position') }}</span><span class="font-mono text-amber-600">14.2 vs 11.6 (z=-1.9)</span></li>
                         </ul>
-                        <div class="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Open Serfix →</div>
+                        <div class="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">{{ __('Open Serfix →') }}</div>
                     </div>
                 </div>
             </div>
@@ -320,13 +320,13 @@
                     <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="flex items-center justify-between border-b border-slate-200 pb-4">
                             <div>
-                                <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Weekly Growth Report</p>
-                                <p class="mt-1 text-sm font-semibold text-slate-900">example.com · Apr 13–19</p>
+                                <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Weekly Growth Report') }}</p>
+                                <p class="mt-1 text-sm font-semibold text-slate-900">{{ __('example.com · Apr 13–19') }}</p>
                             </div>
                             <span class="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">+12% w/w</span>
                         </div>
                         <div class="mt-4 grid grid-cols-3 gap-2.5">
-                            @foreach ([['Users', '8.4k', '+12%'], ['Clicks', '3.1k', '+8%'], ['Avg pos', '14.2', '-0.6']] as [$l, $v, $d])
+                            @foreach ([[__('Users'), '8.4k', '+12%'], [__('Clicks'), '3.1k', '+8%'], [__('Avg pos'), '14.2', '-0.6']] as [$l, $v, $d])
                                 <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-center">
                                     <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $l }}</p>
                                     <p class="mt-1 text-base font-semibold tabular-nums text-slate-900">{{ $v }}</p>
@@ -335,27 +335,27 @@
                             @endforeach
                         </div>
                         <div class="mt-4 rounded-xl border border-orange-100 bg-orange-50/60 p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-wider text-orange-700">Action insights</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-orange-700">{{ __('Action insights') }}</p>
                             <ul class="mt-2 space-y-1.5 text-[12px] text-slate-700">
-                                <li>• 5 striking-distance keywords ready to push</li>
-                                <li>• 3 cannibalization conflicts on "saas seo guide"</li>
-                                <li>• 1 indexing fail still earning impressions</li>
+                                <li>• {{ __('5 striking-distance keywords ready to push') }}</li>
+                                <li>• {{ __('3 cannibalization conflicts on "saas seo guide"') }}</li>
+                                <li>• {{ __('1 indexing fail still earning impressions') }}</li>
                             </ul>
                         </div>
                     </div>
                 </div>
 
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Reporting</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Executive-ready, zero rework.</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Reporting') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Executive-ready, zero rework.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Daily, weekly, or monthly. Every report includes YoY, top gainers/losers, traffic-source concentration, and the top-5 actionable insights.
+                        {{ __('Daily, weekly, or monthly. Every report includes YoY, top gainers/losers, traffic-source concentration, and the top-5 actionable insights.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Per-website recipient lists, multi-stakeholder</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Custom date ranges with in-app preview</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Scheduled auto-send in website timezone</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>White-label PDF export (Agency plan)</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Per-website recipient lists, multi-stakeholder') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Custom date ranges with in-app preview') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Scheduled auto-send in website timezone') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('White-label PDF export (Agency plan)') }}</li>
                     </ul>
                 </div>
             </div>
@@ -367,16 +367,16 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">WordPress plugin</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">Surface insights where editors write.</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('WordPress plugin') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Surface insights where editors write.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        The Serfix plugin embeds rank, click, and content opportunity context inside Gutenberg, the post list, and the WordPress dashboard. Connect with one click; tokens are website-scoped and never live in browser JS.
+                        {{ __('The Serfix plugin embeds rank, click, and content opportunity context inside Gutenberg, the post list, and the WordPress dashboard. Connect with one click; tokens are website-scoped and never live in browser JS.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Gutenberg sidebar with rank, clicks, opportunities</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Posts list column with 30-day clicks + position</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>WP dashboard widget with insight counts</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Per-website Sanctum tokens, challenge-response</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Gutenberg sidebar with rank, clicks, opportunities') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Posts list column with 30-day clicks + position') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('WP dashboard widget with insight counts') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Per-website Sanctum tokens, challenge-response') }}</li>
                     </ul>
                 </div>
 
@@ -386,13 +386,13 @@
                         <span class="h-2 w-2 rounded-full bg-rose-400"></span>
                         <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                         <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                        <span class="ml-2 text-[11px] font-medium text-slate-500">Gutenberg · Serfix SEO</span>
+                        <span class="ml-2 text-[11px] font-medium text-slate-500">{{ __('Gutenberg · Serfix SEO') }}</span>
                     </div>
                     <div class="mt-4 space-y-3 text-[12px]">
                         <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Search performance · 30d</p>
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Search performance · 30d') }}</p>
                             <div class="mt-2 grid grid-cols-4 gap-1.5">
-                                @foreach ([['Clicks', '1,284'], ['Impr', '21.4k'], ['Pos', '6.4'], ['CTR', '6.0%']] as [$l, $v])
+                                @foreach ([[__('Clicks'), '1,284'], [__('Impr'), '21.4k'], [__('Pos'), '6.4'], [__('CTR'), '6.0%']] as [$l, $v])
                                     <div class="rounded bg-white px-2 py-1.5 text-center ring-1 ring-slate-200">
                                         <span class="block text-[9px] font-medium uppercase text-slate-500">{{ $l }}</span>
                                         <span class="block tabular-nums font-semibold text-slate-900">{{ $v }}</span>
@@ -401,20 +401,20 @@
                             </div>
                         </div>
                         <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Rank tracking</p>
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">{{ __('Rank tracking') }}</p>
                             <div class="mt-1.5 flex items-center gap-2">
                                 <span class="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-900 ring-1 ring-slate-200">#4</span>
                                 <span class="text-[10px] font-semibold text-emerald-700">▲ 2</span>
-                                <span class="text-[10px] text-slate-500">"best seo tools"</span>
+                                <span class="text-[10px] text-slate-500">{{ __('"best seo tools"') }}</span>
                             </div>
                         </div>
                         <div class="rounded-lg border border-amber-100 bg-amber-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Cannibalization</p>
-                            <p class="mt-1 text-[11px] text-slate-700">Splits with /blog/seo-tools-guide</p>
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">{{ __('Cannibalization') }}</p>
+                            <p class="mt-1 text-[11px] text-slate-700">{{ __('Splits with /blog/seo-tools-guide') }}</p>
                         </div>
                         <div class="rounded-lg border border-orange-100 bg-orange-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-orange-700">Striking distance</p>
-                            <p class="mt-1 text-[11px] text-slate-700">3 queries at pos 5–20 with below-curve CTR</p>
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-orange-700">{{ __('Striking distance') }}</p>
+                            <p class="mt-1 text-[11px] text-slate-700">{{ __('3 queries at pos 5–20 with below-curve CTR') }}</p>
                         </div>
                     </div>
                 </div>
@@ -426,18 +426,18 @@
     <section id="integrations" class="bg-slate-50/60 py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Integrations</p>
-                <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Connected to the signals that matter.</h2>
-                <p class="mt-4 text-base leading-7 text-slate-600">OAuth-authenticated, synced daily, no spreadsheets.</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('Integrations') }}</p>
+                <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{{ __('Connected to the signals that matter.') }}</h2>
+                <p class="mt-4 text-base leading-7 text-slate-600">{{ __('OAuth-authenticated, synced daily, no spreadsheets.') }}</p>
             </div>
             <div class="mt-12 grid gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ([
-                    ['Google Search Console', 'Clicks, impressions, position, CTR by query × page × device × country.'],
-                    ['Google Analytics 4', 'Users, sessions, bounce rate with source/medium attribution.'],
-                    ['Google Indexing API', 'Per-page verdict, coverage, last-crawl. Resubmit from the UI.'],
-                    ['Core Web Vitals', 'Mobile + desktop performance scores piped into audits.'],
-                    ['SERP data', 'Live SERP capture for rank tracking with feature extraction.'],
-                    ['Email + Slack', 'Reports and alerts via SMTP, Postmark, Resend, or Slack.'],
+                    [__('Google Search Console'), __('Clicks, impressions, position, CTR by query × page × device × country.')],
+                    [__('Google Analytics 4'), __('Users, sessions, bounce rate with source/medium attribution.')],
+                    [__('Google Indexing API'), __('Per-page verdict, coverage, last-crawl. Resubmit from the UI.')],
+                    [__('Core Web Vitals'), __('Mobile + desktop performance scores piped into audits.')],
+                    [__('SERP data'), __('Live SERP capture for rank tracking with feature extraction.')],
+                    [__('Email + Slack'), __('Reports and alerts via SMTP, Postmark, Resend, or Slack.')],
                 ] as [$t, $d])
                     <article class="bg-white p-6">
                         <h3 class="text-base font-semibold text-slate-900">{{ $t }}</h3>
@@ -452,11 +452,11 @@
     <section class="bg-white py-20 sm:py-24">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
             <div class="rounded-3xl border border-slate-200 bg-slate-50/60 px-6 py-14 text-center sm:px-12">
-                <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">See Serfix on your own data.</h2>
-                <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">Connect your first website and run an action-ready report in minutes.</p>
+                <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{{ __('See Serfix on your own data.') }}</h2>
+                <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">{{ __('Connect your first website and run an action-ready report in minutes.') }}</p>
                 <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start free trial</a>
-                    <a href="{{ route('pricing') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">View pricing</a>
+                    <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Start free trial') }}</a>
+                    <a href="{{ route('pricing') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">{{ __('View pricing') }}</a>
                 </div>
             </div>
         </div>
