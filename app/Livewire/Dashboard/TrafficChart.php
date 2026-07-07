@@ -76,7 +76,10 @@ class TrafficChart extends Component
         }
 
         return view('livewire.dashboard.traffic-chart', [
-            'days' => $days,
+            // Payload stores days ascending (the anomaly pair-logic and any
+            // charting depend on chronological order); the table shows the
+            // most recent day first, so reverse at render only.
+            'days' => $days->reverse()->values(),
             'anomalies' => $anomalies,
             'window' => $window,
         ]);
