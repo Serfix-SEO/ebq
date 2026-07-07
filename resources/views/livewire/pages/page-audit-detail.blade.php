@@ -3,10 +3,10 @@
         <div class="min-w-0">
             <a href="{{ route('pages.index') }}" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400" wire:navigate>
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
-                Pages
+                {{ __('Pages') }}
             </a>
             <div class="mt-2 flex flex-wrap items-center gap-2">
-                <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Page audit</h1>
+                <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Page audit') }}</h1>
                 <x-guide-link anchor="audit-report-sections" label="Guide to this report" />
             </div>
             <p class="mt-1 break-all font-mono text-sm text-slate-600 dark:text-slate-300">{{ $pageAuditReport->page }}</p>
@@ -16,7 +16,7 @@
             @endphp
             @if ($hdrPlLabel)
                 <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                    <span class="font-semibold text-slate-800 dark:text-slate-100">Detected market</span>
+                    <span class="font-semibold text-slate-800 dark:text-slate-100">{{ __('Detected market') }}</span>
                     {{ $hdrPlLabel }}
                     @if (! empty($hdrPl['source'] ?? null))
                         <span class="text-slate-400 dark:text-slate-500">· {{ str_replace('_', ' ', (string) $hdrPl['source']) }}</span>
@@ -30,7 +30,7 @@
                 wire:navigate
                 class="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
-                Page context
+                {{ __('Page context') }}
             </a>
             <a
                 href="{{ $pageAuditReport->page }}"
@@ -38,7 +38,7 @@
                 rel="noopener"
                 class="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
-                Open URL
+                {{ __('Open URL') }}
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
             </a>
         </div>
@@ -56,9 +56,9 @@
                         <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.06a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.34 8.374" /></svg>
                     </div>
                     <div class="min-w-0">
-                        <p class="text-sm font-bold text-orange-900 dark:text-orange-100">Limited audit — no Google data connected</p>
+                        <p class="text-sm font-bold text-orange-900 dark:text-orange-100">{{ __('Limited audit — no Google data connected') }}</p>
                         <p class="mt-1 max-w-xl text-xs leading-relaxed text-orange-800/90 dark:text-orange-200/80">
-                            Connect Google Analytics or Search Console for <span class="font-semibold">{{ $auditWebsite->domain ?: 'this website' }}</span> to enrich this audit with real traffic, keyword rankings, impressions and indexing status.
+                            {{ __('Connect Google Analytics or Search Console for') }} <span class="font-semibold">{{ $auditWebsite->domain ?: __('this website') }}</span> {{ __('to enrich this audit with real traffic, keyword rankings, impressions and indexing status.') }}
                         </p>
                     </div>
                 </div>
@@ -67,7 +67,7 @@
                     x-on:click="window.dispatchEvent(new CustomEvent('open-connect-sources', { detail: { websiteId: {{ $auditWebsite->id }} } }))"
                     class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700"
                 >
-                    Connect now
+                    {{ __('Connect now') }}
                 </button>
             </div>
         </div>

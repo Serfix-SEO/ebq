@@ -20,8 +20,8 @@
         'poor' => 'bg-rose-500', 'na' => 'bg-slate-300 dark:bg-slate-600',
     ];
     $ratingBorder = [
-        'good' => 'border-l-emerald-400', 'average' => 'border-l-amber-400',
-        'poor' => 'border-l-rose-400', 'na' => 'border-l-slate-300 dark:border-l-slate-600',
+        'good' => 'border-s-emerald-400', 'average' => 'border-s-amber-400',
+        'poor' => 'border-s-rose-400', 'na' => 'border-s-slate-300 dark:border-s-slate-600',
     ];
     $metricShort = ['fcp' => 'FCP', 'lcp' => 'LCP', 'tbt' => 'TBT', 'cls' => 'CLS', 'si' => 'SI', 'tti' => 'TTI'];
     $fmtSavings = function (int $ms): ?string {
@@ -29,10 +29,10 @@
         return $ms >= 1000 ? number_format($ms / 1000, 2).' s' : $ms.' ms';
     };
     $cats = [
-        ['key' => 'performance', 'label' => 'Performance'],
-        ['key' => 'accessibility', 'label' => 'Accessibility'],
-        ['key' => 'best_practices', 'label' => 'Best Practices'],
-        ['key' => 'seo', 'label' => 'SEO'],
+        ['key' => 'performance', 'label' => __('Performance')],
+        ['key' => 'accessibility', 'label' => __('Accessibility')],
+        ['key' => 'best_practices', 'label' => __('Best Practices')],
+        ['key' => 'seo', 'label' => __('SEO')],
     ];
     $circ = 2 * M_PI * 26;
     $hasShot = ! empty($r['screenshot']);
@@ -49,7 +49,7 @@
                     $offset = $score === null ? $circ : $circ * (1 - $score / 100);
                 @endphp
                 <div class="flex flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-4 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
-                    <div class="relative h-16 w-16" role="img" aria-label="{{ $cat['label'] }} score {{ $score ?? 'unavailable' }} out of 100">
+                    <div class="relative h-16 w-16" role="img" aria-label="{{ __(':label score :score out of 100', ['label' => $cat['label'], 'score' => $score ?? __('unavailable')]) }}">
                         <svg class="h-full w-full -rotate-90" viewBox="0 0 60 60" aria-hidden="true">
                             <circle cx="30" cy="30" r="26" fill="none" stroke="currentColor" stroke-width="5" class="text-slate-100 dark:text-slate-800" />
                             <circle cx="30" cy="30" r="26" fill="none" stroke="{{ $hex }}" stroke-width="5" stroke-linecap="round"
@@ -64,9 +64,9 @@
 
         @if ($hasShot)
             <div class="flex flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Final screenshot</p>
+                <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Final screenshot') }}</p>
                 <div class="flex flex-1 items-center justify-center overflow-hidden rounded-lg bg-slate-50 dark:bg-slate-950">
-                    <img src="{{ $r['screenshot'] }}" alt="Rendered page screenshot" loading="lazy" decoding="async" class="max-h-64 w-auto" />
+                    <img src="{{ $r['screenshot'] }}" alt="{{ __('Rendered page screenshot') }}" loading="lazy" decoding="async" class="max-h-64 w-auto" />
                 </div>
             </div>
         @endif
@@ -92,13 +92,13 @@
     {{-- ── Opportunities (accent cards) ──────────────────────────────── --}}
     <div>
         <div class="mb-2 flex items-baseline justify-between">
-            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Opportunities</h3>
-            <span class="text-[11px] text-slate-400">Expand to see affected resources</span>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Opportunities') }}</h3>
+            <span class="text-[11px] text-slate-400">{{ __('Expand to see affected resources') }}</span>
         </div>
         @if (! empty($r['opportunities']))
             <div class="space-y-2.5">
                 @foreach ($r['opportunities'] as $op)
-                    <details class="group overflow-hidden rounded-xl border border-l-4 border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 {{ $ratingBorder[$op['rating']] ?? $ratingBorder['na'] }}">
+                    <details class="group overflow-hidden rounded-xl border border-s-4 border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 {{ $ratingBorder[$op['rating']] ?? $ratingBorder['na'] }}">
                         <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-3.5">
                             <span class="min-w-0 text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $op['title'] }}</span>
                             <span class="flex shrink-0 items-center gap-2.5">
@@ -120,7 +120,7 @@
         @else
             <div class="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-400">
                 <svg class="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                No major load opportunities — this page is well optimized.
+                {{ __('No major load opportunities — this page is well optimized.') }}
             </div>
         @endif
     </div>
@@ -128,10 +128,10 @@
     {{-- ── Diagnostics (accent cards) ────────────────────────────────── --}}
     @if (! empty($r['diagnostics']))
         <div>
-            <h3 class="mb-2 text-sm font-bold text-slate-900 dark:text-slate-100">Diagnostics</h3>
+            <h3 class="mb-2 text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Diagnostics') }}</h3>
             <div class="space-y-2.5">
                 @foreach ($r['diagnostics'] as $diag)
-                    <details class="group overflow-hidden rounded-xl border border-l-4 border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 {{ $ratingBorder[$diag['rating']] ?? $ratingBorder['na'] }}">
+                    <details class="group overflow-hidden rounded-xl border border-s-4 border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 {{ $ratingBorder[$diag['rating']] ?? $ratingBorder['na'] }}">
                         <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-3.5">
                             <span class="min-w-0 text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $diag['title'] }}</span>
                             <span class="flex shrink-0 items-center gap-2.5">
@@ -156,9 +156,9 @@
     {{-- ── Failed checks for the other categories ────────────────────── --}}
     @php
         $auditGroups = [
-            ['key' => 'accessibility', 'label' => 'Accessibility'],
-            ['key' => 'best_practices', 'label' => 'Best Practices'],
-            ['key' => 'seo', 'label' => 'SEO'],
+            ['key' => 'accessibility', 'label' => __('Accessibility')],
+            ['key' => 'best_practices', 'label' => __('Best Practices')],
+            ['key' => 'seo', 'label' => __('SEO')],
         ];
     @endphp
     @if (collect($auditGroups)->contains(fn ($g) => ! empty($r['failed_audits'][$g['key']] ?? [])))
@@ -169,9 +169,9 @@
                     <div class="flex items-center justify-between">
                         <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200">{{ $group['label'] }}</h3>
                         @if (count($items))
-                            <span class="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-600 dark:bg-rose-500/10 dark:text-rose-400">{{ count($items) }} to fix</span>
+                            <span class="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-600 dark:bg-rose-500/10 dark:text-rose-400">{{ __(':count to fix', ['count' => count($items)]) }}</span>
                         @else
-                            <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">All passed</span>
+                            <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">{{ __('All passed') }}</span>
                         @endif
                     </div>
                     @if (count($items))

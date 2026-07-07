@@ -5,9 +5,9 @@
             <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
         </div>
         <div>
-            <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">PageSpeed Insights</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ __('PageSpeed Insights') }}</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Audit any page's performance, accessibility, best practices and SEO on mobile &amp; desktop.
+                {{ __("Audit any page's performance, accessibility, best practices and SEO on mobile & desktop.") }}
             </p>
         </div>
     </div>
@@ -16,7 +16,7 @@
     <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <form wire:submit="runTest" class="space-y-4">
             <div>
-                <label for="psi-url" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Page URL</label>
+                <label for="psi-url" class="block text-sm font-medium text-slate-700 dark:text-slate-300">{{ __('Page URL') }}</label>
                 <div class="mt-1.5 flex flex-col gap-2 sm:flex-row">
                     <input
                         id="psi-url"
@@ -39,10 +39,10 @@
                     >
                         @if ($status === 'running')
                             <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                            <span>Testing…</span>
+                            <span>{{ __('Testing…') }}</span>
                         @else
                             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
-                            <span>Analyze</span>
+                            <span>{{ __('Analyze') }}</span>
                         @endif
                     </button>
                 </div>
@@ -50,7 +50,7 @@
                     <p class="mt-1.5 text-xs text-rose-600 dark:text-rose-400" role="alert">{{ $message }}</p>
                 @enderror
                 @if ($status !== 'running')
-                    <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Public URLs only · runs a fresh Lighthouse audit each time</p>
+                    <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">{{ __('Public URLs only · runs a fresh Lighthouse audit each time') }}</p>
                 @endif
             </div>
         </form>
@@ -67,18 +67,18 @@
                 <div class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2 text-sm font-semibold text-orange-900 dark:text-orange-100">
                         <svg class="h-4 w-4 animate-spin text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        Measuring page performance…
+                        {{ __('Measuring page performance…') }}
                     </div>
                     <span class="font-mono text-xs tabular-nums text-orange-500 dark:text-orange-400"><span x-text="s"></span>s</span>
                 </div>
                 <p class="mt-1 text-xs leading-relaxed text-orange-700/80 dark:text-orange-300/80">
-                    Running a full Lighthouse audit on mobile and desktop — usually 20–60s. You can leave this page open.
+                    {{ __('Running a full Lighthouse audit on mobile and desktop — usually 20–60s. You can leave this page open.') }}
                 </p>
                 <div class="mt-3 h-1 w-full overflow-hidden rounded-full bg-orange-100 dark:bg-orange-500/20">
                     <div class="h-full w-1/3 animate-pulse rounded-full bg-orange-500"></div>
                 </div>
                 <div class="mt-3 flex flex-wrap gap-2">
-                    @foreach (['mobile' => 'Mobile', 'desktop' => 'Desktop'] as $key => $label)
+                    @foreach (['mobile' => __('Mobile'), 'desktop' => __('Desktop')] as $key => $label)
                         @php $st = $progress[$key] ?? 'running'; @endphp
                         <span @class([
                             'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
@@ -94,7 +94,7 @@
                                 <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" /></svg>
                             @endif
                             {{ $label }}
-                            <span class="font-normal opacity-70">{{ ['running' => 'analyzing', 'done' => 'done', 'failed' => 'failed'][$st] }}</span>
+                            <span class="font-normal opacity-70">{{ ['running' => __('analyzing'), 'done' => __('done'), 'failed' => __('failed')][$st] }}</span>
                         </span>
                     @endforeach
                 </div>
