@@ -122,9 +122,12 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
   2. **Billing page banner** — `SubscriptionPanel` shows a large gradient offer banner to any
      `TrialStatus::isExpired()` user ("auto-applied, no code needed"); plan cards render
      strikethrough originals + discounted first-payment prices. The **public /pricing page**
-     does the same for logged-in expired users (banner + strikethrough cards; `pricing` is
-     allowlisted in `EnsureTrialNotExpired` so locked users can browse it — its CTAs land on
-     billing.checkout which auto-applies).
+     does the same for logged-in expired users (banner + strikethrough cards), and so does the
+     **home page pricing section** (`landing.blade.php` — prices there are HARDCODED, keep in
+     sync with the DB plans). `pricing` + `landing` are allowlisted in `EnsureTrialNotExpired`
+     so locked users can browse them — CTAs land on billing.checkout which auto-applies (the
+     landing CTAs route authed users to checkout instead of /register). The marketing navbar
+     (`components/marketing/page.blade.php`) shows Dashboard/Log out for authed users.
   3. **checkout()** — trial-EXPIRED users get the campaign discount auto-applied
      unconditionally; otherwise the ?promo=/session code applies; the campaign code (and only
      it) resolves to its promotion-code ID (cached 1h) → `withPromotionCode()`; any other/absent

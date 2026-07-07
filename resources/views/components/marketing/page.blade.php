@@ -99,8 +99,16 @@
             </nav>
 
             <div class="flex items-center gap-2">
-                <a href="{{ route('login') }}" class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900 sm:inline-flex">Sign in</a>
-                <a href="{{ route('register') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Get started</a>
+                @auth
+                    <form method="POST" action="{{ route('logout') }}" class="hidden sm:inline-flex">
+                        @csrf
+                        <button type="submit" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900">Log out</button>
+                    </form>
+                    <a href="{{ route('dashboard') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Dashboard</a>
+                @else
+                    <a href="{{ route('login') }}" class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900 sm:inline-flex">Sign in</a>
+                    <a href="{{ route('register') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Get started</a>
+                @endauth
             </div>
         </div>
     </header>

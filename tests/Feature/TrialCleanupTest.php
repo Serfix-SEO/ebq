@@ -210,8 +210,19 @@ class TrialCleanupTest extends TestCase
             ->assertSee('line-through')
             ->assertSee('$310.8')
             ->assertSee('first year with SAVE30');
+        // Home page: same offer + authed navbar (Dashboard/Log out).
+        $this->actingAs($expired)->get(route('landing'))
+            ->assertOk()
+            ->assertSee('OFF any plan')
+            ->assertSee('$310.8')
+            ->assertSee('first year with SAVE30')
+            ->assertSee('Dashboard')
+            ->assertSee('Log out')
+            ->assertSee('billing/checkout?plan=pro');
+
         auth()->logout();
         $this->get(route('pricing'))->assertOk()->assertDontSee('line-through');
+        $this->get(route('landing'))->assertOk()->assertDontSee('SAVE30')->assertSee('Sign in');
 
         $active = $this->trialUser(5 * 24);
         $this->actingAs($active)->get(route('billing.show'))

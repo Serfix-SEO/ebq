@@ -19,6 +19,20 @@
         <script type="application/ld+json">{!! json_encode($landingSchema, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
     </x-slot:schema>
 
+    @php
+        // Trial-winback: logged-in expired users see the same strikethrough
+        // pricing as /pricing and /billing (checkout auto-applies the code).
+        // Their CTAs go straight to checkout instead of /register.
+        $wbAuthed  = auth()->check();
+        $wbCode    = (string) config('services.stripe.winback_promo_code');
+        $wbPercent = (int) config('services.stripe.winback_promo_percent');
+        $wbActive  = $wbCode !== '' && $wbAuthed && \App\Support\TrialStatus::isExpired(auth()->user());
+        $wbMoney   = fn (float $v) => '$' . rtrim(rtrim(number_format($v * (100 - $wbPercent) / 100, 2, '.', ''), '0'), '.');
+        $wbCta     = fn (string $slug, string $interval) => $wbAuthed
+            ? route('billing.checkout', array_filter(['plan' => $slug, 'interval' => $interval !== 'annual' ? $interval : null]))
+            : route('register', array_filter(['plan' => $slug, 'interval' => $interval !== 'annual' ? $interval : null]));
+    @endphp
+
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="relative">
         <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_60%)]"></div>
@@ -434,6 +448,15 @@
                 </div>
             </div>
 
+            @if ($wbActive)
+                <div class="mb-6 flex flex-col items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 px-6 py-4 text-white shadow-lg sm:flex-row">
+                    <div>
+                        <p class="text-[11px] font-bold uppercase tracking-widest text-orange-100">Limited-time offer</p>
+                        <p class="text-xl font-extrabold sm:text-2xl">{{ $wbPercent }}% OFF any plan — applied automatically at checkout</p>
+                    </div>
+                    <span class="inline-block shrink-0 rounded-xl border-2 border-dashed border-white/70 bg-white/15 px-4 py-2 text-base font-extrabold tracking-widest">{{ $wbCode }}</span>
+                </div>
+            @endif
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 items-start">
 
                 {{-- Trial (free) --}}
@@ -456,19 +479,35 @@
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Solo</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'annual'">$14</span>
-                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'monthly'" style="display:none">$19</span>
+                        @if ($wbActive)
+                            <span x-show="billing === 'annual'" class="flex items-baseline gap-1.5">
+                                <span class="text-lg font-semibold text-slate-400 line-through">$14</span>
+                                <span class="text-4xl font-bold text-orange-600">{{ $wbMoney(168.0 / 12) }}</span>
+                            </span>
+                            <span x-show="billing === 'monthly'" style="display:none" class="flex items-baseline gap-1.5">
+                                <span class="text-lg font-semibold text-slate-400 line-through">$19</span>
+                                <span class="text-4xl font-bold text-orange-600">{{ $wbMoney(19) }}</span>
+                            </span>
+                        @else
+                            <span class="text-4xl font-bold text-slate-900" x-show="billing === 'annual'">$14</span>
+                            <span class="text-4xl font-bold text-slate-900" x-show="billing === 'monthly'" style="display:none">$19</span>
+                        @endif
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">$168 billed annually</p>
-                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">Billed monthly.</p>
+                    @if ($wbActive)
+                        <p class="text-xs font-semibold text-orange-700 mb-5" x-show="billing === 'annual'"><span class="line-through">$168</span> {{ $wbMoney(168) }} first year with {{ $wbCode }}</p>
+                        <p class="text-xs font-semibold text-orange-700 mb-5" x-show="billing === 'monthly'" style="display:none">First month with {{ $wbCode }}, then $19/mo.</p>
+                    @else
+                        <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">$168 billed annually</p>
+                        <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">Billed monthly.</p>
+                    @endif
                     <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
                         @foreach (['3 websites', '1 team seat', '100k crawl budget', '100 tracked keywords', '250 keyword searches/mo', '60k AI tokens/mo', '5 long-form articles', 'WordPress plugin', 'GA4 + GSC integration'] as $item)
                             <li class="flex items-center gap-2">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
-                    <a data-url-annual="{{ route('register', ['plan' => 'solo']) }}"
-                       data-url-monthly="{{ route('register', ['plan' => 'solo', 'interval' => 'monthly']) }}"
+                    <a data-url-annual="{{ $wbCta('solo', 'annual') }}"
+                       data-url-monthly="{{ $wbCta('solo', 'monthly') }}"
                        :href="billing === 'monthly' ? $el.dataset.urlMonthly : $el.dataset.urlAnnual"
                        class="block w-full py-2.5 text-center rounded-xl border border-orange-600 text-orange-600 font-semibold text-sm hover:bg-orange-50 transition-all">Get started</a>
                 </div>
@@ -478,19 +517,35 @@
                     <span class="absolute -top-3 left-5 inline-flex items-center rounded-full bg-orange-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">Most Popular</span>
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Pro</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'annual'">$37</span>
-                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'monthly'" style="display:none">$49</span>
+                        @if ($wbActive)
+                            <span x-show="billing === 'annual'" class="flex items-baseline gap-1.5">
+                                <span class="text-lg font-semibold text-slate-400 line-through">$37</span>
+                                <span class="text-4xl font-bold text-orange-600">{{ $wbMoney(444.0 / 12) }}</span>
+                            </span>
+                            <span x-show="billing === 'monthly'" style="display:none" class="flex items-baseline gap-1.5">
+                                <span class="text-lg font-semibold text-slate-400 line-through">$49</span>
+                                <span class="text-4xl font-bold text-orange-600">{{ $wbMoney(49) }}</span>
+                            </span>
+                        @else
+                            <span class="text-4xl font-bold text-slate-900" x-show="billing === 'annual'">$37</span>
+                            <span class="text-4xl font-bold text-slate-900" x-show="billing === 'monthly'" style="display:none">$49</span>
+                        @endif
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">$444 billed annually</p>
-                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">Billed monthly.</p>
+                    @if ($wbActive)
+                        <p class="text-xs font-semibold text-orange-700 mb-5" x-show="billing === 'annual'"><span class="line-through">$444</span> {{ $wbMoney(444) }} first year with {{ $wbCode }}</p>
+                        <p class="text-xs font-semibold text-orange-700 mb-5" x-show="billing === 'monthly'" style="display:none">First month with {{ $wbCode }}, then $49/mo.</p>
+                    @else
+                        <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">$444 billed annually</p>
+                        <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">Billed monthly.</p>
+                    @endif
                     <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
                         @foreach (['All Solo features', '10 websites', '3 team seats', '300k crawl budget', '500 tracked keywords', '1,000 keyword searches/mo', '150k AI tokens/mo', '15 long-form articles', 'Scheduled reports'] as $item)
                             <li class="flex items-center gap-2 {{ $item === 'All Solo features' ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
-                    <a data-url-annual="{{ route('register', ['plan' => 'pro']) }}"
-                       data-url-monthly="{{ route('register', ['plan' => 'pro', 'interval' => 'monthly']) }}"
+                    <a data-url-annual="{{ $wbCta('pro', 'annual') }}"
+                       data-url-monthly="{{ $wbCta('pro', 'monthly') }}"
                        :href="billing === 'monthly' ? $el.dataset.urlMonthly : $el.dataset.urlAnnual"
                        class="block w-full py-2.5 text-center rounded-xl bg-orange-600 text-white font-semibold text-sm hover:bg-orange-500 transition-all">Get started</a>
                 </div>
@@ -499,19 +554,35 @@
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Agency</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'annual'">$74</span>
-                        <span class="text-4xl font-bold text-slate-900" x-show="billing === 'monthly'" style="display:none">$99</span>
+                        @if ($wbActive)
+                            <span x-show="billing === 'annual'" class="flex items-baseline gap-1.5">
+                                <span class="text-lg font-semibold text-slate-400 line-through">$74</span>
+                                <span class="text-4xl font-bold text-orange-600">{{ $wbMoney(888.0 / 12) }}</span>
+                            </span>
+                            <span x-show="billing === 'monthly'" style="display:none" class="flex items-baseline gap-1.5">
+                                <span class="text-lg font-semibold text-slate-400 line-through">$99</span>
+                                <span class="text-4xl font-bold text-orange-600">{{ $wbMoney(99) }}</span>
+                            </span>
+                        @else
+                            <span class="text-4xl font-bold text-slate-900" x-show="billing === 'annual'">$74</span>
+                            <span class="text-4xl font-bold text-slate-900" x-show="billing === 'monthly'" style="display:none">$99</span>
+                        @endif
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">$888 billed annually</p>
-                    <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">Billed monthly.</p>
+                    @if ($wbActive)
+                        <p class="text-xs font-semibold text-orange-700 mb-5" x-show="billing === 'annual'"><span class="line-through">$888</span> {{ $wbMoney(888) }} first year with {{ $wbCode }}</p>
+                        <p class="text-xs font-semibold text-orange-700 mb-5" x-show="billing === 'monthly'" style="display:none">First month with {{ $wbCode }}, then $99/mo.</p>
+                    @else
+                        <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">$888 billed annually</p>
+                        <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">Billed monthly.</p>
+                    @endif
                     <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
                         @foreach (['All Pro features', '30 websites', '10 team seats', '1M crawl budget', '2,000 tracked keywords', '4,000 keyword searches/mo', '600k AI tokens/mo', '50 long-form articles', 'White-label reports'] as $item)
                             <li class="flex items-center gap-2 {{ $item === 'All Pro features' ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
-                    <a data-url-annual="{{ route('register', ['plan' => 'agency']) }}"
-                       data-url-monthly="{{ route('register', ['plan' => 'agency', 'interval' => 'monthly']) }}"
+                    <a data-url-annual="{{ $wbCta('agency', 'annual') }}"
+                       data-url-monthly="{{ $wbCta('agency', 'monthly') }}"
                        :href="billing === 'monthly' ? $el.dataset.urlMonthly : $el.dataset.urlAnnual"
                        class="block w-full py-2.5 text-center rounded-xl border border-orange-600 text-orange-600 font-semibold text-sm hover:bg-orange-50 transition-all">Get started</a>
                 </div>

@@ -33,9 +33,10 @@ class EnsureTrialNotExpired
     private const ALLOWED_ROUTES = [
         'logout',
         'admin.impersonation.stop',
-        // Marketing pricing page — locked users may browse it (it shows the
-        // winback discount and its CTAs land on billing.checkout anyway).
+        // Marketing pages with pricing — locked users may browse them (they
+        // show the winback discount; CTAs land on billing.checkout anyway).
         'pricing',
+        'landing',
     ];
 
     /**
