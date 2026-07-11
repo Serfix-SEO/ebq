@@ -2,15 +2,23 @@
     <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
             <h2 class="text-sm font-semibold">{{ __('WordPress plugin') }}</h2>
+            @if (config('services.wordpress_plugin.coming_soon'))
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('The Serfix SEO plugin for WordPress is coming soon. Already-connected sites keep working.') }}</p>
+            @else
             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {{ __('Download the Serfix SEO plugin, upload it to your WordPress site, then click') }} <span class="font-semibold">{{ __('Connect to Serfix') }}</span> {{ __('— you\'ll be bounced here to approve. No codes or tokens to copy.') }}
             </p>
+            @endif
         </div>
-        <a href="{{ route('wordpress.plugin.download') }}"
+        @if (config('services.wordpress_plugin.coming_soon'))
+            <span class="inline-flex h-8 shrink-0 items-center rounded-md bg-orange-100 px-3 text-[11px] font-bold uppercase tracking-wider text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">{{ __('Coming soon') }}</span>
+        @else
+            <a href="{{ route('wordpress.plugin.download') }}"
             class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-orange-600 px-3 text-[11px] font-semibold text-white transition hover:bg-orange-700">
             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
             {{ __('Download plugin') }}
         </a>
+        @endif
     </div>
 
     @if ($statusMessage)

@@ -18,7 +18,7 @@ class PageAuditReportMail extends Mailable
         public PageAuditReport $auditReport,
         public ?User $timezoneContextUser = null,
     ) {
-        $this->locale($this->timezoneContextUser->locale ?? app()->getLocale());
+        $this->locale(\App\Support\LocaleConfig::resolve($this->timezoneContextUser->locale));
     }
 
     public function envelope(): Envelope

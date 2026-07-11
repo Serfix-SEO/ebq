@@ -4,10 +4,10 @@
             <h1 class="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Get started') }}</h1>
             <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">{{ __('Connect Google Analytics and/or Search Console — or skip and explore with the free tools.') }}</p>
         </div>
-        <form method="POST" action="{{ route('logout') }}">
+        <form method="POST" action="{{ route('logout') }}" class="shrink-0">
             @csrf
             <button type="submit"
-                class="inline-flex h-8 items-center rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+                class="inline-flex h-8 items-center whitespace-nowrap rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100">
                 {{ __('Log out') }}
             </button>
         </form>

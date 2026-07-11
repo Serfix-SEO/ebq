@@ -20,7 +20,7 @@ class GuestPageSpeedLinkMail extends Mailable
 
     public function __construct(public GuestPageSpeed $report)
     {
-        $this->locale($report->locale ?? app()->getLocale());
+        $this->locale(\App\Support\LocaleConfig::resolve($report->locale));
     }
 
     public function envelope(): Envelope

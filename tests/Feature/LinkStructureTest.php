@@ -212,6 +212,16 @@ class LinkStructureTest extends TestCase
         $this->assertSame(1, $groups['crawl_broken_link']['count']);
         $this->assertSame('critical', $groups['crawl_broken_link']['severity']);
         $this->assertSame('Internal-link issues', $groups['crawl_internal_links']['title']);
+
+        // The rendered per-type pills deep-link to that type's URL list
+        // (/issues/{key}?type=…) instead of being inert text (2026-07-10).
+        session(['current_website_id' => $website->id]);
+        $type = $groups['crawl_broken_link']['types'][0]['type'] ?? null;
+        $this->assertNotNull($type);
+        Livewire::actingAs($user)
+            ->test(PriorityActionQueue::class)
+            ->set('websiteId', $website->id)
+            ->assertSeeHtml('/issues/crawl_broken_link?type='.$type);
     }
 
     public function test_completed_crawl_flushes_the_action_queue_cache(): void

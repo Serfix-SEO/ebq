@@ -123,8 +123,9 @@ Per-server `api_key`/`webhook_secret` are admin-entered and encrypted at rest; n
 - **20 seeds** per Idea Finder run; **100 keywords** per Volume Finder run (enforced in the
   UI, see [keyword-research.md](./keyword-research.md)).
 - Volume results are bucketed: competition index → low (<34) / medium (<67) / high (≥67).
-- One in-flight check per server is serialized by the server's own `/queue` (`running: 0|1`);
-  the pool routes around busy ones by queue depth.
+- Per-server concurrency is the node's `QUEUE_CONCURRENCY` (Node 1: **2** since
+  2026-07-07, so `/queue` can report `running: 0..2`); the pool routes around busy
+  servers by queue depth (`last_queue_waiting`).
 
 ## Admin live queue (added 2026-06-23)
 
@@ -165,8 +166,73 @@ the webhook completes it. UI shows an indigo "Instant result" badge when `$fromC
   server that died <5 min ago is still tried (then fails transiently and the pool moves on).
 - **`is_healthy = up AND logged_in ≠ false`** — a server that's reachable but logged out is
   treated as unhealthy (`CheckKeywordServers.php:77`).
-- **Webhook never arrives ⇒ request stuck `running`.** There is no reaper; the UI poll simply
-  times out (`KEYWORD_FINDER_POLL_TTL_MINUTES`). The row stays `running` in the DB.
+- **Webhook never arrives ⇒ request stuck `running` — until the reaper fails it.** The node
+  gives up webhook delivery after 3 attempts (~15s), so a node crash or lost delivery used to
+  strand rows forever (UI poll just times out via `KEYWORD_FINDER_POLL_TTL_MINUTES`). Since
+  2026-07-07 `ebq:reap-stuck-keyword-requests` (every 10 min, `routes/console.php`) marks
+  `queued`/`running` rows older than 15 min as failed
+  (`app/Console/Commands/ReapStuckKeywordRequests.php`).
+- **`webhook_url` is built from `url()` at dispatch time ⇒ every box that dispatches must have
+  the canonical `APP_URL`.** Incident 2026-07-07: worker box B's `.env` still had
+  `APP_URL=https://ebq.io` after the serfix.io migration; Horizon-dispatched requests told the
+  node fleet to call `https://ebq.io/webhooks/keyword-finder`, Apache 301'd to serfix.io, the
+  node HTTP client followed the redirect **as GET** (per-RFC method rewrite on 301), Laravel
+  answered 405, the POST body was lost, and rows sat `running` forever. Same-domain changes
+  must update `.env` on **both** boxes (+ `docker restart ebq-horizon-1`). Recovery: re-POST
+  the same `request_id` + stored `payload` to the server with the fixed `webhook_url` — the
+  webhook is idempotent per `request_id`, so the original rows complete in place.
+- **The node fleet IGNORES the per-request `webhook_url`** — `dispatchWebhook` only reads
+  `config.webhookUrl` from the node's own `.env` (`src/webhook.js`); the `webhook_url` field
+  our pool sends is dead weight. Node 1's `.env` was fixed to serfix.io on 2026-07-07. The
+  old-domain vhosts also carry a method-preserving **308** redirect for `/webhooks/*` (before
+  the 301 catch-all, both `/etc/apache2/sites-enabled/ebq.io.conf` and `ebq.io-le-ssl.conf`)
+  as defense-in-depth — node webhook `fetch` follows a 301 as GET (payload lost, Laravel 405);
+  308 preserves POST+body. Keep those rules.
+
+## Node internals (Node 1, learned 2026-07-07 via SSH)
+
+Node 1 runs **on worker box B itself** (public IP `178.105.218.22` = `ubuntu-4gb-fsn1-3`,
+private `10.0.0.3`) — not a separate machine. Root SSH is password-auth (no shared key).
+
+- App: `/root/keywordfetcher` (Node 22 + Express + Playwright 1.60), systemd unit
+  `keywordfetcher.service` wrapped in `xvfb-run` (headed Chromium on a virtual display;
+  `HEADLESS=false` because GKP bot-detection). nginx proxies :80 → :3000. A second unit
+  `kwf-relay.service` (`relay.mjs`) is a local retry proxy on 127.0.0.1:8888 that Chromium
+  uses as `--proxy-server` (with `--disable-http2` — Google coalesces onto one h2 connection
+  which stalls behind a CONNECT proxy).
+- Config: `/root/keywordfetcher/.env` — `WEBHOOK_URL` (the real callback target),
+  `WEBHOOK_SECRET`/`API_KEY` (must match the server row in our admin), `USER_DATA_DIR`
+  (persistent Chrome profile holding the Google Ads login + 2FA session, created once via
+  `npm run setup`). After editing: `systemctl restart keywordfetcher` (login survives — it
+  lives in the profile dir).
+- **Concurrency: `QUEUE_CONCURRENCY` env — Node 1 runs 1; the code supports N but THIS BOX
+  can't sustain 2.** `src/browser.js` (rewritten 2026-07-07) runs each job on its **own tab**
+  (`ctx.newPage()`, closed in `finally`) of the single shared logged-in persistent context,
+  `PQueue({concurrency})` gates in-flight jobs, and a launch mutex (`contextLaunch` promise)
+  stops concurrent jobs double-launching the persistent context (second launch dies on the
+  profile lock). Pre-rewrite it was one shared reused tab (GKP pickers are stateful page UI —
+  parallel jobs on one tab would corrupt each other; tabs isolate that). **2026-07-07 trial
+  of `QUEUE_CONCURRENCY=2`: mechanism works** (two jobs overlapped, independent per-tab
+  location/language, ~1.7× when both succeeded) **but ~50% of concurrent jobs failed with
+  30–45s interaction timeouts** ("Get results" click, results-table wait, "Include" outside
+  viewport) while single jobs passed 100% — the box has **2 vCPU shared with Horizon**, and
+  two software-rendered (swiftshader/xvfb) GKP tabs starve each other. Reverted to 1.
+  Raising it again needs more vCPUs or a dedicated node (separate Ads account — also
+  the quota/detection-budget answer). CSV downloads are concurrency-safe (unique `hrtime`
+  suffix). Rollback of the whole rewrite: `src.bak-2026-07-07/` on the node. App log:
+  `/var/log/keywordfetcher.log` (systemd `StandardOutput=append:`).
+- Webhook delivery: 3 attempts (0s/+1s/+3s backoff), 10s timeout each, HMAC-SHA256 of raw
+  body, then **gives up permanently** (`src/webhook.js`) — a down receiver still loses
+  results; the app-side reaper (`ebq:reap-stuck-keyword-requests`) is the backstop.
+- **Crash incident (2026-07-07, first hour of concurrency 2):** a tab died mid-job (renderer
+  crash, no OOM logged) while `page.waitForEvent('download')` was pending but not yet awaited
+  → unhandled rejection → **Node 22 killed the whole process** → every in-flight job lost, no
+  failure webhooks, rows stuck. Hardened: `process.on('unhandledRejection'/'uncaughtException')`
+  guards in `src/server.js` (log `[fatal-guard]`, keep serving) + pre-attached no-op catch on
+  the download promise in `captureCsv`. A failed job now delivers a `failed` webhook (verified
+  live: a GKP "Element is outside of the viewport" flake failed one job cleanly, the parallel
+  job completed). If viewport/click flakes recur at concurrency 2, consider per-job retry or
+  dropping `QUEUE_CONCURRENCY` back to 1.
 - **`country_key` must not leak upstream** — it's an internal cache key; `dispatch()` unsets it
   from the outgoing body (`KeywordFinderPool.php:161`).
 

@@ -626,21 +626,35 @@ class PluginHqController extends Controller
             $base->where('page', 'LIKE', '%' . addcslashes($search, '\\%_') . '%');
         }
 
-        $total = (clone $base)->distinct('page')->count('page');
+        // Merge www./non-www host variants into one logical page. Sites that
+        // migrated hosts have BOTH variants in GSC history; on longer ranges
+        // (180d) that rendered as apparent duplicate rows in the plugin's
+        // Pages table (which displays the path only).
+        $normalizedPage = "REPLACE(page, '://www.', '://')";
+
+        $total = (clone $base)->selectRaw("COUNT(DISTINCT {$normalizedPage}) AS c")->value('c');
 
         $rows = (clone $base)
-            ->selectRaw('page, SUM(clicks) AS clicks, SUM(impressions) AS impressions, AVG(position) AS position')
-            ->groupBy('page')
+            ->selectRaw("{$normalizedPage} AS page, SUM(clicks) AS clicks, SUM(impressions) AS impressions, AVG(position) AS position")
+            ->groupByRaw($normalizedPage)
             ->orderByRaw($sort === 'ctr' ? '(SUM(clicks) / NULLIF(SUM(impressions), 0)) ' . $dir : "$sort $dir")
             ->limit($perPage)
             ->offset(($page - 1) * $perPage)
-            ->get()
+            ->get();
+
+        // Crawl overlay: open-issue count per URL when the page is in the
+        // crawl inventory (null = not crawled — the plugin hides the badge).
+        $issueCounts = app(\App\Services\Crawler\CrawlReportService::class)
+            ->findingCountsForUrls($website->id, $rows->pluck('page')->map(fn ($p) => (string) $p)->all());
+
+        $rows = $rows
             ->map(fn ($row) => [
                 'page' => (string) $row->page,
                 'clicks' => (int) $row->clicks,
                 'impressions' => (int) $row->impressions,
                 'position' => $row->position !== null ? round((float) $row->position, 2) : null,
                 'ctr' => $row->impressions > 0 ? round(($row->clicks / $row->impressions) * 100, 2) : 0.0,
+                'crawl_issues' => $issueCounts[(string) $row->page] ?? null,
             ])
             ->all();
 

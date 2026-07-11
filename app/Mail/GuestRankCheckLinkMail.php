@@ -20,7 +20,7 @@ class GuestRankCheckLinkMail extends Mailable
 
     public function __construct(public GuestRankCheck $report)
     {
-        $this->locale($report->locale ?? app()->getLocale());
+        $this->locale(\App\Support\LocaleConfig::resolve($report->locale));
     }
 
     public function envelope(): Envelope

@@ -20,7 +20,7 @@ class GuestAuditLinkMail extends Mailable
 
     public function __construct(public GuestPageAudit $audit)
     {
-        $this->locale($audit->locale ?? app()->getLocale());
+        $this->locale(\App\Support\LocaleConfig::resolve($audit->locale));
     }
 
     public function envelope(): Envelope

@@ -24,8 +24,11 @@
     <section class="bg-white">
         <div class="mx-auto grid max-w-6xl gap-12 px-6 py-16 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-16 lg:px-8 lg:py-20">
 
-            {{-- Sticky TOC --}}
-            <aside class="lg:sticky lg:top-24 lg:self-start">
+            {{-- Sticky TOC. min-w-0 on both grid children: without it the
+                 implicit single-column track (mobile) grows to the widest
+                 table's min-w even inside overflow-x-auto → page-level
+                 sideways scroll on phones. --}}
+            <aside class="min-w-0 lg:sticky lg:top-24 lg:self-start">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('In this guide') }}</p>
                 <nav aria-label="{{ __('Guide sections') }}" class="mt-3 flex flex-col gap-1 text-sm">
                     @php
@@ -82,7 +85,7 @@
             </aside>
 
             {{-- Main content --}}
-            <div class="prose prose-slate max-w-none prose-headings:tracking-tight prose-h2:text-3xl prose-h2:font-semibold prose-h2:mt-0 prose-h3:text-lg prose-h3:font-semibold">
+            <div class="min-w-0 prose prose-slate max-w-none prose-headings:tracking-tight prose-h2:text-3xl prose-h2:font-semibold prose-h2:mt-0 prose-h3:text-lg prose-h3:font-semibold">
 
                 @include('partials.guide-portal-reference')
 

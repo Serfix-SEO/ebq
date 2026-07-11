@@ -69,6 +69,10 @@ class LinkStructurePanel extends Component
                 ? "That URL hasn't been crawled for this website yet."
                 : null;
             if ($structure !== null) {
+                // Snap to the crawl's canonical form of the URL (the lookup
+                // tolerates decoded/www variants) so the query param is
+                // shareable and the findings hash-match below can't miss.
+                $this->pageUrl = $structure['page']['url'];
                 $issues = $report->pageFindings($website->id, $this->pageUrl, $structure['page']['id']);
                 if ($this->issueType !== '') {
                     // Surface the finding that sent the user here first, instead of

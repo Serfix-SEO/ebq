@@ -30,6 +30,19 @@ class SetLocale
             return $next($request);
         }
 
+        // Admin kill switch (Settings → Languages): force the default locale
+        // and never show the picker. Stored user/cookie choices survive
+        // untouched for when it's re-enabled. active() overrides ON for a
+        // logged-in admin so they can preview Arabic while it's off.
+        if (! \App\Support\LocaleConfig::active()) {
+            $locale = config('app.locale');
+            App::setLocale($locale);
+            \Illuminate\Support\Carbon::setLocale($locale);
+            View::share('showLocalePicker', false);
+
+            return $next($request);
+        }
+
         $user = $request->user();
         $cookie = $request->cookie(self::COOKIE);
 

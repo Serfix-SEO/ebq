@@ -5,6 +5,39 @@ site, auth/onboarding, the entire customer dashboard, guest lead-gen tools, tran
 emails, and PDF exports. **Admin panel (`/admin/*`) is deliberately English-only** — internal
 staff tool, excluded at the middleware level.
 
+## Admin kill switch (default OFF)
+
+Since 2026-07-09 the whole multilingual layer sits behind an admin toggle,
+**Settings → Languages** (`admin/settings`), stored as setting
+`locale.multilingual_enabled` and read via `app/Support/LocaleConfig.php`:
+
+- `LocaleConfig::multilingualEnabled()` — the raw stored flag (defaults **false**:
+  English-only). Only the admin settings form should read this directly.
+- `LocaleConfig::active()` — the effective flag for the current request: the stored
+  flag **force-overridden ON for a logged-in admin** (`is_admin`), so admins can
+  preview the Arabic experience while it stays off for everyone else. Queue workers
+  have no authenticated user, so mail is never affected by the override. Middleware,
+  switcher blades, and `supported()` all go through this.
+- `LocaleConfig::supported()` — `SetLocale::SUPPORTED` when active, `[config('app.locale')]` when not.
+- `LocaleConfig::resolve(?string)` — clamps a stored locale to what's currently allowed;
+  **every Mailable constructor must use this**, never the raw `users.locale` /
+  guest-table `locale` column, or a disabled language leaks into queued mail.
+
+When OFF (and not admin): `SetLocale` (`app/Http/Middleware/SetLocale.php:36`) forces
+`config('app.locale')` and shares `showLocalePicker=false` (popup never renders);
+the EN/AR switchers in `layouts/app.blade.php` and `marketing/page.blade.php` are
+wrapped in `@if (LocaleConfig::active())`; `/locale/{locale}` 404s for
+anything outside `LocaleConfig::supported()` (`LocaleController.php:18`). Stored
+`users.locale` and `ebq_locale` cookies are left intact, so re-enabling restores
+everyone's previous choice. Tests: `tests/Feature/LocaleTest.php` (setUp enables the
+flag; four `test_multilingual_off_*` cases cover the off state + admin override).
+
+Testing gotcha (cost an hour on 2026-07-09): `Application::setLocale()` **writes back
+into `config('app.locale')`**, so after any in-process ar request,
+`config('app.locale')` IS `'ar'` until something sets it back — in feature tests that
+chain multiple requests, reset with a literal `app()->setLocale('en')`, never
+`app()->setLocale(config('app.locale'))` (a no-op that keeps ar).
+
 ## How it works
 
 - **Mechanism**: Laravel's JSON translation files, `lang/en.json` / `lang/ar.json` (+ 22
@@ -33,7 +66,7 @@ staff tool, excluded at the middleware level.
   `ai-studio/index.blade.php`, `ai-studio/wizard.blade.php`.
 - **Mail locale** (queued Mailables have no HTTP request context — `app()->getLocale()` at
   render time is the worker's default, NOT the recipient's): every translated Mailable calls
-  `$this->locale($user->locale ?? app()->getLocale())` in its constructor (Laravel's built-in
+  `$this->locale(LocaleConfig::resolve($user->locale))` in its constructor (Laravel's built-in
   per-mailable locale override, survives queue serialization). The 4 guest tools
   (`GuestPageAudit`/`GuestPageSpeed`/`GuestRankCheck`/`GuestKeywordVolume`) additionally
   needed a `locale` column (added `2026_07_07_000000_add_locale_to_guest_tables.php`),

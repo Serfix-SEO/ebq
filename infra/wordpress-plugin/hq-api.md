@@ -89,6 +89,47 @@ notes only *deviations* (writes, external calls, rate limits).
 (The `/writer-projects`, `/ai-writer-prompts`, `/ai/*` routes live in the same `hq`
 group but are handled by sibling controllers — see `routes/api.php:143`.)
 
+## Site Audit (crawler report) — `PluginCrawlController` (2026-07-10)
+
+First token-authorized JSON surface over the shared-crawl subsystem (previously
+iframe-embed-only). All read-only, all delegate to `CrawlReportService` (cache-backed:
+`actionGroups`/`typeBreakdown`/`typeCounts` are 24 h version-keyed). **Gated on the
+`hq` feature flag** in-controller (`website()` helper aborts 403) — deliberately NOT a
+new plan-flag key: `featureMap()` defaults missing keys to `false`, which would kill
+the feature fleet-wide until a plan-row backfill. Works with zero GSC (impact → 0).
+
+| Method · path | Reads | Notes |
+|---|---|---|
+| `GET /site-audit/summary` | `summary()` — health score, run status, blocked+reason, page counts, severity totals | uncached but cheap; `last_crawled_at` ISO-8601 |
+| `GET /site-audit/issues` | `actionGroups()` | `{groups:[{key,title,count,severity,impact,types[]}]}` |
+| `GET /site-audit/issues/{category}` | `typeBreakdown()` + `issuesQuery()->simplePaginate(≤50)`; `guidance` (fix/about) only when `?type=` set | `{category}` validated against `CrawlFinding::CATEGORY_*` → 422; filters `type,severity,q,per_page,page` |
+| `GET /site-audit/pages` | `inventory($filter)` paginated + `pageFindingCounts()` (per-page `open_issues`, same matching as the page detail view) | `filter ∈ all,orphans,broken,noindex,deep` |
+| `GET /site-audit/page?url=` | `pageLinkStructure()` + `pageIntel()` + `pageFindings()` | 404 `not_crawled` when URL not in inventory; 422 without `url` |
+| `GET /site-audit/links?url=` | `pageLinkStructure()`; no `url` → `topInboundPages(8)` as `suggestions` | link-explorer payload |
+
+Pagination is `simplePaginate` (`{data,current_page,per_page,has_more}`) — counts come
+from the cached breakdowns, never a COUNT(*) per request. Tests:
+`tests/Feature/Api/V1/PluginCrawlApiTest.php`.
+
+## Keyword Finder — `PluginKeywordFinderController` (2026-07-10)
+
+Async discovery/volume over the self-hosted fleet (see `infra/keywords/keyword-finder.md`).
+Mirrors the portal Livewire orchestration: cache-first, dispatch via `KeywordFinderPool`,
+caller polls. Same `hq`-flag gate.
+
+| Method · path | Does | Notes |
+|---|---|---|
+| `POST /keyword-finder/ideas` | seeds (≤20) or `url`+`scope` mode; `KeywordIdeasMonthlyCache` hit → results inline (`from_cache`), else `dispatchIdeas` (`website_id` = token website) → 202 `{request_id,status}` | invalid location/language silently fall back to United States/English |
+| `POST /keyword-finder/volume` | keywords ≤100; fresh `keyword_metrics` (30 d, gkp) served inline; only misses dispatch (`dispatchIdeas` seeds-mode with `countryKey`) | |
+| `GET /keyword-finder/requests/{requestId}` | poll — 404 unless the row's `website_id` matches the token website; completed ideas rows come back normalized (`keyword,volume,competition_index,comp_level,low_bid,high_bid` — raw Ads bids, never $ projections); `?keywords=` re-reads `keyword_metrics` for volume-style rows | completed ideas polls warm the monthly cache with a **server-recomputed** key (`KeywordIdeasMonthlyCache::key($req->mode,$req->payload)`) — never client-supplied (cache-poison risk) |
+
+**Fleet is capacity-constrained** (single-tab nodes): real dispatches are limited to
+10/website/day via `RateLimiter` key `plugin-kwf:{websiteId}` (86400 s decay) → 429
+`rate_limited`; cache hits are free. Provider off (`keyword.volume_provider` ≠
+`keyword_finder`) → 503 `unavailable`. Tests:
+`tests/Feature/Api/V1/PluginKeywordFinderApiTest.php` (both suites seed `PlanSeeder` —
+factory users resolve to the trial plan row, which must exist for `hq` to be true).
+
 ## GSC/GA degradation
 
 Endpoints inherit EBQ's "handle all four GSC/GA presence combos" rule (see project

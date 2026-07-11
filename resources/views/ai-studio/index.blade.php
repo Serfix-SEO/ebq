@@ -368,6 +368,7 @@
                         </svg>
                     </span>
                     <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100" x-text="headerTitle()"></h1>
+                    <span class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">{{ __('Beta') }}</span>
                 </div>
                 <p class="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400" x-text="headerSub()"></p>
             </div>

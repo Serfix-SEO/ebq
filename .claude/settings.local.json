@@ -544,7 +544,12 @@
       "Bash(sed -i 's/width=\"148\" height=\"45\" class=\"h-9 w-auto/width=\"101\" height=\"36\" class=\"h-9 w-auto/' resources/views/components/layouts/guest.blade.php)",
       "Bash(sed -i 's/width=\"148\" height=\"45\" class=\"h-9 w-auto/width=\"101\" height=\"36\" class=\"h-9 w-auto/g' resources/views/components/marketing/page.blade.php)",
       "Bash(sed -i 's/width=\"105\" height=\"32\" class=\"h-8 w-auto object-contain dark:hidden/width=\"90\" height=\"32\" class=\"h-8 w-auto object-contain dark:hidden/' resources/views/components/layouts/app.blade.php)",
-      "Bash(google-chrome --headless --disable-gpu --no-sandbox --ignore-certificate-errors --window-size=1400,700 --screenshot=/tmp/claude-0/-var-www-ebq/a2e800fd-f367-4ccf-81f5-26358c1f833c/scratchpad/shots/landing3.png https://localhost/)"
+      "Bash(google-chrome --headless --disable-gpu --no-sandbox --ignore-certificate-errors --window-size=1400,700 --screenshot=/tmp/claude-0/-var-www-ebq/a2e800fd-f367-4ccf-81f5-26358c1f833c/scratchpad/shots/landing3.png https://localhost/)",
+      "Bash(unzip -p ebq-seo.zip ebq-seo/ebq-seo.php)",
+      "Bash(sshpass *)",
+      "Bash(git -C /var/www/ebq log --oneline -2 -- tests/Feature/Dashboard/ActionQueueTest.php)",
+      "Bash(git -C /var/www/ebq status --short tests/Feature/Dashboard/ActionQueueTest.php app/Livewire)",
+      "Bash(git -C /var/www/ebq diff)"
     ]
   },
   "enableAllProjectMcpServers": true,

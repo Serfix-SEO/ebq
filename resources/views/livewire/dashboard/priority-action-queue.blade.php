@@ -63,10 +63,13 @@
                                 {{-- Per-type breakdown with counts (crawl categories) --}}
                                 <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
                                     @foreach (array_slice($item['types'], 0, 6) as $t)
-                                        <span class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white py-0.5 pl-2 pr-1 text-[11px] font-medium text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
+                                        {{-- Each pill deep-links straight to that type's URL list
+                                             (SiteIssues binds ?type= via #[Url]). --}}
+                                        <a href="{{ route('issues.show', ['key' => $item['key'], 'type' => $t['type']]) }}" wire:navigate
+                                            class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white py-0.5 pl-2 pr-1 text-[11px] font-medium text-slate-700 shadow-sm transition hover:border-orange-300 hover:text-orange-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:border-orange-500/50 dark:hover:text-orange-300">
                                             {{ $t['label'] }}
                                             <span class="inline-flex min-w-[1.4rem] items-center justify-center rounded px-1 py-px text-[11px] font-bold tabular-nums {{ $tone['tag'] }}">{{ number_format($t['count']) }}</span>
-                                        </span>
+                                        </a>
                                     @endforeach
                                     @if (count($item['types']) > 6)
                                         <span class="inline-flex items-center rounded px-1 py-0.5 text-[11px] font-medium text-slate-400">+{{ count($item['types']) - 6 }} {{ __('more') }}</span>

@@ -58,6 +58,27 @@ class TrialStatus
     }
 
     /**
+     * Winback/launch discount eligibility (2026-07-10): the :percent%-off
+     * promo shows for EVERY trial-tier user — active trial included, not just
+     * expired — anywhere the discount surfaces (billing panel, pricing page,
+     * landing pricing section, checkout auto-apply). Subscribers and comped
+     * (force-applied paid) plans never see it; admins are internal accounts.
+     * Independent of trialDays() — the promo lives or dies by the
+     * services.stripe.winback_promo_code config knob.
+     */
+    public static function isWinbackEligible(User $user): bool
+    {
+        if ($user->is_admin) {
+            return false;
+        }
+        if (! empty($user->current_plan_slug) && $user->current_plan_slug !== User::TIER_TRIAL) {
+            return false; // comped / snapshot of a paid plan
+        }
+
+        return ! $user->subscribed('default');
+    }
+
+    /**
      * Team member on at least one OTHER user's website (website_user pivot).
      * Such users work under the owner's plan, so trial expiry must not lock
      * them out of the app — only their OWN websites are on the deletion track.

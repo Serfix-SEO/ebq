@@ -37,6 +37,12 @@ class WordPressPluginDownloadController extends Controller
      */
     public function __invoke(PluginReleaseResolver $resolver): BinaryFileResponse|Response
     {
+        // Distribution suppressed while the plugin is being rebuilt (see
+        // services.wordpress_plugin.coming_soon) — existing installs are
+        // untouched (API/embeds/version endpoint stay live), we just stop
+        // handing out the outdated ZIP.
+        abort_if((bool) config('services.wordpress_plugin.coming_soon'), 404);
+
         $channel = request()->query('channel', 'stable');
         $channel = in_array($channel, ['stable', 'beta'], true) ? $channel : 'stable';
 

@@ -367,7 +367,11 @@
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('WordPress plugin') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('WordPress plugin') }}
+                    @if (config('services.wordpress_plugin.coming_soon'))
+                        <span class="ms-2 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-700">{{ __('Coming soon') }}</span>
+                    @endif
+                    </p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Surface insights where editors write.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
                         {{ __('The Serfix plugin embeds rank, click, and content opportunity context inside Gutenberg, the post list, and the WordPress dashboard. Connect with one click; tokens are website-scoped and never live in browser JS.') }}

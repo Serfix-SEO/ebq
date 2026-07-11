@@ -42,7 +42,7 @@ class TeamPermissions
             'route' => 'sitemaps.index',
         ],
         'link_structure' => [
-            'label' => 'Link Structure',
+            'label' => 'Link Explorer',
             'description' => 'Per-page internal link structure from the site crawl (inbound/outbound links, orphans).',
             'route' => 'link-structure.index',
         ],

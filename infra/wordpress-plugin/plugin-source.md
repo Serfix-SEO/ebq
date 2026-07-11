@@ -11,7 +11,7 @@
 ## ⚠️ Separate repo — do not commit into the main app
 
 The plugin lives in its **own git repo** —
-`github.com/malihaider19967-web/ebq-wordpress-plugin` (currently **v1.0.5**),
+`github.com/malihaider19967-web/ebq-wordpress-plugin` (currently **v2.0.0**),
 checked out at `/var/www/ebq/ebq-wordpress-plugin/`. It has its **own release
 cycle** and is packaged/distributed through the server's `PluginRelease` flow
 (see [`releases.md`](releases.md): `WordPressPluginSourceService` rewrites the
@@ -106,8 +106,11 @@ OAuth-*style* link (no codes, no token pasting):
 `includes/class-ebq-api-client.php` — a thin wrapper over `wp_remote_request`
 (`EBQ_Plugin::api_client()` constructs one per call from the stored token).
 
-- **Base URL** (`base_url()`, `:22`): `EBQ_API_BASE` constant wins → per-site
-  `ebq_api_base_override` option → default `https://ebq.io`.
+- **Base URL** (`base_url()`): `EBQ_API_BASE` constant wins → per-site
+  `ebq_api_base_override` option → default `https://serfix.io` (since 2.0.0;
+  `EBQ_Plugin::maybe_upgrade()` deletes a stale ebq.io override on upgrade and
+  an admin notice flags a stale `EBQ_API_BASE` constant; ebq.io 308-redirects
+  `/api/*` + `/wordpress/*` so pre-2.0 installs' POSTs still work).
 - **Auth header**: `Authorization: Bearer {token}` on every request, plus
   `User-Agent: EBQ-SEO-WP/{version}; {home_url}` and JSON Accept/Content-Type
   (`:566`,`:602`). This is the **Sanctum personal-access token** whose tokenable

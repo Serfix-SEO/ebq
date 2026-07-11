@@ -95,23 +95,26 @@ class ActionQueueTest extends TestCase
         $this->assertSame([], app(ActionQueueService::class)->issueRows('not_a_real_key', $website->id));
     }
 
-    public function test_component_opens_and_closes_slide_over(): void
+    /**
+     * The slide-over this test originally exercised (open()/close() +
+     * openIssue/openRows state) was replaced by the dedicated SiteIssues
+     * detail page — group rows now deep-link to route('issues.show').
+     */
+    public function test_component_renders_groups_linking_to_issue_detail_page(): void
     {
         [$user, $website] = $this->makeWebsite();
         $this->trackKeyword($website, $user, 'dropped big', -8);
 
         session(['current_website_id' => $website->id]);
 
+        // The component is #[Lazy]; without this only the placeholder renders.
+        Livewire::withoutLazyLoading();
+
         Livewire::actingAs($user)
             ->test(PriorityActionQueue::class)
             ->set('websiteId', $website->id)
-            ->call('open', 'rank_drops')
-            ->assertSet('openIssue', 'rank_drops')
-            ->assertCount('openRows', 1)
             ->assertSee('Priority Action Queue')
-            ->assertSee('dropped big')
-            ->call('close')
-            ->assertSet('openIssue', null)
-            ->assertCount('openRows', 0);
+            ->assertSee('Ranking drops')
+            ->assertSeeHtml(route('issues.show', ['key' => 'rank_drops']));
     }
 }

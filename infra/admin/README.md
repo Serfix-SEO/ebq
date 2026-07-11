@@ -72,7 +72,37 @@ dispatches `CrawlWebsitePagesJob(..., TRIGGER_MANUAL, force=true)`.
 **Impersonation.** `start` stores `impersonator_id` + `impersonator_return_url`
 and logs in as the client (blocked for disabled users); the app then behaves as
 that user, but `ClientActivityLogger` keeps logging the admin as actor. `stop`
-(plain-`auth` route) restores the admin and returns to the saved URL.
+(plain-`auth` route) restores the admin and returns to the saved URL. The
+"Return to admin" banner lives in the app layout
+(`resources/views/components/layouts/app.blade.php:267`) **and** on the
+onboarding page (`resources/views/onboarding/index.blade.php`) — onboarding uses
+the guest layout, so impersonating a not-yet-onboarded client would otherwise
+strand the admin with no exit. Both banners also state when the impersonated
+client is trial-locked (`TrialStatus::isLockedOut`) — impersonation bypasses the
+billing lockout, so without the note the admin sees pages (e.g. onboarding) the
+client themselves never would. Onboarding additionally swaps the add-site wizard
+for a trial-expired panel for expired users (see
+`infra/billing/plans-and-gating.md`). Stop with a STALE CSRF token (old
+tab / back-nav after logout rotated the token) no longer dead-ends on the
+419 page: a render hook in `bootstrap/app.php` redirects to dashboard (or
+login) with an `impersonation_notice` flash — hook the 419 `HttpException`,
+NOT `TokenMismatchException`, because `Handler::prepareException()` converts
+it before render callbacks run. Verified live via a minted DB-session +
+curl (the session recipe that works: seed `login_web_…`, `_token`, AND
+`password_hash_web` into a `sessions` row, cookie =
+`Crypt::encryptString(CookieValuePrefix + id)`).
+
+**Bug reports (2026-07-10).** In-app "Report a bug" (portal top bar → `BugReportModal`
+Livewire) lands rows in `bug_reports` (central, ULID; optional screenshot on the private
+local disk under `bug-reports/`). Admin surface `/admin/bug-reports`
+(`Admin\BugReportController`): status filter, screenshot served admin-only via
+`response()->file`, resolve toggle. Every `is_admin` user is mailed synchronously on
+submit (`BugReportSubmitted`, local Postal). Resolving REQUIRES a
+customer-facing `resolution_note` (emailed verbatim to the reporter via
+`BugReportResolved`, recipient-locale aware); reopening keeps the note,
+sends nothing. Screenshot capture is client-side
+(`resources/js/bug-report-capture.js`, lazy chunk + `modern-screenshot`); Alpine/Livewire
+attributes must be stripped from the clone (invalid XML names → transparent captures).
 
 **Marketing send.** `MarketingController::send` builds a crawl summary
 (`CrawlReportService::summary` + `reportBreakdown`) plus optional 28-day GSC/GA

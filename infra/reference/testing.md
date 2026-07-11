@@ -136,6 +136,17 @@ source is `app/`. The `<php>` block sets the test environment (`phpunit.xml:20`)
 - **External calls are faked, not made:** `Http::fake` (16 files), `Queue::fake` (23),
   `Bus::fake` (2), `Mockery`/`mock()` (17). Livewire components tested via `Livewire::test`
   (5 files). `QUEUE_CONNECTION=sync` means un-faked jobs run inline.
+- **KNOWN BASELINE FAILURES (2026-07-10): sqlite date-boundary artifact in
+  `InsightsServiceTest` (+2 `InsightsViewsTest` 302s from the unverified-factory
+  pattern).** Since `statsWindowEnd()` anchoring (ReportDataService, 2026-07-07 commit
+  `adf19f9`), report windows end AT the newest data date. sqlite stores the `date`
+  column as `'Y-m-d 00:00:00'` (typeless), and `whereBetween('date', [..,'Y-m-d'])`
+  string-compares `'2026-07-05 00:00:00' <= '2026-07-05'` = FALSE — the anchor day's own
+  rows fall outside the window, so cannibalization/striking-distance return empty **in
+  tests only**. MySQL `DATE` columns are unaffected in prod. Proper fix: compare against
+  `$end->endOfDay()->toDateTimeString()` (safe on both engines) across
+  `ReportDataService`'s date filters; until then, seed a newer low-signal "anchor row"
+  so real fixture rows fall strictly inside the window.
 
 ---
 

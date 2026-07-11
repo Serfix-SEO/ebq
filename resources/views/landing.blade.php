@@ -26,7 +26,7 @@
         $wbAuthed  = auth()->check();
         $wbCode    = (string) config('services.stripe.winback_promo_code');
         $wbPercent = (int) config('services.stripe.winback_promo_percent');
-        $wbActive  = $wbCode !== '' && $wbAuthed && \App\Support\TrialStatus::isExpired(auth()->user());
+        $wbActive  = $wbCode !== '' && $wbAuthed && \App\Support\TrialStatus::isWinbackEligible(auth()->user());
         $wbMoney   = fn (float $v) => '$' . rtrim(rtrim(number_format($v * (100 - $wbPercent) / 100, 2, '.', ''), '0'), '.');
         $wbCta     = fn (string $slug, string $interval) => $wbAuthed
             ? route('billing.checkout', array_filter(['plan' => $slug, 'interval' => $interval !== 'annual' ? $interval : null]))
@@ -35,7 +35,7 @@
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="relative">
-        <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_60%)]"></div>
+        <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(ellipse_at_top,rgba(242,100,25,0.08),transparent_60%)]"></div>
 
         <div class="mx-auto max-w-4xl px-6 pb-20 pt-16 text-center lg:px-8 lg:pb-28 lg:pt-24">
             <a href="{{ route('features') }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900">
@@ -79,7 +79,7 @@
 
             {{-- ── Hero: free instant audit (full-width search bar) ── --}}
             <div class="relative mx-auto mt-10 max-w-3xl">
-                <div aria-hidden="true" class="pointer-events-none absolute -inset-x-8 -inset-y-10 -z-10 bg-[radial-gradient(55%_60%_at_50%_0%,rgba(99,102,241,0.20),transparent_70%)] blur-2xl"></div>
+                <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -inset-y-10 sm:-inset-x-8 -z-10 bg-[radial-gradient(55%_60%_at_50%_0%,rgba(242,100,25,0.20),transparent_70%)] blur-2xl"></div>
 
                 {{-- Live indicator --}}
                 <div class="mb-4 flex items-center justify-center gap-2">
@@ -318,14 +318,19 @@
     </section>
 
     {{-- ── Comparison Table ────────────────────────────────────── --}}
-    <section class="overflow-x-auto bg-slate-50/60 py-20 sm:py-24 px-6">
+    <section class="bg-slate-50/60 py-20 sm:py-24 px-6">
         <div class="mx-auto max-w-6xl">
             <div class="text-center mb-10">
                 <h2 class="text-3xl font-bold text-slate-900 mb-3">{{ __('More features. Lower price.') }}</h2>
                 <p class="text-base text-slate-600">{{ __('Every plan includes bilingual audit support — full, not limited.') }}</p>
             </div>
+            {{-- The scroll container must be INSIDE the rounded card: with
+                 overflow-x-auto up on the <section> and overflow-hidden here,
+                 phones just clipped/crushed the 4 columns with no way to
+                 scroll. min-w keeps cells readable; narrow screens swipe. --}}
             <div class="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                <table class="min-w-full border-collapse bg-white text-sm">
+                <div class="overflow-x-auto">
+                <table class="w-full min-w-[640px] border-collapse bg-white text-sm">
                     <thead>
                         <tr class="border-b border-slate-200">
                             <th class="py-3.5 pl-6 pr-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Feature') }}</th>
@@ -337,7 +342,9 @@
                     <tbody class="divide-y divide-slate-100">
                         @php
                             $checkSvg  = '<svg class="mx-auto h-4 w-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>';
-                            $crossSvg  = '<svg class="mx-auto h-4 w-4 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>';
+                            // Not-available: rose X on a soft pill (matches the pricing
+                            // compare table) so the features competitors lack stand out.
+                            $crossSvg  = '<span class="mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-rose-50"><svg class="h-3.5 w-3.5 text-rose-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-label="'.e(__('Not included')).'"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg></span>';
                             $ebqCheck  = '<svg class="mx-auto h-4 w-4 text-orange-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>';
                             $rows = [
                                 [__('Keyword Research'), 'check', 'check', 'ebq'],
@@ -353,23 +360,24 @@
                                 [__('Scheduled Reports'), 'paid',  'cross', 'ebq'],
                                 [__('White-label Reports'), 'paid',  'cross', 'agency'],
                                 [__('GA4 + GSC Integration'), 'check', 'partial','ebq'],
-                                [__('WordPress Plugin'), 'check', 'check', 'ebq'],
+                                [__('WordPress Plugin'), 'check', 'check', config('services.wordpress_plugin.coming_soon') ? 'soon' : 'ebq'],
                             ];
                         @endphp
                         @foreach ($rows as [$feature, $sem, $ahr, $ebq])
                             <tr class="hover:bg-slate-50/40 transition-colors">
-                                <td class="py-3 pl-6 pr-4 text-[13px] font-medium text-slate-800">{{ $feature }}</td>
+                                <td class="py-3 pl-6 pr-4 text-[15px] font-medium text-slate-800 sm:text-[13px]">{{ $feature }}</td>
                                 @foreach (['sem' => $sem, 'ahr' => $ahr] as $col => $val)
                                     <td class="px-4 py-3 text-center">
                                         @if ($val === 'check') {!! $checkSvg !!}
-                                        @elseif ($val === 'partial') <span class="text-[11px] font-medium text-slate-400">{{ __('Partial') }}</span>
-                                        @elseif ($val === 'paid') <span class="text-[11px] font-medium text-slate-400">{{ __('Paid+') }}</span>
+                                        @elseif ($val === 'partial') <span class="text-xs font-medium text-slate-400 sm:text-[11px]">{{ __('Partial') }}</span>
+                                        @elseif ($val === 'paid') <span class="text-xs font-medium text-slate-400 sm:text-[11px]">{{ __('Paid+') }}</span>
                                         @else {!! $crossSvg !!}
                                         @endif
                                     </td>
                                 @endforeach
                                 <td class="bg-orange-50/60 px-4 py-3 text-center">
-                                    @if ($ebq === 'agency') <span class="text-[11px] font-medium text-orange-600">{{ __('Agency+') }}</span>
+                                    @if ($ebq === 'soon') <span class="text-xs font-bold uppercase tracking-wider text-orange-600 sm:text-[11px]">{{ __('Soon') }}</span>
+                                    @elseif ($ebq === 'agency') <span class="text-xs font-medium text-orange-600 sm:text-[11px]">{{ __('Agency+') }}</span>
                                     @else {!! $ebqCheck !!}
                                     @endif
                                 </td>
@@ -383,6 +391,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </section>
@@ -460,25 +469,25 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 items-start">
 
                 {{-- Trial (free) --}}
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm text-center sm:text-start">
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">{{ __('Trial') }}</p>
-                    <div class="flex items-baseline gap-1 mb-1">
+                    <div class="flex items-baseline justify-center gap-1 mb-1 sm:justify-start">
                         <span class="text-4xl font-bold text-slate-900">$0</span>
                         <span class="text-slate-500 text-sm">/mo</span>
                     </div>
                     <p class="text-xs text-slate-500 mb-5">{{ __('Free forever. No card required.') }}</p>
-                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
-                        @foreach ([__('1 website'), __('1 team seat'), __('20k crawl budget'), __('20 tracked keywords'), __('50 keyword searches/mo'), __('25k AI tokens/mo'), __('2 long-form articles'), __('WordPress plugin'), __('GA4 + GSC integration')] as $item)
-                            <li class="flex items-center gap-2">{!! $ck('') !!}{{ $item }}</li>
+                    <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
+                        @foreach ([__('1 website'), __('1 team seat'), __('20k crawl budget'), __('20 tracked keywords'), __('50 keyword searches/mo'), __('25k AI tokens/mo'), __('2 long-form articles'), config('services.wordpress_plugin.coming_soon') ? __('WordPress plugin (coming soon)') : __('WordPress plugin'), __('GA4 + GSC integration')] as $item)
+                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
                     <a href="{{ route('register') }}" class="block w-full py-2.5 text-center rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:border-slate-400 hover:text-slate-900 transition-all">{{ __('Start free') }}</a>
                 </div>
 
                 {{-- Solo --}}
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm text-center sm:text-start">
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">{{ __('Solo') }}</p>
-                    <div class="flex items-baseline gap-1 mb-1">
+                    <div class="flex items-baseline justify-center gap-1 mb-1 sm:justify-start">
                         @if ($wbActive)
                             <span x-show="billing === 'annual'" class="flex items-baseline gap-1.5">
                                 <span class="text-lg font-semibold text-slate-400 line-through">$14</span>
@@ -501,9 +510,9 @@
                         <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">{{ __('$168 billed annually') }}</p>
                         <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">{{ __('Billed monthly.') }}</p>
                     @endif
-                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
-                        @foreach ([__('3 websites'), __('1 team seat'), __('100k crawl budget'), __('100 tracked keywords'), __('250 keyword searches/mo'), __('60k AI tokens/mo'), __('5 long-form articles'), __('WordPress plugin'), __('GA4 + GSC integration')] as $item)
-                            <li class="flex items-center gap-2">{!! $ck('') !!}{{ $item }}</li>
+                    <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
+                        @foreach ([__('3 websites'), __('1 team seat'), __('100k crawl budget'), __('100 tracked keywords'), __('250 keyword searches/mo'), __('60k AI tokens/mo'), __('5 long-form articles'), config('services.wordpress_plugin.coming_soon') ? __('WordPress plugin (coming soon)') : __('WordPress plugin'), __('GA4 + GSC integration')] as $item)
+                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
                     <a data-url-annual="{{ $wbCta('solo', 'annual') }}"
@@ -513,10 +522,10 @@
                 </div>
 
                 {{-- Pro (Most Popular) --}}
-                <div class="relative bg-white p-6 rounded-2xl border-2 border-orange-600 flex flex-col shadow-xl lg:-translate-y-3">
-                    <span class="absolute -top-3 left-5 inline-flex items-center rounded-full bg-orange-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">{{ __('Most Popular') }}</span>
+                <div class="relative bg-white p-6 rounded-2xl border-2 border-orange-600 flex flex-col shadow-xl lg:-translate-y-3 text-center sm:text-start">
+                    <span class="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center whitespace-nowrap rounded-full bg-orange-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white sm:left-5 sm:translate-x-0">{{ __('Most Popular') }}</span>
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">{{ __('Pro') }}</p>
-                    <div class="flex items-baseline gap-1 mb-1">
+                    <div class="flex items-baseline justify-center gap-1 mb-1 sm:justify-start">
                         @if ($wbActive)
                             <span x-show="billing === 'annual'" class="flex items-baseline gap-1.5">
                                 <span class="text-lg font-semibold text-slate-400 line-through">$37</span>
@@ -539,9 +548,9 @@
                         <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">{{ __('$444 billed annually') }}</p>
                         <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">{{ __('Billed monthly.') }}</p>
                     @endif
-                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
+                    <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
                         @foreach ([__('All Solo features'), __('10 websites'), __('3 team seats'), __('300k crawl budget'), __('500 tracked keywords'), __('1,000 keyword searches/mo'), __('150k AI tokens/mo'), __('15 long-form articles'), __('Scheduled reports')] as $item)
-                            <li class="flex items-center gap-2 {{ $item === __('All Solo features') ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
+                            <li class="flex items-center justify-center gap-2 sm:justify-start {{ $item === __('All Solo features') ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
                     <a data-url-annual="{{ $wbCta('pro', 'annual') }}"
@@ -551,9 +560,9 @@
                 </div>
 
                 {{-- Agency --}}
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm text-center sm:text-start">
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">{{ __('Agency') }}</p>
-                    <div class="flex items-baseline gap-1 mb-1">
+                    <div class="flex items-baseline justify-center gap-1 mb-1 sm:justify-start">
                         @if ($wbActive)
                             <span x-show="billing === 'annual'" class="flex items-baseline gap-1.5">
                                 <span class="text-lg font-semibold text-slate-400 line-through">$74</span>
@@ -576,9 +585,9 @@
                         <p class="text-xs text-slate-500 mb-5" x-show="billing === 'annual'">{{ __('$888 billed annually') }}</p>
                         <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">{{ __('Billed monthly.') }}</p>
                     @endif
-                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
+                    <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
                         @foreach ([__('All Pro features'), __('30 websites'), __('10 team seats'), __('1M crawl budget'), __('2,000 tracked keywords'), __('4,000 keyword searches/mo'), __('600k AI tokens/mo'), __('50 long-form articles'), __('White-label reports')] as $item)
-                            <li class="flex items-center gap-2 {{ $item === __('All Pro features') ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
+                            <li class="flex items-center justify-center gap-2 sm:justify-start {{ $item === __('All Pro features') ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
                     <a data-url-annual="{{ $wbCta('agency', 'annual') }}"
@@ -588,15 +597,15 @@
                 </div>
 
                 {{-- Enterprise --}}
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col shadow-sm text-center sm:text-start">
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-3">{{ __('Enterprise') }}</p>
-                    <div class="flex items-baseline gap-1 mb-1">
+                    <div class="flex items-baseline justify-center gap-1 mb-1 sm:justify-start">
                         <span class="text-4xl font-bold text-slate-900">{{ __('Custom') }}</span>
                     </div>
                     <p class="text-xs text-slate-500 mb-5">{{ __('Contact us for pricing.') }}</p>
-                    <ul class="space-y-2 mb-7 flex-grow text-sm text-slate-700">
-                        @foreach ([__('Unlimited websites'), __('Unlimited team seats'), __('Custom crawl budget'), __('Unlimited keywords'), __('SSO & custom integrations'), __('Dedicated support + SLA'), __('White-label reports'), __('WordPress plugin'), __('GA4 + GSC integration')] as $item)
-                            <li class="flex items-center gap-2">{!! $ck('') !!}{{ $item }}</li>
+                    <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
+                        @foreach ([__('Unlimited websites'), __('Unlimited team seats'), __('Custom crawl budget'), __('Unlimited keywords'), __('SSO & custom integrations'), __('Dedicated support + SLA'), __('White-label reports'), config('services.wordpress_plugin.coming_soon') ? __('WordPress plugin (coming soon)') : __('WordPress plugin'), __('GA4 + GSC integration')] as $item)
+                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ $item }}</li>
                         @endforeach
                     </ul>
                     <a href="{{ route('contact') }}" class="block w-full py-2.5 text-center rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:border-slate-400 hover:text-slate-900 transition-all">{{ __('Contact us') }}</a>

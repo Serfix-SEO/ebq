@@ -22,7 +22,8 @@ Laravel 11 slim bootstrap (no `Kernel.php`). Everything is configured in
   | `website.api` | `WebsiteApiAuth` | Sanctum per-Website bearer auth |
   | `website.features` | `InjectFeatureFlags` | stamp flag map onto JSON responses |
   | `admin` | `EnsureAdmin` | `is_admin` 403 gate |
-  | `research.rollout` | `EnsureResearchRolloutAccess` | **DANGLING** — see Gotchas |
+
+  (The dangling `research.rollout` alias was removed in the 2026-07-06 sweep.)
 
 - **Exceptions** (`:42`):
   - Sentry forwarding (no-op when `SENTRY_LARAVEL_DSN` empty).
@@ -31,7 +32,23 @@ Laravel 11 slim bootstrap (no `Kernel.php`). Everything is configured in
     back for browser flows. See [billing/usage.md](../billing/usage.md).
 
 The standard `web` group (session, cookies, CSRF, `VerifyCsrfToken`) and `api`
-behaviour are Laravel defaults — not customized beyond the CSRF exempt list.
+behaviour are Laravel defaults, plus four appended `web` middlewares
+(`bootstrap/app.php:44`, order matters):
+
+  1. `SetLocale` — i18n (en/ar); self-excludes `admin*` paths.
+  2. `ApplyWebsiteHint` — `?ebq_site=<domain>` switches the session's
+     `current_website_id`, but **only among the user's accessible websites**
+     (`accessibleWebsitesQuery()`, domain matched via
+     `CrawlSite::normalizeDomain` against `websites.normalized_domain`).
+     Unsigned by design — it can't grant anything the user lacks. Consumed by
+     the WP plugin's raw portal links (editor sidebar rank-tracking /
+     custom-audit / page-audits / settings, dashboard-widget fallback hrefs)
+     so multi-website accounts land on the right site. Silent no-op for
+     guests; login preserves the intended URL so the hint applies post-auth.
+     Must precede `ResolveShardContext` (reads the session on the same
+     request). Tests: `tests/Feature/ApplyWebsiteHintTest.php`.
+  3. `ResolveShardContext` — shard routing off session `current_website_id`.
+  4. `EnsureTrialNotExpired` — expired-trial lockout to the billing surface.
 
 ---
 

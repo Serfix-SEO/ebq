@@ -81,7 +81,7 @@ class GrowthReportMail extends Mailable
         $this->branding = $branding
             ?? app(ReportBrandingResolver::class)->for($website->owner ?? $user, $website);
 
-        $this->locale($user->locale ?? app()->getLocale());
+        $this->locale(\App\Support\LocaleConfig::resolve($user->locale));
 
         $service = app(ReportDataService::class);
         $this->report = $service->generate(

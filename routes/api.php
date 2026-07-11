@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\V1\AiToolController;
 use App\Http\Controllers\Api\V1\AiWriterPromptController;
+use App\Http\Controllers\Api\V1\PluginCrawlController;
 use App\Http\Controllers\Api\V1\PluginHqController;
 use App\Http\Controllers\Api\V1\PluginInsightsController;
 use App\Http\Controllers\Api\V1\PluginHeartbeatController;
+use App\Http\Controllers\Api\V1\PluginKeywordFinderController;
 use App\Http\Controllers\Api\V1\ResearchApiController;
 use App\Http\Controllers\Api\V1\WriterProjectController;
 use Illuminate\Support\Facades\Route;
@@ -115,6 +117,26 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/insight-counts', [PluginHqController::class, 'insightCounts'])->name('insight-counts');
             Route::get('/growth-report', [PluginHqController::class, 'growthReport'])->name('growth-report');
             Route::post('/growth-report/send', [PluginHqController::class, 'growthReportSend'])->name('growth-report.send');
+
+            // Site Audit — the crawler-report surface (first JSON API over the
+            // shared-crawl subsystem; read-only, cache-backed, hq-flag gated).
+            Route::get('/site-audit/summary', [PluginCrawlController::class, 'summary'])->name('site-audit.summary');
+            Route::get('/site-audit/issues', [PluginCrawlController::class, 'issues'])->name('site-audit.issues');
+            Route::get('/site-audit/issues/{category}', [PluginCrawlController::class, 'issueDetail'])
+                ->where('category', '[a-z_]+')
+                ->name('site-audit.issue-detail');
+            Route::get('/site-audit/pages', [PluginCrawlController::class, 'pages'])->name('site-audit.pages');
+            Route::get('/site-audit/page', [PluginCrawlController::class, 'page'])->name('site-audit.page');
+            Route::get('/site-audit/links', [PluginCrawlController::class, 'links'])->name('site-audit.links');
+
+            // Keyword Finder — discovery + volume over the self-hosted fleet
+            // (async: POST dispatches, GET polls). Dispatches are rate-limited
+            // per website/day in-controller; cache hits are free.
+            Route::post('/keyword-finder/ideas', [PluginKeywordFinderController::class, 'ideas'])->name('keyword-finder.ideas');
+            Route::post('/keyword-finder/volume', [PluginKeywordFinderController::class, 'volume'])->name('keyword-finder.volume');
+            Route::get('/keyword-finder/requests/{requestId}', [PluginKeywordFinderController::class, 'show'])
+                ->where('requestId', '[A-Za-z0-9\-]+')
+                ->name('keyword-finder.request');
 
             Route::get('/page-audit/countries', [PluginHqController::class, 'pageAuditCountries'])->name('page-audit.countries');
             Route::get('/page-audit/suggestions', [PluginHqController::class, 'pageAuditSuggestions'])->name('page-audit.suggestions');

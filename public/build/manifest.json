@@ -1,6 +1,16 @@
 {
+  "_bootstrap-BbzB21r_.js": {
+    "file": "assets/bootstrap-BbzB21r_.js",
+    "name": "bootstrap"
+  },
+  "node_modules/modern-screenshot/dist/index.mjs": {
+    "file": "assets/index-DnR8HISm.js",
+    "name": "index",
+    "src": "node_modules/modern-screenshot/dist/index.mjs",
+    "isDynamicEntry": true
+  },
   "resources/css/app.css": {
-    "file": "assets/app-dVkcW940.css",
+    "file": "assets/app-CsmO1eZr.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -9,18 +19,37 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-BbzB21r_.js",
+    "file": "assets/app-7SgRXCD6.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_bootstrap-BbzB21r_.js"
+    ],
+    "dynamicImports": [
+      "resources/js/bug-report-capture.js"
+    ]
+  },
+  "resources/js/bug-report-capture.js": {
+    "file": "assets/bug-report-capture-B6d61wBD.js",
+    "name": "bug-report-capture",
+    "src": "resources/js/bug-report-capture.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_bootstrap-BbzB21r_.js"
+    ],
+    "dynamicImports": [
+      "node_modules/modern-screenshot/dist/index.mjs"
+    ]
   },
   "resources/js/marketing.js": {
-    "file": "assets/marketing-w_kkKb6T.js",
+    "file": "assets/marketing-DToKoowZ.js",
     "name": "marketing",
     "src": "resources/js/marketing.js",
     "isEntry": true,
     "imports": [
-      "resources/js/app.js"
+      "_bootstrap-BbzB21r_.js"
     ]
   }
 }

@@ -23,7 +23,7 @@ class TrialExpiryMail extends Mailable
         public string $stage,          // expired | h48 | h24 | h12
         public Carbon $deletionAt,
     ) {
-        $this->locale($user->locale ?? app()->getLocale());
+        $this->locale(\App\Support\LocaleConfig::resolve($user->locale));
     }
 
     public function envelope(): Envelope

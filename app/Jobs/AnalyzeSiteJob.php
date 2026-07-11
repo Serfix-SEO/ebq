@@ -179,6 +179,10 @@ class AnalyzeSiteJob implements ShouldQueue
                 'findings_total' => CrawlFinding::where('crawl_site_id', $crawlSiteId)->where('status', 'open')->count(),
                 'health_score' => $health,
             ]);
+            // Only the clean-completion path — not blocked/aborted (return above)
+            // and not the enrichment-failure catch below, where findings/health
+            // never finalized and a report would be wrong or empty.
+            SendCrawlReportEmailsJob::dispatch($crawlSiteId, $run->id);
         } catch (\Throwable $e) {
             // Finalize the run so the banner clears even if enrichment failed.
             $run->update(['status' => CrawlRun::STATUS_COMPLETED, 'finished_at' => now()]);

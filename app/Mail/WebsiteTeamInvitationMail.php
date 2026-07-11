@@ -17,7 +17,7 @@ class WebsiteTeamInvitationMail extends Mailable
         public WebsiteInvitation $invitation,
         public string $plainToken,
     ) {
-        $this->locale(app()->getLocale());
+        $this->locale(\App\Support\LocaleConfig::resolve(app()->getLocale()));
     }
 
     public function envelope(): Envelope

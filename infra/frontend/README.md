@@ -86,12 +86,29 @@ Livewire components via `<livewire:…>` tags.
 | Guest (auth) | `components/layouts/guest.blade.php` | login / register / password | split-screen brand panel + form `{{ $slot }}`. Light-only. |
 | Marketing | `components/marketing/page.blade.php` | public pages + guest tools | header/footer nav, full SEO meta + JSON-LD (Organization/WebSite schema), `@vite([…/marketing.js])`. |
 
+**Mobile nav (2026-07-07 fix):** before this date the header's `<nav>` (Features/Guide/
+Pricing/Contact/WordPress/FAQ) was `hidden … md:flex` with **no mobile equivalent** —
+below 768px those links, plus Sign in/Dashboard/Log out/locale toggle (`sm:inline-flex`),
+were simply invisible with no hamburger to reveal them. Fixed by adding
+`x-data="{ mobileOpen }"` on `<header>`, a `md:hidden` hamburger button, and a
+`#mobile-nav-panel` (`x-show`, `md:hidden`) listing every link + the auth/locale actions
+vertically. Breakpoint must stay **`md`** on both the hamburger and the panel — it has to
+exactly complement the desktop nav's `md:flex`, or a viewport band exists where neither is
+visible (caught during this fix: an earlier draft used `sm:hidden`, leaving 640–767px
+broken). Gotcha when testing this in headless Chrome: the first-visit
+`partials.locale-picker` modal (`z-[9998]` full-viewport, shown when
+`showLocalePicker` — no locale cookie yet, see `SetLocale.php:58`) sits on top of
+the header and eats the hamburger click; dismiss it (or pass a locale cookie) before
+testing nav interaction. All 7 public pages (`landing`, `features`, `pricing`, `contact`,
+`guide`, `wordpress-plugin`, `website-revamp`) share this one component, so the fix
+covers all of them.
+
 ### Sidebar nav (app layout) — the one place to edit nav
 
 `layouts/app.blade.php:26-180` builds nav from two PHP arrays:
 
 - **`$navItems`** (`:30-51`) — the product nav (Dashboard, Keywords, Rank Tracking,
-  Pages, Sitemaps, Link Structure, Audits, Backlinks, Reports, AI Studio, Websites,
+  Pages, Sitemaps, Link Explorer (fka Link Structure; route name unchanged), Audits, Backlinks, Reports, AI Studio, Websites,
   Team, Settings, Billing). Each item carries a `feature` key; an item is hidden unless
   `$authUser->hasFeatureAccess($feature, $currentWebsiteId)` (`:129-131`) — **per-website
   feature gating drives nav visibility**, matching the route-level `feature:` middleware.
@@ -187,6 +204,15 @@ Frontend changes need **two** cache busts on the web box — Vite output and Bla
 browser/plugin = forgot the FPM restart (opcache serves stale bytecode for any PHP the
 Blade compiles to). A cached `bootstrap/cache/config.php` from `artisan optimize` can also
 silently override config — relevant to the DB-safety rule in the root `CLAUDE.md`.
+
+**Mobile-overflow gotchas (2026-07-10 sweep, all public pages clean at 390px):** (1) a CSS
+grid child defaults to `min-width:auto`, so a wide table inside `overflow-x-auto` STILL
+blows the implicit single-column mobile track — grid children flanking wide content need
+`min-w-0` (`guide.blade.php:28,88`); (2) `<code>` URLs have no break opportunities — legal
+prose wrapper carries `prose-code:break-all` (`legal/privacy.blade.php`); (3) decorative
+`absolute -inset-x-*` glows widen the page — clamp with `inset-x-0 sm:-inset-x-*` (landing +
+tool-page heroes). Re-check with the puppeteer overflow sweep (scrollWidth vs clientWidth
+per page) rather than eyeballing screenshots.
 
 ## Key files
 

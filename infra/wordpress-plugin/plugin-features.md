@@ -150,18 +150,45 @@ config blob; all data flows through `/wp-json/ebq/v1/*` (see
 | `EBQ_Block_Editor_Ai` | `block-editor-ai` | block editor | `ai_inline` | inline toolbar/slash AI on an allowlist of text/media/button blocks |
 | `EBQ_Post_Bulk_Actions` | `post-bulk-ai` | `edit.php` | — | 7 sync robots/schema actions + 4 async AI/index actions via a JS modal |
 | `EBQ_Post_Column` | `post-column-hydrate` | `edit.php` | `post_column` | one bulk REST call hydrates the EBQ column; "+ Track keyphrase" row action |
-| `EBQ_Dashboard_Widget` | `dashboard-hydrate` | `index.php` | `dashboard_widget` | skeleton → `/ebq/v1/dashboard-html` |
+| `EBQ_Dashboard_Widget` | `dashboard-hydrate` | `index.php` | `dashboard_widget` | skeleton → `/ebq/v1/dashboard-html`; card clicks fetch a signed embed URL via `/ebq/v1/hq/iframe-url` (pins the website id — a plain `/reports` link opened the session's last-selected website; fixed 2.0.8), plain href kept as 403/network fallback |
 | `EBQ_Hq_Page` | `hq` | top-level "EBQ HQ" menu | `hq` | React dashboard; renders friendly locked panels (not-connected/frozen/disabled) instead of WP's permission error |
 | `EBQ_AiWriter_Page` | `hq` (reused) | "AI Studio" submenu | `ai_writer` | same bundle, `#ebq-aiwriter-root`; also `wp_enqueue_editor`+media |
 | `EBQ_Setup_Wizard` | `setup` | hidden page, activation redirect | — | Welcome → Connect (skippable) → Pricing (`/api/v1/plans`) → Done |
 
-**HQ structure:** `EBQ_Hq_Page` registers a position-3 admin menu with flat
-sub-sections (`SECTIONS`, `class-ebq-hq-page.php:35`) — SEO Performance, SEO
-Analysis, Content opportunities, Keywords, Rank Tracker, Pages, Index Status,
-Redirects (AI), SERP Features (Prospects gated off via `HQ_PROSPECTS_ENABLED`).
-Legacy slugs redirect to current sections (`:56`). The menu interleaves AI Studio,
-Redirects admin, General settings, and Plugin update as siblings. Every locked
-panel reassures the user that offline features keep working.
+**HQ structure (v2.0.0):** `EBQ_Hq_Page` registers a position-3 admin menu with
+flat sub-sections (`SECTIONS`, `class-ebq-hq-page.php`) — SEO Performance, **Site
+Audit**, SEO Analysis, Content opportunities, Keywords, **Keyword Finder**, Rank
+Tracker, Pages, Index Status, Redirects (AI), SERP Features. The dead Prospects
+tab (hard-disabled pre-release) was deleted in 2.0.0 (tab JSX, proxy routes,
+client methods, `HQ_PROSPECTS_ENABLED` plumbing). Legacy slugs redirect to
+current sections. The menu interleaves "AI Studio (Beta)", Redirects admin,
+General settings, and Plugin update as siblings. Every locked panel reassures
+the user that offline features keep working.
+
+**Site Audit tab** (`src/hq/tabs/SiteAuditTab.jsx`, v2.0.0): native crawler
+report over `/hq/site-audit/*` (see [`hq-api.md`](hq-api.md)). Sub-views:
+Overview (health ring + severity KPIs + crawl status/blocked/never-crawled
+states), Issues (category group cards → drill-down with type chips, severity
+filter, URL search, load-more, per-type fix guidance), Pages (inventory with
+all/orphans/broken/noindex/deep filters, Inspect hand-off), Link Explorer
+(inbound/outbound/suggested links + path-from-home for any crawled URL).
+
+**Keyword Finder tab** (`src/hq/tabs/KeywordFinderTab.jsx`, v2.0.0): async
+discovery (seeds ≤20 or URL mode) + volume check (≤100) over
+`/hq/keyword-finder/*`; dispatch → 5s polling (60 tries then a soft timeout
+message), instant path when the server answers from cache. Raw Google Ads bid
+range shown — never $ projections. "Track" hand-off deep-links into the Rank
+Tracker's AddKeywordModal via `?ebq_track=`.
+
+**⚠ Admin-hook gotcha (fixed in 2.0.0, was broken in shipped 1.0.5):** WP
+submenu hooks are `{sanitize_title(parent menu TITLE)}_page_{slug}` — the EBQ
+HQ → Serfix HQ menu-title rebrand changed the prefix from `ebq-hq_page_…` to
+`serfix-hq_page_…`, so every exact-match `$hook` comparison silently failed and
+HQ *section* pages / AI Studio / Settings never enqueued their bundles (stuck
+on the boot skeleton). All checks now match on the `_page_{slug}` suffix
+(`EBQ_Hq_Page::is_hq_screen_hook`, `EBQ_AiWriter_Page::enqueue`,
+`EBQ_Settings::enqueue_assets`, `EBQ_Migration_Banner`). Never compare a
+submenu `$hook` against a hardcoded parent prefix.
 
 ## Tier & freeze gating
 

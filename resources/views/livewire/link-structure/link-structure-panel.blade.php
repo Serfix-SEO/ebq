@@ -1,6 +1,6 @@
 <div class="space-y-5">
     <div>
-        <h1 class="text-lg font-bold tracking-tight">{{ __('Link Structure') }}</h1>
+        <h1 class="text-lg font-bold tracking-tight">{{ __('Link Explorer') }}</h1>
         <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Type a page URL to see how it\'s linked within your site') }}</p>
     </div>
 

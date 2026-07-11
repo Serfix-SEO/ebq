@@ -28,7 +28,9 @@
         <div class="grid gap-4 sm:grid-cols-[1fr_12rem]">
             <div>
                 <label for="kvf-keywords" class="block text-sm font-medium text-slate-700 dark:text-slate-300">{{ __('Keywords') }}</label>
-                <textarea id="kvf-keywords" wire:model="keywords" rows="6" placeholder="{{ __('One keyword per line (or comma-separated)&#10;best seo tools&#10;keyword research&#10;rank tracker') }}"
+                {{-- Real \n in the placeholder, NOT &#10; inside __() — the {{ }} echo
+                     escapes the ampersand, so users saw the literal entity text. --}}
+                <textarea id="kvf-keywords" wire:model="keywords" rows="6" placeholder="{{ __('One keyword per line (or comma-separated)')."\nbest seo tools\nkeyword research\nrank tracker" }}"
                     class="mt-1.5 block w-full rounded-lg border-slate-300 bg-white text-sm text-slate-900 shadow-sm transition focus:border-orange-500 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"></textarea>
                 <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">
                     @if ($usingFinder)

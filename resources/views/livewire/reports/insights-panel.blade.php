@@ -22,7 +22,9 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7" role="tablist" aria-label="{{ __('Insight categories') }}">
+        {{-- 5 tabs → 5 columns; grid-cols-7 left every tile ~30% too
+             narrow with the hint text clipping hard against the border. --}}
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" role="tablist" aria-label="{{ __('Insight categories') }}">
             @foreach ($tabs as $t)
                 @php $active = $tab === $t['key']; @endphp
                 <button type="button" wire:click="setTab('{{ $t['key'] }}')"
@@ -36,7 +38,7 @@
                         'border-orange-300 bg-orange-50 dark:border-orange-500/40 dark:bg-orange-500/10' => $active,
                         'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800' => ! $active,
                     ])>
-                    <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ $t['label'] }}</span>
+                    <span class="w-full truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="{{ $t['label'] }}">{{ $t['label'] }}</span>
                     <span @class([
                         'mt-1 text-xl font-bold tabular-nums',
                         'text-amber-600 dark:text-amber-400' => $t['tone'] === 'amber',
@@ -46,7 +48,7 @@
                         'text-rose-600 dark:text-rose-400' => $t['tone'] === 'rose',
                         'text-emerald-600 dark:text-emerald-400' => $t['tone'] === 'emerald',
                     ])>{{ $t['count'] === null ? __('View') : number_format($t['count']) }}</span>
-                    <span class="mt-0.5 truncate text-[10px] text-slate-400 dark:text-slate-500">{{ $t['hint'] }}</span>
+                    <span class="mt-0.5 w-full truncate text-[10px] text-slate-400 dark:text-slate-500" title="{{ $t['hint'] }}">{{ $t['hint'] }}</span>
                 </button>
             @endforeach
         </div>
@@ -71,11 +73,11 @@
 
         <div wire:loading.remove wire:target="setTab">
             @if (! $hasAccess)
-                <x-insights.empty-state title="{{ __('Select a website to view insights') }}" body="{{ __('Use the website picker at the top of the app to choose a site. Insights update as its Search Console and indexing data syncs.') }}" />
+                <x-insights.empty-state :title="__('Select a website to view insights')" :body="__('Use the website picker at the top of the app to choose a site. Insights update as its Search Console and indexing data syncs.')" />
             @elseif ($tab === 'cannibalization')
-                <x-insights.card title="{{ __('Keyword cannibalization') }}" description="{{ __('Queries where two or more of your pages split clicks — consolidate content or re-target the weaker URLs.') }}">
+                <x-insights.card :title="__('Keyword cannibalization')" :description="__('Queries where two or more of your pages split clicks — consolidate content or re-target the weaker URLs.')">
                     @if (empty($data['cannibalization']))
-                        <x-insights.empty-state title="{{ __('No cannibalization detected') }}" body="{{ __('No queries in the last 28 days are splitting clicks across multiple pages. Either your information architecture is clean or there\'s not yet enough GSC data — re-check after a full sync.') }}" />
+                        <x-insights.empty-state :title="__('No cannibalization detected')" :body="__('No queries in the last 28 days are splitting clicks across multiple pages. Either your information architecture is clean or there\'s not yet enough GSC data — re-check after a full sync.')" />
                     @else
                         <x-insights.scroll-area>
                             <table class="min-w-full text-left text-xs">
@@ -92,25 +94,40 @@
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                     @foreach ($data['cannibalization'] as $row)
-                                        <tr>
-                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}<x-keyword-language :language="$row['language'] ?? null" /></td>
-                                            <td class="py-2 pr-3 max-w-[280px] truncate text-slate-600 dark:text-slate-300" title="{{ $row['primary_page'] }}">{{ $row['primary_page'] }}</td>
-                                            <td class="py-2 pe-3 text-end tabular-nums">{{ $row['page_count'] }}</td>
-                                            <td class="py-2 pe-3 text-end tabular-nums">{{ number_format($row['total_clicks']) }}</td>
-                                            <td class="py-2 pe-3 text-end tabular-nums">{{ number_format($row['total_impressions']) }}</td>
-                                            <td class="py-2 pe-3 text-end tabular-nums">
+                                        @php
+                                            // Paths read far better than full URLs in a dense table;
+                                            // the full URL stays available via the title tooltip.
+                                            $path = fn (string $url) => (parse_url($url, PHP_URL_PATH) ?: '/').(parse_url($url, PHP_URL_QUERY) ? '?…' : '');
+                                            $primaryShare = max(0, round(100 - collect($row['competing_pages'])->sum('share'), 1));
+                                        @endphp
+                                        <tr class="align-top">
+                                            <td class="py-2.5 pe-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}<x-keyword-language :language="$row['language'] ?? null" /></td>
+                                            <td class="py-2.5 pe-3 max-w-[280px] text-slate-600 dark:text-slate-300">
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="inline-flex shrink-0 rounded bg-emerald-50 px-1.5 py-px text-[10px] font-semibold tabular-nums text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">{{ $primaryShare }}%</span>
+                                                    <span class="truncate" title="{{ $row['primary_page'] }}">{{ $path($row['primary_page']) }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="py-2.5 pe-3 text-end tabular-nums">{{ $row['page_count'] }}</td>
+                                            <td class="py-2.5 pe-3 text-end tabular-nums">{{ number_format($row['total_clicks']) }}</td>
+                                            <td class="py-2.5 pe-3 text-end tabular-nums">{{ number_format($row['total_impressions']) }}</td>
+                                            <td class="py-2.5 pe-3 text-end tabular-nums">
                                                 @if (! empty($row['search_volume']))
                                                     <span class="font-semibold text-amber-600 dark:text-amber-400">{{ number_format($row['search_volume']) }}</span>
                                                 @else
                                                     <span class="text-slate-400">—</span>
                                                 @endif
                                             </td>
-                                            <td class="py-2">
-                                                <ul class="space-y-0.5">
+                                            <td class="py-2.5">
+                                                <ul class="space-y-1">
                                                     @foreach ($row['competing_pages'] as $p)
-                                                        <li class="max-w-[360px] truncate text-slate-500 dark:text-slate-400" title="{{ $p['page'] }}">
-                                                            <span class="tabular-nums font-semibold text-amber-600 dark:text-amber-400">{{ $p['share'] }}%</span>
-                                                            <span class="ms-2">{{ $p['page'] }}</span>
+                                                        <li class="flex items-center gap-2" title="{{ $p['page'] }} — {{ number_format($p['clicks']) }} {{ __('clicks') }} · {{ __('pos') }} {{ $p['position'] }}">
+                                                            <span class="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden="true">
+                                                                <span class="block h-full rounded-full bg-amber-500" style="width: {{ min(100, max(3, $p['share'])) }}%"></span>
+                                                            </span>
+                                                            <span class="w-11 shrink-0 text-end font-semibold tabular-nums text-amber-600 dark:text-amber-400">{{ $p['share'] }}%</span>
+                                                            <span class="max-w-[240px] truncate text-slate-500 dark:text-slate-400">{{ $path($p['page']) }}</span>
+                                                            <span class="shrink-0 text-[10px] tabular-nums text-slate-400 dark:text-slate-500">#{{ $p['position'] }}</span>
                                                         </li>
                                                     @endforeach
                                                 </ul>
@@ -123,9 +140,9 @@
                     @endif
                 </x-insights.card>
             @elseif ($tab === 'striking_distance')
-                <x-insights.card title="{{ __('Striking-distance keywords') }}" description="{{ __('Queries at positions 5–20 with strong impressions and below-curve CTR — the fastest wins on your content calendar.') }}">
+                <x-insights.card :title="__('Striking-distance keywords')" :description="__('Queries at positions 5–20 with strong impressions and below-curve CTR — the fastest wins on your content calendar.')">
                     @if (empty($data['striking_distance']))
-                        <x-insights.empty-state title="{{ __('No striking-distance opportunities yet') }}" body="{{ __('We look for queries with at least 200 impressions ranking between #5 and #20. As your GSC history grows, qualifying keywords will appear here with a priority score.') }}" />
+                        <x-insights.empty-state :title="__('No striking-distance opportunities yet')" :body="__('We look for queries with at least 200 impressions ranking between #5 and #20. As your GSC history grows, qualifying keywords will appear here with a priority score.')" />
                     @else
                         <x-insights.scroll-area>
                             <table class="min-w-full text-left text-xs">
@@ -182,9 +199,9 @@
                     @endif
                 </x-insights.card>
             @elseif ($tab === 'audit_performance')
-                <x-insights.card title="{{ __('Audit vs. performance') }}" description="{{ __('Pages with poor Core Web Vitals scores that still attract real search impressions — technical debt measurably costing traffic.') }}">
+                <x-insights.card :title="__('Audit vs. performance')" :description="__('Pages with poor Core Web Vitals scores that still attract real search impressions — technical debt measurably costing traffic.')">
                     @if (empty($data['audit_performance']))
-                        <x-insights.empty-state title="{{ __('No underperforming audited pages') }}" body="{{ __('Every audited page is scoring well on Core Web Vitals, or you haven\'t audited many pages yet. Run a page audit from the Audits tab to populate this list.') }}" />
+                        <x-insights.empty-state :title="__('No underperforming audited pages')" :body="__('Every audited page is scoring well on Core Web Vitals, or you haven\'t audited many pages yet. Run a page audit from the Audits tab to populate this list.')" />
                     @else
                         <x-insights.scroll-area>
                             <table class="min-w-full text-left text-xs">
@@ -223,9 +240,9 @@
                     @endif
                 </x-insights.card>
             @elseif ($tab === 'content_decay')
-                <x-insights.card title="{{ __('Content decay') }}" description="{{ __('Pages losing clicks 28d-over-28d while still attracting impressions. The indexing verdict tells you whether it\'s ranking decay or de-indexing.') }}">
+                <x-insights.card :title="__('Content decay')" :description="__('Pages losing clicks 28d-over-28d while still attracting impressions. The indexing verdict tells you whether it\'s ranking decay or de-indexing.')">
                     @if (empty($data['content_decay']['pages']))
-                        <x-insights.empty-state title="{{ __('No decay detected') }}" body="{{ __('Either every high-impression page is holding steady, or we don\'t have two full 28-day windows of GSC history yet. Once the baseline fills in, declining pages will appear here.') }}" />
+                        <x-insights.empty-state :title="__('No decay detected')" :body="__('Either every high-impression page is holding steady, or we don\'t have two full 28-day windows of GSC history yet. Once the baseline fills in, declining pages will appear here.')" />
                     @else
                         <x-insights.scroll-area>
                             <table class="min-w-full text-left text-xs">
@@ -284,9 +301,9 @@
                     @endif
                 </x-insights.card>
             @elseif ($tab === 'quick_wins')
-                <x-insights.card title="{{ __('Quick wins') }}" description="{{ __('Low-competition keywords with real search volume where you either don\'t rank or rank outside the top 10. Sorted by search volume and how winnable they look.') }}">
+                <x-insights.card :title="__('Quick wins')" :description="__('Low-competition keywords with real search volume where you either don\'t rank or rank outside the top 10. Sorted by search volume and how winnable they look.')">
                     @if (empty($data['quick_wins']))
-                        <x-insights.empty-state title="{{ __('No quick wins surfaced yet') }}" body="{{ __('Either our keyword intelligence hasn\'t filled in for your queries yet, or everything with real volume is already in your top 10. Check back in a day or two as the cache warms up.') }}" />
+                        <x-insights.empty-state :title="__('No quick wins surfaced yet')" :body="__('Either our keyword intelligence hasn\'t filled in for your queries yet, or everything with real volume is already in your top 10. Check back in a day or two as the cache warms up.')" />
                     @else
                         <x-insights.scroll-area>
                             <table class="min-w-full text-left text-xs">

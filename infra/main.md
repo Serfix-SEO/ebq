@@ -256,6 +256,109 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-11 (WP-plugin deep-links opened the wrong website — `ApplyWebsiteHint`
+  middleware + plugin 2.0.8/2.0.9)** — Owner QA on a multi-website account: every
+  plugin link into the portal that wasn't a signed embed (WP dashboard-widget insight
+  cards; editor-sidebar rank-tracking / custom-audit / page-audits / settings links)
+  rendered whatever website the Serfix session last had selected. Two mechanisms:
+  (1) widget cards now fetch the existing signed embed URL at click time (2.0.8;
+  `manage_options`-gated — signed embeds log in as the website OWNER, never hand
+  them to editors); (2) new **`ApplyWebsiteHint`** web middleware
+  (`bootstrap/app.php`, before `ResolveShardContext`) honors `?ebq_site=<domain>`
+  by switching `current_website_id` **only among the user's accessible websites** —
+  unsigned by design; all raw plugin links now append it (2.0.9,
+  `src/sidebar/utils/portalUrl.js`). Tests: `tests/Feature/ApplyWebsiteHintTest.php`.
+  Docs: [reference/http-and-auth.md](./reference/http-and-auth.md) ·
+  [wordpress-plugin/releases.md](./wordpress-plugin/releases.md).
+- **2026-07-10 (WP plugin v2.0.0 — full rebuild, published, awaiting coming-soon flip)** —
+  Platform: first token-authorized JSON surface over the shared-crawl subsystem —
+  `Api/V1/PluginCrawlController` (6 read-only `/api/v1/hq/site-audit/*` routes over
+  `CrawlReportService`, `hq`-flag gated, GSC-optional) and
+  `Api/V1/PluginKeywordFinderController` (async ideas/volume over the keyword fleet,
+  cache-first, 10 dispatches/website/day; poll warms the monthly ideas cache with a
+  server-recomputed key — never client-supplied). ebq.io Apache vhosts now 308 (not 301)
+  `/api/*` + `/wordpress/*` so old installs' POSTs survive the domain migration.
+  Plugin (v2.0.0, published as the first-ever `plugin_releases` row): native Site Audit
+  + Keyword Finder HQ tabs, `DEFAULT_BASE` → serfix.io with a versioned upgrade routine,
+  full orange rebrand (violet/indigo/legacy-blue swept to zero), "AI Studio (Beta)",
+  Prospects tab deleted, and a **shipped-1.0.5 bug fixed**: submenu `$hook` names embed
+  the sanitized parent menu TITLE (`serfix-hq_page_…`), so the EBQ→Serfix menu rename
+  had silently broken bundle enqueue on every HQ section page / AI Studio / Settings
+  (all checks now suffix-match `_page_{slug}`). E2E-verified on a throwaway Docker WP
+  against production data (falik.com crawl, real fleet keyword lookup, upgrade path,
+  update offer). Download stays 404 until `WP_PLUGIN_COMING_SOON=false`. Tests:
+  `tests/Feature/Api/V1/Plugin{Crawl,KeywordFinder}ApiTest.php` (seed `PlanSeeder` —
+  factory users resolve the trial plan row for the `hq` flag). Docs:
+  [wordpress-plugin/hq-api.md](./wordpress-plugin/hq-api.md),
+  [plugin-features.md](./wordpress-plugin/plugin-features.md),
+  [releases.md](./wordpress-plugin/releases.md); plan at `/var/www/ebq/WP_PLUGIN_V2_PLAN.md`.
+- **2026-07-10 (in-app bug reports with snip screenshots)** — "Report a bug" button in the
+  portal top bar → Livewire modal (`app/Livewire/BugReportModal.php`): description, prefilled
+  page link, optional snipping-tool region capture. Capture =
+  `resources/js/bug-report-capture.js` (lazy Vite chunk) + `modern-screenshot`
+  (html2canvas rejected: crashes on Tailwind 4 oklch). **Gotcha discovered**: Alpine/Livewire
+  attribute names (`@click`, `x-bind:class`, `wire:model`) are invalid XML — XMLSerializer
+  emits broken SVG and foreignObject captures come back fully transparent (black JPEG);
+  fixed by stripping `[@:]` attributes in `onCloneEachNode`. Storage: `bug_reports` table
+  (central, ULID) + private `storage/app/bug-reports/`; admins notified by synchronous mail
+  (`BugReportSubmitted`) and manage at `/admin/bug-reports` (list/screenshot/resolve —
+  `Admin\BugReportController`). Rate limit 5/user/hour in-component. Tests:
+  `tests/Feature/BugReportTest.php`. Details: [admin/README.md](./admin/README.md) § Bug reports.
+- **2026-07-09 (multilingual kill switch — Arabic OFF by default)** — All non-English
+  languages are now disabled unless an admin enables them: new **Settings → Languages**
+  toggle (`admin/settings`, setting `locale.multilingual_enabled`, default false) read via
+  `app/Support/LocaleConfig.php`. When off, `SetLocale` forces `config('app.locale')`,
+  the first-visit picker and EN/AR switchers hide, `/locale/{locale}` 404s non-default
+  locales, and every Mailable clamps its stored locale through `LocaleConfig::resolve()`.
+  Stored `users.locale`/cookies survive for re-enabling. Details:
+  [frontend/i18n-and-rtl.md](./frontend/i18n-and-rtl.md) § Admin kill switch.
+- **2026-07-07 (public site mobile menu — was never built)** — Reported: "menu not
+  visible on mobile." Root cause: `components/marketing/page.blade.php`'s header nav was
+  `hidden … md:flex` with no mobile fallback at all — no hamburger, no drawer — so
+  Features/Pricing/Guide/Contact/WordPress/FAQ plus Sign in/Dashboard/locale toggle were
+  simply gone below 768px on all 7 public pages (landing/features/pricing/contact/guide/
+  wordpress-plugin/website-revamp, which all share this one component). Added a
+  hamburger + slide-down panel, `md:hidden` throughout (matching the desktop nav's
+  `md:flex` exactly — a mismatched breakpoint reopens the same gap). Verified visually
+  via headless Chrome at a 390×844 viewport. Deployed: `npm run build` +
+  `systemctl restart php8.3-fpm` (opcache SHM, full restart required — see
+  CLAUDE.local.md). Details: [frontend/README.md](./frontend/README.md) § Mobile nav.
+- **2026-07-07 (automatic crawl-completion email)** — Every clean crawl completion now
+  auto-emails each subscriber website's owner the same crawl-issues report the admin
+  Marketing panel sends manually (`CrawlReportMail`), via new `SendCrawlReportEmailsJob`
+  dispatched from `AnalyzeSiteJob`'s success path. Skips 0-open-findings sites; not
+  throttled beyond the natural 3–30d adaptive recrawl cadence. Extracted the report-building
+  logic (`emailReportPayload`/traffic snapshot) out of `MarketingController` into
+  `CrawlReportService` so manual and automatic sends share one implementation. Details:
+  [crawler/adjacent-systems.md](./crawler/adjacent-systems.md) § Crawl-completion email.
+- **2026-07-07 (keyword node crash-hardening + stuck-request reaper)** — First hour of
+  concurrency 2 surfaced a fatal: tab death mid-`waitForEvent('download')` → unhandled
+  rejection → whole node process died → in-flight jobs lost with no failure webhook → rows
+  stuck `running` again. Node hardened (fatal-guard handlers + pre-attached catch on the
+  download promise); app side gained the long-missing reaper:
+  `ebq:reap-stuck-keyword-requests` every 10 min fails `queued`/`running` rows >15 min old.
+  Details: [keywords/keyword-finder.md](./keywords/keyword-finder.md).
+- **2026-07-07 (keyword node concurrency — page-per-job shipped, but box reverted to 1)** —
+  Ahead of public launch, `keywordfetcher` was rewritten for N-way concurrency
+  (page-per-job on the shared logged-in context + context-launch mutex, `QUEUE_CONCURRENCY`
+  env). Mechanism verified (2 overlapping jobs, ~1.7×) — but on this 2-vCPU box (shared
+  with Horizon, swiftshader rendering) ~50% of concurrent jobs hit 30–45s interaction
+  timeouts, so Node 1 runs `QUEUE_CONCURRENCY=1`. Throughput path: second node w/ own Ads
+  account, or more vCPUs. Details/rollback:
+  [keywords/keyword-finder.md](./keywords/keyword-finder.md) § Node internals.
+- **2026-07-07 (keyword-finder webhooks broken by domain migration — worker box env drift)** —
+  Worker box B's `.env` still had `APP_URL=https://ebq.io` after the 07-06 serfix.io
+  migration; Horizon-dispatched keyword requests sent an ebq.io `webhook_url`, the node
+  fleet's POST got 301'd and re-issued as GET (405), and `KeywordApiRequest` rows stuck
+  `running` (no reaper). Fixed box B env (APP_URL/APP_PUBLIC_URL/MAIL_FROM/GOOGLE_REDIRECT),
+  restarted `ebq-horizon-1`, recovered stuck rows by re-POSTing the same `request_id`.
+  Second finding: the node fleet **ignores** the per-request `webhook_url` — the real target
+  is `WEBHOOK_URL` in the node's own `.env`; fixed to serfix.io + service restart, and the
+  ebq.io vhosts keep a method-preserving `R=308` rule for `/webhooks/*` ahead of the 301
+  catch-all as defense-in-depth. Bonus: Node 1 turned out to run **on box B itself**; full
+  node internals (systemd/xvfb/relay-proxy/concurrency design) now documented in
+  [keywords/keyword-finder.md](./keywords/keyword-finder.md) § Node internals.
+  Rule: domain/env changes must be swept on **both** boxes.
 - **2026-07-07 (app-wide English/Arabic i18n + RTL — complete)** — Full translation +
   RTL layout across marketing, auth/onboarding, the entire customer dashboard, guest
   lead-gen tools, transactional emails, and PDF exports (~180 files). Admin panel stays

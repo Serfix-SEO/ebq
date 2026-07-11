@@ -15,7 +15,9 @@
         </header>
 
         <div class="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-20">
-            <div class="prose prose-slate max-w-none prose-headings:tracking-tight prose-h2:mt-12 prose-h2:text-xl prose-h2:font-semibold prose-h2:text-slate-900 prose-h3:mt-8 prose-h3:text-base prose-h3:font-semibold prose-h3:text-slate-900 prose-p:text-slate-600 prose-li:text-slate-600 prose-a:text-slate-900 prose-a:underline-offset-2">
+            {{-- prose-code:break-all: OAuth-scope URLs in <code> have no break
+     opportunities and forced sideways scroll on phones. --}}
+<div class="prose prose-slate max-w-none prose-headings:tracking-tight prose-h2:mt-12 prose-h2:text-xl prose-h2:font-semibold prose-h2:text-slate-900 prose-h3:mt-8 prose-h3:text-base prose-h3:font-semibold prose-h3:text-slate-900 prose-p:text-slate-600 prose-li:text-slate-600 prose-a:text-slate-900 prose-a:underline-offset-2 prose-code:break-all">
 
                 <h2>1. Data we collect</h2>
 

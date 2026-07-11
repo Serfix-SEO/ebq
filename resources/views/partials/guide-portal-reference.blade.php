@@ -375,7 +375,7 @@
         </div>
         <ul class="mt-6 list-disc space-y-2 ps-5 text-[14px] leading-7 text-slate-700">
             <li><strong>{{ __('Summary') }}</strong> — {{ __('overall score, benchmark keyword, and device.') }}</li>
-            <li><strong>{{ __('Core Web Vitals &amp; lab timings') }}</strong> — {{ __('field and lab signals with thresholds.') }}</li>
+            <li><strong>{{ __('Core Web Vitals & lab timings') }}</strong> — {{ __('field and lab signals with thresholds.') }}</li>
             <li><strong>{{ __('On-page SEO') }}</strong> — {{ __('titles, meta, headings, canonical, schema, media, internal links.') }}</li>
             <li><strong>{{ __('SERP snapshot') }}</strong> — {{ __('competitors and readability context for the benchmark term.') }}</li>
             <li><strong>{{ __('Recommendations') }}</strong> — {{ __('ordered tasks; wire through to re-audit and URL refresh flows from the live screen.') }}</li>
@@ -592,7 +592,7 @@
         <dl class="mt-4 grid gap-3 text-[13px] leading-6 text-slate-700">
             <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">{{ __('SEO / Read. pills') }}</dt><dd class="mt-1">{{ __('Scores from the editor analysis—open the post once so the analyzer can store them. Labels map to Good / Needs work / Bad bands.') }}</dd></div>
             <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">{{ __('Schema chips') }}</dt><dd class="mt-1">{{ __('Shows which structured-data types are enabled for the URL in the Schema tab.') }}</dd></div>
-            <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">{{ __('Rank &amp; performance strip') }}</dt><dd class="mt-1">{{ __('After background sync, shows rank and search-performance context for that URL when your site is connected.') }}</dd></div>
+            <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">{{ __('Rank & performance strip') }}</dt><dd class="mt-1">{{ __('After background sync, shows rank and search-performance context for that URL when your site is connected.') }}</dd></div>
             <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">{{ __('Row action · Track keyphrase') }}</dt><dd class="mt-1">{{ __('When a focus keyphrase is saved, an extra action can send it to Rank Tracker without leaving the list; if the quick action is unavailable, use Head Quarter instead.') }}</dd></div>
         </dl>
 

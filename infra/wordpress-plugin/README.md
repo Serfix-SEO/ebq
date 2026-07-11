@@ -112,3 +112,21 @@ install on the public version endpoint.
   `app/Console/Commands/{PublishScheduledPluginReleases,ApplyPluginVersionCommand,PackageWordPressPlugin}.php`,
   model `app/Models/PluginRelease.php`
 - Plugin source — `ebq-seo-wp/ebq-seo.php` (header `Version:`, `EBQ_SEO_VERSION` define)
+
+## Live test install (owner-provided, for plugin QA)
+
+**pubgnamegenerator.net** — a real, owner-controlled WordPress site connected to the
+`pubgnamegenerator.net` Serfix website (owner malihaider19967@gmail.com). Use it to QA
+plugin releases against real crawl data. Provided 2026-07-10 explicitly for testing.
+
+- SSH (Hostinger shared): `ssh -p 65002 u913932807@195.35.62.145` — password in
+  project memory (`wp-test-install-creds`), **not in this repo**.
+  WP root: `~/domains/pubgnamegenerator.net/public_html` (wp-cli available as `wp`).
+  Same account also hosts capcutmodapk.app, gbwhatsapp.app, namesforfreefire.com, etc. —
+  **touch only pubgnamegenerator.net**.
+- wp-admin: `https://pubgnamegenerator.net/wp-login.php`, user `hamzaajaz251@gmail.com` —
+  password in project memory (`wp-test-install-creds`).
+- Install a build: `scp -P 65002 ebq-seo.zip u913932807@…:/tmp/` then
+  `cd ~/domains/pubgnamegenerator.net/public_html && wp plugin install /tmp/ebq-seo.zip --force`.
+- Pre-existing noise: wp-cli prints a warning about a broken `pubg-name-generator`
+  plugin folder — unrelated to ebq-seo, ignore.

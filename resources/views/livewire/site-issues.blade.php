@@ -91,16 +91,20 @@
         {{-- Grouped-by-type breakdown (Semrush-style): one card per issue type, not
              one undifferentiated list — click a type to drill into its affected URLs. --}}
         <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+            {{-- While a drill-down loads: dim + lock the list and swap the clicked
+                 row's chevron for a spinner, so the click visibly "took". --}}
+            <ul class="divide-y divide-slate-100 dark:divide-slate-800"
+                wire:loading.class="pointer-events-none opacity-60" wire:target="selectType">
                 @forelse ($crawlGroups as $g)
                     @php $gTone = $findingTones[$g['severity']] ?? $findingTones['low']; @endphp
                     <li>
-                        <button type="button" wire:click="selectType('{{ $g['type'] }}')"
-                            class="flex w-full items-center gap-3 px-5 py-3.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                        <button type="button" wire:click="selectType('{{ $g['type'] }}')" wire:loading.attr="disabled" wire:target="selectType"
+                            class="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60">
                             <span class="rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums {{ $gTone }}">{{ number_format($g['count']) }}</span>
                             <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 dark:text-slate-100">{{ $g['label'] }}</span>
                             <span class="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide {{ $gTone }}">{{ __(ucfirst($g['severity'])) }}</span>
-                            <svg class="h-3.5 w-3.5 flex-none text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                            <svg wire:loading.remove wire:target="selectType('{{ $g['type'] }}')" class="h-3.5 w-3.5 flex-none text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                            <svg wire:loading wire:target="selectType('{{ $g['type'] }}')" class="h-3.5 w-3.5 flex-none animate-spin text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" class="opacity-75"></path></svg>
                         </button>
                     </li>
                 @empty
@@ -122,16 +126,18 @@
                     <div class="text-[13px] font-semibold text-amber-900 dark:text-amber-200">{{ __('From Google Search Console') }}</div>
                     <p class="text-[11px] text-amber-700 dark:text-amber-300">{{ __('Based on Search Console history, not our own crawl — this data can be a few days old, so treat these as worth checking rather than confirmed.') }}</p>
                 </div>
-                <ul class="divide-y divide-amber-100/70 dark:divide-amber-500/10">
+                <ul class="divide-y divide-amber-100/70 dark:divide-amber-500/10"
+                    wire:loading.class="pointer-events-none opacity-60" wire:target="selectType">
                     @foreach ($gscGroups as $g)
                         @php $gTone = $findingTones[$g['severity']] ?? $findingTones['low']; @endphp
                         <li>
-                            <button type="button" wire:click="selectType('{{ $g['type'] }}')"
-                                class="flex w-full items-center gap-3 px-5 py-3.5 text-left transition hover:bg-amber-100/40 dark:hover:bg-amber-500/10">
+                            <button type="button" wire:click="selectType('{{ $g['type'] }}')" wire:loading.attr="disabled" wire:target="selectType"
+                                class="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left transition hover:bg-amber-100/40 dark:hover:bg-amber-500/10">
                                 <span class="rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums {{ $gTone }}">{{ number_format($g['count']) }}</span>
                                 <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 dark:text-slate-100">{{ $g['label'] }}</span>
                                 <span class="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide {{ $gTone }}">{{ __(ucfirst($g['severity'])) }}</span>
-                                <svg class="h-3.5 w-3.5 flex-none text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                                <svg wire:loading.remove wire:target="selectType('{{ $g['type'] }}')" class="h-3.5 w-3.5 flex-none text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                                <svg wire:loading wire:target="selectType('{{ $g['type'] }}')" class="h-3.5 w-3.5 flex-none animate-spin text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" class="opacity-75"></path></svg>
                             </button>
                         </li>
                     @endforeach

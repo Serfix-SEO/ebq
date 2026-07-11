@@ -101,6 +101,27 @@
                 </select>
             </section>
 
+            {{-- ── Languages ────────────────────────────────────────── --}}
+            <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Languages</h2>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    When off, the whole customer-facing app (site, dashboard, emails, PDFs) runs in English only: the first-visit language popup and the EN/AR switchers disappear. Saved user language choices are kept and take effect again when re-enabled.
+                </p>
+
+                <label class="mt-4 flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200">
+                    <input type="hidden" name="multilingual_enabled" value="0" />
+                    <input type="checkbox" name="multilingual_enabled" value="1"
+                        class="mt-0.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                        @checked(old('multilingual_enabled', $multilingualEnabled)) />
+                    <span>
+                        <span class="font-medium">Enable additional languages (Arabic)</span>
+                        <span class="mt-0.5 block text-[11px] text-slate-500 dark:text-slate-400">
+                            Shows the language picker popup to new visitors and the EN/AR switcher in menus. The admin panel is always English.
+                        </span>
+                    </span>
+                </label>
+            </section>
+
             {{-- ── WordPress HQ banner ──────────────────────────────── --}}
             <section x-data="{ type: '{{ old('banner_type', $banner['type']) }}' }"
                 class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">

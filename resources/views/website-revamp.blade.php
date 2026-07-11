@@ -169,7 +169,7 @@
     <section id="example" class="bg-white py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Before &amp; after') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Before & after') }}</p>
                 <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{{ __('See where the leads were leaking.') }}</h2>
                 <p class="mt-4 text-base leading-7 text-slate-600">
                     {{ __('Here’s a real example. A local plumbing firm was running Google Ads, but the old site let visitors slip away before they ever picked up the phone. Same traffic, same budget. This is what changed.') }}
@@ -282,7 +282,7 @@
                 <div>
                     <div class="mb-3 flex items-center gap-2">
                         <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-100">{{ __('After') }}</span>
-                        <span class="text-[12px] text-slate-500">{{ __('Visitors call &amp; convert') }}</span>
+                        <span class="text-[12px] text-slate-500">{{ __('Visitors call & convert') }}</span>
                     </div>
 
                     {{-- Fake browser window: modern, conversion-focused site --}}
@@ -321,7 +321,7 @@
                             </div>
                             {{-- hero --}}
                             <div class="bg-gradient-to-b from-orange-50/70 to-white px-6 pb-8 pt-8 text-center">
-                                <span class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[8px] font-semibold text-emerald-700 ring-1 ring-emerald-100">{{ __('★★★★★ 480+ reviews · Licensed &amp; insured') }}</span>
+                                <span class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[8px] font-semibold text-emerald-700 ring-1 ring-emerald-100">{{ __('★★★★★ 480+ reviews · Licensed & insured') }}</span>
                                 <p class="mt-4 text-[18px] font-extrabold leading-tight tracking-tight text-slate-900">{{ __('Emergency Plumber') }}<br>{{ __('in Manchester, Fixed Today') }}</p>
                                 <p class="mx-auto mt-3 max-w-[15rem] text-[9px] leading-relaxed text-slate-600">{{ __('No call-out fee. Upfront pricing. A qualified engineer at your door within 60 minutes.') }}</p>
                                 <div class="mt-5 flex items-center justify-center gap-2.5">

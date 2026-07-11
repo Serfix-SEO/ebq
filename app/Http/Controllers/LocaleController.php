@@ -15,7 +15,7 @@ class LocaleController extends Controller
      */
     public function set(Request $request, string $locale): RedirectResponse
     {
-        abort_unless(in_array($locale, SetLocale::SUPPORTED, true), 404);
+        abort_unless(in_array($locale, \App\Support\LocaleConfig::supported(), true), 404);
 
         if ($request->user()) {
             $request->user()->forceFill(['locale' => $locale])->save();

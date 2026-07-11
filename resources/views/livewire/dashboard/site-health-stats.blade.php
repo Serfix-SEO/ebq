@@ -5,7 +5,7 @@
         <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="mb-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('Site Health') }}</h2>
-                <a href="{{ route('link-structure.index') }}" wire:navigate class="text-[11px] font-medium text-orange-600 hover:text-orange-700 dark:text-orange-400">{{ __('Link structure') }} →</a>
+                <a href="{{ route('link-structure.index') }}" wire:navigate class="text-[11px] font-medium text-orange-600 hover:text-orange-700 dark:text-orange-400">{{ __('Link Explorer') }} →</a>
             </div>
 
             @if (! empty($partial))

@@ -19,7 +19,7 @@
     // the numbers shown here are exactly what Stripe charges).
     $winbackCode    = (string) config('services.stripe.winback_promo_code');
     $winbackPercent = (int) config('services.stripe.winback_promo_percent');
-    $winbackActive  = $winbackCode !== '' && $authed && \App\Support\TrialStatus::isExpired(auth()->user());
+    $winbackActive  = $winbackCode !== '' && $authed && \App\Support\TrialStatus::isWinbackEligible(auth()->user());
     $fmtMoney       = fn (float $v) => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
     $contactUrl    = route('contact');
     $refundUrl     = route('refund-policy');
@@ -142,7 +142,7 @@
             }
         }
 
-        $rawBullets   = is_array($p->features) ? array_values($p->features) : [];
+        $rawBullets   = $p->publicFeatures();
         $bulletVideos = is_array($p->feature_videos ?? null) ? $p->feature_videos : [];
         $featureItems = [];
         foreach ($rawBullets as $i => $bullet) {
@@ -290,7 +290,7 @@
             ['feature' => __('White-label reports'),      'trial' => false,      'solo' => false,      'pro' => false,      'agency' => true,        'enterprise' => true],
         ],
         'WordPress Plugin' => [
-            ['feature' => __('WordPress plugin'),         'trial' => true,       'solo' => true,       'pro' => true,       'agency' => true,        'enterprise' => true],
+            ['feature' => __('WordPress plugin'), 'trial' => $wpSoonCell = (config('services.wordpress_plugin.coming_soon') ? __('Coming soon') : true), 'solo' => $wpSoonCell, 'pro' => $wpSoonCell, 'agency' => $wpSoonCell, 'enterprise' => $wpSoonCell],
         ],
     ];
 
@@ -416,19 +416,21 @@
                 @endif
                 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     @foreach ($plans as $plan)
+                        {{-- Phones stack cards full-width: center the copy there,
+                             back to start-aligned once the grid kicks in (sm+). --}}
                         <div @class([
-                            'relative flex flex-col rounded-2xl border bg-white p-6',
+                            'relative flex flex-col rounded-2xl border bg-white p-6 text-center sm:text-start',
                             'border-slate-900 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.25)]' => $plan['highlight'],
                             'border-slate-200' => ! $plan['highlight'],
                         ])>
                             @if ($plan['highlight'])
-                                <span class="absolute -top-3 left-6 inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">{{ __('Most popular') }}</span>
+                                <span class="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center whitespace-nowrap rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white sm:left-6 sm:translate-x-0">{{ __('Most popular') }}</span>
                             @endif
 
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ $plan['name'] }}</p>
 
                             @if ($plan['winback'])
-                                <div class="mt-4 flex items-baseline gap-1.5">
+                                <div class="mt-4 flex items-baseline justify-center gap-1.5 sm:justify-start">
                                     <span x-show="billing === 'annual'" class="flex items-baseline gap-1.5">
                                         <span class="text-lg font-semibold text-slate-400 line-through">{{ $plan['price_annual'] }}</span>
                                         <span class="text-4xl font-semibold tracking-tight text-orange-600">{{ $plan['winback']['annual'] }}</span>
@@ -445,7 +447,7 @@
                                 <p class="mt-1 text-xs font-semibold text-orange-700"
                                    x-show="billing === 'monthly'" style="display:none">{{ $plan['winback']['caption_monthly'] }}</p>
                             @else
-                                <div class="mt-4 flex items-baseline gap-1.5">
+                                <div class="mt-4 flex items-baseline justify-center gap-1.5 sm:justify-start">
                                     {{-- Annual price (default) --}}
                                     <span class="text-4xl font-semibold tracking-tight text-slate-900"
                                           x-show="billing === 'annual'">{{ $plan['price_annual'] }}</span>
@@ -469,7 +471,7 @@
                                      prominent red play badge that opens the
                                      auto-playing video modal. --}}
                                 @foreach ($plan['features'] as $feature)
-                                    <li class="flex gap-2.5">
+                                    <li class="flex justify-center gap-2.5 sm:justify-start">
                                         <svg class="mt-0.5 h-4 w-4 flex-none text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                                         @if ($feature['video_id'])
                                             <button type="button"
@@ -531,8 +533,10 @@
         </div>
     </section>
 
-    {{-- ── Feature comparison table ─────────────────────────────── --}}
-    <section class="bg-white py-16 sm:py-20">
+    {{-- ── Feature comparison table (desktop/tablet only — the 6-column
+         grid can't degrade usefully on phones; plan cards above carry the
+         mobile story) ─────────────────────────────── --}}
+    <section class="hidden bg-white py-16 sm:py-20 md:block">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mb-10 text-center">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('Full Comparison') }}</p>
@@ -596,7 +600,14 @@
                                             @if ($row[$planSlug] === true)
                                                 <svg class="mx-auto h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-label="{{ __('Included') }}"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                                             @elseif ($row[$planSlug] === false)
-                                                <svg class="mx-auto h-4 w-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-label="{{ __('Not included') }}"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                {{-- Not included: rose X on a soft pill so missing features
+                                                     read at a glance instead of blending into the page. --}}
+                                                <span class="mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-rose-50">
+                                                    <svg class="h-3.5 w-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-label="{{ __('Not included') }}"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                </span>
+                                            @elseif ($row[$planSlug] === '—')
+                                                {{-- "Not available" dash — muted so it doesn't read as a value. --}}
+                                                <span class="text-[13px] text-slate-300" aria-label="{{ __('Not included') }}">—</span>
                                             @else
                                                 <span class="text-[13px] text-slate-700">{{ $row[$planSlug] }}</span>
                                             @endif
@@ -633,7 +644,9 @@
     </div>{{-- end billing x-data wrapper (toggle + cards + comparison table) --}}
 
     {{-- ── Pricing FAQ ──────────────────────────────────────────── --}}
-    <section class="bg-slate-50/60 py-16 sm:py-20">
+    {{-- id="faq" is the target of the header/footer FAQ links site-wide;
+         scroll-mt offsets the sticky marketing header. --}}
+    <section id="faq" class="scroll-mt-20 bg-slate-50/60 py-16 sm:py-20">
         <div class="mx-auto max-w-3xl px-6 lg:px-8">
             <div class="text-center">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('FAQ') }}</p>

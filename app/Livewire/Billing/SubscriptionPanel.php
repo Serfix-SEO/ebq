@@ -115,11 +115,12 @@ class SubscriptionPanel extends Component
         // config('app.free').
         $isFreePromo = (bool) config('app.free');
 
-        // Trial-expired winback: loud discount banner + the checkout()
-        // auto-apply (BillingController) — same TrialStatus rule as the
-        // lockout middleware, same config knobs as the h24 expiry email.
+        // Winback/trial discount: loud banner + the checkout() auto-apply
+        // (BillingController). Since 2026-07-10 this shows for every
+        // trial-tier user (active trial too), not only expired ones —
+        // same config knobs as the h24 expiry email.
         $winbackCode = (string) config('services.stripe.winback_promo_code');
-        $showWinback = $winbackCode !== '' && \App\Support\TrialStatus::isExpired($user);
+        $showWinback = $winbackCode !== '' && \App\Support\TrialStatus::isWinbackEligible($user);
 
         return view('livewire.billing.subscription-panel', [
             'user' => $user,

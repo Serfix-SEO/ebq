@@ -84,7 +84,7 @@
     @include('partials.locale-picker')
     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">{{ __('Skip to content') }}</a>
 
-    <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
+    <header x-data="{ mobileOpen: false }" @keydown.escape.window="mobileOpen = false" class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
             <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="Serfix home">
                 <img src="{{ asset('serfix-logo.png') }}" alt="Serfix" width="101" height="36" class="h-9 w-auto object-contain">
@@ -95,26 +95,71 @@
                 <a href="{{ route('guide') }}" class="transition hover:text-slate-900 {{ $active === 'guide' ? 'text-slate-900' : '' }}">{{ __('Guide') }}</a>
                 <a href="{{ route('pricing') }}" class="transition hover:text-slate-900 {{ $active === 'pricing' ? 'text-slate-900' : '' }}">{{ __('Pricing') }}</a>
                 <a href="{{ route('contact') }}" class="transition hover:text-slate-900 {{ $active === 'contact' ? 'text-slate-900' : '' }}">{{ __('Contact') }}</a>
-                <a href="{{ route('wordpress-plugin') }}" class="transition hover:text-slate-900 {{ $active === 'wordpress' ? 'text-slate-900' : '' }}">{{ __('WordPress') }}</a>
-                <a href="{{ route('landing') }}#faq" class="transition hover:text-slate-900">{{ __('FAQ') }}</a>
+                <a href="{{ route('wordpress-plugin') }}" class="inline-flex items-center transition hover:text-slate-900 {{ $active === 'wordpress' ? 'text-slate-900' : '' }}">{{ __('WordPress') }}@if (config('services.wordpress_plugin.coming_soon'))<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('Soon') }}</span>@endif</a>
+                <a href="{{ route('pricing') }}#faq" class="transition hover:text-slate-900">{{ __('FAQ') }}</a>
             </nav>
 
             <div class="flex items-center gap-2">
-                <a href="{{ route('locale.set', app()->getLocale() === 'ar' ? 'en' : 'ar') }}"
-                    class="hidden rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 transition hover:text-slate-900 sm:inline-flex">
-                    {{ app()->getLocale() === 'ar' ? 'EN' : 'AR' }}
-                </a>
+                @if (\App\Support\LocaleConfig::active())
+                    <a href="{{ route('locale.set', app()->getLocale() === 'ar' ? 'en' : 'ar') }}"
+                        class="hidden rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 transition hover:text-slate-900 sm:inline-flex">
+                        {{ app()->getLocale() === 'ar' ? 'EN' : 'AR' }}
+                    </a>
+                @endif
                 @auth
                     <form method="POST" action="{{ route('logout') }}" class="hidden sm:inline-flex">
                         @csrf
                         <button type="submit" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900">{{ __('Log out') }}</button>
                     </form>
-                    <a href="{{ route('dashboard') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Dashboard') }}</a>
+                    <a href="{{ route('dashboard') }}" class="hidden items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:inline-flex">{{ __('Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900 sm:inline-flex">{{ __('Sign in') }}</a>
-                    <a href="{{ route('register') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Get started') }}</a>
+                    <a href="{{ route('register') }}" class="hidden items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:inline-flex">{{ __('Get started') }}</a>
                 @endauth
+
+                {{-- Mobile menu toggle: the nav above is `hidden md:flex`, and the CTA
+                     buttons are `sm:inline-flex`, so below `sm` nothing was reachable —
+                     this button + the panel below are the only way to see Features/
+                     Pricing/Sign in/etc. on a phone. --}}
+                <button type="button" @click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen.toString()" aria-controls="mobile-nav-panel"
+                    class="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 md:hidden">
+                    <span class="sr-only">{{ __('Menu') }}</span>
+                    <svg x-show="!mobileOpen" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                    <svg x-show="mobileOpen" style="display:none" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
             </div>
+        </div>
+
+        <div id="mobile-nav-panel" x-show="mobileOpen" x-cloak
+            x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="border-t border-slate-200/80 bg-white md:hidden">
+            <nav aria-label="Primary mobile" @click="mobileOpen = false" class="mx-auto flex max-w-6xl flex-col gap-1 px-6 py-4 text-sm text-slate-600">
+                <a href="{{ route('features') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'features' ? 'font-semibold text-slate-900' : '' }}">{{ __('Features') }}</a>
+                <a href="{{ route('guide') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'guide' ? 'font-semibold text-slate-900' : '' }}">{{ __('Guide') }}</a>
+                <a href="{{ route('pricing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'pricing' ? 'font-semibold text-slate-900' : '' }}">{{ __('Pricing') }}</a>
+                <a href="{{ route('contact') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'contact' ? 'font-semibold text-slate-900' : '' }}">{{ __('Contact') }}</a>
+                <a href="{{ route('wordpress-plugin') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'wordpress' ? 'font-semibold text-slate-900' : '' }}">{{ __('WordPress') }}@if (config('services.wordpress_plugin.coming_soon'))<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('Soon') }}</span>@endif</a>
+                <a href="{{ route('pricing') }}#faq" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900">{{ __('FAQ') }}</a>
+
+                <div class="my-2 border-t border-slate-200"></div>
+
+                @if (\App\Support\LocaleConfig::active())
+                    <a href="{{ route('locale.set', app()->getLocale() === 'ar' ? 'en' : 'ar') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900">
+                        {{ app()->getLocale() === 'ar' ? __('English') : __('العربية') }}
+                    </a>
+                @endif
+                @auth
+                    <a href="{{ route('dashboard') }}" class="rounded-lg px-3 py-2.5 font-semibold text-slate-900 transition hover:bg-slate-50">{{ __('Dashboard') }}</a>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="w-full rounded-lg px-3 py-2.5 text-start transition hover:bg-slate-50 hover:text-slate-900">{{ __('Log out') }}</button>
+                    </form>
+                @else
+                    <a href="{{ route('login') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900">{{ __('Sign in') }}</a>
+                    <a href="{{ route('register') }}" class="rounded-lg bg-slate-900 px-3 py-2.5 font-semibold text-white transition hover:bg-slate-800">{{ __('Get started') }}</a>
+                @endauth
+            </nav>
         </div>
     </header>
 
@@ -136,14 +181,13 @@
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('features') }}">{{ __('Features') }}</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('guide') }}">{{ __('Guide') }}</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}">{{ __('Pricing') }}</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('website-revamp') }}">{{ __('Website revamp') }}</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('wordpress-plugin') }}">{{ __('WordPress plugin') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('wordpress-plugin') }}">{{ __('WordPress plugin') }}@if (config('services.wordpress_plugin.coming_soon'))<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('Soon') }}</span>@endif</a></li>
                 </ul>
             </div>
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Company') }}</p>
                 <ul class="mt-3 space-y-2.5">
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('landing') }}#faq">{{ __('FAQ') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}#faq">{{ __('FAQ') }}</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('contact') }}">{{ __('Contact') }}</a></li>
                 </ul>
             </div>

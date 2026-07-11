@@ -22,6 +22,11 @@ Schedule::command('ebq:publish-scheduled-plugin-releases')->everyMinute();
 // resolution. Disabled entirely while trial_days = 0.
 Schedule::command('ebq:trial-cleanup')->hourly()->withoutOverlapping();
 
+// One-shot 30%-discount promo to ACTIVE trial users (day 2+ of trial, once
+// per user ever — users.trial_discount_email_sent_at). Expired users get the
+// same offer via the h24 countdown email above instead.
+Schedule::command('ebq:send-trial-discount-emails')->dailyAt('09:15')->withoutOverlapping();
+
 // Failed-job visibility (2026-07-06 incident: crawl jobs died on the worker for
 // 3 days, seen only in failed_jobs). Queue::failing() on every box buffers into
 // shared Redis; this drains + mails admins a digest. Empty buffer = no mail.
@@ -53,6 +58,10 @@ Schedule::command('ebq:check-worker-nodes')->everyFiveMinutes()->withoutOverlapp
 // Keep the self-hosted keyword API fleet's health/queue snapshot warm so the
 // load balancer routes to live, least-busy servers.
 Schedule::command('ebq:check-keyword-servers')->everyFiveMinutes();
+
+// Terminal backstop for keyword requests whose result webhook never arrived
+// (node crash / lost delivery): fail them so they don't sit `running` forever.
+Schedule::command('ebq:reap-stuck-keyword-requests')->everyTenMinutes()->withoutOverlapping();
 
 // Smart per-domain crawl-rate controller (AIMD): ramp each crawling domain up while it's
 // healthy, back it off the moment latency climbs or it blocks. See DomainRateLimiter.

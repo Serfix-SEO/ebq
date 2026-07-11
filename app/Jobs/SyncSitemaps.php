@@ -53,10 +53,28 @@ class SyncSitemaps implements ShouldQueue
             return;
         }
 
-        try {
-            $sitemaps = $service->listSitemaps($account, $website->gsc_site_url);
-        } catch (\Throwable $e) {
-            Log::warning("SyncSitemaps: GSC fetch failed for website {$this->websiteId}: {$e->getMessage()}");
+        // GSC scopes sitemaps.list to ONE property. A site stored under a
+        // narrow URL-prefix property (e.g. https://falik.com/en/) misses
+        // sitemaps that only exist on a broader property of the same domain
+        // (https://falik.com/ or sc-domain:) — so query every accessible
+        // property matching this website's domain and merge by path.
+        $sitemaps = [];
+        $fetchedAny = false;
+        foreach ($this->candidateProperties($service, $account, $website) as $property) {
+            try {
+                $rows = $service->listSitemaps($account, $property);
+                $fetchedAny = true;
+            } catch (\Throwable $e) {
+                Log::info("SyncSitemaps: GSC fetch failed for {$property} (website {$this->websiteId}): {$e->getMessage()}");
+                continue;
+            }
+            foreach ($rows as $row) {
+                $sitemaps[$row['path']] ??= $row;
+            }
+        }
+
+        if (! $fetchedAny) {
+            Log::warning("SyncSitemaps: GSC fetch failed for website {$this->websiteId} (all candidate properties)");
             return;
         }
 
@@ -84,6 +102,40 @@ class SyncSitemaps implements ShouldQueue
                 ]
             );
         }
+    }
+
+    /**
+     * The stored property plus every other property on the account that
+     * belongs to this website's domain (sc-domain: or any URL-prefix on the
+     * same host, www tolerated). Stored property first so its rows win the
+     * merge. Falls back to just the stored property if listing sites fails.
+     *
+     * @return array<int, string>
+     */
+    private function candidateProperties(SearchConsoleService $service, $account, Website $website): array
+    {
+        $domain = strtolower(ltrim((string) $website->domain, '.'));
+        $out = [(string) $website->gsc_site_url];
+
+        try {
+            $sites = $service->listSites($account);
+        } catch (\Throwable $e) {
+            Log::info("SyncSitemaps: listSites failed for website {$this->websiteId}: {$e->getMessage()}");
+
+            return $out;
+        }
+
+        foreach ($sites as $site) {
+            $url = (string) $site['siteUrl'];
+            $matches = str_starts_with($url, 'sc-domain:')
+                ? strtolower(substr($url, 10)) === $domain
+                : in_array(preg_replace('/^www\./', '', strtolower((string) parse_url($url, PHP_URL_HOST))), [$domain, preg_replace('/^www\./', '', $domain)], true);
+            if ($matches && ! in_array($url, $out, true)) {
+                $out[] = $url;
+            }
+        }
+
+        return $out;
     }
 
     private function parseTimestamp(mixed $value): ?Carbon

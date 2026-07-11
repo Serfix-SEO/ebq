@@ -12,6 +12,67 @@ that public path. Installs poll `GET /wordpress/plugin/version` (public, unauthe
 to learn the latest version + download URL, and the WP native update flow pulls the ZIP
 from `GET /wordpress/plugin.zip`.
 
+## Current state (2026-07-11)
+
+**v2.0.9 is the published `stable` release.** 2.0.9: closed the wrong-website
+residue 2.0.8 left open — ALL remaining raw portal links now carry an
+`?ebq_site=<domain>` hint consumed server-side by the new `ApplyWebsiteHint`
+web middleware (switches `current_website_id` only among the user's accessible
+websites — unsigned by design, safe for any WP role, works for teammates with
+their own Serfix logins; see
+[../reference/http-and-auth.md](../reference/http-and-auth.md)). Plugin side:
+`src/sidebar/utils/portalUrl.js` builds every sidebar portal link
+(rank-tracking / custom-audit / page-audits/{id} / settings CTAs in
+`InsightsTab`/`SeoTab`/`BriefTab`/`dependencyMessages`; hint =
+`cfg.workspaceDomain` from the `ebq_website_domain` option set at connect,
+fallback `homeUrl` host), and the dashboard-widget fallback hrefs append the
+hint too. 2.0.8 (owner QA on a multi-website
+account): WP dashboard widget insight cards (Striking distance etc.) linked plain
+`{base}/reports?insight=…` — no website identity — so Serfix opened whatever
+website the session last had selected. Cards now carry `data-ebq-insight`;
+`dashboard-hydrate.js` intercepts the click, fetches a signed embed URL via
+`/ebq/v1/hq/iframe-url` (same path the HQ tab uses; `WordPressEmbedController::reports`
+sets `current_website_id` from the signed `website` param) and opens it — tab
+opened synchronously pre-fetch so popup blockers don't eat it; plain href kept
+as fallback (non-admins get 403 from the `manage_options`-gated proxy route —
+intentional: signed embed links log in as the website OWNER, never hand them to
+mere editors). The editor-sidebar raw links 2.0.8 left open were closed in
+2.0.9 via the `ebq_site` hint (above). 2.0.7: Site-issues digest on the
+HQ Overview (SiteIssuesCard → `?ebq_subtab=issues` deep link; subtab whitelist
+in `current_subtab_id()` now includes issues/pages/links) and in the WP
+dashboard widget (`dashboard_html` proxy also fetches `hq_site_audit_summary`,
+best-effort; severity pills + "Fix N issues" CTA). 2.0.6: menu icon served as an SVG
+FILE — **WP core's svg-painter.js repaints base64 data-URI menu icons to the
+admin color scheme (every `fill` becomes grey/white)**, which turned the brand
+tile into a white square; file URLs render as a plain `<img>` and are left
+alone. Never register a colored base64 SVG menu icon. 2.0.5: GSC Pages report
+gained a per-page Site Audit CTA ("Fix N issues →" / "Healthy") deep-linking
+into Link Explorer via `?ebq_link_url=`; backed by
+`CrawlReportService::findingCountsForUrls()` (batch URL→count, tolerates
+www/slash variants, absent = not crawled). 2.0.4: filemtime cache-buster on
+the inline-AI toolbar icon — the file was swapped in-place and browsers kept
+the old logo cached; HQ Pages report merges www/non-www host variants via
+`REPLACE(page, '://www.', '://')` grouping — long ranges showed both hosts of
+the same path as apparent duplicates. Prior 2.0.3: Pages issue counts +
+Links/Audit row actions, Serfix icon everywhere — admin menu, HQ header,
+editor sidebar, inline-AI toolbar; also regenerated the PLATFORM's stale EBQ
+favicons: `public/favicon.{svg,ico}`, `favicon-32.png`, `apple-touch-icon*.png`,
+`logo*.png` now all carry the Serfix zigzag mark.)
+Prior: **v2.0.2** (2.0.0 was the first `plugin_releases`
+row ever — before it the table was empty and `public/downloads/ebq-seo.zip` was a
+stale 1.0.5 static file; 2.0.1 added the Overview "Where to start" top-issues list
+and per-page issues in Link Explorer; 2.0.2 fixed spacing — the tabs' `.ebq-hq-stack`
+wrapper class had NO css definition, so every section butted flush; both from owner
+QA on pubgnamegenerator.net).
+`zip_path=@public`; ZIPs are built with `npm run dist` in the plugin repo and
+copied over the public file. `GET /wordpress/plugin/version` serves the published
+version; **the ZIP download still 404s while `WP_PLUGIN_COMING_SOON=true`** —
+the update *offer* shows on older installs but the download only works after
+the flag flips. The owner's test install (see README § Live test install) is
+updated by scp'ing the ZIP directly.
+Flip procedure: `.env` both boxes → `WP_PLUGIN_COMING_SOON=false`,
+`php artisan config:clear`, FPM restart (web) + container restart (worker).
+
 ## Release model
 
 `app/Models/PluginRelease.php`. Key fields: `slug` (always `ebq-seo`), `version`,

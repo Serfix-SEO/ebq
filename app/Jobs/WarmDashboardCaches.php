@@ -111,5 +111,10 @@ class WarmDashboardCaches implements ShouldBeUnique, ShouldQueue
         // is deliberately NOT warmed: it's per-category (user picks one) and far
         // cheaper than the sitewide actionGroups scan.
         $warm('crawl-action-groups', fn () => app(CrawlReportService::class)->actionGroups($this->websiteId));
+
+        // Per-user 28d click impact (mapFinding badge on every issue drill-down
+        // row). ~9s cold on a 1.4M-row GSC site — warming it here means even the
+        // FIRST type drill after a sync/crawl responds instantly (2026-07-10).
+        $warm('user-clicks', fn () => app(CrawlReportService::class)->warmUserClicks($this->websiteId));
     }
 }

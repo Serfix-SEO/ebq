@@ -46,6 +46,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // Guards itself off for admin* paths — admin stays English-only,
             // no separate admin layout exists so this is the exclusion point.
             \App\Http\Middleware\SetLocale::class,
+            // WP-plugin deep-links: `?ebq_site=<domain>` switches the session
+            // website (only among the user's accessible ones). Must precede
+            // ResolveShardContext, which reads current_website_id.
+            \App\Http\Middleware\ApplyWebsiteHint::class,
             \App\Http\Middleware\ResolveShardContext::class,
             // Expired-trial lockout: confines trial-expired users to the
             // billing surface (no-op for guests/admins/subscribers/comped).
@@ -70,5 +74,22 @@ return Application::configure(basePath: dirname(__DIR__))
             return redirect()
                 ->back(fallback: route('dashboard', absolute: false) ?: '/')
                 ->with('quota_notice', $e->toPayload());
+        });
+
+        // Impersonation-stop with a stale CSRF token (banner rendered in an
+        // old tab, or reached via back-navigation after a logout rotated the
+        // token) used to dead-end on the raw 419 page. Redirect somewhere
+        // sane instead: a fresh page re-renders the banner with a valid
+        // token, so a second click always works. NOTE: must hook the 419
+        // HttpException, not TokenMismatchException — Handler::prepareException()
+        // converts it BEFORE render callbacks run.
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, \Illuminate\Http\Request $request) {
+            if ($e->getStatusCode() === 419 && $request->routeIs('admin.impersonation.stop')) {
+                return redirect()
+                    ->route(auth()->check() ? 'dashboard' : 'login')
+                    // Dedicated key: rendered by the app layout next to the
+                    // impersonation banner ('error' is only shown on billing).
+                    ->with('impersonation_notice', 'That page had expired — please click "Return to admin" again.');
+            }
         });
     })->create();

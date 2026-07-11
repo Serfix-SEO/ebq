@@ -295,4 +295,27 @@ class Plan extends Model
         }
         return null;
     }
+
+    /**
+     * Marketing/billing bullet list with the WordPress-plugin suppression
+     * applied (services.wordpress_plugin.coming_soon): any WP bullet gets
+     * its "(full)" suffix swapped for "(coming soon)" while the plugin is
+     * paused. Raw $plan->features stays untouched for the admin editor.
+     *
+     * @return array<int, string>
+     */
+    public function publicFeatures(): array
+    {
+        $features = is_array($this->features) ? array_values($this->features) : [];
+        if (! config('services.wordpress_plugin.coming_soon')) {
+            return $features;
+        }
+
+        return array_map(
+            fn ($f) => is_string($f) && stripos($f, 'wordpress') !== false
+                ? trim((string) preg_replace('/\s*\((full|beta)\)\s*$/i', '', $f)).' (coming soon)'
+                : $f,
+            $features,
+        );
+    }
 }

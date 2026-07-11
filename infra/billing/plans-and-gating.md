@@ -110,6 +110,42 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
   full app access (works under those owners' plans) while their own sites still expire.
   Locked users are confined to `billing.*`/`cashier.*`/logout/impersonation-stop; everything
   else redirects to /billing with an explanatory flash. Impersonating admins pass through.
+- **Onboarding trial-expired panel (2026-07-10)**: `/onboarding`
+  (`resources/views/onboarding/index.blade.php`) renders a "Your free trial has ended" card
+  with a billing CTA — never the connect-Google/add-site wizard — for any
+  `TrialStatus::isExpired()` user (copy adapts to `trial_data_deleted_at`). In practice only
+  impersonating admins reach onboarding while expired (direct visits are locked to /billing),
+  and the impersonation banner (app layout + onboarding) additionally states the client is
+  billing-locked on their own login. Rationale: an expired user must never be shown the
+  add-website flow — a site added there would just re-enter the deletion countdown.
+- **WordPress plugin suppressed (2026-07-10, reversible)**: the shipped plugin is
+  outdated, so `services.wordpress_plugin.coming_soon` (env `WP_PLUGIN_COMING_SOON`,
+  default TRUE) gates every distribution surface with neutral "Coming soon" copy
+  (per the client-facing-wording rule: no internal detail): marketing /wordpress-plugin
+  CTAs + hero badge, marketing nav/footer "Soon" badges, features-page badge, landing
+  compare-table cell + card bullets, pricing compare-table row, Settings download/connect
+  panel, and `/wordpress/plugin.zip` → 404. `Plan::publicFeatures()` rewrites DB bullets
+  ("WordPress plugin (full)" → "(coming soon)") at render time — plans table untouched.
+  EXISTING installs unaffected: website API, embeds, `/wordpress/plugin/version`, and the
+  connect approval flow stay live. **Re-enable: `WP_PLUGIN_COMING_SOON=false` in .env on
+  both boxes + `config:clear` + FPM restart.**
+- **Trial-discount promo email (2026-07-10)**: `ebq:send-trial-discount-emails` (daily
+  09:15) mails `TrialDiscountMail` ONCE per user (marker:
+  `users.trial_discount_email_sent_at`, additive migration) to verified, non-admin,
+  trial-tier, NOT-yet-expired users ≥1 day into the trial — expired users get the offer
+  via the h24 countdown email instead. No-op when `winback_promo_code` empty. CTA lands
+  on `/billing?promo=CODE` (session-parked → checkout auto-apply). Tests:
+  `SendTrialDiscountEmailsTest`. Initial live send 2026-07-10: 5 recipients.
+- **App-wide discount strip (2026-07-10)**: `partials/winback-banner.blade.php`, included
+  at the top of the app layout's `<main>` — slim orange gradient bar on EVERY dashboard
+  page for `isWinbackEligible()` users ("30% OFF any plan … Claim"), hidden on `billing.*`
+  (big banner lives there), dismissible per-tab via sessionStorage. Test:
+  `TrialCleanupTest::test_dashboard_shows_discount_strip_for_eligible_users_everywhere`.
+- **Eligibility widened 2026-07-10**: the discount shows for EVERY trial-tier user —
+  **active trial included** — via `TrialStatus::isWinbackEligible()` (no subscription, not
+  comped, not admin; independent of the trial window). All four surfaces below switched
+  from `isExpired()` to it; the billing banner copy branches ("You're on the free trial…"
+  vs "Your trial has ended…"). Only the h24 expiry EMAIL still keys off actual expiry.
 - **Winback offer (2026-07-07, 30% since same day)**: **30% off any plan** — Stripe coupon
   `TRIAL-WINBACK-30` (percent_off 30, duration `once`) exposed as promotion code **`SAVE30`**
   (`promo_1TqNrMETsnSIf8R5LDCYCIDu`; the earlier 20% `SAVE20`/`TRIAL-WINBACK-20` campaign is
@@ -134,7 +170,7 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
      code falls back to `allowPromotionCodes()` (Stripe forbids combining the two).
 - Tests: `tests/Feature/TrialCleanupTest.php` (stages, anchor, dedupe, shared-crawl safety,
   exemptions, lockout, team-member exemptions, re-add countdown restart, stale anchor,
-  h24 winback offer).
+  h24 winback offer, onboarding lockout redirect + trial-expired panel + impersonation note).
 
 ## Stale Stripe customers (account switch 2026-07-06)
 

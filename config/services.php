@@ -48,6 +48,17 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    // WordPress plugin distribution kill switch (2026-07-10): the shipped
+    // plugin is outdated, so every "get it" surface (marketing page CTAs,
+    // nav badge, settings download/connect panel, /wordpress/plugin.zip,
+    // pricing/landing table rows) shows "Coming soon" while this is true.
+    // EXISTING installs keep working — the website API, embeds, version
+    // endpoint and connect approval flow stay live. Flip to re-enable:
+    // WP_PLUGIN_COMING_SOON=false in .env (both boxes) + FPM restart.
+    'wordpress_plugin' => [
+        'coming_soon' => (bool) env('WP_PLUGIN_COMING_SOON', true),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

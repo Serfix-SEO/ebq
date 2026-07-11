@@ -315,6 +315,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/marketing/{website}/send', [AdminMarketingController::class, 'send'])->name('marketing.send');
 
     Route::get('/leads', [\App\Http\Controllers\Admin\LeadController::class, 'index'])->name('leads.index');
+    Route::get('/bug-reports', [\App\Http\Controllers\Admin\BugReportController::class, 'index'])->name('bug-reports.index');
+    Route::get('/bug-reports/{bugReport}/screenshot', [\App\Http\Controllers\Admin\BugReportController::class, 'screenshot'])->name('bug-reports.screenshot');
+    Route::post('/bug-reports/{bugReport}/resolve', [\App\Http\Controllers\Admin\BugReportController::class, 'resolve'])->name('bug-reports.resolve');
     Route::get('/usage', [AdminUsageController::class, 'index'])->name('usage.index');
     Route::get('/plugin-releases', [AdminPluginReleaseController::class, 'index'])->name('plugin-releases.index');
     Route::post('/plugin-releases/toggle-updates', [AdminPluginReleaseController::class, 'toggleUpdates'])->name('plugin-releases.toggle-updates');

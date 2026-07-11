@@ -34,6 +34,7 @@
     </x-slot:schema>
 
     @php
+        $wpSoon = (bool) config('services.wordpress_plugin.coming_soon');
         $downloadUrl = route('wordpress.plugin.download');
 
         // Feature groups rendered as cards. Each: heading + bullet list.
@@ -108,10 +109,14 @@
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="relative">
-        <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[26rem] bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_60%)]"></div>
+        <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[26rem] bg-[radial-gradient(ellipse_at_top,rgba(242,100,25,0.08),transparent_60%)]"></div>
 
         <div class="mx-auto max-w-3xl px-6 pb-16 pt-16 text-center lg:px-8 lg:pt-24">
-            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('WordPress plugin') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('WordPress plugin') }}
+                @if ($wpSoon)
+                    <span class="ms-2 inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-orange-700">{{ __('Coming soon') }}</span>
+                @endif
+            </p>
             <h1 class="mt-4 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
                 {{ __('Serfix SEO for WordPress') }}
             </h1>
@@ -120,11 +125,17 @@
             </p>
 
             <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <a href="{{ $downloadUrl }}"
+                @if ($wpSoon)
+                    <span class="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-500">
+                        {{ __('Coming soon') }}
+                    </span>
+                @else
+                    <a href="{{ $downloadUrl }}"
                    class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
                     <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                     {{ __('Download plugin') }}
                 </a>
+                @endif
                 <a href="{{ route('guide') }}#step-8"
                    class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
                     {{ __('How to install') }}
@@ -166,11 +177,17 @@
                     {{ __('Download the plugin, upload it to your site, activate, and click') }} <span class="font-semibold">{{ __('Connect to Serfix') }}</span>. {{ __('Core SEO (sitemap, schema, meta, redirects) works immediately; live data and AI unlock when you connect.') }}
                 </p>
                 <div class="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <a href="{{ $downloadUrl }}"
+                    @if ($wpSoon)
+                        <span class="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-500">
+                            {{ __('Coming soon') }}
+                        </span>
+                    @else
+                        <a href="{{ $downloadUrl }}"
                        class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
                         <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                         {{ __('Download plugin') }}
                     </a>
+                    @endif
                     <a href="{{ route('register') }}"
                        class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
                         {{ __('Create your Serfix account') }}

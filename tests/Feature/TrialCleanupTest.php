@@ -180,7 +180,7 @@ class TrialCleanupTest extends TestCase
         $this->assertStringNotContainsString('30% off', $h24Off);
     }
 
-    public function test_billing_page_shows_winback_banner_only_for_expired_users(): void
+    public function test_billing_page_shows_winback_banner_for_trial_tier_users(): void
     {
         config(['services.stripe.winback_promo_code' => 'SAVE30', 'services.stripe.winback_promo_percent' => 30]);
 
@@ -224,10 +224,43 @@ class TrialCleanupTest extends TestCase
         $this->get(route('pricing'))->assertOk()->assertDontSee('line-through');
         $this->get(route('landing'))->assertOk()->assertDontSee('SAVE30')->assertSee('Sign in');
 
+        // Since 2026-07-10 ACTIVE trial users get the same straight discount
+        // (isWinbackEligible), with in-trial copy instead of "trial has ended".
         $active = $this->trialUser(5 * 24);
         $this->actingAs($active)->get(route('billing.show'))
             ->assertOk()
+            ->assertSee('30% OFF any plan')
+            ->assertSee("You're on the free trial")
+            ->assertDontSee('Your trial has ended');
+
+        // Subscribers/comped plans never see it.
+        $comped = $this->trialUser(5 * 24);
+        $comped->forceFill(['current_plan_slug' => 'pro'])->save();
+        $this->actingAs($comped)->get(route('billing.show'))
+            ->assertOk()
             ->assertDontSee('30% OFF any plan');
+    }
+
+    public function test_dashboard_shows_discount_strip_for_eligible_users_everywhere(): void
+    {
+        config(['services.stripe.winback_promo_code' => 'SAVE30', 'services.stripe.winback_promo_percent' => 30]);
+
+        // App-layout strip (partials/winback-banner) on any dashboard page.
+        $active = $this->trialUser(5 * 24);
+        $w = Website::factory()->create(['user_id' => $active->id, 'domain' => 'strip.test']);
+        session(['current_website_id' => $w->id]);
+        $this->actingAs($active)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('% OFF any plan')
+            ->assertSee('Claim 30% off');
+
+        $comped = $this->trialUser(5 * 24);
+        $comped->forceFill(['current_plan_slug' => 'pro'])->save();
+        $w2 = Website::factory()->create(['user_id' => $comped->id, 'domain' => 'strip2.test']);
+        session(['current_website_id' => $w2->id]);
+        $this->actingAs($comped)->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('% OFF any plan');
     }
 
     public function test_stale_anchor_resets_for_readded_site(): void
@@ -316,5 +349,58 @@ class TrialCleanupTest extends TestCase
         session(['current_website_id' => $w->id]);
 
         $this->actingAs($user)->get(route('dashboard'))->assertOk();
+    }
+
+    public function test_expired_user_with_deleted_data_is_locked_from_onboarding_too(): void
+    {
+        // Post-deletion state: expired, zero websites. EnsureOnboarded would
+        // send them to /onboarding, but the lockout must win — /onboarding is
+        // NOT in the trial-lockout allowlist, so they land on billing.
+        $user = $this->trialUser(30 * 24);
+        $user->forceFill(['trial_data_deleted_at' => now()->subDays(10)])->save();
+
+        $this->actingAs($user)->get(route('onboarding'))->assertRedirect(route('billing.show'));
+        $this->actingAs($user)->get(route('dashboard'))->assertRedirect(route('billing.show'));
+    }
+
+    public function test_impersonating_admin_sees_lockout_note_on_onboarding(): void
+    {
+        // Impersonation bypasses the lockout (by design), so an admin viewing
+        // an expired no-website client lands on onboarding — the banner must
+        // say the client is actually locked to billing, plus give an exit.
+        $user = $this->trialUser(30 * 24);
+        $admin = User::factory()->create(['email_verified_at' => now(), 'is_admin' => true]);
+        session(['impersonator_id' => $admin->id]);
+
+        $res = $this->actingAs($user)->get(route('onboarding'))->assertOk();
+        $res->assertSee('impersonating another client account');
+        $res->assertSee('trial has expired');
+        $res->assertSee('Return to admin');
+    }
+
+    public function test_onboarding_shows_trial_expired_panel_not_add_website_flow(): void
+    {
+        // An expired user on /onboarding must see the trial-ended state with
+        // a billing CTA, never the connect-Google/add-site wizard. (Reached
+        // via impersonation; direct visits are already locked to billing.)
+        $user = $this->trialUser(30 * 24);
+        $user->forceFill(['trial_data_deleted_at' => now()->subDay()])->save();
+        $admin = User::factory()->create(['email_verified_at' => now(), 'is_admin' => true]);
+        session(['impersonator_id' => $admin->id]);
+
+        $res = $this->actingAs($user)->get(route('onboarding'))->assertOk();
+        $res->assertSee('Your free trial has ended');
+        $res->assertSee('Your trial websites and their data have been removed.');
+        $res->assertSee(route('billing.show'));
+        $res->assertDontSee('Connect your Google account');
+    }
+
+    public function test_onboarding_still_shows_connect_flow_for_active_trial(): void
+    {
+        $user = $this->trialUser(5 * 24); // day 5 of 14, no websites yet
+
+        $res = $this->actingAs($user)->get(route('onboarding'))->assertOk();
+        $res->assertSee('Connect your Google account');
+        $res->assertDontSee('Your free trial has ended');
     }
 }

@@ -9,10 +9,12 @@ use App\Models\Website;
 use App\Models\WebsiteInternalLink;
 use App\Models\WebsitePage;
 use App\Services\ReportCache;
+use App\Services\ReportDataService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Read-only aggregation over the SHARED crawl_site. Every method takes a
@@ -25,6 +27,83 @@ use Illuminate\Support\Facades\DB;
  */
 class CrawlReportService
 {
+    public function __construct(private readonly ReportDataService $reportData) {}
+
+    /**
+     * The numbers + top-3-examples snapshot for a client-facing crawl report
+     * email (admin Marketing panel send, and the automatic post-crawl send —
+     * see SendCrawlReportEmailJob). One source of truth for both callers.
+     *
+     * @return array<string,mixed>
+     */
+    public function emailReportPayload(Website $website): array
+    {
+        $summary = $this->summary($website->id);
+
+        return [
+            'domain' => $website->domain,
+            'health_score' => $summary['health_score'],
+            'counts' => $summary['findings'],
+            'pages_total' => $summary['pages_total'],
+            'last_crawled_at' => optional($summary['last_crawled_at'])->toIso8601String(),
+            'breakdown' => $this->reportBreakdown($website->id, 5),
+            'traffic' => $this->emailTraffic($website),
+            'dashboard_url' => url('/dashboard'),
+        ];
+    }
+
+    /**
+     * Headline 28-day traffic numbers (GSC clicks/impressions/position + GA
+     * users/sessions) for the report. Returns null when the site has neither
+     * Search Console nor Analytics connected, and only includes the sub-block
+     * for each source that actually has data. Failures degrade to null so a
+     * traffic hiccup never blocks the crawl report from sending.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function emailTraffic(Website $website): ?array
+    {
+        try {
+            $readiness = $this->reportData->reportReadiness($website);
+            if (! $readiness['any'] || ! $readiness['date']) {
+                return null;
+            }
+
+            $end = $readiness['date']->copy();
+            $start = $end->copy()->subDays(27);
+            $data = $this->reportData->generate($website->id, $start->toDateString(), $end->toDateString());
+            $sc = $data['search_console'] ?? [];
+            $an = $data['analytics'] ?? [];
+
+            $traffic = [
+                'has_gsc' => (bool) $readiness['gsc'],
+                'has_ga' => (bool) $readiness['ga'],
+                'period_label' => '28 days',
+            ];
+            if ($readiness['gsc']) {
+                $traffic['gsc'] = [
+                    'clicks' => (int) ($sc['clicks']['current'] ?? 0),
+                    'clicks_change_percent' => $sc['clicks']['change_percent'] ?? null,
+                    'clicks_direction' => $sc['clicks']['direction'] ?? 'flat',
+                    'impressions' => (int) ($sc['impressions']['current'] ?? 0),
+                    'position' => (float) ($sc['position']['current'] ?? 0),
+                ];
+            }
+            if ($readiness['ga']) {
+                $traffic['ga'] = [
+                    'users' => (int) ($an['users']['current'] ?? 0),
+                    'sessions' => (int) ($an['sessions']['current'] ?? 0),
+                ];
+            }
+
+            return $traffic;
+        } catch (\Throwable $e) {
+            Log::warning("CrawlReportService: traffic summary failed for {$website->domain}: {$e->getMessage()}");
+
+            return null;
+        }
+    }
+
     /**
      * Display metadata + dashboard severity per finding category. A method,
      * not a const array — __() is a runtime call and can't appear inside a
@@ -88,31 +167,92 @@ class CrawlReportService
         })();
     }
 
+    /**
+     * Find a crawled page by URL, tolerating the ways users actually paste
+     * URLs: browsers display percent-DECODED urls (spaces, Arabic paths)
+     * while the crawl stores them encoded, and people add/drop the "www."
+     * host prefix. Tries the hash of every plausible form.
+     */
+    private function pageByUrl(?string $crawlSiteId, string $url): ?WebsitePage
+    {
+        if (! $crawlSiteId || trim($url) === '') {
+            return null;
+        }
+
+        $forms = [trim($url)];
+        $decoded = urldecode($forms[0]);
+        if ($decoded !== $forms[0]) {
+            $forms[] = $decoded;
+        }
+        foreach ($forms as $f) {
+            // Re-encode spaces + non-ASCII the way a crawler/browser sends them.
+            $encoded = preg_replace_callback('/[^\x21-\x7e]/', fn (array $m): string => rawurlencode($m[0]), $f);
+            if ($encoded !== null && ! in_array($encoded, $forms, true)) {
+                $forms[] = $encoded;
+            }
+        }
+        foreach ($forms as $f) {
+            // Toggle the www. prefix for each form.
+            $toggled = preg_match('#^(https?://)www\.#i', $f)
+                ? preg_replace('#^(https?://)www\.#i', '$1', $f)
+                : preg_replace('#^(https?://)#i', '$1www.', $f);
+            if ($toggled !== null && ! in_array($toggled, $forms, true)) {
+                $forms[] = $toggled;
+            }
+        }
+
+        $hashes = array_values(array_unique(array_map([WebsitePage::class, 'hashUrl'], $forms)));
+
+        return WebsitePage::where('crawl_site_id', $crawlSiteId)
+            ->whereIn('url_hash', $hashes)
+            // Prefer the exact form the caller gave us when several match.
+            ->get()
+            ->sortBy(fn (WebsitePage $p): int => (int) array_search($p->url_hash, $hashes, true))
+            ->first();
+    }
+
     /** This website's own 28d GSC clicks, keyed by url_hash (per-user impact). Lazy + memoized. */
     private function userClicks(string $websiteId): array
     {
-        return $this->clicks[$websiteId] ??= (function () use ($websiteId): array {
-            // Anchor to the last finalized GSC day, not "now" — the raw
-            // 28d-from-now window held 2-3 empty lag days (see
-            // ReportDataService::statsWindowEnd), understating per-user impact.
-            $anchor = app(\App\Services\ReportDataService::class)->lastSafeReportDate($websiteId)
-                ?? Carbon::now()->subDay();
-            $since = $anchor->copy()->subDays(27)->toDateString();
-            $clicks = [];
-            SearchConsoleData::query()
-                ->where('website_id', $websiteId)
-                ->whereDate('date', '>=', $since)
-                ->where('page', '!=', '')
-                ->select('page', DB::raw('SUM(clicks) as c'))
-                ->groupBy('page')
-                ->chunk(2000, function ($rows) use (&$clicks): void {
-                    foreach ($rows as $r) {
-                        $clicks[WebsitePage::hashUrl((string) $r->page)] = (int) $r->c;
-                    }
-                });
+        // Cross-request cache on top of the per-request memo: this aggregate
+        // cost ~9s on a 1.4M-row GSC site and was repaid on EVERY Livewire
+        // round-trip (the "issue drill-down feels dead" bug, 2026-07-10).
+        // The version key bumps on GSC sync/crawl finalize, so 24h TTL never
+        // serves stale impact numbers. Pure numbers — no locale in the key.
+        return $this->clicks[$websiteId] ??= Cache::remember(
+            "crawl-rpt:userClicks:{$websiteId}:v".ReportCache::version($websiteId),
+            now()->addHours(24),
+            function () use ($websiteId): array {
+                // Anchor to the last finalized GSC day, not "now" — the raw
+                // 28d-from-now window held 2-3 empty lag days (see
+                // ReportDataService::statsWindowEnd), understating per-user impact.
+                $anchor = app(\App\Services\ReportDataService::class)->lastSafeReportDate($websiteId)
+                    ?? Carbon::now()->subDay();
+                $since = $anchor->copy()->subDays(27)->toDateString();
+                $clicks = [];
+                // Plain where(), NOT whereDate(): wrapping the column in
+                // DATE() defeats the (website_id, date) index and forces a
+                // scan of every GSC row for the site.
+                $rows = SearchConsoleData::query()
+                    ->where('website_id', $websiteId)
+                    ->where('date', '>=', $since)
+                    ->where('page', '!=', '')
+                    ->select('page', DB::raw('SUM(clicks) as c'))
+                    ->groupBy('page')
+                    ->get();
+                foreach ($rows as $r) {
+                    $clicks[WebsitePage::hashUrl((string) $r->page)] = (int) $r->c;
+                }
 
-            return $clicks;
-        })();
+                return $clicks;
+            },
+        );
+    }
+
+    /** Warm hook for WarmDashboardCaches — populates the userClicks cache. */
+    public function warmUserClicks(string $websiteId): int
+    {
+        return count($this->userClicks($websiteId));
     }
 
     /** Per-user impact (clicks-at-risk) for a finding's URL. */
@@ -354,10 +494,12 @@ class CrawlReportService
     /** Open-finding counts per type within a category for this user. */
     public function typeCounts(string $category, string $websiteId): array
     {
-        return $this->findingsBase($websiteId, $category)
+        // Cached (version-keyed): SiteIssues re-runs this on every Livewire
+        // round-trip to build the type-filter dropdown.
+        return $this->remember("typeCounts:{$category}", $websiteId, fn (): array => $this->findingsBase($websiteId, $category)
             ->select('type', DB::raw('COUNT(*) as c'))
             ->groupBy('type')->orderByDesc('c')
-            ->pluck('c', 'type')->all();
+            ->pluck('c', 'type')->all());
     }
 
     /**
@@ -614,8 +756,7 @@ class CrawlReportService
     public function pageLinkStructure(string $websiteId, string $url): ?array
     {
         $ctx = $this->context($websiteId);
-        $page = WebsitePage::where('crawl_site_id', $ctx['cs'])
-            ->where('url_hash', WebsitePage::hashUrl($url))->first();
+        $page = $this->pageByUrl($ctx['cs'], $url);
         if (! $page) {
             return null;
         }
@@ -940,6 +1081,102 @@ class CrawlReportService
             'crawl_blocked' => 'If the site itself blocks our crawler, every other check on it is unreliable or simply can\'t run — this is the most foundational issue to resolve first.',
             default => 'An issue detected during the site crawl that affects search visibility or user experience.',
         };
+    }
+
+    /**
+     * Open-finding counts for a batch of arbitrary URLs (e.g. the GSC Pages
+     * report), keyed by the ORIGINAL input URL. A URL that isn't in the
+     * crawl inventory is simply absent from the result — callers use that
+     * to distinguish "not crawled" from "crawled, zero issues". Tolerates
+     * trailing-slash and www. host variants (GSC URLs rarely match the
+     * crawl store byte-for-byte).
+     *
+     * @param  list<string>  $urls
+     * @return array<string,int>
+     */
+    public function findingCountsForUrls(string $websiteId, array $urls): array
+    {
+        $ctx = $this->context($websiteId);
+        if (! $ctx['cs'] || $urls === []) {
+            return [];
+        }
+
+        $hashesByUrl = [];
+        foreach ($urls as $url) {
+            $url = trim((string) $url);
+            if ($url === '') {
+                continue;
+            }
+            $forms = [$url, str_contains($url, '://www.')
+                ? str_replace('://www.', '://', $url)
+                : preg_replace('#^(https?://)#', '$1www.', $url)];
+            foreach (array_slice($forms, 0, 2) as $f) {
+                $forms[] = str_ends_with($f, '/') ? rtrim($f, '/') : $f.'/';
+            }
+            $hashesByUrl[$url] = array_map(WebsitePage::hashUrl(...), array_values(array_unique($forms)));
+        }
+
+        $pages = WebsitePage::where('crawl_site_id', $ctx['cs'])
+            ->whereNull('removed_at')
+            ->whereIn('url_hash', array_merge(...array_values($hashesByUrl)))
+            ->get(['id', 'url_hash']);
+        if ($pages->isEmpty()) {
+            return [];
+        }
+
+        $counts = $this->pageFindingCounts($websiteId, $pages->pluck('url_hash', 'id')->all());
+        $countByHash = [];
+        foreach ($pages as $p) {
+            $countByHash[$p->url_hash] = $counts[$p->id] ?? 0;
+        }
+
+        $out = [];
+        foreach ($hashesByUrl as $url => $hashes) {
+            foreach ($hashes as $h) {
+                if (array_key_exists($h, $countByHash)) {
+                    $out[$url] = $countByHash[$h];
+                    break;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Open-finding counts for a batch of pages, keyed by page id. Same
+     * matching logic as pageFindings() — affected_url_hash for on-page
+     * findings plus page_id for the outbound link types — so a count
+     * shown next to a page always equals what its detail view lists.
+     *
+     * @param  array<string,string>  $hashByPageId  page id => url_hash
+     * @return array<string,int>
+     */
+    public function pageFindingCounts(string $websiteId, array $hashByPageId): array
+    {
+        if ($hashByPageId === []) {
+            return [];
+        }
+
+        $byHash = $this->findingsBase($websiteId)
+            ->whereIn('affected_url_hash', array_values($hashByPageId))
+            ->select('affected_url_hash', DB::raw('COUNT(*) as c'))
+            ->groupBy('affected_url_hash')
+            ->pluck('c', 'affected_url_hash');
+
+        $outbound = $this->findingsBase($websiteId)
+            ->whereIn('page_id', array_keys($hashByPageId))
+            ->whereIn('type', ['broken_external', 'external_redirect'])
+            ->select('page_id', DB::raw('COUNT(*) as c'))
+            ->groupBy('page_id')
+            ->pluck('c', 'page_id');
+
+        $out = [];
+        foreach ($hashByPageId as $pageId => $hash) {
+            $out[$pageId] = (int) ($byHash[$hash] ?? 0) + (int) ($outbound[$pageId] ?? 0);
+        }
+
+        return $out;
     }
 
     /**

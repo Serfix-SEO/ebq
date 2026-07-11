@@ -8,6 +8,14 @@ Google traffic stays per-website.**
 
 - **Discovery is per-website.** `SyncSitemaps` (queue `sync`) reads each website's GSC
   sitemap list into `website_sitemaps` (keyed by `website_id`). No crawl trigger.
+  Two GSC scoping traps handled since 2026-07-10: (1) `sitemaps.list` only returns
+  SUBMITTED sitemaps — `SearchConsoleService::listSitemaps` re-queries each
+  `is_sitemaps_index` entry with the `sitemapIndex` param (BFS, 25-index cap) to pull
+  children; (2) the list is scoped to ONE property — a site stored under a narrow
+  URL-prefix property (falik.com was `https://falik.com/en/`) misses sitemaps submitted
+  on a broader property of the same domain, so `SyncSitemaps::candidateProperties()`
+  merges every accessible account property matching the website's domain (sc-domain: or
+  same host, www-tolerant), stored property's rows winning duplicates.
 - **The frontier unions sitemaps across all subscribers** (`CrawlFrontierBuilder`);
   `source_sitemap` on a shared page = "in ANY subscriber's sitemap".
 - **`CrawlSitemapDeltaJob`** (daily, queue `crawl`, unique per crawl_site) extracts sitemap
@@ -36,6 +44,28 @@ and redirects, so they stay **per-website**:
 - `AiRedirectMatcherService` builds candidate inventory from that website's **own**
   `SearchConsoleData` (top ~200 URLs by clicks) and writes `redirect_suggestions` keyed by
   `website_id`. Each user gets redirect suggestions weighted by *their* traffic.
+
+## Crawl-completion email — per-website (2026-07-07)
+
+`AnalyzeSiteJob` dispatches `SendCrawlReportEmailsJob(crawlSiteId, runId)` from its clean-
+completion path only (not the blocked/aborted `return`, not the enrichment-`catch`, not
+`failed()`) — findings/health must be finalized first. The job loops
+`crawlSite->websites()` (**not** crawl_site-level — each subscriber gets their own capped,
+per-user report via `CrawlReportService::emailReportPayload()`, same as the admin Marketing
+panel's manual send) and:
+- skips a website with no owner email, or **0 open findings** (product decision: a
+  "nothing's wrong" email isn't worth sending — matches the Marketing panel's own listing
+  filter of open-findings-only sites).
+- sends `CrawlReportMail` (health score, issue counts, top-3 examples per category, 28d
+  GSC/GA headline traffic if connected) and logs a `CrawlReportSend` row with
+  `sent_by_user_id = null` (the admin sends view already renders `sentBy?->name` as blank,
+  so automatic vs manual sends are distinguishable for free, no schema change).
+- Fires on **every** completed crawl, including auto-recrawls (adaptive 3–30d cadence per
+  the Incremental / change detection section above) — deliberate, not throttled; the
+  recrawl cadence itself is the natural rate limit.
+- `CrawlReportService::emailReportPayload()`/`emailTraffic()` are the shared implementation
+  — `MarketingController::send` (manual) and this job both call into the service now; don't
+  re-duplicate the report-building logic in either caller again.
 
 ## Term extraction & link suggestions — shared
 
