@@ -26,6 +26,7 @@
             'imagesSearch' => route('ai-studio.writer-projects.images.search', ['externalId' => '__ID__']),
             'strategy'     => route('ai-studio.writer-projects.strategy', ['externalId' => '__ID__']),
             'generate'     => route('ai-studio.writer-projects.generate', ['externalId' => '__ID__']),
+            'generateStatus' => route('ai-studio.writer-projects.generate.status', ['externalId' => '__ID__']),
             'credits'      => route('ai-studio.writer-projects.credits', ['externalId' => '__ID__']),
             'promptsList'  => route('ai-studio.prompts.index'),
             'promptsStore' => route('ai-studio.prompts.store'),
@@ -98,13 +99,16 @@
             briefTimer: null,
 
             // ── strategy step ──
-            s: { busyAll: false, busyCard: {}, error: '', open: { meta: true, faqs: false, keywords: false, links: false }, drafts: {}, suggOpen: {}, manualAnchor: '', manualUrl: '', manualError: '' },
+            s: { busyAll: false, busyCard: {}, error: '', open: { h1: true, meta: true, faqs: false, keywords: false, lsi: false, links: false }, drafts: {}, suggOpen: {}, manualAnchor: '', manualUrl: '', manualError: '' },
 
             // ── images step ──
             im: { query: '', results: [], searching: false, selected: [], savingDirty: false, error: '' },
 
             // ── review step ──
             rv: { mode: 'preview', html: '', saving: false, regenerating: false, error: '', saved: false, copied: false },
+
+            // ── async generation (queued job + status polling) ──
+            gen: { active: false, status: 'idle', error: '', startedAt: 0, elapsed: 0, tick: null, poll: null },
 
             /* ───────────────────────── lifecycle ───────────────────────── */
 
@@ -185,6 +189,14 @@
                     this.postGenView = (res.project.generated_html || res.project.step === 'completed') ? 'review' : 'wizard';
                     this.error = '';
                     this.refreshCredits(id);
+                    // A generation kicked off earlier (possibly from another
+                    // tab, or before a page reload) is still running —
+                    // resume the progress view instead of a stale summary.
+                    if (['queued', 'running'].includes(res.project.generation_status)) {
+                        this.postGenView = 'wizard';
+                        this.startGenPolling();
+                        this.gen.status = res.project.generation_status;
+                    }
                 } else {
                     this.error = res?.message || 'Could not load that project.';
                 }
@@ -503,6 +515,7 @@
             },
             syncStrategyDrafts(p) {
                 this.s.drafts = {
+                    h1: String(p?.h1 || ''),
                     meta_title: String(p?.meta_title || ''),
                     meta_description: String(p?.meta_description || ''),
                     og_title: String(p?.og_title || ''),
@@ -559,6 +572,36 @@
             metaBlur(key) {
                 const v = this.s.drafts[key];
                 if (v !== (this.project[key] || '')) this.strategyPatch({ [key]: v });
+            },
+            // keyword data (volume / competition / trend from the shared
+            // metrics cache — missing rows are queued server-side and fill
+            // in on the next strategy view)
+            kwData(kw) {
+                const map = (this.project?.keyword_data && typeof this.project.keyword_data === 'object') ? this.project.keyword_data : {};
+                return map[String(kw || '').toLowerCase()] || null;
+            },
+            kwVolumeLabel(kw) {
+                const d = this.kwData(kw);
+                if (!d || d.volume === null || d.volume === undefined) return '';
+                const v = Number(d.volume);
+                if (v >= 1000000) return (v / 1000000).toFixed(1).replace(/\.0$/, '') + 'M/mo';
+                if (v >= 1000) return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'K/mo';
+                return v + '/mo';
+            },
+            kwTrendIcon(kw) {
+                const d = this.kwData(kw);
+                if (!d) return '';
+                if (d.trend === 'rising') return '▲';
+                if (d.trend === 'falling') return '▼';
+                return '';
+            },
+            // LSI
+            lsiKeywords() { return Array.isArray(this.project?.lsi_keywords) ? this.project.lsi_keywords : []; },
+            lsiSuggestions() { return Array.isArray(this.project?.lsi_suggestions) ? this.project.lsi_suggestions : []; },
+            addLsi(kw) {
+                const cur = this.lsiKeywords();
+                if (cur.includes(kw)) return;
+                this.strategyPatch({ lsi_keywords: [...cur, kw] });
             },
             suggestionsFor(key) { return Array.isArray(this.project?.[key]) ? this.project[key] : []; },
             toggleSugg(key) { this.s.suggOpen = { ...this.s.suggOpen, [key]: !this.s.suggOpen[key] }; },
@@ -680,13 +723,97 @@
                 return Math.max(8, expected * 5);
             },
             hasGeneratedHtml() { return typeof this.project?.generated_html === 'string' && this.project.generated_html.trim() !== ''; },
+
+            /* Generation now runs as a queued server job — POST returns
+               202 immediately and we poll generate-status. The user can
+               navigate away (or close the tab) and the article is still
+               written; reopening the project resumes the progress view. */
             async generateArticle() {
-                if (this.loading) return;
-                this.loading = true; this.error = '';
+                if (this.gen.active || !this.project?.id) return;
+                this.error = ''; this.rv.error = ''; this.gen.error = '';
+                this.startGenPolling();
                 const res = await this.req('POST', this.url('generate', this.project.id));
-                this.loading = false;
-                if (res?.project) { this.setProject(res.project); this.postGenView = 'review'; }
-                else this.error = res?.message || 'Generation failed.';
+                if (!res?.generation) {
+                    this.stopGenPolling();
+                    this.gen.error = res?.message || '{{ __('Could not start the writer. Please try again.') }}';
+                }
+            },
+            startGenPolling() {
+                this.stopGenPolling();
+                this.gen.active = true;
+                this.gen.status = 'queued';
+                this.gen.startedAt = Date.now();
+                this.gen.elapsed = 0;
+                this.gen.tick = setInterval(() => { this.gen.elapsed = Math.floor((Date.now() - this.gen.startedAt) / 1000); }, 1000);
+                this.gen.poll = setInterval(() => this.pollGeneration(), 4000);
+            },
+            stopGenPolling() {
+                if (this.gen.tick) clearInterval(this.gen.tick);
+                if (this.gen.poll) clearInterval(this.gen.poll);
+                this.gen.tick = this.gen.poll = null;
+                this.gen.active = false;
+            },
+            async pollGeneration() {
+                if (!this.project?.id) { this.stopGenPolling(); return; }
+                const res = await this.req('GET', this.url('generateStatus', this.project.id));
+                const g = res?.generation;
+                if (!g) return; // transient network hiccup — keep polling
+                this.gen.status = g.status;
+                // Anchor elapsed to the server's start time once known, so a
+                // page reload mid-run shows the true elapsed, not zero.
+                if (g.started_at) {
+                    const t = new Date(g.started_at).getTime();
+                    if (t > 0 && Math.abs(t - this.gen.startedAt) > 3000) this.gen.startedAt = t;
+                }
+                if (g.status === 'done' && res.project) {
+                    this.stopGenPolling();
+                    this.setProject(res.project);
+                    this.postGenView = 'review';
+                    this.rv.mode = 'preview';
+                    this.refreshCredits(this.project.id);
+                } else if (g.status === 'failed') {
+                    this.stopGenPolling();
+                    this.gen.error = this.genErrorMessage(g.error);
+                } else if (this.gen.elapsed > 720) {
+                    // Hard client stop — the server marks stale rows failed
+                    // on its own; this just ends a hopeless polling loop.
+                    this.stopGenPolling();
+                    this.gen.error = this.genErrorMessage('generation_timeout');
+                }
+            },
+            genErrorMessage(code) {
+                if (code === 'quota_exceeded') return '{{ __('You\'ve reached your monthly AI limit. Upgrade your plan to keep writing.') }}';
+                if (code === 'generation_timeout') return '{{ __('The writer took longer than expected and was stopped. Please try again.') }}';
+                return '{{ __('The article couldn\'t be finished. Please try again — your brief, strategy and images are all saved.') }}';
+            },
+            // Stage list is elapsed-based (the LLM call is one opaque
+            // request — there is no true per-section progress to read).
+            genStages() {
+                return [
+                    '{{ __('Analyzing your brief and keywords') }}',
+                    '{{ __('Planning the article structure') }}',
+                    '{{ __('Writing sections') }}',
+                    '{{ __('Weaving in links and images') }}',
+                    '{{ __('Polishing headings and SEO') }}',
+                ];
+            },
+            genStageIndex() {
+                const e = this.gen.elapsed;
+                if (this.gen.status === 'queued') return 0;
+                if (e < 12) return 0;
+                if (e < 30) return 1;
+                if (e < 140) return 2;
+                if (e < 200) return 3;
+                return 4;
+            },
+            genProgressPct() {
+                // Asymptotic ease toward 96% over a ~3 minute expected run.
+                return Math.min(96, Math.round(100 * (1 - Math.exp(-this.gen.elapsed / 105))));
+            },
+            genElapsedLabel() {
+                const m = Math.floor(this.gen.elapsed / 60);
+                const s = this.gen.elapsed % 60;
+                return m + ':' + String(s).padStart(2, '0');
             },
 
             /* ════════════════════════ STEP 6 — REVIEW ════════════════════════ */
@@ -703,18 +830,16 @@
                 };
             },
             previewHtml() {
-                const title = (this.project?.title || '').replace(/[<>]/g, (c) => (c === '<' ? '&lt;' : '&gt;'));
+                // Prefer the writer's SEO-optimized H1 (keyword-front, output
+                // language); the raw project title is the legacy fallback.
+                const title = (this.project?.generated_h1 || this.project?.title || '').replace(/[<>]/g, (c) => (c === '<' ? '&lt;' : '&gt;'));
                 const heading = title ? `<h1 class="ebq-prev-h1">${title}</h1>` : '';
                 return heading + (this.rv.html || '');
             },
             async reviewRegenerate() {
-                if (this.rv.saving || this.rv.regenerating) return;
+                if (this.rv.saving || this.gen.active) return;
                 if (this.reviewStats().words > 0 && !window.confirm('Regenerate the entire article? Your edits will be replaced, but your selected images and brief stay the same.')) return;
-                this.rv.regenerating = true; this.rv.error = '';
-                const res = await this.req('POST', this.url('generate', this.project.id));
-                this.rv.regenerating = false;
-                if (res?.project) this.setProject(res.project);
-                else this.rv.error = res?.message || 'Could not regenerate.';
+                await this.generateArticle();
             },
             async reviewMarkComplete() {
                 if (this.rv.saving) return;

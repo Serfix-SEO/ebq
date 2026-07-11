@@ -387,7 +387,8 @@
                             <td class="py-4 pl-6 pr-4 text-[14px] text-slate-900">{{ __('Starting Price') }}</td>
                             <td class="px-4 py-4 text-center text-[13px] text-slate-400 line-through">$117/mo</td>
                             <td class="px-4 py-4 text-center text-[13px] text-slate-400 line-through">$108/mo</td>
-                            <td class="bg-orange-50/60 px-4 py-4 text-center text-base font-bold text-orange-600">$14/mo</td>
+                            {{-- Month-to-month price, apples-to-apples with the competitor columns (the $14 annual-equivalent lives only in the billing toggle). --}}
+                            <td class="bg-orange-50/60 px-4 py-4 text-center text-base font-bold text-orange-600">$19/mo</td>
                         </tr>
                     </tbody>
                 </table>

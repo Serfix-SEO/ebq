@@ -4,7 +4,10 @@ namespace App\Services;
 
 use App\Models\Website;
 use App\Services\Llm\LlmClient;
+use App\Services\Llm\LlmClientFactory;
 use App\Services\AiContentBriefService;
+use App\Support\AiModelConfig;
+use App\Support\LlmProviderConfig;
 
 /**
  * Block-level AI ops invoked from the Gutenberg block toolbar:
@@ -187,27 +190,38 @@ class AiBlockEditorService
                 ."- Match the input language and approximate length unless the operation explicitly asks otherwise.\n";
         }
 
-        // Title mode benefits from the medium-tier model — better
+        // Title mode benefits from the premium-tier model — better
         // length-constraint adherence is worth the modest cost overhead.
         // Other modes (rewrite/extend/grammar/etc.) stay on the default
         // tier where speed matters more and constraints are looser.
-        $modelOverride = $mode === self::MODE_TITLE ? ['model' => 'mistral-medium-latest'] : [];
+        $modelOverride = $mode === self::MODE_TITLE ? ['model' => AiModelConfig::premiumModel()] : [];
 
         // Vision-mode alt text: when an image URL is supplied for the
         // `alt_text` mode, send a multi-modal user message (text part +
-        // image_url part) and route to Pixtral. Mistral's chat API
-        // accepts the same OpenAI-style content-array shape, so the
-        // underlying LlmClient passes through unchanged.
+        // image_url part) and route to a vision model. Only Mistral has
+        // one (Pixtral) — when the active provider doesn't (DeepSeek),
+        // pin the call to Mistral so alt text keeps working; its token
+        // spend lands in the same pooled LLM cap. No Mistral key →
+        // graceful error, never throw.
+        $llm = $this->llm;
         $userContent = $user;
         if ($mode === self::MODE_ALT_TEXT && $imageUrl !== '' && ! $isSelectionEdit) {
             $userContent = [
                 ['type' => 'text', 'text' => $user],
                 ['type' => 'image_url', 'image_url' => $imageUrl],
             ];
-            $modelOverride = ['model' => 'pixtral-12b-latest'];
+            $visionModel = AiModelConfig::visionModel();
+            if ($visionModel === null) {
+                if (! LlmProviderConfig::isConfigured(LlmProviderConfig::PROVIDER_MISTRAL)) {
+                    return ['ok' => false, 'error' => 'vision_not_supported'];
+                }
+                $llm = LlmClientFactory::make(LlmProviderConfig::PROVIDER_MISTRAL);
+                $visionModel = AiModelConfig::visionModel(LlmProviderConfig::PROVIDER_MISTRAL);
+            }
+            $modelOverride = ['model' => $visionModel];
         }
 
-        $response = $this->llm->complete([
+        $response = $llm->complete([
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $userContent],
         ], array_merge([
@@ -250,7 +264,7 @@ class AiBlockEditorService
                         ['role' => 'assistant', 'content' => $generated],
                         ['role' => 'user', 'content' => $retryFeedback],
                     ], [
-                        'model' => 'mistral-medium-latest',
+                        'model' => AiModelConfig::premiumModel(),
                         'temperature' => 0.4,
                         'max_tokens' => 1500,
                         'timeout' => 60,

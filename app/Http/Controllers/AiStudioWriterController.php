@@ -168,6 +168,9 @@ class AiStudioWriterController extends Controller
             'images.*.height' => 'nullable|integer|min:0|max:20000',
             'seo_titles' => 'nullable|array',
             'seo_titles.*' => 'string|max:200',
+            'h1' => 'nullable|string|max:200',
+            'h1_suggestions' => 'nullable|array',
+            'h1_suggestions.*' => 'string|max:200',
             'meta_title' => 'nullable|string|max:200',
             'meta_description' => 'nullable|string|max:320',
             'meta_descriptions' => 'nullable|array',
@@ -224,12 +227,12 @@ class AiStudioWriterController extends Controller
                 $project->custom_prompt = $incoming;
             }
         }
-        foreach (['meta_title', 'meta_description', 'og_title', 'og_description'] as $metaField) {
+        foreach (['h1', 'meta_title', 'meta_description', 'og_title', 'og_description'] as $metaField) {
             if (array_key_exists($metaField, $data) && $data[$metaField] !== null) {
                 $project->{$metaField} = $data[$metaField];
             }
         }
-        foreach (['seo_titles', 'meta_descriptions', 'faqs', 'keyword_suggestions', 'link_suggestions'] as $jsonField) {
+        foreach (['seo_titles', 'h1_suggestions', 'meta_descriptions', 'faqs', 'keyword_suggestions', 'link_suggestions'] as $jsonField) {
             if (array_key_exists($jsonField, $data) && $data[$jsonField] !== null) {
                 $project->{$jsonField} = $data[$jsonField];
             }
@@ -349,7 +352,7 @@ class AiStudioWriterController extends Controller
 
         $data = $request->validate([
             'only' => 'nullable|array',
-            'only.*' => ['string', Rule::in(['seo_titles', 'meta', 'faqs', 'keyword_suggestions', 'link_suggestions'])],
+            'only.*' => ['string', Rule::in(['seo_titles', 'h1', 'lsi', 'meta', 'faqs', 'keyword_suggestions', 'link_suggestions'])],
         ]);
 
         @set_time_limit(360);
@@ -359,17 +362,62 @@ class AiStudioWriterController extends Controller
         return response()->json(['project' => $this->full($project)]);
     }
 
+    /**
+     * POST …/generate — queues GenerateWriterDraftJob and returns 202.
+     * The 2–4 minute writer LLM call is far too long to hold the HTTP
+     * request open; the wizard polls generateStatus() instead and the
+     * user can leave the page while the article is written.
+     */
     public function generate(Request $request, string $externalId): JsonResponse
     {
         $project = $this->resolve($request, $externalId);
         if ($project instanceof JsonResponse) {
             return $project;
         }
+        $website = $this->currentWebsite($request);
 
-        @set_time_limit(360);
-        $project = $this->service->generate($project, $this->currentWebsite($request));
+        if (! in_array($project->generation_status, [WriterProject::GEN_QUEUED, WriterProject::GEN_RUNNING], true)) {
+            $project->generation_status = WriterProject::GEN_QUEUED;
+            $project->generation_error = null;
+            $project->generation_started_at = null;
+            $project->save();
+            \App\Jobs\GenerateWriterDraftJob::dispatch($project->id, (string) $website->id);
+        }
 
-        return response()->json(['project' => $this->full($project)]);
+        return response()->json(['generation' => $this->generationState($project)], 202);
+    }
+
+    /**
+     * GET …/generate-status — poll target for the wizard. Includes the
+     * full project once generation lands so the client needs no second
+     * fetch. Self-heals rows orphaned by a lost job (stuck queued/running
+     * past any plausible runtime) so the UI never polls forever.
+     */
+    public function generateStatus(Request $request, string $externalId): JsonResponse
+    {
+        $project = $this->resolve($request, $externalId);
+        if ($project instanceof JsonResponse) {
+            return $project;
+        }
+
+        $this->service->failStaleGeneration($project);
+
+        $out = ['generation' => $this->generationState($project)];
+        if ($project->generation_status === WriterProject::GEN_DONE) {
+            $out['project'] = $this->full($project);
+        }
+
+        return response()->json($out);
+    }
+
+    /** @return array{status:string,error:?string,started_at:?string} */
+    private function generationState(WriterProject $project): array
+    {
+        return [
+            'status' => (string) ($project->generation_status ?? WriterProject::GEN_IDLE),
+            'error' => $project->generation_error,
+            'started_at' => $project->generation_started_at?->toIso8601String(),
+        ];
     }
 
     public function credits(Request $request, string $externalId): JsonResponse
@@ -595,6 +643,10 @@ class AiStudioWriterController extends Controller
             'chat_history' => is_array($p->chat_history) ? $p->chat_history : [],
             'images' => is_array($p->images) ? $p->images : [],
             'seo_titles' => is_array($p->seo_titles) ? $p->seo_titles : [],
+            'h1' => (string) ($p->h1 ?? ''),
+            'h1_suggestions' => is_array($p->h1_suggestions) ? $p->h1_suggestions : [],
+            'lsi_suggestions' => is_array($p->lsi_suggestions) ? $p->lsi_suggestions : [],
+            'keyword_data' => is_array($p->keyword_data) ? $p->keyword_data : (object) [],
             'meta_title' => (string) ($p->meta_title ?? ''),
             'meta_description' => (string) ($p->meta_description ?? ''),
             'meta_descriptions' => is_array($p->meta_descriptions) ? $p->meta_descriptions : [],
@@ -605,6 +657,10 @@ class AiStudioWriterController extends Controller
             'link_suggestions' => is_array($p->link_suggestions) ? $p->link_suggestions : [],
             'selected_links' => is_array($p->selected_links) ? $p->selected_links : ['internal' => [], 'external' => []],
             'generated_html' => (string) ($p->generated_html ?? ''),
+            'generated_h1' => (string) ($p->generated_h1 ?? ''),
+            'generation_meta' => is_array($p->generation_meta) ? $p->generation_meta : null,
+            'generation_status' => (string) ($p->generation_status ?? WriterProject::GEN_IDLE),
+            'generation_error' => $p->generation_error,
             'wp_post_id' => $p->wp_post_id,
             'credits_used' => (int) $p->credits_used,
             'updated_at' => $p->updated_at?->toIso8601String(),

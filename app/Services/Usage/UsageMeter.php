@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Cache;
  *   - keywords_everywhere  (KE credits — units_consumed is the credit cost)
  *   - serper               (Serper API — one call = one unit)
  *   - mistral              (Mistral LLM — units_consumed is total_tokens)
+ *   - deepseek             (DeepSeek LLM — pooled with mistral under one cap)
  *
  * Tracker cap is handled separately (active row count, not a monthly sum).
  */
@@ -37,7 +38,21 @@ class UsageMeter
         'keywords_everywhere' => 'keywords_everywhere.monthly_credits',
         'serp_api'            => 'serper.monthly_calls',
         'mistral'             => 'mistral.monthly_tokens',
+        // DeepSeek shares the SAME plan cap as Mistral: LLM tokens are one
+        // pool regardless of which provider the admin has active, so
+        // flipping the platform provider mid-month can't reset or bypass
+        // anyone's quota. Activity rows still log the real provider for
+        // cost telemetry.
+        'deepseek'            => 'mistral.monthly_tokens',
     ];
+
+    /**
+     * LLM providers whose token spend counts against the shared cap.
+     * consumedInWindow() sums across the pool and reservationKey()
+     * canonicalizes to one key so reserve (client passes 'deepseek') and
+     * release (ClientActivityLogger passes the same) stay symmetric.
+     */
+    private const LLM_POOL = ['mistral', 'deepseek'];
 
     public function currentWindowStart(User $user): Carbon
     {
@@ -49,9 +64,20 @@ class UsageMeter
     {
         return (int) ClientActivity::query()
             ->where('user_id', $user->id)
-            ->where('provider', $provider)
+            ->whereIn('provider', $this->poolFor($provider))
             ->where('created_at', '>=', $this->currentWindowStart($user))
             ->sum('units_consumed');
+    }
+
+    /**
+     * Providers whose consumption counts together with `$provider`.
+     * LLM providers pool; everything else stands alone.
+     *
+     * @return list<string>
+     */
+    private function poolFor(string $provider): array
+    {
+        return in_array($provider, self::LLM_POOL, true) ? self::LLM_POOL : [$provider];
     }
 
     /**
@@ -153,6 +179,12 @@ class UsageMeter
 
     private function reservationKey(string $userId, string $provider): string
     {
+        // Pooled LLM providers share one reservation bucket (canonical
+        // key 'mistral' — predates the pool; keeping it avoids orphaning
+        // in-flight reservations at deploy).
+        if (in_array($provider, self::LLM_POOL, true)) {
+            $provider = 'mistral';
+        }
         return "usage-reserve:{$provider}:{$userId}";
     }
 
@@ -225,7 +257,8 @@ class UsageMeter
         return match ($provider) {
             'keywords_everywhere' => "You've used all {$limit} Keywords Everywhere credits for this month. Upgrade your plan to keep researching.",
             'serp_api'            => "You've used all {$limit} keyword-tracking lookups for this month. Upgrade your plan to keep tracking.",
-            'mistral'             => "You've used all {$limit} content-writing tokens for this month. Upgrade your plan to keep writing.",
+            'mistral',
+            'deepseek'            => "You've used all {$limit} content-writing tokens for this month. Upgrade your plan to keep writing.",
             default               => "You've reached your monthly limit for {$provider}. Upgrade your plan to continue.",
         };
     }

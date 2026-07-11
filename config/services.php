@@ -220,6 +220,22 @@ return [
     ],
 
     /*
+     * DeepSeek — alternative LLM provider (admin-switchable, see
+     * App\Support\LlmProviderConfig). OpenAI-compatible API; no vision
+     * model.
+     */
+    'deepseek' => [
+        'key' => env('DEEPSEEK_API_KEY'),
+        'model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),
+        // Per-1M-token pricing for cost telemetry (deepseek-chat,
+        // cache-miss rates — errs high like mistral's).
+        'cost_per_million_input_usd' => (float) env('DEEPSEEK_INPUT_USD_PER_M', 0.27),
+        'cost_per_million_output_usd' => (float) env('DEEPSEEK_OUTPUT_USD_PER_M', 1.10),
+        // Blended per-token rate for the admin Usage page.
+        'cost_per_token_usd' => (float) env('DEEPSEEK_COST_PER_TOKEN_USD', 0.0000011),
+    ],
+
+    /*
      * Hetzner Cloud — the crawl-worker fleet autoscaler provisions/destroys
      * worker boxes via the API. The token lives ONLY on the web box (the only
      * host that calls the API). network_id/ssh_key_id/firewall_id/location are

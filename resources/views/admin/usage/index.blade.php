@@ -21,6 +21,7 @@
             'keywords_everywhere' => 'bg-amber-50 text-amber-700 border-amber-200',
             'serp_api' => 'bg-orange-50 text-orange-700 border-orange-200',
             'mistral'  => 'bg-purple-50 text-purple-700 border-purple-200',
+            'deepseek' => 'bg-sky-50 text-sky-700 border-sky-200',
         ];
 
         // Build sparkline path for a series.
@@ -277,7 +278,7 @@
                                 <th class="px-4 py-2">Window started</th>
                                 <th class="px-4 py-2">KE credits</th>
                                 <th class="px-4 py-2">Serper calls</th>
-                                <th class="px-4 py-2">Mistral tokens</th>
+                                <th class="px-4 py-2">AI tokens (Mistral + DeepSeek)</th>
                                 <th class="px-4 py-2">Tracked keywords</th>
                             </tr>
                         </thead>

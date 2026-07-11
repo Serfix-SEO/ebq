@@ -40,28 +40,35 @@ abstract class AbstractAiTool implements AiTool
     abstract public function meta(): AiToolMeta;
 
     /**
-     * Translate raw `mistral_*` / `llm_*` error codes into actionable
-     * UI copy. The old single "model did not respond" message hid
-     * three very different failure modes (missing key, rate-limit,
-     * network timeout, upstream 5xx) that each need different fixes.
+     * Translate raw `{provider}_*` / `llm_*` error codes into actionable
+     * UI copy. Codes are provider-prefixed (`mistral_http_429`,
+     * `deepseek_network_error`, …) so we match on the suffix pattern
+     * rather than the provider name. The old single "model did not
+     * respond" message hid three very different failure modes (missing
+     * key, rate-limit, network timeout, upstream 5xx) that each need
+     * different fixes.
      */
     private static function llmErrorMessage(string $code): string
     {
-        if (str_starts_with($code, 'mistral_http_429') || $code === 'mistral_http_429') {
+        if (str_contains($code, '_http_429')) {
             return 'The AI provider rate-limited the request. Wait 30s and try again.';
         }
-        if (str_starts_with($code, 'mistral_http_401') || str_starts_with($code, 'mistral_http_403')) {
-            return 'The AI provider rejected the API key. An admin needs to refresh the Mistral credentials.';
+        if (str_contains($code, '_http_401') || str_contains($code, '_http_403') || str_contains($code, '_http_402')) {
+            return 'The AI provider rejected the API key. An admin needs to refresh the AI provider credentials.';
         }
-        if (str_starts_with($code, 'mistral_http_5')) {
+        if (preg_match('/_http_5\d\d$/', $code)) {
             return 'The AI provider returned a server error. Try again in a moment.';
         }
+        if (str_ends_with($code, '_api_key_missing')) {
+            return 'The AI provider isn\'t configured. An admin needs to set the AI provider\'s API key.';
+        }
+        if (str_ends_with($code, '_network_error')) {
+            return 'Couldn\'t reach the AI provider. Check the server\'s outbound connection and retry.';
+        }
         return match ($code) {
-            'mistral_api_key_missing' => 'The AI provider isn\'t configured. An admin needs to set the Mistral API key.',
-            'mistral_network_error'   => 'Couldn\'t reach the AI provider. Check the server\'s outbound connection and retry.',
-            'llm_not_configured'      => 'The AI provider isn\'t configured. Contact an admin.',
-            'llm_failed'              => 'The model did not respond. Try again in a moment.',
-            default                   => 'The model did not respond ('.$code.'). Try again in a moment.',
+            'llm_not_configured' => 'The AI provider isn\'t configured. Contact an admin.',
+            'llm_failed'         => 'The model did not respond. Try again in a moment.',
+            default              => 'The model did not respond ('.$code.'). Try again in a moment.',
         };
     }
 
@@ -77,6 +84,21 @@ abstract class AbstractAiTool implements AiTool
         }
 
         $system = $this->buildSystemPrompt($context);
+
+        // Output language — honored at the BASE so every tool respects the
+        // caller's `language` input (found 2026-07-11: the wizard's strategy
+        // bundle passed language=ar to seo-title/seo-meta/faq-generator/
+        // keyword-suggestions and ALL of them ignored it, so an Arabic
+        // project got English meta tags and FAQs). User-supplied phrases
+        // (focus keyword, keyword lists) stay verbatim; char-count limits
+        // in tool prompts apply to the localized text.
+        $langName = \App\Services\AiWriterService::LANGUAGE_NAMES[strtolower(trim((string) ($input['language'] ?? '')))] ?? '';
+        if ($langName !== '' && $langName !== 'English') {
+            $system .= "\n\nOUTPUT LANGUAGE (HARD RULE): write every generated value in {$langName}. "
+                . "Translate any English context you were given rather than echoing it. Keep the focus "
+                . "keyword and other user-supplied phrases verbatim in their original language; proper "
+                . "nouns and brand names stay as-is. Character/length limits apply to the {$langName} text.";
+        }
 
         // When the plugin tells us which Gutenberg block the result
         // will be inserted into, append a shape constraint so a

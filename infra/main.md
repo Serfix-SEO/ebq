@@ -256,6 +256,99 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-11 (blog-post wizard: full input coverage — language/H1/LSI/strategy
+  selections; writer prompt v25)** — owner QA found the writer ignored most wizard
+  inputs: `AiWriterService::draft()` never consumed `language/country/tone/audience`
+  (Arabic projects wrote English), strategy `keyword_suggestions`/`faqs` never
+  reached the article, LSI misses were only logged, and the H1 was the raw project
+  title. v25: OUTPUT-LANGUAGE hard block (translate SERP-language brief/PAA;
+  keyword/LSI/proper nouns verbatim), top-level `"h1"` output (user's Strategy pick
+  locked verbatim, else keyword-front ≤65 chars in the output language →
+  `generated_h1`; consumers use `h1 → generated_h1 → title`, incl. plugin WP
+  `post_title`), secondary-keywords + curated-FAQ prompt blocks (FAQ section now
+  triggers on PAA OR curated FAQs), one corrective LSI retry + coverage persisted
+  to `generation_meta` (shown on review). Strategy step gained an H1 card
+  (`h1`/`h1_suggestions`, direct LLM call, `AI_WRITER_STRATEGY_H1` credits), LSI
+  suggestions (`AiRelatedKeywordsService`), and a `keyword_data` volume/
+  competition/trend map via `KeywordMetricsService::metricsOrQueue` (cache-first,
+  provider-respecting, never blocking, never $). Cache key bumped
+  `ai_writer_v24`→`v25` WITH locale+selections in the key. Migration
+  `2026_07_11_150000` (main + shard node). Gotcha: a heredoc line starting with
+  `USER-` terminated the `<<<USER` prompt heredoc — PHP treats `USER` followed by
+  a non-identifier char as the closing marker. Follow-up (same day, owner re-test
+  "didn't generate arabic fully"): the STRATEGY tools had the same bug one layer
+  down — `AiToolRunner` passed `language` through (`:178`) but every registry
+  tool's prompt ignored it (English meta/FAQs/keywords on Arabic projects). Fixed
+  at the base: `AbstractAiTool::execute` appends a hard OUTPUT-LANGUAGE system
+  rule for any known non-English code — covers all 47 Studio tools + the wizard
+  bundle in one seam; tool cache keys already vary by language (input hash).
+  THIRD layer same day (owner: "still didn't write in arabic", reading the brief
+  step): `WriterProjectService::generateBrief` hardcoded `country/language => null`
+  → `AiContentBriefService` briefed the US/English SERP and its prompt had no
+  language rule. Fixed: project locale → Serper `gl`/`hl` + output-language rule;
+  brief cache `v3`→`v4` with a language segment (`cachedBrief()` signature gained
+  `$language`). Pattern to remember: locale inputs flowed through every layer's
+  PLUMBING but were dropped at each consumption point — when adding a localized
+  surface, grep for where the language string is actually interpolated into a
+  prompt, not just passed. Two follow-on landmines: (1) the tool cache
+  (`AiToolRunner::cacheKey`) hashed `language` all along, so pre-fix ENGLISH
+  outputs sat cached under Arabic keys — key namespace bumped `ai_tool:` →
+  `ai_tool:v2:`; note prompt edits do NOT change the input hash, so a prompt fix
+  can silently serve pre-fix cached output (bump or forget the exact key when
+  verifying). (2) `keyword-suggestions` needed special handling: keywords are
+  search DATA — real GSC queries must stay verbatim (never translate a query
+  nobody types), so the prompt asks for a MIX (≥half native-language variations
+  alongside the strongest cross-script queries). The owner's live Arabic
+  projects' briefs + strategies were regenerated server-side after the fix.
+  Docs: `infra/ai/writer.md`, `infra/ai/tools.md`.
+
+- **2026-07-11 (blog-post wizard: async generation + progress UI, both surfaces;
+  plugin 2.0.12)** — "Generate article" was one blocking 240–360s HTTP request on
+  the dashboard (no spinner at all) and a 280s `wp_remote_post` through the plugin
+  proxy (shared hosts kill those). Now: POST generate queues
+  `App\Jobs\GenerateWriterDraftJob` → 202; both UIs poll `GET …/generate-status`
+  (4s) and render a staged progress panel (elapsed-based stages, "you can leave
+  this page" — true, the job keeps running; reopening a project resumes the poll).
+  New `writer_projects` columns `generation_status/error/started_at` (migration
+  run on main + shard node); `failStaleGeneration()` self-heals rows orphaned by a
+  lost job; job passes `__user_id` so queued LLM calls stay metered (they'd be
+  unbilled otherwise — no Auth user in a worker); plugin API keeps the blocking
+  path for pre-2.0.12 installs (`async=1` opt-in). Dashboard: Alpine state machine
+  + shared `wizard-steps/partials/generation-progress.blade.php`; plugin:
+  `useGeneration.js` hook + `GenerationProgress.jsx` (also fixed
+  `NEVER_CACHE_ROUTE_PREFIXES` listing `/hq/writer-projects` while routes register
+  as `/writer-projects`). E2E'd live: queue job on prod project, API 202/status
+  parity via temp token, headless-Chrome regenerate on the QA install. Docs:
+  `infra/ai/writer.md`, `infra/wordpress-plugin/releases.md`. Tests:
+  `tests/Feature/WriterProjectAsyncGenerationTest.php` (gotcha: fresh-DB tests
+  must set `global_feature_flags` — `FEATURE_DEFAULTS['ai_writer']` is false).
+
+- **2026-07-11 (DeepSeek as second LLM provider, admin-switchable)** — extracted
+  `OpenAiCompatibleClient` base from `MistralClient` (error codes byte-identical),
+  added `DeepSeekClient` (32k output-token clamp — the V3-era 8k limit is gone on
+  V4 and originally truncated the writer, JSON-mode "json"-in-prompt nudge,
+  `deepseek-reasoner` denylisted — no function calling/JSON mode), new
+  `LlmProviderConfig` (Setting `ai.llm.provider`) + `LlmClientFactory` behind the
+  container binding, `AiModelConfig` now per-provider (legacy `ai.llm.model` stays
+  Mistral's; `premiumModel()`/`visionModel()` replace the hardcoded
+  `mistral-medium-latest`/`pixtral` call sites). Alt-text vision pins Mistral when
+  DeepSeek is active (DeepSeek has no vision model). **LLM tokens pool**: deepseek
+  shares `plans.api_limits.mistral.monthly_tokens` (consumption summed across both
+  providers, reservation key canonicalized) so a provider flip mid-month can't
+  reset quotas. Admin settings: provider select + per-provider model selects
+  (activating a keyless provider is refused). phpunit now blanks
+  `MISTRAL_API_KEY`/`DEEPSEEK_API_KEY` (same landmine class as the KE leak).
+  Docs: `infra/ai/llm.md` (rewritten), `infra/ai/README.md`,
+  `infra/reference/configuration.md`. Tests: `tests/Unit/Llm/*`,
+  `tests/Feature/LlmProviderSwitchTest.php`. **Thinking mode**: live-probing
+  found DeepSeek V4 (`deepseek-v4-flash`/`-pro` are the real model ids;
+  `deepseek-chat`/`deepseek-reasoner` are aliases) supports
+  `thinking:{type:enabled}` per request WITH json_object + function calling —
+  wired as per-call option `reasoning => true`, routed to exactly one site
+  (AI Writer full draft); all interactive paths stay non-thinking by design
+  (latency + reasoning-token cost). Reasoner aliases stay out of the admin
+  dropdown.
+
 - **2026-07-11 (plugin keyword detail page + a live test-suite landmine: tests were
   billing the real Keywords Everywhere API)** — HQ Keywords tab (`ebq-hq-keywords`)
   had no per-keyword view. Server: extracted the portal `/keywords/{query}` signal

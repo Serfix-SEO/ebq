@@ -236,6 +236,8 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('strategy');
             Route::post('/{externalId}/generate', [\App\Http\Controllers\AiStudioWriterController::class, 'generate'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('generate');
+            Route::get('/{externalId}/generate-status', [\App\Http\Controllers\AiStudioWriterController::class, 'generateStatus'])
+                ->where('externalId', '[A-Za-z0-9\-]+')->name('generate.status');
             Route::get('/{externalId}/credits', [\App\Http\Controllers\AiStudioWriterController::class, 'credits'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('credits');
         });

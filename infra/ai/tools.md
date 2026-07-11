@@ -37,7 +37,13 @@
 3. **Validate** input against `meta()->inputs` (`:129`): required, type coercion
    (`number/tags/post_picker/select`), `maxLength` clip, `select` option whitelist.
    Pass-through extras (`focus_keyword, country, language, url, post, current_html`)
-   survive even if not declared (`:178`).
+   survive even if not declared (`:178`). **`language` is honored at the BASE**
+   (2026-07-11): `AbstractAiTool::execute` appends a hard OUTPUT-LANGUAGE rule to
+   every tool's system prompt when a known non-English code arrives — before this,
+   tools received the code and every prompt ignored it, so the wizard's Arabic
+   strategy bundle produced English meta/FAQs/keywords. User-supplied phrases stay
+   verbatim; the language is part of the tool cache key (input hash), so localized
+   runs never hit a cached English result.
 4. **Cache lookup** when `cacheTtlSeconds > 0` — key `ai_tool:{id}:{websiteId}:{xxh3(input)}`
    (`:207`). Cache hit still logs credits (`:89`).
 5. **Build `ToolContext`** via `ContextBuilder::build` (`:103`).

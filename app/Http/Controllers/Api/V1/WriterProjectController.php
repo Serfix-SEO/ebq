@@ -157,6 +157,9 @@ class WriterProjectController extends Controller
             // the meta description, etc.) without regenerating the bundle.
             'seo_titles' => 'nullable|array',
             'seo_titles.*' => 'string|max:200',
+            'h1' => 'nullable|string|max:200',
+            'h1_suggestions' => 'nullable|array',
+            'h1_suggestions.*' => 'string|max:200',
             'meta_title' => 'nullable|string|max:200',
             'meta_description' => 'nullable|string|max:320',
             'meta_descriptions' => 'nullable|array',
@@ -222,12 +225,12 @@ class WriterProjectController extends Controller
                 $project->custom_prompt = $incoming;
             }
         }
-        foreach (['meta_title', 'meta_description', 'og_title', 'og_description'] as $metaField) {
+        foreach (['h1', 'meta_title', 'meta_description', 'og_title', 'og_description'] as $metaField) {
             if (array_key_exists($metaField, $data) && $data[$metaField] !== null) {
                 $project->{$metaField} = $data[$metaField];
             }
         }
-        foreach (['seo_titles', 'meta_descriptions', 'faqs', 'keyword_suggestions', 'link_suggestions'] as $jsonField) {
+        foreach (['seo_titles', 'h1_suggestions', 'meta_descriptions', 'faqs', 'keyword_suggestions', 'link_suggestions'] as $jsonField) {
             if (array_key_exists($jsonField, $data) && $data[$jsonField] !== null) {
                 $project->{$jsonField} = $data[$jsonField];
             }
@@ -369,7 +372,7 @@ class WriterProjectController extends Controller
 
         $data = $request->validate([
             'only' => 'nullable|array',
-            'only.*' => ['string', Rule::in(['seo_titles', 'meta', 'faqs', 'keyword_suggestions', 'link_suggestions'])],
+            'only.*' => ['string', Rule::in(['seo_titles', 'h1', 'lsi', 'meta', 'faqs', 'keyword_suggestions', 'link_suggestions'])],
         ]);
 
         $only = is_array($data['only'] ?? null) ? $data['only'] : null;
@@ -383,17 +386,62 @@ class WriterProjectController extends Controller
     /**
      * POST /api/v1/hq/writer-projects/{externalId}/generate
      * Final generation — strict-mode writer + image placement.
+     *
+     * Plugin ≥2.0.12 sends `async=1` and polls generateStatus() — the
+     * 2–4 minute LLM call would otherwise hold a wp_remote_post open for
+     * its full duration, which shared WP hosts routinely kill. The
+     * blocking path stays for older installed plugin versions.
      */
     public function generate(Request $request, string $externalId): JsonResponse
     {
         $project = $this->resolve($request, $externalId);
         $website = $this->website($request);
 
+        if ($request->boolean('async')) {
+            if (! in_array($project->generation_status, [WriterProject::GEN_QUEUED, WriterProject::GEN_RUNNING], true)) {
+                $project->generation_status = WriterProject::GEN_QUEUED;
+                $project->generation_error = null;
+                $project->generation_started_at = null;
+                $project->save();
+                \App\Jobs\GenerateWriterDraftJob::dispatch($project->id, (string) $website->id);
+            }
+
+            return response()->json(['generation' => $this->generationState($project)], 202);
+        }
+
         $project = $this->service->generate($project, $website);
 
         return response()->json([
             'project' => $this->full($project),
         ]);
+    }
+
+    /**
+     * GET /api/v1/hq/writer-projects/{externalId}/generate-status
+     * Poll target for the async flow; carries the full project once done.
+     */
+    public function generateStatus(Request $request, string $externalId): JsonResponse
+    {
+        $project = $this->resolve($request, $externalId);
+
+        $this->service->failStaleGeneration($project);
+
+        $out = ['generation' => $this->generationState($project)];
+        if ($project->generation_status === WriterProject::GEN_DONE) {
+            $out['project'] = $this->full($project);
+        }
+
+        return response()->json($out);
+    }
+
+    /** @return array{status:string,error:?string,started_at:?string} */
+    private function generationState(WriterProject $project): array
+    {
+        return [
+            'status' => (string) ($project->generation_status ?? WriterProject::GEN_IDLE),
+            'error' => $project->generation_error,
+            'started_at' => $project->generation_started_at?->toIso8601String(),
+        ];
     }
 
     /**
@@ -482,6 +530,10 @@ class WriterProjectController extends Controller
             'chat_history' => is_array($p->chat_history) ? $p->chat_history : [],
             'images' => is_array($p->images) ? $p->images : [],
             'seo_titles' => is_array($p->seo_titles) ? $p->seo_titles : [],
+            'h1' => (string) ($p->h1 ?? ''),
+            'h1_suggestions' => is_array($p->h1_suggestions) ? $p->h1_suggestions : [],
+            'lsi_suggestions' => is_array($p->lsi_suggestions) ? $p->lsi_suggestions : [],
+            'keyword_data' => is_array($p->keyword_data) ? $p->keyword_data : (object) [],
             'meta_title' => (string) ($p->meta_title ?? ''),
             'meta_description' => (string) ($p->meta_description ?? ''),
             'meta_descriptions' => is_array($p->meta_descriptions) ? $p->meta_descriptions : [],
@@ -492,6 +544,10 @@ class WriterProjectController extends Controller
             'link_suggestions' => is_array($p->link_suggestions) ? $p->link_suggestions : [],
             'selected_links' => is_array($p->selected_links) ? $p->selected_links : ['internal' => [], 'external' => []],
             'generated_html' => (string) ($p->generated_html ?? ''),
+            'generated_h1' => (string) ($p->generated_h1 ?? ''),
+            'generation_meta' => is_array($p->generation_meta) ? $p->generation_meta : null,
+            'generation_status' => (string) ($p->generation_status ?? WriterProject::GEN_IDLE),
+            'generation_error' => $p->generation_error,
             'wp_post_id' => $p->wp_post_id,
             'credits_used' => (int) $p->credits_used,
             'updated_at' => $p->updated_at?->toIso8601String(),

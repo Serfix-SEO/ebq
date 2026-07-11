@@ -26,6 +26,28 @@
                 <button type="button" @click="runStrategy(null)" :disabled="s.busyAll" class="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" x-text="s.busyAll ? '{{ __('Regenerating…') }}' : '{{ __('↻ Regenerate all') }}'"></button>
             </div>
 
+            {{-- ── H1 heading ── --}}
+            <section class="rounded-xl border border-slate-200 dark:border-slate-800">
+                <header class="flex items-center justify-between px-4 py-3">
+                    <button type="button" @click="toggleSec('h1')" class="flex min-w-0 items-center gap-2 text-start">
+                        <span class="text-slate-400" x-text="s.open.h1 ? '▾' : '▸'"></span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ __('H1 heading') }}</span>
+                        <span class="hidden text-[11px] text-slate-400 sm:inline">{{ __('The on-page headline of the generated article.') }}</span>
+                    </button>
+                    <button type="button" @click="runStrategy(['h1'])" :disabled="s.busyCard.h1" class="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800" title="{{ __('Regenerate H1 suggestions') }}">↻</button>
+                </header>
+                <div x-show="s.open.h1" class="border-t border-slate-100 p-4 dark:border-slate-800">
+                    <div class="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        <span>{{ __('Page H1') }}</span>
+                        <span :class="metaFieldLenClass('h1', 20, 65)" x-text="(s.drafts.h1 || '').length + '/≤65'"></span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">{{ __('Focus keyword near the front, 65 characters or fewer. The writer uses this exact headline.') }}</p>
+                    <input type="text" x-model="s.drafts.h1" @blur="metaBlur('h1')" class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                    <template x-if="(s.drafts.h1 || '').length > 0 && !containsKw(s.drafts.h1, project?.focus_keyword)"><p class="mt-1 text-[11px] text-amber-600 dark:text-amber-400">{{ __('⚠ Focus keyword is missing.') }}</p></template>
+                    @include('ai-studio.wizard-steps.partials.suggestions', ['field' => 'h1', 'key' => 'h1_suggestions'])
+                </div>
+            </section>
+
             {{-- ── Meta section ── --}}
             <section class="rounded-xl border border-slate-200 dark:border-slate-800">
                 <header class="flex items-center justify-between px-4 py-3">
@@ -119,7 +141,40 @@
                                 class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition"
                                 :class="additionalKeywords().includes(kw) ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'">
                                 <span x-text="kw"></span>
+                                <span x-show="kwVolumeLabel(kw)" class="rounded-full bg-slate-100 px-1.5 py-px text-[10px] font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                                    <span x-text="kwVolumeLabel(kw)"></span><span x-show="kwTrendIcon(kw)" :class="kwTrendIcon(kw) === '▲' ? 'text-emerald-600' : 'text-red-500'" x-text="' ' + kwTrendIcon(kw)"></span>
+                                </span>
                                 <span x-text="additionalKeywords().includes(kw) ? '✓' : '+'"></span>
+                            </button>
+                        </template>
+                    </div>
+                    <p class="mt-2 text-[10px] text-slate-400" x-show="keywordSuggestions().length > 0">{{ __('Volumes come from the keyword data cache — missing ones are being looked up and appear on your next visit to this step.') }}</p>
+                </div>
+            </section>
+
+            {{-- ── LSI keywords ── --}}
+            <section class="rounded-xl border border-slate-200 dark:border-slate-800">
+                <header class="flex items-center justify-between px-4 py-3">
+                    <button type="button" @click="toggleSec('lsi')" class="flex items-center gap-2">
+                        <span class="text-slate-400" x-text="s.open.lsi ? '▾' : '▸'"></span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ __('LSI keywords') }}</span>
+                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800" x-text="lsiKeywords().length + ' {{ __('selected') }}'"></span>
+                    </button>
+                    <button type="button" @click="runStrategy(['lsi'])" :disabled="s.busyCard.lsi" class="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800" title="{{ __('Regenerate LSI suggestions') }}">↻</button>
+                </header>
+                <div x-show="s.open.lsi" class="border-t border-slate-100 p-4 dark:border-slate-800">
+                    <p class="mb-2 text-[11px] text-slate-400">{{ __('Semantically-related phrases the article must include word-for-word. Your Step-1 picks are shown selected; add suggestions with one click.') }}</p>
+                    <p x-show="lsiSuggestions().length === 0 && lsiKeywords().length === 0" class="text-xs text-slate-400">{{ __('No suggestions yet. Click ↻ to generate.') }}</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        <template x-for="kw in [...new Set([...lsiKeywords(), ...lsiSuggestions()])]" :key="kw">
+                            <button type="button" @click="addLsi(kw)" :disabled="lsiKeywords().includes(kw)"
+                                class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition"
+                                :class="lsiKeywords().includes(kw) ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'">
+                                <span x-text="kw"></span>
+                                <span x-show="kwVolumeLabel(kw)" class="rounded-full bg-slate-100 px-1.5 py-px text-[10px] font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                                    <span x-text="kwVolumeLabel(kw)"></span><span x-show="kwTrendIcon(kw)" :class="kwTrendIcon(kw) === '▲' ? 'text-emerald-600' : 'text-red-500'" x-text="' ' + kwTrendIcon(kw)"></span>
+                                </span>
+                                <span x-text="lsiKeywords().includes(kw) ? '✓' : '+'"></span>
                             </button>
                         </template>
                     </div>

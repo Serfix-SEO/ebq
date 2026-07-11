@@ -38,21 +38,17 @@ class AppServiceProvider extends ServiceProvider
         // the customer_columns one because we have our own version on
         // `websites`). So no migration-skipping API call is needed here.
 
-        // LLM client — bind the interface to Mistral by default. Per-task
-        // services that want a different provider for a specific endpoint
-        // (e.g. Claude for copywriting in Phase 2) can take a concrete
-        // class via constructor injection instead of the interface.
-        $this->app->bind(\App\Services\Llm\LlmClient::class, function () {
-            // Model resolution goes through AiModelConfig so the admin's
-            // dropdown choice (persisted in `settings.ai.llm.model`)
-            // takes precedence over the .env-driven config default.
-            // Per-call `model` overrides on individual LLM calls still
-            // win — this is just the platform-wide fallback.
-            return new \App\Services\Llm\MistralClient(
-                (string) config('services.mistral.key', ''),
-                \App\Support\AiModelConfig::currentModel(),
-            );
-        });
+        // LLM client — provider (Mistral/DeepSeek) and model both come
+        // from admin settings via the factory. Deliberately bind(), not
+        // singleton(): resolution happens per request, so an admin
+        // flipping the provider or model takes effect on the next
+        // request without a deploy. Per-call `model` overrides on
+        // individual LLM calls still win — this is just the
+        // platform-wide fallback.
+        $this->app->bind(
+            \App\Services\Llm\LlmClient::class,
+            fn () => \App\Services\Llm\LlmClientFactory::make(),
+        );
     }
 
     /**

@@ -91,6 +91,33 @@ class AiWriterService
         // — the strict-output rules above it always win.
         $customPrompt = trim((string) ($input['custom_prompt'] ?? ''));
 
+        // Strategy-step selections (v25 — previously generated for the
+        // user but never fed to the writer, so the article ignored them):
+        // secondary keywords to weave, and the user-approved FAQ list
+        // that must join the PAA questions in the FAQ section.
+        $keywordSuggestions = array_values(array_filter(
+            array_map('trim', (array) ($input['keyword_suggestions'] ?? [])),
+            static fn ($k) => is_string($k) && $k !== ''
+        ));
+        $curatedFaqs = array_values(array_filter(
+            (array) ($input['faqs'] ?? []),
+            static fn ($f) => is_array($f) && trim((string) ($f['question'] ?? '')) !== ''
+        ));
+
+        // Output locale + voice from the wizard's Step-1 pickers. These
+        // were passed by WriterProjectService since the wizard shipped
+        // but never consumed — an Arabic-language project still wrote
+        // English (owner report 2026-07-11). Empty language = legacy
+        // behavior (match the input/keyword language).
+        $style = [
+            'language' => strtolower(trim((string) ($input['language'] ?? ''))),
+            'country'  => strtoupper(trim((string) ($input['country'] ?? ''))),
+            'tone'     => trim((string) ($input['tone'] ?? '')),
+            'audience' => trim((string) ($input['audience'] ?? '')),
+            // User's Strategy-step H1 pick — locks the "h1" output.
+            'chosen_h1' => is_array($input['selected'] ?? null) ? trim((string) ($input['selected']['h1'] ?? '')) : '',
+        ];
+
         // Standalone-draft mode: user supplied a Title but no existing
         // content. Treat the title as the brief's suggested H1 if the
         // brief didn't return one (or override if user explicitly chose
@@ -193,13 +220,16 @@ class AiWriterService
         //      invalidates on edit; the version bump invalidates
         //      pre-LSI cached drafts whose user message lacked the
         //      block entirely.
+        // v25: output-locale block — language/country/tone/audience from
+        // the wizard now reach the prompt (they were passed but dropped;
+        // Arabic projects wrote English until 2026-07-11).
         // v24: LSI rule rewritten from "aim for half, paraphrase OK" to
         //      strict verbatim use. Bump invalidates v23 cached drafts
         //      whose model output was generated under the lax rule.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
-        $extraHash = substr(hash('sha256', mb_strtolower($title).'|'.implode('|', $additionalKeywords).'|lsi:'.implode('|', $lsiKeywords)), 0, 8);
+        $extraHash = substr(hash('sha256', mb_strtolower($title).'|'.implode('|', $additionalKeywords).'|lsi:'.implode('|', $lsiKeywords).'|ks:'.implode('|', $keywordSuggestions).'|faq:'.substr(hash('sha256', (string) json_encode($curatedFaqs)), 0, 8)), 0, 8);
         $linksHash = substr(hash('sha256', json_encode([
             'i' => $selectedInternal,
             'e' => $selectedExternal,
@@ -207,8 +237,10 @@ class AiWriterService
         $customPromptHash = $customPrompt !== ''
             ? substr(hash('sha256', mb_strtolower($customPrompt)), 0, 12)
             : '0';
+        // v25: locale/voice joined the key — same keyword in a different
+        // language must never serve the other language's cached draft.
         $cacheKey = sprintf(
-            'ai_writer_v24:%s:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s',
+            'ai_writer_v25:%s:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -221,6 +253,7 @@ class AiWriterService
             $extraHash,
             $linksHash,
             $customPromptHash,
+            implode('-', $style) ?: '0',
         );
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ($cached['ok'] ?? false) === true) {
@@ -229,17 +262,32 @@ class AiWriterService
             return $cached;
         }
 
-        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null, $title, $additionalKeywords, $selectedExternal, $customPrompt, $lsiKeywords);
+        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null, $title, $additionalKeywords, $selectedExternal, $customPrompt, $lsiKeywords, $style, $keywordSuggestions, $curatedFaqs);
         // 16k output tokens supports the 20-section cap with room for JSON
         // overhead. Mistral Small's 32k context window comfortably fits
         // input + this output. 240s timeout matches the worst-case wall
         // time for large JSON-mode generations.
-        $response = $this->llm->completeJson($messages, [
+        //
+        // `reasoning` opts into DeepSeek's thinking mode for THIS call
+        // only — the one long-form, quality-dominant generation where the
+        // extra latency + reasoning tokens pay off. Every other LLM call
+        // site stays non-thinking (interactive paths can't afford it);
+        // Mistral ignores the flag.
+        $llmOptions = [
             'temperature' => 0.5,
             'max_tokens' => 16000,
             'json_object' => true,
             'timeout' => 240,
-        ]);
+            'reasoning' => true,
+        ];
+        // Billing hints from the caller (queue jobs have no Auth user —
+        // without an explicit __user_id the call would be unmetered).
+        foreach (['__user_id', '__website_id', '__source'] as $hint) {
+            if (isset($input[$hint]) && (string) $input[$hint] !== '') {
+                $llmOptions[$hint] = (string) $input[$hint];
+            }
+        }
+        $response = $this->llm->completeJson($messages, $llmOptions);
 
         if (! is_array($response) || ! isset($response['sections']) || ! is_array($response['sections'])) {
             Log::warning('AiWriterService: malformed LLM response', [
@@ -260,6 +308,42 @@ class AiWriterService
         }
 
         $sections = $this->normalizeSections($response['sections']);
+
+        // LSI enforcement (v25): the verbatim rule is strict but models
+        // still drop phrases on long generations, and before this the
+        // misses were only a log line. ONE corrective retry that replays
+        // the draft and calls out the missing phrases; keep whichever
+        // response covers more. Costs a second full call only when the
+        // first actually missed something.
+        if ($lsiKeywords !== []) {
+            $firstAudit = $this->auditLsiUsage($lsiKeywords, $sections);
+            if ($firstAudit['missing'] !== []) {
+                $retryMessages = array_merge($messages, [
+                    ['role' => 'assistant', 'content' => (string) json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)],
+                    ['role' => 'user', 'content' => 'REVISION REQUIRED — these LSI phrases are missing verbatim from the article: "'
+                        .implode('", "', $firstAudit['missing'])
+                        .'". Return the SAME JSON object (identical keys, same section count, same headings and content) with each missing phrase woven word-for-word into the most fitting existing section, per the LSI rules. Change only what is needed to host the phrases naturally.'],
+                ]);
+                $retryResponse = $this->llm->completeJson($retryMessages, $llmOptions);
+                if (is_array($retryResponse) && is_array($retryResponse['sections'] ?? null)) {
+                    $retrySections = $this->normalizeSections($retryResponse['sections']);
+                    $retryAudit = $this->auditLsiUsage($lsiKeywords, $retrySections);
+                    if ($retrySections !== [] && count($retryAudit['missing']) < count($firstAudit['missing'])) {
+                        $sections = $retrySections;
+                        if (is_string($retryResponse['h1'] ?? null) && trim($retryResponse['h1']) !== '') {
+                            $response['h1'] = $retryResponse['h1'];
+                        }
+                        if (is_string($retryResponse['summary'] ?? null) && trim($retryResponse['summary']) !== '') {
+                            $response['summary'] = $retryResponse['summary'];
+                        }
+                    }
+                }
+                Log::info('AiWriterService: LSI retry', [
+                    'missing_before' => count($firstAudit['missing']),
+                    'missing_after' => count($this->auditLsiUsage($lsiKeywords, $sections)['missing']),
+                ]);
+            }
+        }
 
         // Belt-and-suspenders for strict mode: drop any "replace" sections
         // the model snuck in despite the prompt. They collapse the entire
@@ -445,6 +529,11 @@ class AiWriterService
         $result = [
             'ok' => true,
             'summary' => self::stripDashes(mb_substr((string) ($response['summary'] ?? ''), 0, 600)),
+            // SEO-optimized page headline (v25) — keyword-front, ≤65
+            // chars, in the output language. Consumers use it as the
+            // page H1 / WP post title; empty when an older cached
+            // payload predates the field.
+            'h1' => self::stripDashes(trim(strip_tags(mb_substr((string) ($response['h1'] ?? ''), 0, 200)))),
             'sections' => $sections,
             'sources_used' => [
                 'brief' => $hasBrief,
@@ -477,7 +566,19 @@ class AiWriterService
      * @param  list<array{anchor:string,url:string,manual:bool}>  $selectedExternal
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection, string $title, array $additionalKeywords, array $selectedExternal = [], string $customPrompt = '', array $lsiKeywords = []): array
+    /** Wizard language codes → English names for prompts (mirrors the pickers; also used by WriterProjectService). */
+    public const LANGUAGE_NAMES = [
+        'en' => 'English', 'es' => 'Spanish', 'fr' => 'French', 'de' => 'German',
+        'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'sv' => 'Swedish',
+        'no' => 'Norwegian', 'da' => 'Danish', 'fi' => 'Finnish', 'pl' => 'Polish',
+        'cs' => 'Czech', 'el' => 'Greek', 'tr' => 'Turkish', 'ro' => 'Romanian',
+        'hu' => 'Hungarian', 'ru' => 'Russian', 'uk' => 'Ukrainian', 'ar' => 'Arabic',
+        'he' => 'Hebrew', 'hi' => 'Hindi', 'th' => 'Thai', 'vi' => 'Vietnamese',
+        'id' => 'Indonesian', 'ms' => 'Malay', 'ja' => 'Japanese', 'ko' => 'Korean',
+        'zh' => 'Chinese',
+    ];
+
+    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection, string $title, array $additionalKeywords, array $selectedExternal = [], string $customPrompt = '', array $lsiKeywords = [], array $style = [], array $keywordSuggestions = [], array $curatedFaqs = []): array
     {
         $briefBlock = '(none)';
         if (is_array($brief) && ! empty($brief)) {
@@ -554,16 +655,20 @@ user can review and approve one section at a time. Your job is to use
 EVERY signal you're given — the brief's outline, must-have entities,
 "people also ask" questions, top-SERP titles, internal-link targets,
 and the topical-gap analysis — and turn them into reviewable sections.
-
+%OUTPUT_LOCALE%
 Output rules (STRICT — non-compliance breaks the consumer):
 - Return ONE JSON object only. No prose, no markdown fences, no commentary.
-- Top-level keys: "summary" (string) and "sections" (array).
+- Top-level keys: "summary" (string), "h1" (string) and "sections" (array).
+- "h1" — %H1_SPEC% It is rendered as the page's H1 by the publishing
+  platform — separate from the per-section headings, and must NOT be
+  repeated as a heading inside any section.
 - Section count: %SECTION_COUNT_RULE%
 - 200–500 words per section is the sweet spot; up to 800 when the topic
   genuinely warrants depth. Don't pad. Don't undersell.
 - "people also ask" handling — REQUIRED: when the brief's
-  `people_also_ask` array is NON-EMPTY, produce exactly ONE consolidated
-  FAQ section. Structure:
+  `people_also_ask` array OR the USER-APPROVED FAQs list (user message)
+  is NON-EMPTY, produce exactly ONE consolidated FAQ section covering
+  BOTH sources (dedupe near-identical questions). Structure:
     • kind: "add"
     • Section <h2> is "Frequently Asked Questions" (or "FAQs" — keep
       it generic; do NOT use the focus keyword in this heading).
@@ -581,7 +686,7 @@ Output rules (STRICT — non-compliance breaks the consumer):
       from the brief).
     • Do NOT produce multiple FAQ sections. ONE section, all questions
       grouped under its <h2>.
-  When `people_also_ask` is empty or absent, do NOT emit a FAQ section.
+  When `people_also_ask` AND the USER-APPROVED FAQs are both empty, do NOT emit a FAQ section.
   Example skeleton (with two PAA questions):
     <h2>Frequently Asked Questions</h2>
     <h3>Is vegan protein complete?</h3>
@@ -811,7 +916,7 @@ SYS;
                 : 'When the post has no existing <h1>, the FIRST add (or the replace, if any) MUST start with ONE <h1> that includes the focus keyword naturally, IMMEDIATELY FOLLOWED by an intro <p> paragraph of 2–4 sentences. Only after that intro paragraph may any <h2> appear. Never place an <h2> directly after an <h1> with no intervening body content. Subsequent sections must NOT include another <h1>.');
 
         $sectionCountRule = $strictSelection
-            ? "STRICT-SELECTION MODE — the user curated their inputs in a prior step. Follow these rules exactly:\n  (1) Build the INPUT LIST as the case-insensitive UNION of all items in: `suggested_outline` + `subtopics` + the gap analysis's `missing` array. Deduplicate so the same string never appears twice. Call its size M.\n      PAA does NOT contribute to M — when `people_also_ask` is non-empty, the consolidated FAQ section adds +1 to the total. Call the final count N = M + (people_also_ask non-empty ? 1 : 0).\n      (Do NOT count `must_have_entities`, `top_serp_titles`, or internal_links — those are CONTEXT for prose, not section drivers.)\n  (2) Generate EXACTLY N sections of kind=\"add\":\n      - M sections, one per item in the input list, ordered: outline → subtopics → gap topics. Each section's <h2> uses or closely paraphrases its source item.\n      - When PAA is non-empty, append ONE additional consolidated FAQ section per the \"people also ask\" handling rule above (one <h2>, all PAA questions as <h3>+<p> pairs nested inside).\n  (3) NEVER use kind=\"replace\" in strict mode, EVEN WHEN THE POST IS EMPTY. Always emit N add sections instead.\n  (4) Do NOT invent new topics, do NOT pad with extra sections, do NOT split an input into multiple sections, do NOT merge two inputs into one section. One input → one section. PAA questions are the exception — they all live inside the single FAQ section as <h3>s.\n  (5) Optionally append `edit` sections for weak passages of the existing post (improvements). These do NOT count toward N and are extra, not substitutes.\n  (6) Verify before emitting: the number of `add` sections in your output must equal N exactly. If you produce N-1 or N+1, the response is invalid."
+            ? "STRICT-SELECTION MODE — the user curated their inputs in a prior step. Follow these rules exactly:\n  (1) Build the INPUT LIST as the case-insensitive UNION of all items in: `suggested_outline` + `subtopics` + the gap analysis's `missing` array. Deduplicate so the same string never appears twice. Call its size M.\n      PAA does NOT contribute to M — when `people_also_ask` OR the USER-APPROVED FAQs list is non-empty, the consolidated FAQ section adds +1 to the total. Call the final count N = M + (people_also_ask or user-approved FAQs non-empty ? 1 : 0).\n      (Do NOT count `must_have_entities`, `top_serp_titles`, or internal_links — those are CONTEXT for prose, not section drivers.)\n  (2) Generate EXACTLY N sections of kind=\"add\":\n      - M sections, one per item in the input list, ordered: outline → subtopics → gap topics. Each section's <h2> uses or closely paraphrases its source item.\n      - When PAA is non-empty, append ONE additional consolidated FAQ section per the \"people also ask\" handling rule above (one <h2>, all PAA questions as <h3>+<p> pairs nested inside).\n  (3) NEVER use kind=\"replace\" in strict mode, EVEN WHEN THE POST IS EMPTY. Always emit N add sections instead.\n  (4) Do NOT invent new topics, do NOT pad with extra sections, do NOT split an input into multiple sections, do NOT merge two inputs into one section. One input → one section. PAA questions are the exception — they all live inside the single FAQ section as <h3>s.\n  (5) Optionally append `edit` sections for weak passages of the existing post (improvements). These do NOT count toward N and are extra, not substitutes.\n  (6) Verify before emitting: the number of `add` sections in your output must equal N exactly. If you produce N-1 or N+1, the response is invalid."
             : 'BETWEEN 12 AND 20 sections. Coverage is the point — produce one section per brief subtopic, one per topical gap, and ONE consolidated FAQ section that absorbs every "people also ask" question as a nested <h3>+<p> pair. Returning fewer than 12 sections when richer inputs are available is a failure of the task.';
 
         $linkFallbackRule = $strictSelection
@@ -826,9 +931,47 @@ SYS;
             ? '' // no fallback paragraph in strict mode — STRICT-SELECTION rule already covers it
             : "INPUT-SCARCITY FALLBACK: when CONTENT BRIEF, TOPICAL GAPS, and CURRENT\nPOST CONTENT are ALL marked \"(none)\" / \"(empty post)\", you still produce\na useful first draft using only the target keyword and any user-curated\nitems in the user message. In that case, return ONE \"replace\" section\nthat scaffolds a complete article: H1 (if not yet on page) → 2–4\nsentence intro paragraph → 6–10 H2 sections covering the keyword's\ntypical search intent (problem → core explanation → how-to / comparison\n→ FAQs → next steps), each followed by 2–4 paragraphs of substantive\nprose. Do NOT refuse — the absence of brief / gaps means richer output\nis impossible, not that no output is.";
 
+        // Output locale + voice from the wizard pickers (v25). The
+        // language rule is a HARD block near the top of the system
+        // message — the brief/PAA arrive in the SERP's language (usually
+        // English), so without an explicit translate instruction the
+        // model mirrors the brief's language and ignores the picker.
+        // "h1" output spec: when the user chose an H1 on the Strategy
+        // step it's locked (echo verbatim); otherwise the model writes
+        // an SEO-optimized one. Deliberately NOT keyed off the brief's
+        // suggested_h1 — standalone-draft mode seeds that from the raw
+        // project title, which is exactly the unoptimized string we're
+        // trying to replace.
+        $chosenH1 = trim((string) ($style['chosen_h1'] ?? ''));
+        $h1Spec = $chosenH1 !== ''
+            ? "the user chose this page headline — return it VERBATIM as the \"h1\" value, unchanged: \"{$chosenH1}\"."
+            : 'the page\'s SEO headline you write: contains the focus keyword verbatim as close to the front as natural, 65 characters or fewer, written in the OUTPUT LANGUAGE, compelling but not clickbait, no quotes or brackets.';
+
+        $langName = self::LANGUAGE_NAMES[(string) ($style['language'] ?? '')] ?? '';
+        $localeLines = [];
+        if ($langName !== '') {
+            $localeLines[] = "OUTPUT LANGUAGE (HARD RULE): write the ENTIRE article in {$langName}. "
+                . "Every heading, paragraph, list item, table cell, FAQ question and answer, the \"summary\" value, "
+                . "and every section \"title\" must be in {$langName}. The brief's outline, subtopics and "
+                . "\"people also ask\" questions may arrive in a different language — TRANSLATE them into {$langName}; "
+                . "never echo untranslated headings. Only these stay verbatim in their original language: the focus "
+                . "keyword, the additional keyphrases, the LSI phrases (their verbatim rules override translation), "
+                . "proper nouns, and brand names.";
+        }
+        if (($style['country'] ?? '') !== '') {
+            $localeLines[] = "TARGET MARKET: {$style['country']} — prefer conventions, examples, units and spellings natural to that market.";
+        }
+        if (($style['tone'] ?? '') !== '') {
+            $localeLines[] = "TONE: {$style['tone']}.";
+        }
+        if (($style['audience'] ?? '') !== '') {
+            $localeLines[] = "AUDIENCE: {$style['audience']} readers — match depth and vocabulary to them.";
+        }
+        $localeRule = $localeLines === [] ? '' : "\n".implode("\n", $localeLines)."\n";
+
         $system = str_replace(
-            ['%H1_FLAG%', '%H1_RULE%', '%SECTION_COUNT_RULE%', '%LINK_FALLBACK_RULE%', '%REPLACE_RULE%', '%SCARCITY_FALLBACK%'],
-            [$hasH1 ? 'true' : 'false', $h1Rule, $sectionCountRule, $linkFallbackRule, $replaceRule, $scarcityFallback],
+            ['%OUTPUT_LOCALE%', '%H1_SPEC%', '%H1_FLAG%', '%H1_RULE%', '%SECTION_COUNT_RULE%', '%LINK_FALLBACK_RULE%', '%REPLACE_RULE%', '%SCARCITY_FALLBACK%'],
+            [$localeRule, $h1Spec, $hasH1 ? 'true' : 'false', $h1Rule, $sectionCountRule, $linkFallbackRule, $replaceRule, $scarcityFallback],
             $system,
         );
 
@@ -852,6 +995,16 @@ SYS;
         $lsiBlock = empty($lsiKeywords)
             ? '(none)'
             : '"' . implode('", "', array_slice($lsiKeywords, 0, 30)) . '"';
+        $ksBlock = empty($keywordSuggestions)
+            ? '(none)'
+            : '"' . implode('", "', array_slice($keywordSuggestions, 0, 25)) . '"';
+        $faqBlock = '(none)';
+        if (! empty($curatedFaqs)) {
+            $faqBlock = (string) json_encode(array_map(static fn (array $f) => [
+                'question' => (string) ($f['question'] ?? ''),
+                'answer' => mb_substr((string) ($f['answer'] ?? ''), 0, 600),
+            ], array_slice($curatedFaqs, 0, 15)), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
 
         $user = <<<USER
 Target keyword: "{$keyword}"
@@ -884,6 +1037,21 @@ word-for-word, in the same order the user typed it. Rules:
     placeholder.
 LSI phrases:
 {$lsiBlock}
+
+SECONDARY KEYWORDS from the user's strategy step (weave each into at
+least one section where it reads naturally; translate to the OUTPUT
+LANGUAGE when the article language differs, keeping the meaning —
+these are coverage signals, not verbatim strings):
+{$ksBlock}
+
+STRATEGY FAQs — user-approved on the strategy step (REQUIRED when
+non-empty): include EVERY one of these Q&As in the consolidated FAQ section,
+alongside the brief's "people also ask" questions. Use each question
+as its <h3> (translated into the OUTPUT LANGUAGE when needed) and
+base its <p> answer on the provided answer text, tightened to the
+40–60-word snippet format. Skip a provided FAQ only when it duplicates
+a PAA question — keep whichever phrasing is clearer:
+{$faqBlock}
 
 CONTENT BRIEF (may be empty):
 {$briefBlock}

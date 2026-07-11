@@ -14,8 +14,44 @@ from `GET /wordpress/plugin.zip`.
 
 ## Current state (2026-07-11)
 
-**v2.0.10 is the published `stable` release; v2.0.11 is built and awaiting
-QA/publish** (ZIP at `ebq-wordpress-plugin/ebq-seo.zip`). 2.0.11: keyword
+**v2.0.10 is the published `stable` release; v2.0.13 is built, installed on the
+QA install, and awaiting publish** (ZIP at `ebq-wordpress-plugin/ebq-seo.zip`;
+2.0.11/2.0.12 were never published — 2.0.13 supersedes them). **2.0.13** carries
+the wizard full-input-coverage UI (H1/LSI/volume cards below) — split from
+2.0.12 because two different bundles had shipped under the 2.0.12 version
+string, so installs' browsers/LiteSpeed kept serving the older asset
+(`?ver=` never changed). RULE: never rebuild a changed bundle under an
+already-installed version number — bump every time.
+
+**2.0.12 — async AI Writer generation + progress UI.** "Generate article" no
+longer holds one `wp_remote_post` open for the full 2–4 minute writer LLM run
+(shared WP hosts routinely killed it): `writer_projects_generate()` now sends
+`async=1` (45s timeout) and Serfix queues `GenerateWriterDraftJob`, answering
+202; the wizard polls the new `GET /writer-projects/{id}/generate-status`
+proxy route (→ `/api/v1/hq/writer-projects/{id}/generate-status`) every 4s via
+`src/hq/aiwriter/useGeneration.js`, rendering a staged progress panel
+(`components/GenerationProgress.jsx`, `.ebq-aiw-genprog*` in `aiw.css`) with a
+Try-again failure card. Closing the tab no longer loses the article — the job
+keeps running server-side and reopening the project resumes the poll
+(`generation_status` in the API `full()` payload drives the resume in
+StepSummary/StepReview). The server keeps the blocking generate path for older
+installed plugin versions (`async` is opt-in). Gotcha fixed in the same
+change: `NEVER_CACHE_ROUTE_PREFIXES` listed `/ebq/v1/hq/writer-projects` but
+the routes register as `/ebq/v1/writer-projects` (no `/hq/`) — both prefixes
+are now listed so status polls can never be served stale. QA'd live on the
+test install (headless Chrome: regenerate → progress panel → review refresh).
+
+Also in the 2.0.12 ZIP — **wizard full-input coverage UI** (server side: writer
+prompt v25, see `infra/ai/writer.md`): Strategy step gained an **H1 heading
+card** (`H1Section` — editable, 65-char counter, keyword check, 5 suggestions
+popover), an **LSI keywords card** (`LsiSection` — one-click add of
+`lsi_suggestions` into `lsi_keywords`), and **volume/trend badges**
+(`KwVolume` reading `project.keyword_data`) on keyword + LSI chips. Review step
+shows an **LSI coverage strip** (`generation_meta` — x/y verbatim + missing
+list) and now uses the SEO H1 (`h1 → generated_h1 → title`) for both the
+preview heading and the WP `post_title` on Save-as-draft.
+
+Prior, bundled in the same unpublished ZIP — 2.0.11: keyword
 detail page on the HQ Keywords tab (`ebq-hq-keywords`) — query click →
 in-tab deep-dive (`src/hq/components/KeywordDetailView.jsx`) mirroring the
 portal's `/keywords/{query}` page, fed by the new

@@ -19,15 +19,30 @@
             <button type="button" @click="rv.mode = 'edit'" class="rounded-md px-3 py-1.5 transition" :class="rv.mode === 'edit' ? 'bg-orange-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">{{ __('Edit HTML') }}</button>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            <button type="button" @click="reviewRegenerate()" :disabled="rv.regenerating || rv.saving" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" x-text="rv.regenerating ? '{{ __('Regenerating…') }}' : '{{ __('Regenerate') }}'"></button>
+            <button type="button" @click="reviewRegenerate()" :disabled="gen.active || rv.saving" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">{{ __('Regenerate') }}</button>
             <button type="button" @click="reviewCopy()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" x-text="rv.copied ? '{{ __('Copied ✓') }}' : '{{ __('Copy HTML') }}'"></button>
             <button type="button" @click="reviewDownload()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">{{ __('Download .html') }}</button>
             <button type="button" @click="reviewMarkComplete()" :disabled="rv.saving || !(rv.html || '').trim()" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50" x-text="rv.saving ? '{{ __('Saving…') }}' : (project?.step === 'completed' ? '{{ __('Completed ✓') }}' : '{{ __('Mark complete') }}')"></button>
         </div>
     </div>
 
+    @include('ai-studio.wizard-steps.partials.generation-progress')
+
+    {{-- Coverage report — what the writer actually honoured --}}
+    <template x-if="!gen.active && project?.generation_meta && (project.generation_meta.lsi_provided || []).length > 0">
+        <div class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs dark:border-slate-800 dark:bg-slate-900">
+            <span class="font-semibold text-slate-700 dark:text-slate-200">{{ __('LSI coverage:') }}</span>
+            <span class="rounded-full px-2 py-0.5 font-semibold"
+                :class="(project.generation_meta.lsi_missing || []).length === 0 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'"
+                x-text="(project.generation_meta.lsi_present || []).length + ' / ' + (project.generation_meta.lsi_provided || []).length + ' {{ __('verbatim') }}'"></span>
+            <template x-if="(project.generation_meta.lsi_missing || []).length > 0">
+                <span class="text-slate-500 dark:text-slate-400">{{ __('Missing:') }} <span class="italic" x-text="(project.generation_meta.lsi_missing || []).join(', ')"></span></span>
+            </template>
+        </div>
+    </template>
+
     {{-- Stats --}}
-    <ul class="flex flex-wrap gap-4 rounded-lg bg-slate-50 px-4 py-2 text-sm dark:bg-slate-800/60">
+    <ul class="flex flex-wrap gap-4 rounded-lg bg-slate-50 px-4 py-2 text-sm dark:bg-slate-800/60" x-show="!gen.active">
         <li><strong x-text="reviewStats().words.toLocaleString()"></strong> <span class="text-slate-500 dark:text-slate-400">{{ __('words') }}</span></li>
         <li><strong x-text="reviewStats().headings"></strong> <span class="text-slate-500 dark:text-slate-400">{{ __('headings') }}</span></li>
         <li><strong x-text="reviewStats().paragraphs"></strong> <span class="text-slate-500 dark:text-slate-400">{{ __('paragraphs') }}</span></li>

@@ -32,6 +32,10 @@ class UsageController extends Controller
             'label' => 'Mistral AI',
             'unit' => 'tokens',
         ],
+        'deepseek' => [
+            'label' => 'DeepSeek',
+            'unit' => 'tokens',
+        ],
     ];
 
     public function index(Request $request): View
@@ -195,6 +199,7 @@ class UsageController extends Controller
             // we don't split the two in the activity log so blend to a
             // single per-token rate that errs on the conservative side.
             'mistral' => (float) config('services.mistral.cost_per_token_usd', 0.0000003),
+            'deepseek' => (float) config('services.deepseek.cost_per_token_usd', 0.0000011),
         ];
     }
 
@@ -314,6 +319,8 @@ class UsageController extends Controller
     private function buildPerClientUtilisation(array $byClient, $users): array
     {
         $meter = app(\App\Services\Usage\UsageMeter::class);
+        // 'mistral' here is the pooled LLM bucket — UsageMeter sums
+        // mistral+deepseek consumption together, so one column covers both.
         $providers = ['keywords_everywhere', 'serp_api', 'mistral'];
         $out = [];
         foreach ($byClient as $row) {

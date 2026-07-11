@@ -207,7 +207,11 @@ class AiToolRunner
     private function cacheKey(Website $website, string $toolId, array $input): string
     {
         $hash = hash('xxh3', json_encode($input) ?: '');
-        return sprintf('ai_tool:%s:%s:%s', $toolId, $website->id, $hash);
+        // v2 namespace (2026-07-11): `language` was always part of the
+        // input hash, but tools IGNORED it until the AbstractAiTool
+        // output-language rule — so English outputs sat cached under
+        // localized keys. The bump orphans every pre-fix entry at once.
+        return sprintf('ai_tool:v2:%s:%s:%s', $toolId, $website->id, $hash);
     }
 
     private function logCredits(Website $website, ?string $userId, string $toolId, AiToolResult $result, bool $cached): void

@@ -76,6 +76,7 @@ source is `app/`. The `<php>` block sets the test environment (`phpunit.xml:20`)
 | `PULSE/TELESCOPE/NIGHTWATCH_ENABLED` | `false`, `RECAPTCHA_*` | `""` | Disable monitoring/captcha. |
 | `REDIS_DB`/`REDIS_CACHE_DB`/`REDIS_PREFIX` | `13`/`14`/`serfix-testing-` | Tests can never touch the prod Redis keyspace (2026-07-06). |
 | `KEYWORDS_EVERYWHERE_API_KEY` | `""` | **Tests were making real, credit-billed KE API calls** (found 2026-07-11): `QUEUE_CONNECTION=sync` runs `RankTrackingKeywordObserver`'s `FetchKeywordMetricsJob` inline, and the prod `.env` key leaked through — every `RankTrackingKeyword::create()` in a test hit the live API and silently overwrote seeded `KeywordMetric` rows with real data. Any other billable provider key added to `.env` needs the same blanking here. |
+| `MISTRAL_API_KEY` / `DEEPSEEK_API_KEY` | `""` | Same landmine class (added 2026-07-11 with the DeepSeek provider): a leaked LLM key lets any test resolving `LlmClient` — or hitting the admin settings form, which fetches the live `/models` list during validation — make real network calls; completions are token-billed. Tests needing HTTP use `Http::fake()` + a fake key via `config()`. |
 
 **Gotcha:** these are `<env>` *defaults*. A cached `bootstrap/cache/config.php` overrides them
 — the whole reason the incident happened and the guard exists. And they only cover the keys

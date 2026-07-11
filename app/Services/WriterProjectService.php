@@ -48,6 +48,8 @@ class WriterProjectService
         private readonly LlmClient $llm,
         private readonly ClientActivityLogger $activity,
         private readonly AiToolRunner $toolRunner,
+        private readonly KeywordMetricsService $keywordMetrics,
+        private readonly AiRelatedKeywordsService $relatedKeywords,
     ) {
     }
 
@@ -64,7 +66,7 @@ class WriterProjectService
      *
      * @param  list<string>|null  $only  optional subset of keys to
      *   regenerate; `null` regenerates everything. Allowed keys:
-     *   'seo_titles', 'meta', 'faqs', 'keyword_suggestions',
+     *   'seo_titles', 'h1', 'meta', 'faqs', 'keyword_suggestions',
      *   'link_suggestions'.
      */
     public function generateStrategy(WriterProject $project, Website $website, ?array $only = null): WriterProject
@@ -98,6 +100,44 @@ class WriterProjectService
                     $res->value,
                 ), static fn ($t) => $t !== ''));
                 $project->seo_titles = $this->filterCandidates($titles, (string) $project->focus_keyword, 50, 60);
+            }
+        }
+
+        // H1 heading. Distinct from SEO titles (SERP snippets, 50–60
+        // chars): the H1 is the on-page headline — focus keyword up
+        // front, ≤65 chars, written in the project's output language.
+        // Direct LLM call (like briefChat) rather than a registry tool —
+        // this card is wizard-only, not a Studio catalog entry. The
+        // user's pick/edit lands on `h1` via PATCH; the writer uses it
+        // as the fixed page headline (selected.h1 → brief suggested_h1)
+        // and its own generated_h1 is only the fallback.
+        if ($shouldRun('h1')) {
+            $langName = $this->languageName((string) ($project->language ?? ''));
+            $langRule = $langName !== ''
+                ? "Write every option in {$langName}. Keep the focus keyword itself verbatim (do not translate it)."
+                : 'Match the language of the focus keyword.';
+            $resp = $this->llm->completeJson([
+                ['role' => 'system', 'content' => 'You write on-page H1 headlines for SEO articles. Return ONE JSON object: {"h1_options": [five strings]}. Rules: each option contains the focus keyword verbatim as close to the front as natural; 65 characters or fewer; compelling but not clickbait; no quotes, brackets, colons-as-gimmick, or trailing brand names; each option takes a different angle (benefit, how-to, list, question, direct). '.$langRule],
+                ['role' => 'user', 'content' => 'Focus keyword: "'.$project->focus_keyword.'". Article context: '.$summary],
+            ], [
+                'temperature' => 0.6,
+                'max_tokens' => 500,
+                'json_object' => true,
+                'timeout' => 30,
+            ]);
+            $options = is_array($resp['h1_options'] ?? null) ? $resp['h1_options'] : [];
+            $options = array_values(array_filter(array_map(
+                static fn ($t) => is_string($t) ? \App\Services\AiWriterService::stripDashes(trim($t)) : '',
+                $options,
+            ), static fn ($t) => $t !== ''));
+            if ($options !== []) {
+                $project->h1_suggestions = array_slice($options, 0, 5);
+                if (trim((string) ($project->h1 ?? '')) === '') {
+                    $project->h1 = mb_substr($options[0], 0, 200);
+                }
+                $this->recordCredits($project, CreditTypes::AI_WRITER_STRATEGY_H1, max(1, (int) ceil(strlen(implode('', $options)) / 200)), [
+                    'options' => count($options),
+                ]);
             }
         }
 
@@ -222,7 +262,28 @@ class WriterProjectService
             }
         }
 
-        // Link suggestions: internal (GSC-driven) + external (authority).
+        // LSI suggestions — semantically-related phrases the user can
+        // one-click add to the project's LSI list (Step 1 only offered a
+        // free-text box; owner asked for suggestions + data). Source:
+        // AiRelatedKeywordsService (LLM + GSC-grounded, 7d cache).
+        if ($shouldRun('lsi')) {
+            $sugs = $this->relatedKeywords->suggest((string) $website->id, (string) $project->focus_keyword);
+            $project->lsi_suggestions = array_slice(array_values(array_filter(array_map(
+                static fn ($s) => is_array($s) ? trim((string) ($s['keyword'] ?? '')) : '',
+                $sugs,
+            ), static fn ($k) => $k !== '')), 0, 20);
+        }
+
+        // Keyword data card: search volume / competition / trend for
+        // every keyword surfaced on this step (suggestions, LSI, the
+        // user's own lists). Cache-first via KeywordMetricsService —
+        // reads the shared 30-day keyword_metrics cache for free and
+        // queues a provider fetch (admin-selected provider, user-quota
+        // metered) for misses; those fill in on the next strategy view.
+        // Deliberately NOT a blocking synchronous fetch: the self-hosted
+        // finder is async-by-design and KE spends credits — the wizard
+        // must render instantly with whatever data exists.
+        $project->keyword_data = $this->keywordDataFor($project);
         if ($shouldRun('link_suggestions')) {
             $internal = [];
             $internalRes = $this->toolRunner->run('internal-link-suggestions', $website, $project->user_id, [
@@ -517,10 +578,15 @@ class WriterProjectService
     {
         @set_time_limit(180);
 
+        // Project locale drives the SERP (Serper gl/hl) AND the brief's
+        // output language — these were hardcoded null until 2026-07-11,
+        // so an Arabic project briefed against the US/English SERP and
+        // got an English outline (owner report: "still didn't write in
+        // arabic" — the user was reading the brief step).
         $briefRes = $this->briefService->brief($website, 0, [
             'focus_keyword' => $project->focus_keyword,
-            'country' => null,
-            'language' => null,
+            'country' => (string) ($project->country ?? ''),
+            'language' => (string) ($project->language ?? ''),
         ]);
 
         if (! is_array($briefRes) || ($briefRes['ok'] ?? false) !== true || ! is_array($briefRes['brief'] ?? null)) {
@@ -568,12 +634,17 @@ class WriterProjectService
      */
     private function briefErrorMessage(string $error): string
     {
+        // LLM error codes are provider-prefixed (mistral_network_error,
+        // deepseek_network_error, …) — match the suffix.
+        if (str_ends_with($error, '_network_error')) {
+            return 'The AI provider didn\'t respond in time. Wait a few seconds and click "Regenerate brief".';
+        }
+
         return match ($error) {
             'no_serp_data'           => 'No search results came back for that keyword. Try a more common phrasing, switch country/language, or wait a minute and retry.',
             'llm_parse_failed'       => 'The AI returned a brief in an unexpected shape. Try again, or use a more specific focus keyword so the model has clearer signals.',
             'llm_not_configured'     => 'The AI provider isn\'t configured. Contact support.',
             'missing_focus_keyword'  => 'A focus keyword is required to build a brief.',
-            'mistral_network_error'  => 'The AI provider didn\'t respond in time. Wait a few seconds and click "Regenerate brief".',
             default                  => 'Could not generate brief ('.$error.'). Try again.',
         };
     }
@@ -727,6 +798,32 @@ class WriterProjectService
     }
 
     /**
+     * Safety net for the async generate flow: a project stuck on
+     * queued/running long past any plausible runtime (job lost to a
+     * queue flush, worker OOM before failed() ran) is flipped to failed
+     * so the wizard's poller stops instead of spinning forever. The job
+     * itself times out at 400s — 10 minutes means something upstream
+     * already went wrong.
+     */
+    public function failStaleGeneration(WriterProject $project): void
+    {
+        $status = (string) $project->generation_status;
+        if ($status === WriterProject::GEN_RUNNING) {
+            $anchor = $project->generation_started_at ?? $project->updated_at;
+        } elseif ($status === WriterProject::GEN_QUEUED) {
+            $anchor = $project->updated_at;
+        } else {
+            return;
+        }
+
+        if ($anchor === null || $anchor->lt(now()->subMinutes(10))) {
+            $project->generation_status = WriterProject::GEN_FAILED;
+            $project->generation_error = 'generation_timeout';
+            $project->save();
+        }
+    }
+
+    /**
      * Final generation step. Calls the existing AiWriterService in
      * strict-selection mode with the curated brief, then post-processes
      * to inject <figure> blocks for each selected image immediately
@@ -743,7 +840,10 @@ class WriterProjectService
         ));
 
         $selected = [
-            'h1' => '',
+            // User's chosen H1 from the Strategy step — the writer treats
+            // it as the fixed page headline (selected.h1 -> suggested_h1)
+            // and echoes it as the top-level "h1" instead of inventing one.
+            'h1' => trim((string) ($project->h1 ?? '')),
             'h2_outline' => array_map(static fn (array $s) => (string) $s['h2'], $h2List),
             'subtopics' => $this->flattenSubtopics($h2List),
             'paa' => array_values(array_filter((array) ($brief['paa'] ?? []), 'is_string')),
@@ -777,6 +877,12 @@ class WriterProjectService
             // forced presence per section (that's what additional_keywords
             // is for).
             'lsi_keywords' => is_array($project->lsi_keywords) ? $project->lsi_keywords : [],
+            // Strategy-step selections (v25): secondary keywords to weave
+            // and the user-approved FAQs that must join the FAQ section.
+            // Generated for the user since the strategy step shipped but
+            // never handed to the writer until now.
+            'keyword_suggestions' => is_array($project->keyword_suggestions) ? $project->keyword_suggestions : [],
+            'faqs' => is_array($project->faqs) ? $project->faqs : [],
             // Locale + voice — wired through so the LLM knows the
             // target country / language / tone / reader level. The
             // writer service consumes these in its prompt builder.
@@ -794,21 +900,54 @@ class WriterProjectService
             // lookup and uses these instead. External is a new prompt
             // section added when non-empty.
             'selected_links' => $selectedLinks,
+            // Billing/telemetry hints for the LLM client. Explicit
+            // __user_id because this now also runs inside
+            // GenerateWriterDraftJob where there is no Auth user — the
+            // token cap must still be enforced and the spend logged.
+            '__user_id' => $website->user_id !== null ? (string) $website->user_id : '',
+            '__website_id' => (string) $website->id,
+            '__source' => 'blog_post_wizard',
         ]);
 
         if (! is_array($payload) || ($payload['ok'] ?? false) !== true) {
-            return tap($project, function (WriterProject $p) use ($payload): void {
-                Log::warning('WriterProjectService: writer.draft failed', [
-                    'project' => $p->id,
-                    'error' => is_array($payload) ? ($payload['error'] ?? 'unknown') : 'invalid',
-                ]);
-            });
+            $error = is_array($payload) ? (string) ($payload['error'] ?? 'unknown') : 'invalid';
+            Log::warning('WriterProjectService: writer.draft failed', [
+                'project' => $project->id,
+                'error' => $error,
+            ]);
+            $project->generation_status = WriterProject::GEN_FAILED;
+            $project->generation_error = mb_substr($error, 0, 120);
+            $project->save();
+
+            return $project;
         }
 
         $sections = is_array($payload['sections'] ?? null) ? $payload['sections'] : [];
         $html = $this->assembleHtml($project, $sections);
 
         $project->generated_html = $html;
+        // SEO-optimized H1 from the writer (keyword-front, output
+        // language). Falls back to the user's project title downstream
+        // when empty (older cached payloads predate the field).
+        $project->generated_h1 = (string) ($payload['h1'] ?? '') !== ''
+            ? mb_substr((string) $payload['h1'], 0, 200)
+            : $project->generated_h1;
+        // Coverage report for the review step — LSI hit/miss and section
+        // counts were diagnostics-only log lines before; users asked to
+        // SEE what the writer covered.
+        $diag = is_array($payload['diagnostics'] ?? null) ? $payload['diagnostics'] : [];
+        // NB: diagnostics' lsi_provided is a COUNT; the UIs want the list —
+        // rebuild it from the project so present/missing/provided align.
+        $project->generation_meta = [
+            'sections' => (int) ($diag['sections_returned'] ?? 0),
+            'lsi_provided' => array_values(array_filter(array_map('strval', (array) ($project->lsi_keywords ?? [])))),
+            'lsi_present' => array_values((array) ($diag['lsi_present_verbatim'] ?? [])),
+            'lsi_missing' => array_values((array) ($diag['lsi_missing'] ?? [])),
+            'internal_links' => (int) ($diag['internal_links_in_output'] ?? 0),
+            'paa_covered' => (int) ($diag['paa_questions_available'] ?? 0),
+        ];
+        $project->generation_status = WriterProject::GEN_DONE;
+        $project->generation_error = null;
         $project->step = WriterProject::STEP_SUMMARY; // user reviews on step 5 (review), but project stays at 'summary' until they Save-as-draft
         $project->save();
 
@@ -849,6 +988,61 @@ class WriterProjectService
      *
      * @param  array<string, mixed>  $extraMeta
      */
+    /** English language name for prompt rules, '' when unknown/unset. */
+    private function languageName(string $code): string
+    {
+        return AiWriterService::LANGUAGE_NAMES[strtolower(trim($code))] ?? '';
+    }
+
+    /**
+     * Volume / competition / trend map for every keyword surfaced by the
+     * wizard (focus, additional, LSI + suggestions, strategy keyword
+     * suggestions). Keys are lowercased keywords. Cache-first: rows the
+     * shared keyword_metrics cache doesn't have yet are queued for the
+     * admin-selected provider and appear on the next strategy view. No $
+     * projections here — volume/competition/trend only (app-wide rule).
+     *
+     * @return array<string, array{volume:?int, competition:?float, trend:string}>
+     */
+    private function keywordDataFor(WriterProject $project): array
+    {
+        $keywords = array_values(array_unique(array_filter(array_map(
+            static fn ($k) => mb_strtolower(trim((string) $k)),
+            array_merge(
+                [(string) $project->focus_keyword],
+                is_array($project->additional_keywords) ? $project->additional_keywords : [],
+                is_array($project->lsi_keywords) ? $project->lsi_keywords : [],
+                is_array($project->lsi_suggestions) ? $project->lsi_suggestions : [],
+                is_array($project->keyword_suggestions) ? $project->keyword_suggestions : [],
+            ),
+        ), static fn ($k) => $k !== '')));
+        if ($keywords === []) {
+            return [];
+        }
+
+        $rows = $this->keywordMetrics->metricsOrQueue(
+            $keywords,
+            'global',
+            (string) $project->website_id,
+            $project->user_id !== null ? (string) $project->user_id : null,
+        );
+
+        $out = [];
+        foreach ($keywords as $kw) {
+            $row = $rows[\App\Models\KeywordMetric::hashKeyword($kw)] ?? null;
+            if ($row === null) {
+                continue;
+            }
+            $out[$kw] = [
+                'volume' => $row->search_volume,
+                'competition' => $row->competition,
+                'trend' => KeywordValueCalculator::trendClassify($row->trend_12m),
+            ];
+        }
+
+        return $out;
+    }
+
     private function recordCredits(WriterProject $project, string $type, int $credits, array $extraMeta = []): void
     {
         if ($credits <= 0) {

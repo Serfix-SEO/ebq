@@ -78,10 +78,12 @@
 
     <template x-if="error"><div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300" x-text="error"></div></template>
 
-    <div class="flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+    @include('ai-studio.wizard-steps.partials.generation-progress')
+
+    <div class="flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800" x-show="!gen.active">
         <button type="button" @click="goToStep('images')" class="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400">{{ __('← Back') }}</button>
-        <button type="button" @click="generateArticle()" :disabled="loading || summarySections().length === 0 || featureLocked"
+        <button type="button" @click="generateArticle()" :disabled="gen.active || summarySections().length === 0 || featureLocked"
             class="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
-            x-text="loading ? '{{ __('Generating article…') }}' : (hasGeneratedHtml() ? '{{ __('Regenerate article →') }}' : '{{ __('Generate article →') }}')"></button>
+            x-text="hasGeneratedHtml() ? '{{ __('Regenerate article →') }}' : '{{ __('Generate article →') }}'"></button>
     </div>
 </div>

@@ -61,18 +61,20 @@ class AiContentBriefService
      *
      * @return array<string, mixed>|null
      */
-    public function cachedBrief(Website $website, string $focusKeyword, string $country = 'us'): ?array
+    public function cachedBrief(Website $website, string $focusKeyword, string $country = 'us', string $language = 'en'): ?array
     {
         $keyword = trim($focusKeyword);
         if ($keyword === '') {
             return null;
         }
         $country = $country !== '' ? strtolower($country) : 'us';
+        $language = $language !== '' ? strtolower($language) : 'en';
         $cacheKey = sprintf(
-            'ai_content_brief_v3:%s:%s:%s',
+            'ai_content_brief_v4:%s:%s:%s:%s',
             $website->id,
             hash('xxh3', mb_strtolower($keyword)),
             $country,
+            $language,
         );
         $cached = Cache::get($cacheKey);
         return is_array($cached) ? $cached : null;
@@ -93,15 +95,18 @@ class AiContentBriefService
         $language = is_string($input['language'] ?? null) && $input['language'] !== ''
             ? strtolower($input['language']) : 'en';
 
-        // v3 cache namespace — bump when the brief schema/prompt changes.
+        // v4 cache namespace — bump when the brief schema/prompt changes.
         // v2 added: suggested_h1 field.
         // v3 sharpened the suggested_outline vs. subtopics distinction so
         //     they're no longer near-duplicates in the UI.
+        // v4 added the output-language rule + language cache segment — an
+        //     Arabic project must neither get nor cache an English brief.
         $cacheKey = sprintf(
-            'ai_content_brief_v3:%s:%s:%s',
+            'ai_content_brief_v4:%s:%s:%s:%s',
             $website->id,
             hash('xxh3', mb_strtolower($keyword)),
             $country,
+            $language,
         );
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
@@ -123,7 +128,7 @@ class AiContentBriefService
         }
 
         $organic = array_slice(array_filter($serp['organic'], 'is_array'), 0, 10);
-        $brief = $this->llm->completeJson($this->buildPrompt($keyword, $organic), [
+        $brief = $this->llm->completeJson($this->buildPrompt($keyword, $organic, $language), [
             'temperature' => 0.4,
             'max_tokens' => 1500,
             'json_object' => true,
@@ -174,7 +179,7 @@ class AiContentBriefService
      * @param  list<array<string, mixed>>  $organic
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, array $organic): array
+    private function buildPrompt(string $keyword, array $organic, string $language = 'en'): array
     {
         $serpBlock = '';
         foreach ($organic as $i => $row) {
@@ -189,6 +194,15 @@ class AiContentBriefService
                 mb_substr($snippet, 0, 240),
             );
         }
+
+        $langName = AiWriterService::LANGUAGE_NAMES[$language] ?? '';
+        $langRule = ($langName !== '' && $langName !== 'English')
+            ? "\n\nOUTPUT LANGUAGE (HARD RULE): write EVERY brief value — suggested_h1, "
+                ."suggested_outline headings, subtopics, people_also_ask questions, the angle — "
+                ."in {$langName}. The SERP results may be in another language: translate the "
+                ."concepts, never echo untranslated headings. Keep the target keyword itself "
+                ."verbatim; proper nouns and brand names stay as-is."
+            : '';
 
         $system = <<<'SYS'
 You are a senior SEO content strategist. Given a target keyword and the
@@ -222,6 +236,7 @@ Constraints:
 
 Return STRICTLY valid JSON. No prose, no markdown.
 SYS;
+        $system .= $langRule;
 
         $user = <<<USER
 Target keyword: "{$keyword}"

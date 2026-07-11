@@ -189,6 +189,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/writer-projects/{externalId}/generate', [WriterProjectController::class, 'generate'])
                 ->where('externalId', '[A-Za-z0-9\-]+')
                 ->name('writer-projects.generate');
+            Route::get('/writer-projects/{externalId}/generate-status', [WriterProjectController::class, 'generateStatus'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.generate-status');
             Route::get('/writer-projects/{externalId}/credits', [WriterProjectController::class, 'credits'])
                 ->where('externalId', '[A-Za-z0-9\-]+')
                 ->name('writer-projects.credits');

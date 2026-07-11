@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Support\AiModelConfig;
 use App\Support\AuditConfig;
 use App\Support\KeywordProviderConfig;
+use App\Support\LlmProviderConfig;
 use App\Support\LocaleConfig;
 use App\Support\RankTrackerConfig;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +19,7 @@ use Illuminate\View\View;
  * Single consolidated admin settings page. Replaces the previously separate
  * AI model / Rank tracker / Page audit settings pages with one screen:
  *
- *   - Default AI model (Mistral) for every AI feature
+ *   - Active AI provider (Mistral / DeepSeek) + default model per provider
  *   - Rank tracker default re-check interval
  *   - Keywords Everywhere competitor-data toggle
  *
@@ -30,8 +31,12 @@ class PlatformSettingsController extends Controller
     public function edit(): View
     {
         return view('admin.settings.index', [
-            'models'                       => AiModelConfig::listAvailableModels(),
-            'currentModel'                 => AiModelConfig::currentModel(),
+            'llmProvider'                  => LlmProviderConfig::currentProvider(),
+            'llmProviders'                 => LlmProviderConfig::options(),
+            'mistralModels'                => AiModelConfig::listAvailableModels(LlmProviderConfig::PROVIDER_MISTRAL),
+            'deepseekModels'               => AiModelConfig::listAvailableModels(LlmProviderConfig::PROVIDER_DEEPSEEK),
+            'currentMistralModel'          => AiModelConfig::currentModel(LlmProviderConfig::PROVIDER_MISTRAL),
+            'currentDeepseekModel'         => AiModelConfig::currentModel(LlmProviderConfig::PROVIDER_DEEPSEEK),
             'checkIntervalHours'           => RankTrackerConfig::checkIntervalHours(),
             'defaultDepth'                 => RankTrackerConfig::DEFAULT_DEPTH,
             'competitorKeywordsEverywhere' => AuditConfig::competitorKeywordsEverywhereEnabled(),
@@ -51,10 +56,25 @@ class PlatformSettingsController extends Controller
 
     public function update(Request $request): RedirectResponse
     {
-        $availableIds = array_column(AiModelConfig::listAvailableModels(), 'id');
+        $mistralIds = array_column(AiModelConfig::listAvailableModels(LlmProviderConfig::PROVIDER_MISTRAL), 'id');
+        $deepseekIds = array_column(AiModelConfig::listAvailableModels(LlmProviderConfig::PROVIDER_DEEPSEEK), 'id');
 
         $data = $request->validate([
-            'model' => ['required', 'string', Rule::in($availableIds)],
+            'llm_provider' => [
+                'required', 'string', Rule::in(LlmProviderConfig::PROVIDERS),
+                // Refuse activating a provider whose API key isn't
+                // configured — one dropdown save must not take down every
+                // AI feature with {provider}_api_key_missing.
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    if (is_string($value) && in_array($value, LlmProviderConfig::PROVIDERS, true)
+                        && ! LlmProviderConfig::isConfigured($value)) {
+                        $fail('That AI provider has no API key configured on the server.');
+                    }
+                },
+            ],
+            // Field name `model` kept for the Mistral select (form back-compat).
+            'model' => ['required', 'string', Rule::in($mistralIds)],
+            'deepseek_model' => ['required', 'string', Rule::in($deepseekIds)],
             'default_check_interval_hours' => ['required', 'integer', 'min:1', 'max:168'],
             'competitor_keywords_everywhere' => ['nullable', 'boolean'],
             'multilingual_enabled' => ['nullable', 'boolean'],
@@ -67,7 +87,9 @@ class PlatformSettingsController extends Controller
             'banner_youtube_url' => ['nullable', 'url', 'max:2048'],
         ]);
 
-        AiModelConfig::setModel((string) $data['model']);
+        LlmProviderConfig::setProvider((string) $data['llm_provider']);
+        AiModelConfig::setModel((string) $data['model'], LlmProviderConfig::PROVIDER_MISTRAL);
+        AiModelConfig::setModel((string) $data['deepseek_model'], LlmProviderConfig::PROVIDER_DEEPSEEK);
         Setting::set(RankTrackerConfig::SETTING_CHECK_INTERVAL, (int) $data['default_check_interval_hours']);
         Setting::set(
             AuditConfig::SETTING_COMPETITOR_KEYWORDS_EVERYWHERE,
@@ -96,6 +118,6 @@ class PlatformSettingsController extends Controller
 
         return redirect()
             ->route('admin.settings')
-            ->with('status', 'Model list refreshed from the provider.');
+            ->with('status', 'Model lists refreshed from the providers.');
     }
 }

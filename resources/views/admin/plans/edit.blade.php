@@ -291,7 +291,7 @@
                                class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
                     </label>
                     <label class="block">
-                        <span class="block text-xs font-medium text-slate-700">Mistral — tokens / month (raw cost cap, enforced)</span>
+                        <span class="block text-xs font-medium text-slate-700">AI tokens / month — all LLM providers (raw cost cap, enforced)</span>
                         <input type="number" min="0" name="api_limits[mistral][monthly_tokens]"
                                value="{{ old('api_limits.mistral.monthly_tokens', $mis) }}"
                                placeholder="Unlimited"

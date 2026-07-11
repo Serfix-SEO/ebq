@@ -26,26 +26,80 @@
 
 1. **Brief** (`generateBrief` → `AiContentBriefService::brief`): Serper top-10 SERP →
    one `completeJson` call (temp 0.4, 1500 tokens, 45s) → bolt on internal-link targets
-   from the site's own GSC (90d). Cached **7 days** (`ai_content_brief_v3:*`).
+   from the site's own GSC (90d). Cached **7 days** (`ai_content_brief_v4:*` — v4
+   2026-07-11 added the language cache segment + output-language prompt rule).
+   **The project's country/language drive the Serper `gl`/`hl` AND the brief's
+   output language** — `generateBrief` hardcoded both to null until 2026-07-11, so
+   an Arabic project briefed against the US/English SERP and showed an English
+   outline (third layer of the same "input passed but dropped" bug: writer →
+   strategy tools → brief).
 2. **Strategy** (`generateStrategy`): runs registry tools (`seo-title`, `seo-meta`,
    `seo-description`, `faq-generator`, `keyword-suggestions`, internal/external link
    suggestions) — **multiple LLM calls**, with a retry for meta descriptions when <3
-   land in the 120–158 char band.
+   land in the 120–158 char band. Since 2026-07-11 the bundle also produces:
+   - **H1 card** (`h1` / `h1_suggestions` columns): 5 on-page headline options
+     (keyword-front, ≤65 chars, in the project's output language) via a direct
+     `completeJson` call (wizard-only, deliberately not a Studio catalog tool);
+     the user's pick/edit is PATCHed to `h1` and the writer locks onto it.
+   - **LSI suggestions** (`lsi_suggestions`): `AiRelatedKeywordsService::suggest`
+     (7d cache) — one-click add to `lsi_keywords`.
+   - **Keyword data** (`keyword_data`): volume/competition/trend map for every
+     surfaced keyword via `KeywordMetricsService::metricsOrQueue` — cache-first
+     (shared 30-day `keyword_metrics`), misses queued for the admin-selected
+     provider and filled on the next strategy view. Never a blocking fetch, never
+     $ projections.
 3. **Images** (`searchImages`): Serper image search, flat **1 credit**.
 4. **Generate** (`generate` → `AiWriterService::draft` in strict mode): the final draft.
+   **Async since 2026-07-11**: both wizard UIs POST generate → the controller queues
+   `App\Jobs\GenerateWriterDraftJob` (queue `default`, web-box Horizon; `tries=1` — a
+   retry would re-bill the whole article; `timeout=400` < redis `retry_after` 1320) and
+   answers **202** with `{generation:{status}}`; clients poll
+   `GET …/generate-status` every 4s (returns `generation` + the full project once
+   `done`). Lifecycle on `writer_projects`: `generation_status`
+   (idle|queued|running|done|failed) + `generation_error` + `generation_started_at`
+   (migration `2026_07_11_120000`). `WriterProjectService::generate` persists
+   done/failed itself; `failStaleGeneration()` (called from the status endpoints)
+   flips rows stuck >10min to failed so pollers never spin forever. The plugin API
+   keeps the old blocking path unless the request carries `async=1` (old installed
+   plugin versions). The job passes `__user_id` into the LLM call — without it a
+   queued generation would be unmetered (no Auth user in a worker).
+   Tests: `tests/Feature/WriterProjectAsyncGenerationTest.php`.
 
 ### `AiWriterService::draft` — essentially ONE big LLM call
 
-`completeJson`, **temp 0.5, max_tokens 16000, 240s timeout** (`AiWriterService.php:237`).
-The model emits ALL sections in a single JSON object `{summary, sections[]}`; there is
-no outline→sections two-phase (the outline arrives pre-built in the brief). Heavy PHP
-post-processing follows: strict-mode strips per-section `<h1>`/`replace` ops, enforces
-locked anchors, re-injects dropped manual links, audits LSI usage, builds schema
-suggestions, strips dashes. Caps: `MAX_SECTIONS = 20`, `SECTION_HTML_CAP = 6000` chars
-(~900 words). Prompt is version **v24** (changelog in-file); cache key `ai_writer_v24:*`
-(24h TTL). Then `WriterProjectService::assembleHtml` concatenates sections (no leading
+`completeJson`, **temp 0.5, max_tokens 16000, 240s timeout**.
+The model emits ALL sections in a single JSON object `{summary, h1, sections[]}`;
+there is no outline→sections two-phase (the outline arrives pre-built in the brief).
+Heavy PHP post-processing follows: strict-mode strips per-section `<h1>`/`replace`
+ops, enforces locked anchors, re-injects dropped manual links, audits LSI usage,
+builds schema suggestions, strips dashes. Caps: `MAX_SECTIONS = 20`,
+`SECTION_HTML_CAP = 6000` chars (~900 words). Prompt is version **v25** (changelog
+in-file); cache key `ai_writer_v25:*` (24h TTL; locale/voice + strategy selections
+are part of the key — an Arabic request must never hit a cached English draft).
+
+**v25 — full wizard-input coverage (owner reports 2026-07-11).** The wizard passed
+`language/country/tone/audience`, strategy `keyword_suggestions` and curated `faqs`
+into `draft()` since day one — and `draft()` silently dropped ALL of them (an
+Arabic project wrote English; strategy picks never reached the article). Now:
+- **`%OUTPUT_LOCALE%` block**: hard rule to write everything in the picked
+  language and TRANSLATE the (SERP-language) brief/PAA; focus keyword +
+  additional/LSI phrases + proper nouns stay verbatim. Plus target-market /
+  tone / audience lines.
+- **`%H1_SPEC%`**: top-level `"h1"` — user's Strategy pick echoed verbatim when
+  set, else an SEO-optimized headline (keyword-front, ≤65 chars, output
+  language). Persisted to `generated_h1`; consumers use `h1 → generated_h1 →
+  title` (dashboard preview/download heading, plugin WP `post_title`).
+- **Secondary keywords + curated FAQs blocks**: strategy keyword suggestions are
+  woven; user-approved FAQs are REQUIRED members of the consolidated FAQ section
+  (which now triggers on PAA *or* curated FAQs).
+- **LSI enforcement retry**: `auditLsiUsage` misses used to be a log line — now
+  ONE corrective retry replays the draft with the missing phrases called out and
+  keeps whichever response covers more. Coverage is persisted to
+  `writer_projects.generation_meta` and shown on the review step (both UIs). Then `WriterProjectService::assembleHtml` concatenates sections (no leading
 `<h1>` — the WP post title is the H1) and injects `<figure>` blocks by H2 match.
-Everything is **synchronous / in-request — no queues**.
+Brief/strategy/images stay synchronous in-request; **the final generate runs as a
+queued job** (see step 4 above). On DeepSeek the draft call opts into thinking mode
+(`reasoning => true`, budget-capped — see [llm.md](./llm.md)).
 
 ### Writer guardrails / moat
 

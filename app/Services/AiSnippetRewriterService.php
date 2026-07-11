@@ -329,12 +329,12 @@ RULES;
 
         $messages = $this->buildPrompt($focusKeyword, $currentTitle, $currentMeta, $contentExcerpt, $competitorTitles, $intent, $additionalKeywords);
         // Snippet rewrites need solid constraint adherence (verbatim focus
-        // keyword + 30–60 / 130–155 char windows). Mistral-small-latest
-        // routinely drifts on length; medium is markedly better at
-        // constraint following at modest cost overhead. Worth it for a
+        // keyword + 30–60 / 130–155 char windows). The default tier
+        // routinely drifts on length; the premium tier is markedly better
+        // at constraint following at modest cost overhead. Worth it for a
         // user-facing "Improve with AI" surface.
         $payload = $this->llm->completeJson($messages, [
-            'model' => 'mistral-medium-latest',
+            'model' => \App\Support\AiModelConfig::premiumModel(),
             'temperature' => 0.6,
             // 10 rewrites × ~280 output tokens each (title + meta +
             // rationale + JSON envelope) leaves comfortable headroom.
@@ -405,7 +405,7 @@ RULES;
             'ok' => true,
             'intent' => $intent,
             'rewrites' => $rewrites,
-            'model' => 'mistral',
+            'model' => \App\Support\LlmProviderConfig::currentProvider(),
             'cached' => false,
             'generated_at' => Carbon::now()->toIso8601String(),
         ];
@@ -691,7 +691,7 @@ FEEDBACK;
         ]);
 
         $payload = $this->llm->completeJson($messagesWithFeedback, [
-            'model' => 'mistral-medium-latest',
+            'model' => \App\Support\AiModelConfig::premiumModel(),
             'temperature' => 0.4,         // tighter for the corrective pass
             'max_tokens' => 3200,
             'json_object' => true,

@@ -60,7 +60,7 @@ class AiRelatedKeywordsService
 
         $messages = $this->buildPrompt($keyword);
         $payload = $this->llm->completeJson($messages, [
-            'model' => 'mistral-medium-latest',
+            'model' => \App\Support\AiModelConfig::premiumModel(),
             'temperature' => 0.5,
             'max_tokens' => 700,
             'json_object' => true,

@@ -40,6 +40,13 @@ class WriterProject extends Model
     public const STEP_SUMMARY   = 'summary';
     public const STEP_COMPLETED = 'completed';
 
+    // Async article-generation lifecycle (GenerateWriterDraftJob).
+    public const GEN_IDLE    = 'idle';
+    public const GEN_QUEUED  = 'queued';
+    public const GEN_RUNNING = 'running';
+    public const GEN_DONE    = 'done';
+    public const GEN_FAILED  = 'failed';
+
     public const STEPS = [
         self::STEP_TOPIC,
         self::STEP_BRIEF,
@@ -67,6 +74,10 @@ class WriterProject extends Model
         'chat_history',
         'images',
         'seo_titles',
+        'h1',
+        'h1_suggestions',
+        'lsi_suggestions',
+        'keyword_data',
         'meta_title',
         'meta_description',
         'meta_descriptions',
@@ -77,6 +88,11 @@ class WriterProject extends Model
         'link_suggestions',
         'selected_links',
         'generated_html',
+        'generated_h1',
+        'generation_meta',
+        'generation_status',
+        'generation_error',
+        'generation_started_at',
         'wp_post_id',
         'credits_used',
     ];
@@ -90,6 +106,10 @@ class WriterProject extends Model
             'chat_history' => 'array',
             'images' => 'array',
             'seo_titles' => 'array',
+            'h1_suggestions' => 'array',
+            'lsi_suggestions' => 'array',
+            'keyword_data' => 'array',
+            'generation_meta' => 'array',
             'meta_descriptions' => 'array',
             'faqs' => 'array',
             'keyword_suggestions' => 'array',
@@ -97,6 +117,7 @@ class WriterProject extends Model
             'selected_links' => 'array',
             'wp_post_id' => 'integer',
             'credits_used' => 'integer',
+            'generation_started_at' => 'datetime',
         ];
     }
 

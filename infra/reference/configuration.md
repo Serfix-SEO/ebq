@@ -168,7 +168,8 @@ listed because they change behaviour/billing.
 | Integration | Block | Secret env | Non-secret knobs (default) |
 |---|---|---|---|
 | **Google OAuth + CAP** | `services.php:80` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `GOOGLE_REDIRECT_URI`, `GOOGLE_CAP_AUDIENCE`, `GOOGLE_CAP_JWKS_URL` (Google certs), `GOOGLE_CAP_ISSUERS` (accounts.google.com) |
-| **Mistral (LLM)** | `services.php:193` | `MISTRAL_API_KEY` | `MISTRAL_MODEL` (`mistral-small-latest`), `MISTRAL_INPUT_USD_PER_M` (0.10), `MISTRAL_OUTPUT_USD_PER_M` (0.30) |
+| **Mistral (LLM)** | `services.php:212` | `MISTRAL_API_KEY` | `MISTRAL_MODEL` (`mistral-small-latest`), `MISTRAL_INPUT_USD_PER_M` (0.10), `MISTRAL_OUTPUT_USD_PER_M` (0.30) |
+| **DeepSeek (LLM, admin-switchable alternative)** | `services.php:227` | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` (`deepseek-chat`), `DEEPSEEK_INPUT_USD_PER_M` (0.27), `DEEPSEEK_OUTPUT_USD_PER_M` (1.10), `DEEPSEEK_COST_PER_TOKEN_USD` (0.0000011). Active provider = Setting `ai.llm.provider`, see `infra/ai/llm.md` |
 | **Serper (SERP)** | `services.php:90` | `SERPER_API_KEY` | `SERPER_SEARCH_URL`, `SERPER_COST_PER_CALL_USD` (0.0003) |
 | **Lighthouse (PageSpeed)** | `services.php:99` | `LIGHTHOUSE_API_KEY` | `LIGHTHOUSE_API_URL`, `LIGHTHOUSE_TIMEOUT_S` (90) |
 | **Keywords Everywhere** | `services.php:105` | `KEYWORDS_EVERYWHERE_API_KEY` | `_BASE_URL`, `_FRESH_DAYS` (30), `_COST_PER_KEYWORD_USD` (0.0001), `_BACKLINKS_ENDPOINT/COUNTRY/CURRENCY/DATASOURCE`, `KE_BACKLINKS_TTL_DAYS` (30) |
@@ -244,6 +245,7 @@ See the crawler.php table above — all `CRAWLER_*` plus `CRAWLER_EGRESS_IP`.
 
 ### Integrations (all secret keys 🔒)
 `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`, `GOOGLE_CAP_*`, `MISTRAL_API_KEY` (+ model/cost),
+`DEEPSEEK_API_KEY` (+ model/cost),
 `SERPER_API_KEY` (+ url/cost), `LIGHTHOUSE_API_URL/KEY/TIMEOUT_S`,
 `KEYWORDS_EVERYWHERE_API_KEY` (+ ttl/cost/backlinks), `KEYWORD_FINDER_*`,
 `MICROSOFT_CLIENT_ID/SECRET/REDIRECT_URI/TENANT`, `COMPETITIVE_*`, `LANGUAGE_DETECTION_ENABLED`.

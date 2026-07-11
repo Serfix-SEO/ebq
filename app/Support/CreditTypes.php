@@ -17,12 +17,14 @@ final class CreditTypes
 
     public const AI_WRITER_BRIEF        = 'credit_usage.ai_writer.brief';
     public const AI_WRITER_BRIEF_CHAT   = 'credit_usage.ai_writer.brief_chat';
+    public const AI_WRITER_STRATEGY_H1  = 'credit_usage.ai_writer.strategy_h1';
     public const AI_WRITER_IMAGE_SEARCH = 'credit_usage.ai_writer.image_search';
     public const AI_WRITER_GENERATE     = 'credit_usage.ai_writer.generate';
 
     public const TYPES = [
         self::AI_WRITER_BRIEF,
         self::AI_WRITER_BRIEF_CHAT,
+        self::AI_WRITER_STRATEGY_H1,
         self::AI_WRITER_IMAGE_SEARCH,
         self::AI_WRITER_GENERATE,
     ];
