@@ -57,7 +57,13 @@ class InsightsPayloadTest extends TestCase
         $this->assertSame(2000, $response->json('gsc.totals_30d.impressions'));
         $this->assertNotEmpty($response->json('gsc.top_queries_30d'));
         $this->assertSame('sample query', $response->json('gsc.primary_query'));
-        $this->assertNull($response->json('indexing'));
+        // No inspection row exists, but the page has recent impressions, so
+        // the resolver now derives a PASS verdict from impressions instead
+        // of returning null (Google serving the page implies indexed).
+        $this->assertSame('PASS', $response->json('indexing.verdict'));
+        $this->assertSame('impressions', $response->json('indexing.verdict_source'));
+        $this->assertTrue((bool) $response->json('indexing.indexed'));
+        $this->assertNull($response->json('indexing.coverage_state'));
     }
 
     public function test_show_post_rejects_url_not_belonging_to_website(): void

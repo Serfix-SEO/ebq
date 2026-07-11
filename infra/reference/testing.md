@@ -87,9 +87,10 @@ source is `app/`. The `<php>` block sets the test environment (`phpunit.xml:20`)
   once and wraps each test in a transaction — fast and isolated. On a *real* server it is a
   data-destroying `migrate:fresh`. That asymmetry is the whole risk.
 - **Factories** (`database/factories/`, 4 total):
-  - `UserFactory` — `email_verified_at => null` by **default** (`UserFactory.php:30`).
-    *Gotcha (from memory):* GET tests behind the `verified` middleware 302-redirect to
-    verify-email because of this; use a verified state/override when needed.
+  - `UserFactory` — **verified by default** (`email_verified_at => now()`, stock Laravel
+    convention; fixed 2026-07-11 — the old null default made every HTTP test behind the
+    `verified` middleware 302 to verify-email). Use `->unverified()` for the
+    unverified state.
   - `WebsiteFactory` — default leaves source FKs null; states encode the GSC/GA presence
     matrix used across the app: `withBothSources()`, `withGaOnly()`, `withGscOnly()`,
     `withNoSources()` (`WebsiteFactory.php:36-80`). Maps to `Website::hasGa()`/`hasGsc()`.
@@ -136,17 +137,24 @@ source is `app/`. The `<php>` block sets the test environment (`phpunit.xml:20`)
 - **External calls are faked, not made:** `Http::fake` (16 files), `Queue::fake` (23),
   `Bus::fake` (2), `Mockery`/`mock()` (17). Livewire components tested via `Livewire::test`
   (5 files). `QUEUE_CONNECTION=sync` means un-faked jobs run inline.
-- **KNOWN BASELINE FAILURES (2026-07-10): sqlite date-boundary artifact in
-  `InsightsServiceTest` (+2 `InsightsViewsTest` 302s from the unverified-factory
-  pattern).** Since `statsWindowEnd()` anchoring (ReportDataService, 2026-07-07 commit
-  `adf19f9`), report windows end AT the newest data date. sqlite stores the `date`
-  column as `'Y-m-d 00:00:00'` (typeless), and `whereBetween('date', [..,'Y-m-d'])`
-  string-compares `'2026-07-05 00:00:00' <= '2026-07-05'` = FALSE — the anchor day's own
-  rows fall outside the window, so cannibalization/striking-distance return empty **in
-  tests only**. MySQL `DATE` columns are unaffected in prod. Proper fix: compare against
-  `$end->endOfDay()->toDateTimeString()` (safe on both engines) across
-  `ReportDataService`'s date filters; until then, seed a newer low-signal "anchor row"
-  so real fixture rows fall strictly inside the window.
+- **Baseline is GREEN (0 failures) as of 2026-07-11** — a 42-failure backlog was cleared
+  in one sweep (see main.md changelog). Recurring landmines to avoid reintroducing:
+  - **sqlite date-string artifact (FIXED at the model):** Eloquent's `'date'` cast writes
+    `'Y-m-d H:i:s'`; MySQL `DATE` columns truncate it server-side but sqlite (TEXT) keeps
+    the full string, so `whereBetween('date', [..,'Y-m-d'])` string-compares the row OUT
+    of the window — reports empty **in tests only**. Fixed via
+    `SearchConsoleData::setDateAttribute()` (normalizes to `Y-m-d` on write). Any new
+    model with a DATE column + window queries needs the same mutator, or seed via
+    `DB::table()` with plain strings.
+  - **`#[Lazy]` Livewire components render only their placeholder** in both HTTP GETs and
+    `Livewire::test()` — call `Livewire::withoutLazyLoading()` (setUp) before asserting on
+    their real markup. Bit `DashboardCacheTest`, `SyncAndReportPanelTest`,
+    `InsightsViewsTest`.
+  - **Tests without `RefreshDatabase` 500 on any request** now that `SetLocale` reads the
+    `settings` table each request (`LocaleConfig` fails safe to English if the table is
+    missing, but other `Setting::get` callers — e.g. the plugin version endpoint — don't).
+  - **Unit tests are not DB-free by default:** `SerperSearchClient` logs every call to
+    `client_activities`, so even "pure" client tests need `RefreshDatabase`.
 
 ---
 

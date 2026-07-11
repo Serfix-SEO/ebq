@@ -43,6 +43,10 @@ class PluginReleaseEndpointsTest extends TestCase
 
     public function test_admin_can_create_scheduled_plugin_release(): void
     {
+        // Scheduling now REQUIRES an uploaded ZIP (source-tree packaging is
+        // blocked from the UI in production); the ZIP is stashed in storage
+        // and only promoted to @public when the release actually publishes.
+        \Illuminate\Support\Facades\Storage::fake('local');
         $admin = User::factory()->create(['is_admin' => true]);
 
         $this->actingAs($admin)->post(route('admin.plugin-releases.store'), [
@@ -51,13 +55,16 @@ class PluginReleaseEndpointsTest extends TestCase
             'publish_mode' => 'schedule',
             'publish_at' => now()->addHour()->format('Y-m-d H:i:s'),
             'release_notes' => 'Scheduled release',
+            'zip' => \Illuminate\Http\UploadedFile::fake()->create('ebq-seo.zip', 120, 'application/zip'),
         ])->assertRedirect();
 
         $this->assertDatabaseHas('plugin_releases', [
             'version' => '2.3.0',
             'channel' => 'stable',
             'status' => PluginRelease::STATUS_SCHEDULED,
-            'zip_path' => PluginRelease::ZIP_PUBLIC_BUILD,
+            'zip_path' => 'plugin-releases/ebq-seo-2.3.0-stable.zip',
         ]);
+        \Illuminate\Support\Facades\Storage::disk('local')
+            ->assertExists('plugin-releases/ebq-seo-2.3.0-stable.zip');
     }
 }

@@ -549,7 +549,12 @@
       "Bash(sshpass *)",
       "Bash(git -C /var/www/ebq log --oneline -2 -- tests/Feature/Dashboard/ActionQueueTest.php)",
       "Bash(git -C /var/www/ebq status --short tests/Feature/Dashboard/ActionQueueTest.php app/Livewire)",
-      "Bash(git -C /var/www/ebq diff)"
+      "Bash(git -C /var/www/ebq diff)",
+      "Bash(awk '/FAILED.*FeaturesPageTest|FAILED.*ExampleTest/{p=1} p&&/at tests|vendor frames/{print; if\\(++n>12\\) exit} p{print}' /tmp/claude-0/-var-www-ebq/32e00e6a-a5d8-4332-b0ad-27938e4b13cb/scratchpad/sweep1.out)",
+      "Bash(sed -i 's/^use Tests\\\\\\\\TestCase;/use Illuminate\\\\\\\\Foundation\\\\\\\\Testing\\\\\\\\RefreshDatabase;\\\\nuse Tests\\\\\\\\TestCase;/' tests/Unit/SerperSearchClientTest.php tests/Unit/SerperAuditBenchmarkTest.php)",
+      "Bash(sed -i 's/^class SerperSearchClientTest extends TestCase\\\\n{/&/' tests/Unit/SerperSearchClientTest.php)",
+      "Bash(perl -0pi -e 's/\\(class SerperSearchClientTest extends TestCase\\\\n\\\\{\\)/$1\\\\n    use RefreshDatabase;\\\\n/' tests/Unit/SerperSearchClientTest.php)",
+      "Bash(perl -0pi -e 's/\\(class SerperAuditBenchmarkTest extends TestCase\\\\n\\\\{\\)/$1\\\\n    use RefreshDatabase;\\\\n/' tests/Unit/SerperAuditBenchmarkTest.php)"
     ]
   },
   "enableAllProjectMcpServers": true,

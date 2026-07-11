@@ -256,6 +256,27 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-11 (test suite: 42 pre-existing failures → 0; two production hardenings
+  shipped with it)** — Full-suite run surfaced a 42-failure backlog (none caused by
+  current work; verified by baseline diff). Root causes, largest first:
+  (1) `UserFactory` defaulted `email_verified_at = null` while the app routes sit
+  behind `verified` → ~14 HTTP tests 302'd; factory now verified-by-default
+  (stock Laravel), `->unverified()` for the rest. (2) `SetLocale`→`LocaleConfig`
+  (07-09 kill switch) queries `settings` on EVERY request → 7 tests without
+  RefreshDatabase 500'd; **prod hardening**: `LocaleConfig::multilingualEnabled()`
+  now fails safe (English) on a missing table — protects fresh deploys pre-migrate.
+  (3) sqlite date-string artifact (already documented in testing.md) **fixed at the
+  model**: `SearchConsoleData::setDateAttribute()` normalizes to `Y-m-d`.
+  (4) **Prod hardening #2**: `CrawlReportMail` crashed on a Website with no loaded
+  owner (`owner->locale`) — nullsafe now. The rest were stale tests updated to
+  current behavior: Serper `base_url` config key + usage-logging DB dependency,
+  marketing-copy assertions, plugin scheduling requires a ZIP upload,
+  free→trial tier rename, `#[Lazy]` component placeholders, GrowthReportMail is
+  queued not sent, registration lands on verify-email, DomainRateLimiter's raw-Redis
+  fixed window, PriorityActionQueue slide-over→SiteIssues page (×2 files),
+  content_terms-based link suggester, seo_signals-gated issue detector, derived
+  indexing verdicts. Full landmine list: [reference/testing.md](./reference/testing.md)
+  § Notable patterns.
 - **2026-07-11 (WP-plugin deep-links opened the wrong website — `ApplyWebsiteHint`
   middleware + plugin 2.0.8/2.0.9)** — Owner QA on a multi-website account: every
   plugin link into the portal that wasn't a signed embed (WP dashboard-widget insight

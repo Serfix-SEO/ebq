@@ -18,6 +18,14 @@ class SyncAndReportPanelTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // The panel is #[Lazy]; without this only the skeleton placeholder
+        // renders and the flash messages never appear in the HTML.
+        Livewire::withoutLazyLoading();
+    }
+
     public function test_send_report_dispatches_growth_report_mail(): void
     {
         Mail::fake();
@@ -33,7 +41,8 @@ class SyncAndReportPanelTest extends TestCase
             ->call('sendReport')
             ->assertSee('data through');
 
-        Mail::assertSent(GrowthReportMail::class, function (GrowthReportMail $mail) use ($user, $website) {
+        // The dispatcher queues the mailable (locale-aware queued send).
+        Mail::assertQueued(GrowthReportMail::class, function (GrowthReportMail $mail) use ($user, $website) {
             return $mail->user->is($user) && $mail->website->is($website);
         });
     }

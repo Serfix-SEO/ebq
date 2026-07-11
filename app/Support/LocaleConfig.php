@@ -22,7 +22,14 @@ class LocaleConfig
     /** The raw stored flag — use this for the admin settings form only. */
     public static function multilingualEnabled(): bool
     {
-        return (bool) Setting::get(self::SETTING_MULTILINGUAL, false);
+        // Fail safe (English-only) when the settings table doesn't exist yet:
+        // SetLocale calls this on EVERY request, so a fresh deploy before
+        // `migrate` — or a test without RefreshDatabase — must not 500.
+        try {
+            return (bool) Setting::get(self::SETTING_MULTILINGUAL, false);
+        } catch (\Illuminate\Database\QueryException|\PDOException) {
+            return false;
+        }
     }
 
     /**

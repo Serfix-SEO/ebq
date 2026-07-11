@@ -27,7 +27,9 @@ class CrawlReportMail extends Mailable implements ShouldQueue
         public array $report,
         public ?string $recipientName = null,
     ) {
-        $this->locale(\App\Support\LocaleConfig::resolve($website->owner->locale));
+        // Nullsafe: render-only callers (previews/tests) may pass an unsaved
+        // Website with no owner; resolve(null) falls back to the app locale.
+        $this->locale(\App\Support\LocaleConfig::resolve($website->owner?->locale));
     }
 
     public function envelope(): Envelope

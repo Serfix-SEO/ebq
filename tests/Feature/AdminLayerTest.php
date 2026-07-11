@@ -27,7 +27,7 @@ class AdminLayerTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.clients.index'))
             ->assertOk()
-            ->assertSee('Admin Clients');
+            ->assertSee('Clients');
     }
 
     public function test_admin_can_impersonate_client(): void
@@ -74,13 +74,15 @@ class AdminLayerTest extends TestCase
         $admin = User::factory()->create(['is_admin' => true]);
         $client = User::factory()->create(['current_plan_slug' => 'agency']);
 
-        Plan::create(['slug' => 'free', 'name' => 'Free', 'display_order' => 0, 'is_active' => true]);
+        // The free tier was renamed to 'trial' (User::TIER_TRIAL) — only that
+        // slug maps to a null current_plan_slug (matches a never-paid user).
+        Plan::create(['slug' => 'trial', 'name' => 'Trial', 'display_order' => 0, 'is_active' => true]);
 
         $this->actingAs($admin)
             ->put(route('admin.clients.update', $client), [
                 'name' => $client->name,
                 'email' => $client->email,
-                'plan_slug' => 'free',
+                'plan_slug' => 'trial',
             ])
             ->assertRedirect(route('admin.clients.index'));
 

@@ -24,10 +24,13 @@ class SiteIssueDetectorTest extends TestCase
         $cs = $website->crawl_site_id;
         $run = CrawlRun::create(['crawl_site_id' => $cs, 'trigger' => 'manual', 'status' => 'running', 'started_at' => now()]);
 
+        // seo_signals must be non-null: detectForPage() skips all on-page +
+        // link-structure checks for pages the analyzer never produced signals
+        // for (a null-signal page would generate false findings).
         // Clean-path page with no inbound links -> a real orphan.
-        WebsitePage::create(['crawl_site_id' => $cs, 'url' => 'https://example.com/clean', 'url_hash' => WebsitePage::hashUrl('https://example.com/clean'), 'http_status' => 200, 'is_indexable' => true, 'inbound_link_count' => 0, 'last_crawled_at' => now()]);
+        WebsitePage::create(['crawl_site_id' => $cs, 'url' => 'https://example.com/clean', 'url_hash' => WebsitePage::hashUrl('https://example.com/clean'), 'http_status' => 200, 'is_indexable' => true, 'inbound_link_count' => 0, 'last_crawled_at' => now(), 'seo_signals' => []]);
         // Parameter URL with no inbound links -> expected, NOT flagged.
-        WebsitePage::create(['crawl_site_id' => $cs, 'url' => 'https://example.com/gen?name=max', 'url_hash' => WebsitePage::hashUrl('https://example.com/gen?name=max'), 'http_status' => 200, 'is_indexable' => true, 'inbound_link_count' => 0, 'last_crawled_at' => now()]);
+        WebsitePage::create(['crawl_site_id' => $cs, 'url' => 'https://example.com/gen?name=max', 'url_hash' => WebsitePage::hashUrl('https://example.com/gen?name=max'), 'http_status' => 200, 'is_indexable' => true, 'inbound_link_count' => 0, 'last_crawled_at' => now(), 'seo_signals' => []]);
 
         app(SiteIssueDetector::class)->detect($website->crawlSite, $run);
 

@@ -12,10 +12,13 @@ use Illuminate\Support\Facades\Http;
 use Mockery;
 use ReflectionMethod;
 use RuntimeException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class SerperAuditBenchmarkTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function tearDown(): void
     {
         Http::fake();
@@ -31,7 +34,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->app->instance(SafeHttpGuard::class, $guard);
 
         Config::set('services.serper.key', 'test-serper-key');
-        Config::set('services.serper.search_url', 'https://google.serper.dev/search');
+        Config::set('services.serper.base_url', 'https://google.serper.dev');
 
         $html = '<!DOCTYPE html><html><head><title>Comp</title></head><body><p>'
             .str_repeat('The quick brown fox jumps over the lazy dog. ', 50)
@@ -108,7 +111,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->app->instance(SafeHttpGuard::class, $guard);
 
         Config::set('services.serper.key', 'test-serper-key');
-        Config::set('services.serper.search_url', 'https://google.serper.dev/search');
+        Config::set('services.serper.base_url', 'https://google.serper.dev');
 
         $html = '<!DOCTYPE html><html><head><title>T</title></head><body><p>'
             .str_repeat('Word. ', 200)
@@ -230,7 +233,10 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->assertSame('Add content', $wc['status']);
         $fl = collect($out['rows'])->firstWhere('key', 'flesch');
         $this->assertSame(20.1, round((float) $fl['delta'], 1));
-        $this->assertSame('Better UX', $fl['status']);
+        // Zone-aware fleschStatus: 83.4 is in the "accessible" band (>=60)
+        // with a +5 delta, so it labels 'Accessible · above sample' rather
+        // than the mid-band 'Better UX'.
+        $this->assertSame('Accessible · above sample', $fl['status']);
         $im = collect($out['rows'])->firstWhere('key', 'images');
         $this->assertSame(-8.0, $im['delta']);
         $this->assertSame('Add visuals', $im['status']);
@@ -375,7 +381,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->app->instance(SafeHttpGuard::class, $guard);
 
         Config::set('services.serper.key', 'test-serper-key');
-        Config::set('services.serper.search_url', 'https://google.serper.dev/search');
+        Config::set('services.serper.base_url', 'https://google.serper.dev');
 
         $html = '<!DOCTYPE html><html><head><title>C</title></head><body><p>'
             .str_repeat('Word. ', 200)
@@ -420,7 +426,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->app->instance(SafeHttpGuard::class, $guard);
 
         Config::set('services.serper.key', 'test-serper-key');
-        Config::set('services.serper.search_url', 'https://google.serper.dev/search');
+        Config::set('services.serper.base_url', 'https://google.serper.dev');
 
         $html = '<!DOCTYPE html><html><head><title>C</title></head><body><p>'
             .str_repeat('Word. ', 200)
@@ -466,7 +472,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->app->instance(SafeHttpGuard::class, $guard);
 
         Config::set('services.serper.key', 'test-serper-key');
-        Config::set('services.serper.search_url', 'https://google.serper.dev/search');
+        Config::set('services.serper.base_url', 'https://google.serper.dev');
 
         $html = '<!DOCTYPE html><html><head><title>C</title></head><body><p>'
             .str_repeat('Word. ', 200)

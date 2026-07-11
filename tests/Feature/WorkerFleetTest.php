@@ -116,11 +116,22 @@ class WorkerFleetTest extends TestCase
         AutoscalerConfig::update(['per_domain_rate' => 2]);
         $limiter = new \App\Services\Crawler\DomainRateLimiter();
 
+        // The limiter is a raw-Redis fixed-window counter now (key
+        // crawl-rl:<domain>:<second-slot>), not Laravel's RateLimiter.
+        // Make sure all three calls land inside ONE second-slot: if the
+        // boundary is close, wait for the next slot to open first.
+        $msLeft = (1.0 - fmod(microtime(true), 1.0)) * 1000;
+        if ($msLeft < 250) {
+            usleep(((int) ceil($msLeft) + 10) * 1000);
+        }
+        $slot = (int) floor(microtime(true));
+
         $limiter->throttle('example.com');
         $limiter->throttle('https://www.example.com/some/page'); // normalizes to the SAME bucket
-        $limiter->throttle('example.com'); // over the per-second rate → fail-open, no extra hit
+        $limiter->throttle('example.com'); // over the per-second rate → fail-open, undoes its increment
 
-        $this->assertSame(2, \Illuminate\Support\Facades\RateLimiter::attempts('crawl-rate:example.com'),
+        $count = (int) \Illuminate\Support\Facades\Redis::connection()->get('crawl-rl:example.com:'.$slot);
+        $this->assertSame(2, $count,
             'only `rate` requests counted per window; www/scheme variants share one domain bucket');
     }
 

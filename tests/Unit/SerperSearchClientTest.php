@@ -5,10 +5,13 @@ namespace Tests\Unit;
 use App\Services\SerperSearchClient;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class SerperSearchClientTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function tearDown(): void
     {
         Http::fake();
@@ -19,7 +22,7 @@ class SerperSearchClientTest extends TestCase
     public function test_returns_null_when_api_key_missing(): void
     {
         Config::set('services.serper.key', '');
-        Config::set('services.serper.search_url', 'https://serper-stub.test/search');
+        Config::set('services.serper.base_url', 'https://serper-stub.test');
 
         $out = app(SerperSearchClient::class)->search('hello world');
 
@@ -30,7 +33,7 @@ class SerperSearchClientTest extends TestCase
     public function test_posts_json_and_returns_decoded_array_on_success(): void
     {
         Config::set('services.serper.key', 'secret-key');
-        Config::set('services.serper.search_url', 'https://serper-stub.test/search');
+        Config::set('services.serper.base_url', 'https://serper-stub.test');
 
         Http::fake([
             'https://serper-stub.test/search' => Http::response([
@@ -58,7 +61,7 @@ class SerperSearchClientTest extends TestCase
     public function test_posts_gl_and_hl_when_valid(): void
     {
         Config::set('services.serper.key', 'secret-key');
-        Config::set('services.serper.search_url', 'https://serper-stub.test/search');
+        Config::set('services.serper.base_url', 'https://serper-stub.test');
 
         Http::fake([
             'https://serper-stub.test/search' => Http::response(['organic' => []], 200),
@@ -79,7 +82,7 @@ class SerperSearchClientTest extends TestCase
     public function test_returns_null_on_non_success_status(): void
     {
         Config::set('services.serper.key', 'k');
-        Config::set('services.serper.search_url', 'https://serper-stub.test/search');
+        Config::set('services.serper.base_url', 'https://serper-stub.test');
 
         Http::fake([
             'https://serper-stub.test/search' => Http::response(['error' => 'bad'], 500),
@@ -91,7 +94,7 @@ class SerperSearchClientTest extends TestCase
     public function test_returns_null_when_body_is_not_json_object(): void
     {
         Config::set('services.serper.key', 'k');
-        Config::set('services.serper.search_url', 'https://serper-stub.test/search');
+        Config::set('services.serper.base_url', 'https://serper-stub.test');
 
         Http::fake([
             'https://serper-stub.test/search' => Http::response('not-json', 200, ['Content-Type' => 'text/plain']),

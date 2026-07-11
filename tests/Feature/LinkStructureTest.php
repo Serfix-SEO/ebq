@@ -182,6 +182,11 @@ class LinkStructureTest extends TestCase
             ->assertSee('68');
     }
 
+    /**
+     * The queue's slide-over (open()/openIssue) was replaced by the SiteIssues
+     * detail page: group cards deep-link to route('issues.show') and the URL
+     * rows come from ActionQueueService::issueRows().
+     */
     public function test_action_queue_crawl_group_drills_down_to_urls(): void
     {
         $user = User::factory()->create();
@@ -189,12 +194,22 @@ class LinkStructureTest extends TestCase
         $this->seedCrawl($website);
         session(['current_website_id' => $website->id]);
 
+        Livewire::withoutLazyLoading();
+
         Livewire::actingAs($user)
             ->test(PriorityActionQueue::class)
             ->set('websiteId', $website->id)
-            ->call('open', 'crawl_broken_link')
-            ->assertSet('openIssue', 'crawl_broken_link')
-            ->assertSee('/dead');
+            ->assertSee('Broken links')
+            ->assertSeeHtml(route('issues.show', ['key' => 'crawl_broken_link']));
+
+        $urls = array_column(
+            app(\App\Services\ActionQueueService::class)->issueRows('crawl_broken_link', $website->id),
+            'title',
+        );
+        $this->assertTrue(
+            collect($urls)->contains(fn ($u) => str_contains((string) $u, '/dead')),
+            'issue rows should list the broken /dead URL',
+        );
     }
 
     public function test_crawl_issues_are_grouped_in_the_action_queue_with_counts(): void

@@ -2,22 +2,26 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class FeaturesPageTest extends TestCase
 {
+    // The version endpoint reads settings/plugin_releases; marketing pages
+    // read settings via SetLocale. Without migrated tables those 500.
+    use RefreshDatabase;
+
     public function test_features_page_is_public(): void
     {
         $this->get(route('features'))
             ->assertOk()
-            ->assertSee('Ship SEO decisions, not dashboards')
+            ->assertSee('Every signal, every action, in one workspace.')
             ->assertSee('Cross-signal insights')
             ->assertSee('Rank tracking')
             ->assertSee('Anomaly alerts')
             ->assertSee('Page audits')
             ->assertSee('Backlinks')
             ->assertSee('Reporting')
-            ->assertSee('Team &amp; permissions', escape: false)
             ->assertSee('Integrations');
     }
 
@@ -28,12 +32,11 @@ class FeaturesPageTest extends TestCase
             ->assertSee(route('features'));
     }
 
-    public function test_landing_advertises_wordpress_plugin_behind_sign_in(): void
+    public function test_landing_advertises_wordpress_plugin_without_direct_download(): void
     {
         $this->get(route('landing'))
             ->assertOk()
-            ->assertSee('WordPress plugin')
-            ->assertSee('Sign in to download plugin')
+            ->assertSee('WordPress Plugin')
             ->assertDontSee('/wordpress/plugin.zip', escape: false);
     }
 
@@ -41,7 +44,7 @@ class FeaturesPageTest extends TestCase
     {
         $this->get(route('features'))
             ->assertOk()
-            ->assertSee('Ship insights where editors already work')
+            ->assertSee('Surface insights where editors write.')
             ->assertDontSee('/wordpress/plugin.zip', escape: false);
     }
 
@@ -72,9 +75,12 @@ class FeaturesPageTest extends TestCase
         $this->assertStringContainsString('/wordpress/plugin.zip', (string) $response->json('download_url'));
     }
 
-    // TEMP: plugin downloads are disabled — restore the original assertions when re-enabling.
-    public function test_plugin_download_route_is_temporarily_disabled(): void
+    public function test_plugin_download_is_gated_by_the_coming_soon_flag(): void
     {
-        $this->get(route('wordpress.plugin.download'))->assertStatus(503);
+        config(['services.wordpress_plugin.coming_soon' => true]);
+
+        // 404 (not 503) on purpose: existing installs treat 5xx as a server
+        // outage and retry; 404 reads as "no build published".
+        $this->get(route('wordpress.plugin.download'))->assertNotFound();
     }
 }

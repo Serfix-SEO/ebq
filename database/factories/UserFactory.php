@@ -27,7 +27,11 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => null,
+            // Verified by default (stock Laravel convention): app routes sit
+            // behind the `verified` middleware, so a null default made every
+            // HTTP feature test 302 to verify-email. Use ->unverified() when
+            // a test needs the unverified state.
+            'email_verified_at' => now(),
             'is_admin' => false,
             'is_disabled' => false,
             'password' => static::$password ??= Hash::make('password'),
