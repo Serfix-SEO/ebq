@@ -105,6 +105,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/keywords/{id}/history', [PluginHqController::class, 'keywordHistory'])
                 ->whereNumber('id')
                 ->name('keywords.history');
+            Route::get('/keyword-detail', [PluginHqController::class, 'keywordDetail'])->name('keyword-detail');
             Route::get('/gsc-keywords', [PluginHqController::class, 'gscKeywords'])->name('gsc-keywords');
             Route::get('/pages', [PluginHqController::class, 'pages'])->name('pages');
             Route::get('/index-status', [PluginHqController::class, 'indexStatus'])->name('index-status');

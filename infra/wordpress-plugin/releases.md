@@ -14,7 +14,40 @@ from `GET /wordpress/plugin.zip`.
 
 ## Current state (2026-07-11)
 
-**v2.0.10 is the published `stable` release.** 2.0.10 (owner QA: "not all issues
+**v2.0.10 is the published `stable` release; v2.0.11 is built and awaiting
+QA/publish** (ZIP at `ebq-wordpress-plugin/ebq-seo.zip`). 2.0.11: keyword
+detail page on the HQ Keywords tab (`ebq-hq-keywords`) — query click →
+in-tab deep-dive (`src/hq/components/KeywordDetailView.jsx`) mirroring the
+portal's `/keywords/{query}` page, fed by the new
+`GET /api/v1/hq/keyword-detail` endpoint (shared `KeywordDetailService`, see
+[hq-api.md](hq-api.md)); proxy route `/ebq/v1/hq/keyword-detail` added to
+`NEVER_CACHE_ROUTE_PREFIXES`. Also in 2.0.11 (owner QA: "site issues not all
+showing" on the HQ Overview): the Overview's Site-issues digest card was the
+LAST crawl-only surface — it now merges the GSC-derived groups
+(`src/hq/searchIssues.js`, shared with the Site Audit Issues subtab's 2.0.10
+block; counts reuse the overview payload's `insight_counts`, no extra request)
+— pubgnamegenerator now reads "81 open issues · 26 crawl + 55 search data"
+matching the portal action queue; the Site Audit → Overview subview got the
+same treatment (Total-open-issues KPI + GSC rows in "Where to start"). Two
+more 2.0.11 fixes found in the same owner-QA round: (1) **2.0.10's insight
+deep-links were dead** — they pointed at `page=ebq-hq-seo_performance`, which
+is never a registered page (the first HQ section lives on the PARENT slug
+`ebq-hq`, `class-ebq-hq-page.php` `section_slug()`), so WP answered "Sorry,
+you are not allowed to access this page"; links now target `page=ebq-hq&…`.
+(2) **All legacy-slug redirects were dead on current WP**: admin.php runs the
+menu access check (`wp-admin/includes/menu.php` → `wp_die`) BEFORE
+`admin_init` fires, so `redirect_legacy_sections` never ran for unregistered
+slugs — now also hooked on **`admin_page_access_denied`** (fires right before
+that `wp_die`), and the old `ebq-hq-seo_performance` URLs redirect preserving
+`ebq_subtab`/`ebq_insight`. (3) **Cannibalization showed the same URL twice per
+row** (owner bug report w/ screenshot: www + non-www variants of `/symbols`) —
+fixed server-side in `ReportDataService::buildCannibalizationReport` (host-variant
+merge, see [../reports/insights.md](../reports/insights.md)), benefiting portal
+AND plugin. (4) **"$ At stake" / "$ Upside" columns removed** from the plugin's
+cannibalization + quick-wins tables (violated the app-wide no-$-projections rule,
+2026-07-07; portal was already clean) — replaced with Volume/mo; `upside_value`
+stays the hidden quick-wins sort. All QA'd live on the test install (headless
+Chrome). Prior: 2.0.10 (owner QA: "not all issues
 showing" on the Issues subtab): Site Audit → Issues only rendered the crawl-finding
 groups (`actionGroups`) — the GSC-derived groups the portal's action queue shows
 alongside them (cannibalization / striking distance / content decay / index fails /

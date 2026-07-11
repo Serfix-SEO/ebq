@@ -28,7 +28,28 @@ cached 24h, version-keyed.
 **Cannibalization** (:765) — default 28-day window. Candidate query needs ≥2
 distinct pages, `total_impressions ≥ 100`, and the primary page's click-share
 **< 90%** (≥90% = one URL clearly dominates, no real split), plus ≥1 competing
-page after the primary. Sorted by impressions desc.
+page after the primary. Sorted by impressions desc. **Host variants are merged
+first** (2026-07-11, `canonicalPageKey()` — strips scheme/leading-www/trailing
+slash, keeps query strings): GSC reports `https://x.com/p` and
+`https://www.x.com/p` as distinct pages, which showed the same path twice in
+every competing list and let variant-only queries masquerade as cannibalization
+(owner bug report w/ screenshot). Merged variant stats are summed, position is
+impressions-weighted, display URL = the variant with the most clicks; queries
+whose "pages" collapse to one logical page are dropped (canonicalization
+concern, not cannibalization). Cache key bumped `v1`→`v2` with the shape change.
+Regression: `tests/Feature/InsightsServiceTest.php`
+`test_cannibalization_merges_host_variants_of_the_same_page`. Competing-page
+`share` is **click**-share. **Sitelinks-noise filter** (2026-07-11, cache
+v2→v3): Google sitelinks under the primary result log impressions *at the
+parent's position* with 0 clicks (fingerprint on pubgnamegenerator: four pages,
+identical 13 impressions, identical pos 3.9) and GSC doesn't label them — they
+showed as 0%-share "competitors". A competing page is now kept only if it took
+clicks OR holds ≥10% of the query's impressions; `page_count` counts the
+filtered set + primary, while `total_clicks`/`total_impressions` still reflect
+the whole query. Rows whose competition was only noise disappear. Regression:
+`test_cannibalization_filters_sitelinks_noise_competitors`. Note the
+pre-existing ≥90% dominance gate means a 0-click rival only ever surfaces when
+some other page also takes clicks.
 
 **Striking distance** (:860) — 28-day window, grouped by (query, page).
 Inclusion: `impressions ≥ 200 AND impression-weighted position in [5, 20]`.
@@ -96,7 +117,7 @@ so the cache auto-rolls daily.
 
 | Method | Key pattern (suffix `…:{version}`) | TTL |
 |---|---|---|
-| `cannibalizationReport` :744 | `report:cannibalization:v1:{id}:{start}:{end}:{limit}:{country}` | 24h |
+| `cannibalizationReport` :744 | `report:cannibalization:v3:{id}:{start}:{end}:{limit}:{country}` (v2 host-variant merge, v3 sitelinks filter) | 24h |
 | `strikingDistance` :843 | `report:strikingDistance:v2:{id}:…` (v2 added page+page_position) | 24h |
 | `contentDecay` :1009 | `report:contentDecay:v1:{id}:{limit}:{country}:{yesterday}` | 24h |
 | `indexingFailsWithTraffic` :1208 | `report:indexingFails:v1:{id}:{windowDays}:{limit}:{country}:{yesterday}` | 24h |

@@ -176,6 +176,35 @@ screen's totals match the portal action queue), Pages (inventory with
 all/orphans/broken/noindex/deep filters, Inspect hand-off), Link Explorer
 (inbound/outbound/suggested links + path-from-home for any crawled URL).
 
+**Site-issues parity rule (2.0.10/2.0.11):** the portal action queue counts
+crawl findings AND GSC-derived groups, so **every** plugin "site issues"
+surface must render both or it under-reports vs Serfix. The shared list is
+`src/hq/searchIssues.js` (`SEARCH_ISSUE_TYPES`: cannibalizations / striking
+distance / content decay / index-fails-with-traffic / quick wins, with tones +
+deep-link hrefs); consumers: Site Audit → Issues subtab (2.0.10), Site Audit →
+Overview ("Where to start" + total KPI, 2.0.11) and the HQ Overview
+Site-issues digest card (2.0.11, reuses the overview payload's
+`insight_counts`). A new issues surface must import from there, not re-list.
+⚠ Deep-link gotcha: the first HQ section (`seo_performance`) is registered on
+the PARENT slug — links must use `page=ebq-hq`, never
+`page=ebq-hq-seo_performance` (unregistered → WP "not allowed"; 2.0.10 shipped
+that bug). Legacy/wrong slugs are rescued by `redirect_legacy_sections`, which
+must stay hooked on **`admin_page_access_denied`** — `admin_init` alone never
+fires for unregistered slugs (menu access check `wp_die`s first).
+
+**Keyword detail view** (`src/hq/components/KeywordDetailView.jsx`, v2.0.11):
+clicking any query on the Keywords tab (`GscKeywordsTab`, page
+`ebq-hq-keywords`) opens an in-tab deep-dive mirroring the portal's
+`/keywords/{query}` page — volume/CPC/competition/12-mo-trend KPIs, GSC 28d
+totals + 90d clicks/impressions charts, ranking pages (with a cannibalization
+callout), countries/devices, rank-tracker stats + position history (reuses
+`/hq/keywords/{id}/history`), PAA + related searches (each related query opens
+its own detail). Data: `GET /hq/keyword-detail` (see [`hq-api.md`](hq-api.md))
+— all analysis is server-side, the view is pure presentation. "+ Track" seeds
+the AddKeywordModal and remounts the view via a nonce key (the same query
+string wouldn't refetch). "Open in Serfix ↗" deep-links to the portal detail
+page with the `ebq_site` hint.
+
 **Keyword Finder tab** (`src/hq/tabs/KeywordFinderTab.jsx`, v2.0.0): async
 discovery (seeds ≤20 or URL mode) + volume check (≤100) over
 `/hq/keyword-finder/*`; dispatch → 5s polling (60 tries then a soft timeout

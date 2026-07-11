@@ -65,6 +65,7 @@ notes only *deviations* (writes, external calls, rate limits).
 | `POST /keywords/{id}/recheck` | **write** — dispatch `TrackKeywordRankJob` | — |
 | `GET /keywords/{id}/history` | `RankTrackingSnapshot` series | — |
 | `GET /gsc-keywords` | `SearchConsoleData` keywords + tracked overlay | — |
+| `GET /keyword-detail?query=` | `KeywordDetailService::signals()` — one keyword's full signal set: metric (volume/CPC/competition/12-mo trend), GSC 28d totals + 90d daily/top-pages/countries/devices, tracker + latest snapshot, related searches/PAA, opportunity flags, CTR-curve `projected_clicks` | 422 on missing/>255-char `query`. The service is **shared with the portal's `/keywords/{query}` Livewire page** (`Livewire\Keywords\KeywordDetail` delegates to it), so plugin and portal can't drift. Raw CPC only — never $ projections (2026-07-07 rule) |
 | `GET /pages` | `SearchConsoleData` per-page aggregates | — |
 | `GET·POST /index-status` | `SearchConsoleData` + `PageIndexingStatus`; sitemap presence; sort priority | POST accepts a URL list body |
 | `POST /index-status/submit` | **external** — Google Indexing API `urlNotifications:publish`; needs `gscAccountResolved()`; writes `last_reindex_requested_at` (`:887`) | 502 on Google error; `needs_google_reconnect` flag |

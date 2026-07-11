@@ -517,6 +517,74 @@ class PluginHqController extends Controller
     }
 
     /**
+     * Keyword deep-dive — every signal we hold on one query, mirroring the
+     * portal's /keywords/{query} page (KeywordDetailService is shared with
+     * the Livewire component, so the two can never drift):
+     * keyword-intelligence metric (volume/CPC/competition/12-mo trend), GSC
+     * 28d totals + 90d daily series, top pages / countries / devices,
+     * rank-tracker state + latest SERP snapshot, related searches + PAA,
+     * opportunity flags, CTR-curve click projection (never $ figures).
+     *   GET /api/v1/hq/keyword-detail?query=…
+     */
+    public function keywordDetail(Request $request): JsonResponse
+    {
+        $website = $this->website($request);
+        $query = trim((string) $request->query('query', ''));
+        if ($query === '' || mb_strlen($query) > 255) {
+            return response()->json(['error' => 'invalid_query'], 422);
+        }
+
+        $signals = app(\App\Services\KeywordDetailService::class)->signals($website->id, $query);
+
+        $metric = $signals['metric'];
+        $tracker = $signals['tracker'];
+        $snapshot = $signals['tracker_latest_snapshot'];
+
+        return response()->json([
+            'query' => $query,
+            'metric' => $metric ? [
+                'search_volume' => $metric->search_volume !== null ? (int) $metric->search_volume : null,
+                'cpc' => $metric->cpc !== null ? (float) $metric->cpc : null,
+                'currency' => $metric->currency ?: 'USD',
+                'competition' => $metric->competition !== null ? (float) $metric->competition : null,
+                'trend_class' => $metric->trend_class,
+                'trend_12m' => is_array($metric->trend_12m)
+                    ? array_values(array_filter($metric->trend_12m, fn ($r) => is_array($r) && isset($r['value'])))
+                    : [],
+            ] : null,
+            'gsc_totals' => $signals['gsc_totals'],
+            'gsc_daily' => $signals['gsc_daily'],
+            'top_pages' => $signals['top_pages'],
+            'countries' => $signals['countries'],
+            'devices' => $signals['devices'],
+            'tracker' => $tracker ? [
+                'id' => $tracker->id,
+                'keyword' => $tracker->keyword,
+                'current_position' => $tracker->current_position !== null ? (float) $tracker->current_position : null,
+                'best_position' => $tracker->best_position !== null ? (float) $tracker->best_position : null,
+                'position_change' => $tracker->position_change !== null ? (float) $tracker->position_change : null,
+                'current_url' => $tracker->current_url,
+                'target_url' => $tracker->target_url,
+                'last_checked_at' => $tracker->last_checked_at?->toIso8601String(),
+                'last_status' => (string) ($tracker->last_status ?? ''),
+                'depth' => (int) ($tracker->depth ?? 100),
+                'country' => $tracker->country,
+                'device' => $tracker->device,
+                'is_active' => (bool) $tracker->is_active,
+            ] : null,
+            'latest_snapshot' => $snapshot ? [
+                'position' => $snapshot->position !== null ? (float) $snapshot->position : null,
+                'url' => $snapshot->url,
+                'checked_at' => $snapshot->checked_at?->toIso8601String(),
+            ] : null,
+            'related_searches' => $signals['related_searches'],
+            'paa' => $signals['paa'],
+            'flags' => $signals['flags'],
+            'projected_clicks' => $signals['projections']['projected_clicks'],
+        ]);
+    }
+
+    /**
      * GSC keywords directory — every query the site has impressions for in
      * the chosen range, with clicks/impressions/CTR/position aggregates.
      * Marks each one with `is_tracked` so the UI can show a "Track this"

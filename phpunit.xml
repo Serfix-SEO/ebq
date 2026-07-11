@@ -41,5 +41,12 @@
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="RECAPTCHA_SITE_KEY" value=""/>
         <env name="RECAPTCHA_SECRET_KEY" value=""/>
+        <!-- Blank the real provider key so tests can NEVER hit (and bill) the
+             live Keywords Everywhere API. QUEUE_CONNECTION=sync runs
+             RankTrackingKeywordObserver's FetchKeywordMetricsJob inline, so a
+             leaked key means every RankTrackingKeyword::create() in a test
+             makes a real credit-billed HTTP call (found 2026-07-11). Same
+             philosophy as the REDIS_DB pin above. -->
+        <env name="KEYWORDS_EVERYWHERE_API_KEY" value=""/>
     </php>
 </phpunit>

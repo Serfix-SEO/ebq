@@ -747,7 +747,9 @@ class ReportDataService
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28, $websiteId);
 
         $key = sprintf(
-            'report:cannibalization:v1:%s:%s:%s:%d:%s:%d',
+            // v2: host/protocol page variants merged (www vs non-www).
+            // v3: sitelinks-noise competitors filtered (0 clicks + <10% impr share).
+            'report:cannibalization:v3:%s:%s:%s:%d:%s:%d',
             $websiteId,
             $start->toDateString(),
             $end->toDateString(),
@@ -793,15 +795,35 @@ class ReportDataService
             if ($pageRows->count() < 2) {
                 continue;
             }
+            // GSC reports host/protocol variants of one page as distinct rows
+            // (https://example.com/x vs https://www.example.com/x) — merge them
+            // or every variant pair reads as fake "competition with yourself"
+            // and the same path shows twice in the competing list.
             $pages = $pageRows
-                ->map(fn ($r) => [
-                    'page' => (string) $r->page,
-                    'clicks' => (int) $r->total_clicks,
-                    'impressions' => (int) $r->total_impressions,
-                    'position' => round((float) $r->avg_position, 1),
-                ])
+                ->groupBy(fn ($r) => self::canonicalPageKey((string) $r->page))
+                ->map(function ($variants) {
+                    $clicks = (int) $variants->sum('total_clicks');
+                    $impressions = (int) $variants->sum('total_impressions');
+                    $best = $variants->sortByDesc('total_clicks')->first();
+                    $position = $impressions > 0
+                        ? $variants->reduce(fn ($carry, $r) => $carry + (float) $r->avg_position * (int) $r->total_impressions, 0.0) / $impressions
+                        : (float) $best->avg_position;
+
+                    return [
+                        'page' => (string) $best->page,
+                        'clicks' => $clicks,
+                        'impressions' => $impressions,
+                        'position' => round($position, 1),
+                    ];
+                })
                 ->sortByDesc('clicks')
                 ->values();
+
+            // Variants may have collapsed into a single logical page — that's
+            // a canonicalization concern, not cannibalization.
+            if ($pages->count() < 2) {
+                continue;
+            }
 
             $totalClicks = (int) $pages->sum('clicks');
             $totalImpressions = (int) $pages->sum('impressions');
@@ -816,9 +838,18 @@ class ReportDataService
                 continue;
             }
 
-            $competing = $pages->slice(1)->map(fn (array $p) => $p + [
-                'share' => $totalClicks > 0 ? round(($p['clicks'] / $totalClicks) * 100, 1) : 0.0,
-            ])->values()->toArray();
+            $competing = $pages->slice(1)
+                // Sitelinks noise: when Google decorates the primary result
+                // with sitelinks, each sitelinked page logs impressions AT THE
+                // PARENT'S POSITION but rarely earns a click — GSC doesn't
+                // label them, so they masquerade as 0%-share "competitors".
+                // A real competitor either takes clicks or holds a meaningful
+                // slice (≥10%) of the query's impressions on its own.
+                ->filter(fn (array $p) => $p['clicks'] > 0
+                    || ($totalImpressions > 0 && $p['impressions'] >= $totalImpressions * 0.10))
+                ->map(fn (array $p) => $p + [
+                    'share' => $totalClicks > 0 ? round(($p['clicks'] / $totalClicks) * 100, 1) : 0.0,
+                ])->values()->toArray();
 
             if (empty($competing)) {
                 continue;
@@ -829,7 +860,7 @@ class ReportDataService
                 'primary_page' => $primary['page'],
                 'total_clicks' => $totalClicks,
                 'total_impressions' => $totalImpressions,
-                'page_count' => $pages->count(),
+                'page_count' => count($competing) + 1,
                 'competing_pages' => $competing,
             ];
         }
@@ -837,6 +868,20 @@ class ReportDataService
         usort($out, fn ($a, $b) => $b['total_impressions'] <=> $a['total_impressions']);
 
         return $this->attachKeywordMetrics(array_slice($out, 0, $limit), 'query');
+    }
+
+    /**
+     * Collapse scheme / leading-www / trailing-slash so GSC's host variants of
+     * one page compare equal. Query strings are kept — they can be real
+     * distinct pages.
+     */
+    private static function canonicalPageKey(string $url): string
+    {
+        $key = strtolower(trim($url));
+        $key = (string) preg_replace('#^https?://#', '', $key);
+        $key = (string) preg_replace('#^www\.#', '', $key);
+
+        return rtrim($key, '/');
     }
 
     /**

@@ -256,6 +256,50 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-11 (plugin keyword detail page + a live test-suite landmine: tests were
+  billing the real Keywords Everywhere API)** — HQ Keywords tab (`ebq-hq-keywords`)
+  had no per-keyword view. Server: extracted the portal `/keywords/{query}` signal
+  gathering out of `Livewire\Keywords\KeywordDetail` into
+  `app/Services/KeywordDetailService.php` (component delegates; zero parallel logic)
+  and exposed it as `GET /api/v1/hq/keyword-detail` (`PluginHqController::keywordDetail`,
+  tenancy via the token website only, 422 on bad `query`, raw CPC but never $
+  projections). Plugin 2.0.11 (built, NOT yet published): `KeywordDetailView.jsx` —
+  query click on `GscKeywordsTab` → in-tab deep-dive (metric KPIs, GSC charts/pages/
+  countries/devices, tracker history via the existing history endpoint, PAA/related,
+  `ebq_site`-hinted portal deep-link); proxy route in `NEVER_CACHE_ROUTE_PREFIXES`.
+  **Landmine found while testing**: phpunit.xml never blanked
+  `KEYWORDS_EVERYWHERE_API_KEY`, and `QUEUE_CONNECTION=sync` runs
+  `RankTrackingKeywordObserver`→`FetchKeywordMetricsJob` inline — so every test
+  creating a `RankTrackingKeyword` made a **real, credit-billed KE HTTP call** and
+  overwrote seeded metrics with live data (a seeded 12000 came back 22200). Key now
+  pinned blank in phpunit.xml (same philosophy as the REDIS_DB pin). Tests:
+  `tests/Feature/Api/V1/PluginHqKeywordDetailTest.php`,
+  `tests/Feature/Keywords/KeywordDetailPageTest.php` (first coverage of the portal
+  detail page). Same release, second owner-QA fix: the HQ **Overview** Site-issues
+  digest card was still crawl-only ("site issues not all showing") — now merges the
+  GSC-derived groups via shared `src/hq/searchIssues.js` (see the parity rule in
+  plugin-features.md), same for Site Audit → Overview ("Where to start" + total KPI);
+  verified live on the QA install (26 crawl + 55 search data = 81, matches the portal
+  action queue). Two more owner-QA finds fixed in 2.0.11: 2.0.10's insight deep-links
+  pointed at unregistered `page=ebq-hq-seo_performance` (first section lives on the
+  parent slug) → WP "not allowed"; and ALL legacy-slug redirects were dead because
+  admin.php's menu access check `wp_die`s before `admin_init` — redirects now also
+  hook `admin_page_access_denied`. Owner bug report (screenshot) same round:
+  cannibalization listed the same URL twice per row — GSC reports www/non-www +
+  scheme/trailing-slash variants as distinct pages; `buildCannibalizationReport`
+  now merges variants via `canonicalPageKey()` (stats summed, impressions-weighted
+  position, variant-only "splits" dropped, cache v1→v2; fixes portal AND plugin —
+  [reports/insights.md](./reports/insights.md)). Follow-up ("why 0% pages?"):
+  those were Google **sitelinks** (identical impressions + identical position, 0
+  clicks) masquerading as competitors — v3 filter keeps a competing page only if
+  it took clicks or holds ≥10% of the query's impressions. Also removed the plugin's
+  "$ At stake"/"$ Upside" columns (no-$-projections rule; portal was already
+  clean). Everything E2E-QA'd via headless Chrome on pubgnamegenerator.net
+  (2.0.11 installed over SSH). Details:
+  [wordpress-plugin/releases.md](./wordpress-plugin/releases.md). Docs: [wordpress-plugin/hq-api.md](./wordpress-plugin/hq-api.md) ·
+  [wordpress-plugin/plugin-features.md](./wordpress-plugin/plugin-features.md) ·
+  [wordpress-plugin/releases.md](./wordpress-plugin/releases.md) ·
+  [reference/testing.md](./reference/testing.md).
 - **2026-07-11 (test suite: 42 pre-existing failures → 0; two production hardenings
   shipped with it)** — Full-suite run surfaced a 42-failure backlog (none caused by
   current work; verified by baseline diff). Root causes, largest first:
