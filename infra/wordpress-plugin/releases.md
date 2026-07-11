@@ -14,7 +14,17 @@ from `GET /wordpress/plugin.zip`.
 
 ## Current state (2026-07-11)
 
-**v2.0.9 is the published `stable` release.** 2.0.9: closed the wrong-website
+**v2.0.10 is the published `stable` release.** 2.0.10 (owner QA: "not all issues
+showing" on the Issues subtab): Site Audit → Issues only rendered the crawl-finding
+groups (`actionGroups`) — the GSC-derived groups the portal's action queue shows
+alongside them (cannibalization / striking distance / content decay / index fails /
+quick wins; on pubgnamegenerator that was 57 of 83 items missing) were absent.
+Now a "Search-data issues" block (fed by the existing `/hq/insight-counts` proxy,
+best-effort — hidden if GSC absent) renders after the crawl groups; its cards
+deep-link to `page=ebq-hq-seo_performance&ebq_subtab=insights&ebq_insight=<type>`
+(the Reports insights panel preselects via that param — note the insight surface
+lives under SEO Performance → Reports, NOT the "SEO Analysis" section, which is
+page audits) and Index fails → `page=ebq-hq-index_status`. Prior: 2.0.9: closed the wrong-website
 residue 2.0.8 left open — ALL remaining raw portal links now carry an
 `?ebq_site=<domain>` hint consumed server-side by the new `ApplyWebsiteHint`
 web middleware (switches `current_website_id` only among the user's accessible

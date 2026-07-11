@@ -169,7 +169,10 @@ the user that offline features keep working.
 report over `/hq/site-audit/*` (see [`hq-api.md`](hq-api.md)). Sub-views:
 Overview (health ring + severity KPIs + crawl status/blocked/never-crawled
 states), Issues (category group cards → drill-down with type chips, severity
-filter, URL search, load-more, per-type fix guidance), Pages (inventory with
+filter, URL search, load-more, per-type fix guidance; since 2.0.10 also a
+"Search-data issues" block — GSC-derived counts via `/hq/insight-counts`,
+cards deep-link to the SEO Performance insights panel / Index Status so the
+screen's totals match the portal action queue), Pages (inventory with
 all/orphans/broken/noindex/deep filters, Inspect hand-off), Link Explorer
 (inbound/outbound/suggested links + path-from-home for any crawled URL).
 
