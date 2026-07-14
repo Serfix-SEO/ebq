@@ -125,6 +125,12 @@ return [
         'key' => env('KEYWORDS_EVERYWHERE_API_KEY'),
         'base_url' => env('KEYWORDS_EVERYWHERE_BASE_URL', 'https://api.keywordseverywhere.com'),
         'fresh_days' => (int) env('KEYWORDS_EVERYWHERE_FRESH_DAYS', 30),
+        // Kill switch for the PAID KE backlink endpoints (50 credits/domain):
+        // competitor-backlink refresh + own-backlink sync. OFF by default
+        // since 2026-07-14 — domain authority now comes from Open PageRank
+        // (free) everywhere; the per-link backlink tables serve whatever is
+        // already cached and simply stop refreshing while this is off.
+        'backlinks_enabled' => (bool) env('KEYWORDS_EVERYWHERE_BACKLINKS_ENABLED', false),
         // Per-keyword cost (USD) — KE bills 1 credit per keyword. Default
         // reflects the published 100,000-credit pack at $10 = $0.0001/credit.
         'cost_per_keyword_usd' => (float) env('KEYWORDS_EVERYWHERE_COST_PER_KEYWORD_USD', 0.0001),

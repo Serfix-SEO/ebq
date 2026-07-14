@@ -69,6 +69,13 @@ class CompetitorBacklinkService
      */
     public function queueRefresh(array $domains, ?string $websiteId = null, ?string $ownerUserId = null): void
     {
+        // Paid KE backlink endpoint suppressed (services.keywords_everywhere
+        // .backlinks_enabled, default off since 2026-07-14) — consumers read
+        // whatever is already cached; DA needs are served by Open PageRank.
+        if (! (bool) config('services.keywords_everywhere.backlinks_enabled', false)) {
+            return;
+        }
+
         $toFetch = [];
         foreach ($domains as $d) {
             $normalized = CompetitorBacklink::extractDomain((string) $d);
@@ -90,6 +97,12 @@ class CompetitorBacklinkService
      */
     public function refresh(string $domain, ?string $websiteId = null, ?string $ownerUserId = null): int
     {
+        // Defense in depth with queueRefresh(): a directly-dispatched job or
+        // CLI call must also never hit the paid KE endpoint while suppressed.
+        if (! (bool) config('services.keywords_everywhere.backlinks_enabled', false)) {
+            return 0;
+        }
+
         $domain = CompetitorBacklink::extractDomain($domain);
         if ($domain === '') {
             return 0;

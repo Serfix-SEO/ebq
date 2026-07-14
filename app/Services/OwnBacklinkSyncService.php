@@ -34,6 +34,13 @@ class OwnBacklinkSyncService
      */
     public function syncForWebsite(Website $website, ?string $ownerUserId = null): int
     {
+        // Paid KE backlink endpoint suppressed (services.keywords_everywhere
+        // .backlinks_enabled, default off since 2026-07-14) — Site Explorer
+        // (DataForSEO) is the backlink source of record now.
+        if (! (bool) config('services.keywords_everywhere.backlinks_enabled', false)) {
+            return 0;
+        }
+
         $domain = $this->extractDomain((string) $website->domain);
         if ($domain === '') {
             return 0;

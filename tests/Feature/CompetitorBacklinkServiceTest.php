@@ -22,6 +22,10 @@ class CompetitorBacklinkServiceTest extends TestCase
             'services.keywords_everywhere.key' => 'test-ke-key',
             'services.keywords_everywhere.base_url' => 'https://api.keywordseverywhere.com',
             'services.keywords_everywhere.backlinks_endpoint' => '/v1/get_backlinks',
+            // Suppressed by default in prod (2026-07-14) — enabled here so the
+            // KE machinery keeps its coverage for when the switch is flipped
+            // back on. Suppression itself is covered by KeBacklinkSuppressionTest.
+            'services.keywords_everywhere.backlinks_enabled' => true,
             'services.competitor_backlinks.fresh_days' => 30,
             'services.competitor_backlinks.limit_per_competitor' => 50,
         ]);

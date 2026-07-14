@@ -8,7 +8,7 @@ use App\Models\CompetitorDiscoveryRun;
 use App\Models\DiscoveredCompetitor;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
-use App\Services\CompetitorBacklinkService;
+use App\Services\OpenPageRankClient;
 use App\Support\KeywordFinderLocations;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
@@ -41,7 +41,7 @@ class CompetitorDiscoveryService
 
     public function __construct(
         private SerpCache $serp,
-        private CompetitorBacklinkService $backlinks,
+        private OpenPageRankClient $opr,
     ) {
     }
 
@@ -292,14 +292,20 @@ class CompetitorDiscoveryService
             return;
         }
 
-        $ownerUserId = $website->user_id;
-        $this->backlinks->queueRefresh($top, $website->id, $ownerUserId);
-
+        // Authority from Open PageRank (free bulk endpoint) — replaced the
+        // paid KE backlink fetch (50 credits/domain) that used to warm the
+        // CompetitorBacklink cache purely to derive this number (2026-07-14).
+        // Falls back to any historically-cached CompetitorBacklink DA.
+        $metrics = $this->opr->metricsFor($top);
         foreach ($top as $domain) {
-            $da = CompetitorBacklink::query()
-                ->forDomain($domain)
-                ->whereNotNull('domain_authority')
-                ->max('domain_authority');
+            $score = $metrics[$domain]['score']
+                ?? ($metrics[OpenPageRankClient::registrable($domain)]['score'] ?? null);
+            $da = $score !== null
+                ? (int) min(100, round((float) $score * 10))
+                : CompetitorBacklink::query()
+                    ->forDomain($domain)
+                    ->whereNotNull('domain_authority')
+                    ->max('domain_authority');
             if ($da !== null) {
                 DiscoveredCompetitor::query()
                     ->where('website_id', $website->id)
