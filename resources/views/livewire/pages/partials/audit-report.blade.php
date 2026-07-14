@@ -720,7 +720,7 @@
                                                                     </li>
                                                                 @endforeach
                                                                 @if ($_compLinkCount > 10)
-                                                                    <li class="pt-1 text-[9px] text-slate-400">{{ __('showing 10 of') }} {{ $_compLinkCount }} {{ __('cached') }}</li>
+                                                                    <li class="pt-1 text-[9px] text-slate-400">{{ __('showing 10 of') }} {{ $_compLinkCount }}</li>
                                                                 @endif
                                                             </ul>
                                                         </details>

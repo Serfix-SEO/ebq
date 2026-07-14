@@ -667,7 +667,7 @@
                             <div class="mb-3 flex items-center justify-between">
                                 <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Result') }}</h3>
                                 <div class="flex items-center gap-2" x-show="result && result.ok">
-                                    <span x-show="result?.cached" class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{{ __('Cached') }}</span>
+                                    
                                     <span x-show="result?.model" class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300" x-text="result?.model"></span>
                                     <span x-show="result?.usage?.total" class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300" x-text="`${result.usage.total} ${@js(__('tok'))}`"></span>
                                     <button type="button" @click="copyResult()" class="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" :title="copied ? @js(__('Copied')) : @js(__('Copy'))">
@@ -688,7 +688,7 @@
                                     <div class="h-3 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
                                     <div class="h-3 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
                                     <div class="h-3 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800"></div>
-                                    <p class="pt-2 text-xs text-slate-400">{{ __('This can take up to a minute on cold cache.') }}</p>
+                                    <p class="pt-2 text-xs text-slate-400">{{ __('This can take up to a minute.') }}</p>
                                 </div>
                             </template>
 

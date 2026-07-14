@@ -22,6 +22,24 @@ trait TracksKeyword
     public function track(string $keyword): void
     {
         $this->trackNotice = null;
+        $created = $this->trackOne($keyword);
+
+        if ($created === null) {
+            // trackOne already set a specific error notice.
+            return;
+        }
+
+        $this->trackNotice = $created
+            ? 'Added “'.trim($keyword).'” to rank tracker — first check queued.'
+            : 'Already tracking “'.trim($keyword).'”.';
+    }
+
+    /**
+     * Track one keyword. Returns true when newly created, false when it was
+     * already tracked, null on error (with $trackNotice set to the reason).
+     */
+    protected function trackOne(string $keyword): ?bool
+    {
         $keyword = trim($keyword);
         $user = Auth::user();
         $websiteId = session('current_website_id');
@@ -29,7 +47,7 @@ trait TracksKeyword
         if ($keyword === '' || $user === null || ($websiteId === null || $websiteId === '') || ! $user->canViewWebsiteId($websiteId)) {
             $this->trackNotice = 'Could not add to rank tracker.';
 
-            return;
+            return null;
         }
 
         $website = Website::find($websiteId);
@@ -37,7 +55,7 @@ trait TracksKeyword
         if ($domain === '') {
             $this->trackNotice = 'Set a target domain on the website first.';
 
-            return;
+            return null;
         }
 
         $row = RankTrackingKeyword::updateOrCreate(
@@ -66,9 +84,10 @@ trait TracksKeyword
 
         if ($row->wasRecentlyCreated) {
             TrackKeywordRankJob::dispatch($row->id, $row->website_id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
-            $this->trackNotice = 'Added “'.$keyword.'” to rank tracker — first check queued.';
-        } else {
-            $this->trackNotice = 'Already tracking “'.$keyword.'”.';
+
+            return true;
         }
+
+        return false;
     }
 }

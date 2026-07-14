@@ -65,7 +65,10 @@ class ClientController extends Controller
             ->selectSub(
                 fn ($q) => $q->from('client_activities')
                     ->selectRaw('MAX(created_at)')
-                    ->whereColumn('client_activities.user_id', 'users.id'),
+                    ->whereColumn('client_activities.user_id', 'users.id')
+                    // Admin support/debugging while impersonating shouldn't
+                    // read back as the client's own "last activity".
+                    ->where('is_impersonated', false),
                 'last_activity_at'
             )
             // Trial-days-left badge: EXISTS is cheap and avoids a Cashier

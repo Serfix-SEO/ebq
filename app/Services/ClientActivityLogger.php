@@ -57,6 +57,7 @@ class ClientActivityLogger
             'type'            => $type,
             'user_id'         => $billedUserId,
             'actor_user_id'   => $actorUserId ?? $this->resolveActor(),
+            'is_impersonated' => $this->isImpersonating(),
             'website_id'      => $websiteId,
             'provider'        => $provider,
             'meta'            => $meta,
@@ -89,6 +90,21 @@ class ClientActivityLogger
         }
 
         return Auth::id();
+    }
+
+    /**
+     * Whether the current request is an admin impersonating a client.
+     * Rows written during impersonation are flagged so the admin clients
+     * list doesn't treat admin poking-around as the client's own activity.
+     */
+    private function isImpersonating(): bool
+    {
+        try {
+            return ! empty(session('impersonator_id'));
+        } catch (\Throwable) {
+            // No session (queue worker, CLI).
+            return false;
+        }
     }
 
     /**

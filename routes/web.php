@@ -8,6 +8,8 @@ use App\Http\Controllers\GuestKeywordVolumeController;
 use App\Http\Controllers\GoogleCapController;
 use App\Http\Controllers\MicrosoftOAuthController;
 use App\Http\Controllers\PageAuditController;
+use App\Http\Controllers\PublicReportController;
+use App\Http\Controllers\ClientReportExportController;
 use App\Http\Controllers\SiteAuditExportController;
 use App\Http\Controllers\Admin\ActivityController as AdminActivityController;
 use App\Http\Controllers\Admin\ClientController as AdminClientController;
@@ -15,6 +17,7 @@ use App\Http\Controllers\Admin\ClientImpersonationController;
 use App\Http\Controllers\Admin\PluginAdoptionController as AdminPluginAdoptionController;
 use App\Http\Controllers\Admin\PluginReleaseController as AdminPluginReleaseController;
 use App\Http\Controllers\Admin\UsageController as AdminUsageController;
+use App\Http\Controllers\Admin\SiteExplorerUsageController as AdminSiteExplorerUsageController;
 use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureController;
 use App\Http\Controllers\Admin\BillingController as AdminBillingController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
@@ -40,6 +43,30 @@ Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');
 Route::view('/guide', 'guide')->name('guide');
 
 Route::get('/locale/{locale}', [\App\Http\Controllers\LocaleController::class, 'set'])->name('locale.set');
+
+// Public, no-auth shared backlink report. High-entropy token → cached snapshot.
+// Bad/revoked/expired tokens 404 (never 403). Throttled against enumeration.
+Route::get('/r/{token}', [PublicReportController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->name('report.public');
+
+// Homepage "Analyze website" funnel. Anonymous submit calls NO backlink API —
+// it validates the URL (throttle + SSRF + reCAPTCHA) and returns require:signup.
+// Only a signed-in submit generates the report. See WebsiteAnalyzeController.
+Route::post('/analyze', [\App\Http\Controllers\WebsiteAnalyzeController::class, 'store'])->name('analyze.store');
+
+// Report view. Guests see a blurred MOCK teaser + signup modal (no API call);
+// authed (NOT verified-gated) users see the real report — first value lands
+// right after signup, before email verification.
+Route::get('/report/view', [\App\Http\Controllers\ReportViewController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->name('report.view');
+
+// Blurred teaser preview for the public tools (anonymous): renders the tool's
+// real result view with sample data behind a signup/login modal. No API.
+Route::get('/tools/preview/{tool}', [\App\Http\Controllers\ToolPreviewController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->name('tool.preview');
 
 // Public, no-signup SEO audit launched from the landing-page hero. Anonymous —
 // no GSC/GA, no paid SERP/CWV — and rate-limited + reCAPTCHA-gated in the
@@ -148,6 +175,16 @@ Route::get('/wordpress/embed/page-audit', [WordPressEmbedController::class, 'pag
 
 Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->middleware('feature:dashboard')->name('dashboard');
+    // Post-signup landing hub — website-scoped Site Explorer report + a top
+    // tab bar (Site Explorer / Site Health / Traffic / GSC), each tab showing
+    // a real processing/needs-action/ready pill. See WebsiteOverviewController.
+    Route::get('/overview', [\App\Http\Controllers\WebsiteOverviewController::class, 'show'])->name('website-overview');
+    Route::view('/site-explorer', 'site-explorer')->name('site-explorer');
+    // Backlink slice of the Site Explorer snapshot for the current website,
+    // rendered in dashboard style (Pulse group nav item).
+    Route::get('/backlinks', [\App\Http\Controllers\BacklinksController::class, 'show'])->name('backlinks.index');
+    // Organic-competitor slice of the same snapshot (Pulse group nav item).
+    Route::get('/competitors', [\App\Http\Controllers\CompetitorsController::class, 'show'])->name('competitors.index');
     // Priority Action Queue drill-down: one filterable + paginated page per issue
     // group (crawl_* findings and the GSC/keyword action types).
     Route::get('/issues/{key}', fn (string $key) => view('issues.show', ['key' => $key]))
@@ -166,14 +203,21 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/keyword-research', 'keyword-research.index')->middleware('feature:keywords')->name('keyword-research.index');
     Route::redirect('/keyword-volume', '/keyword-research?tab=volume')->name('keyword-volume.index');
     Route::redirect('/keyword-ideas', '/keyword-research?tab=ideas')->name('keyword-ideas.index');
-    Route::redirect('/competitive', '/keyword-research?tab=gap')->name('competitive.index');
+    // Competitor Gap moved out of the hub to its own Orbit page (2026-07-14).
+    Route::view('/keyword-gap', 'keyword-gap')->middleware('feature:keywords')->name('keyword-gap.index');
+    Route::redirect('/competitive', '/keyword-gap')->name('competitive.index');
     // Competitor auto-discovery — reachable from the Gap tab.
     Route::view('/competitive/competitors', 'competitive.competitors')->middleware('feature:keywords')->name('competitive.competitors');
     Route::view('/rank-tracking', 'rank-tracking.index')->middleware('feature:rank_tracking')->name('rank-tracking.index');
     Route::get('/rank-tracking/{keywordId}', fn (string $keywordId) => view('rank-tracking.show', ['keywordId' => $keywordId]))
         ->middleware('feature:rank_tracking')
         ->name('rank-tracking.show');
-    Route::view('/backlinks', 'backlinks.index')->middleware('feature:backlinks')->name('backlinks.index');
+    // The legacy manual backlink tracker (backlinks/index.blade.php +
+    // Livewire\Backlinks\BacklinksManager) was UNROUTED 2026-07-14 — it
+    // used to own this URI and, being registered after the Site Explorer
+    // backlinks page above, silently overrode it (same URI + name → last
+    // registration wins). /backlinks is now exclusively the read-only
+    // Site Explorer backlink view (BacklinksController).
     Route::view('/pages', 'pages.index')->middleware('feature:pages')->name('pages.index');
     Route::view('/custom-audit', 'pages.custom-audit')->middleware('feature:audits')->name('custom-audit.index');
     Route::view('/pagespeed', 'pages.page-speed')->middleware('feature:audits')->name('pagespeed.index');
@@ -185,6 +229,14 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::get('/site-audit/download', [SiteAuditExportController::class, 'download'])
         ->middleware(['feature:link_structure', 'throttle:10,1'])
         ->name('site-audit.download');
+    Route::get('/report/download', [ClientReportExportController::class, 'download'])
+        ->middleware('throttle:10,1')
+        ->name('report.download');
+    Route::post('/report/share', [\App\Http\Controllers\ReportShareController::class, 'store'])
+        ->middleware('throttle:20,1')
+        ->name('report.share');
+    Route::delete('/report/share', [\App\Http\Controllers\ReportShareController::class, 'destroy'])
+        ->name('report.share.revoke');
     Route::get('/page-audits/{pageAuditReport}', [PageAuditController::class, 'show'])
         ->middleware('feature:audits')
         ->name('page-audits.show');
@@ -321,6 +373,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/bug-reports/{bugReport}/screenshot', [\App\Http\Controllers\Admin\BugReportController::class, 'screenshot'])->name('bug-reports.screenshot');
     Route::post('/bug-reports/{bugReport}/resolve', [\App\Http\Controllers\Admin\BugReportController::class, 'resolve'])->name('bug-reports.resolve');
     Route::get('/usage', [AdminUsageController::class, 'index'])->name('usage.index');
+    Route::get('/site-explorer-usage', [AdminSiteExplorerUsageController::class, 'index'])->name('site-explorer-usage.index');
     Route::get('/plugin-releases', [AdminPluginReleaseController::class, 'index'])->name('plugin-releases.index');
     Route::post('/plugin-releases/toggle-updates', [AdminPluginReleaseController::class, 'toggleUpdates'])->name('plugin-releases.toggle-updates');
     Route::post('/plugin-releases', [AdminPluginReleaseController::class, 'store'])->name('plugin-releases.store');

@@ -55,5 +55,18 @@
              Http::fake() and set a fake key via config(). -->
         <env name="MISTRAL_API_KEY" value=""/>
         <env name="DEEPSEEK_API_KEY" value=""/>
+        <!-- Same rule for the Site Explorer report providers (found again
+             2026-07-14: a plain GET /backlinks in a test dispatched a REAL
+             billed DataForSEO generation via QUEUE_CONNECTION=sync, because
+             these creds leaked from prod .env). Blank creds make
+             DataForSeoBacklinkClient::isConfigured() false, so report
+             controllers/jobs no-op; tests that need the pipeline mock the
+             clients or Http::fake() with config() overrides. -->
+        <env name="DATAFORSEO_LOGIN" value=""/>
+        <env name="DATAFORSEO_PASSWORD" value=""/>
+        <env name="MOZ_API_TOKEN" value=""/>
+        <env name="MOZ_ACCESS_ID" value=""/>
+        <env name="MOZ_SECRET_KEY" value=""/>
+        <env name="OPENPAGERANK_API_KEY" value=""/>
     </php>
 </phpunit>

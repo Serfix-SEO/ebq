@@ -79,7 +79,7 @@ class SiteHealthStats extends Component
         // show; until then the prominent crawl banner stands in.
         $partial = $website !== null
             && ! $website->hasCompletedCrawl()
-            && ($justStarted || $website->isCrawling());
+            && ($justStarted || $website->isInitialCrawl());
         $hasPartialData = $summary && (int) ($summary['pages_total'] ?? 0) > 0;
         $hide = $partial && ! $hasPartialData;
 

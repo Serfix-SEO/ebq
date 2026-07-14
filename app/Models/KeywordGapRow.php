@@ -36,6 +36,7 @@ class KeywordGapRow extends Model
         'cpc',
         'our_position',
         'competitor_position',
+        'competitor_domain',
         'competitor_domains',
         'opportunity_score',
         'score_components',

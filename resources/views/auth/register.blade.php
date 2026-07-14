@@ -59,6 +59,11 @@
         </div>
 
         <div>
+            <label for="phone" class="mb-1.5 block text-xs font-medium text-slate-700">{{ __('Phone number') }}</label>
+            @include('partials.phone-input')
+        </div>
+
+        <div>
             <label for="password" class="mb-1.5 block text-xs font-medium text-slate-700">{{ __('Password') }}</label>
             <input id="password" name="password" type="password" required autocomplete="new-password"
                 class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />

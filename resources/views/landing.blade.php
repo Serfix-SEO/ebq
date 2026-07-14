@@ -20,17 +20,32 @@
     </x-slot:schema>
 
     @php
-        // Trial-winback: logged-in expired users see the same strikethrough
-        // pricing as /pricing and /billing (checkout auto-applies the code).
-        // Their CTAs go straight to checkout instead of /register.
+        // Trial-winback (2026-07-14: extended to every new signup, not just
+        // logged-in trial users) — same strikethrough pricing as /pricing
+        // and /billing (checkout auto-applies the code). A guest sees it too
+        // since every signup starts on the Trial plan and will be eligible
+        // the moment they register; only suppressed for a logged-in user
+        // who's ALREADY ineligible (subscribed/comped). Authed CTAs go
+        // straight to checkout instead of /register.
         $wbAuthed  = auth()->check();
         $wbCode    = (string) config('services.stripe.winback_promo_code');
         $wbPercent = (int) config('services.stripe.winback_promo_percent');
-        $wbActive  = $wbCode !== '' && $wbAuthed && \App\Support\TrialStatus::isWinbackEligible(auth()->user());
+        $wbActive  = $wbCode !== '' && (! $wbAuthed || \App\Support\TrialStatus::isWinbackEligible(auth()->user()));
         $wbMoney   = fn (float $v) => '$' . rtrim(rtrim(number_format($v * (100 - $wbPercent) / 100, 2, '.', ''), '0'), '.');
         $wbCta     = fn (string $slug, string $interval) => $wbAuthed
             ? route('billing.checkout', array_filter(['plan' => $slug, 'interval' => $interval !== 'annual' ? $interval : null]))
             : route('register', array_filter(['plan' => $slug, 'interval' => $interval !== 'annual' ? $interval : null]));
+
+        // Feature bullets: pull the SAME authentic, admin-editable list
+        // /pricing renders (Plan::publicFeatures() — the `plans.features`
+        // DB column via /admin/plans/{plan}/edit), instead of a hardcoded
+        // array here that silently drifts out of sync whenever plans change
+        // (exactly what happened — this page's bullets no longer matched
+        // /pricing). Empty array (missing plan row) renders no bullets
+        // rather than a fatal error.
+        $planFeatures = \App\Models\Plan::ordered()->get()->keyBy('slug')
+            ->map(fn (\App\Models\Plan $p) => $p->publicFeatures());
+        $featuresFor  = fn (string $slug) => $planFeatures[$slug] ?? [];
     @endphp
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
@@ -38,13 +53,7 @@
         <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(ellipse_at_top,rgba(242,100,25,0.08),transparent_60%)]"></div>
 
         <div class="mx-auto max-w-4xl px-6 pb-20 pt-16 text-center lg:px-8 lg:pb-28 lg:pt-24">
-            <a href="{{ route('features') }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900">
-                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                {{ __('New: Anomaly alerts and backlink impact') }}
-                <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
-            </a>
-
-            <h1 class="mx-auto mt-6 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+            <h1 class="mx-auto max-w-3xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
                 {{ __('The SEO command center for teams that ship.') }}
             </h1>
 
@@ -81,146 +90,14 @@
             <div class="relative mx-auto mt-10 max-w-3xl">
                 <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -inset-y-10 sm:-inset-x-8 -z-10 bg-[radial-gradient(55%_60%_at_50%_0%,rgba(242,100,25,0.20),transparent_70%)] blur-2xl"></div>
 
-                {{-- Live indicator --}}
-                <div class="mb-4 flex items-center justify-center gap-2">
-                    <span class="flex h-2 w-2 relative">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span class="text-xs font-semibold text-slate-600 tracking-wide">{{ __('Live tool — enter your URL below and run a free audit') }}</span>
-                </div>
+                @include('partials.analyze-hero')
 
-                <form id="guest-audit-form" class="text-left" data-action="{{ route('guest-audit.store') }}" novalidate>
-                    <div class="flex flex-col rounded-[20px] bg-white p-2 shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)] ring-2 ring-orange-200/60 transition hover:ring-orange-300/80 focus-within:ring-2 focus-within:ring-orange-500/70 sm:flex-row sm:items-center sm:divide-x sm:divide-slate-200/70 divide-y divide-slate-100 sm:divide-y-0">
-                        {{-- URL --}}
-                        <div class="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 cursor-text transition-colors hover:bg-slate-50">
-                            <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-100">
-                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12a8.964 8.964 0 0 1-1.318 4.682M12 21a8.997 8.997 0 0 1-7.843-4.582" /></svg>
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <label for="ga-url" class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{{ __('Page URL') }}</label>
-                                <input id="ga-url" name="url" type="text" inputmode="url" autocomplete="url" autofocus required
-                                    placeholder="yourwebsite.com/page"
-                                    class="w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0 cursor-text">
-                            </div>
-                        </div>
 
-                        {{-- Keyword --}}
-                        <div class="flex items-center gap-3 rounded-xl px-3 py-2.5 cursor-text transition-colors hover:bg-slate-50 sm:w-52">
-                            <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200">
-                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <label for="ga-keyword" class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{{ __('Keyword') }}</label>
-                                <input id="ga-keyword" name="keyword" type="text" required maxlength="200"
-                                    placeholder="best seo tools"
-                                    class="w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0 cursor-text">
-                            </div>
-                        </div>
-
-                        {{-- Country --}}
-                        <div class="flex items-center gap-3 rounded-xl px-3 py-2.5 cursor-pointer transition-colors hover:bg-slate-50 sm:w-44">
-                            <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200">
-                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <label for="ga-country" class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{{ __('Country') }}</label>
-                                <select id="ga-country" name="country"
-                                    class="-ml-0.5 w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 focus:outline-none focus:ring-0 cursor-pointer">
-                                    <option value="">{{ __('Auto-detect') }}</option>
-                                    @foreach (\App\Support\Audit\SerpGlCatalog::selectOptions() as $code => $label)
-                                        <option value="{{ $code }}" @selected($code === 'us')>{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-
-                        {{-- Submit --}}
-                        <div class="pt-2 sm:pl-2 sm:pt-0">
-                            <button type="submit" id="ga-submit"
-                                class="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-orange-600 px-6 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700 hover:shadow-orange-600/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
-                                <svg id="ga-spinner" class="hidden h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                                <span id="ga-label">{{ __('Run free audit') }}</span>
-                                <svg id="ga-arrow" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5l7.5 7.5-7.5 7.5M21 12H3" /></svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    @if (\App\Support\Recaptcha::isEnabled())
-                        <div id="ga-captcha-hero-slot" class="mt-4 flex justify-center">
-                            <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
-                        </div>
-                    @endif
-
-                    <p id="ga-error" role="alert" class="mx-auto mt-4 hidden max-w-md rounded-lg bg-rose-50 px-3 py-2 text-center text-[13px] font-medium text-rose-700 ring-1 ring-rose-100"></p>
-
-                    <p class="mt-5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-slate-500">
-                        <span class="inline-flex items-center gap-1.5"><svg class="h-3.5 w-3.5 text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>{{ __('Free') }}</span>
-                        <span class="text-slate-300">·</span>
-                        <span>{{ __('No signup') }}</span>
-                        <span class="text-slate-300">·</span>
-                        <span>{{ __('No credit card') }}</span>
-                        <span class="text-slate-300">—</span>
-                        <a href="{{ route('register') }}" class="font-medium text-orange-600 underline-offset-2 transition hover:text-orange-700 hover:underline">{{ __('or start a free trial →') }}</a>
-                    </p>
-                </form>
-
-                <div id="ga-success" class="hidden rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)]">
-                    <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
-                    </span>
-                    <h3 class="mt-5 text-lg font-semibold text-slate-900">{{ __('Check your inbox') }}</h3>
-                    <p id="ga-success-msg" class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">{{ __('We\'ve emailed your audit. It lands in a minute.') }}</p>
-                    <a href="{{ route('register') }}" class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                        {{ __('Create a free account for unlimited audits →') }}
-                    </a>
-                </div>
+                
             </div>
         </div>
     </section>
-
-    {{-- ── Email modal (2nd audit) ─────────────────────────────── --}}
-    <div id="ga-email-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-        <div id="ga-email-backdrop" class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
-        <div role="dialog" aria-modal="true" aria-labelledby="ga-email-title" class="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5">
-            <div class="px-7 pt-7">
-                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-100">
-                    <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
-                </span>
-                <h2 id="ga-email-title" class="mt-4 text-xl font-semibold tracking-tight text-slate-900">{{ __('We\'ll email you this audit') }}</h2>
-                <p id="ga-email-modal-msg" class="mt-2 text-sm leading-6 text-slate-600">{{ __('This one\'s on us — tell us where to send your report and we\'ll deliver it to your inbox in about a minute.') }}</p>
-            </div>
-            <form id="ga-email-form" class="px-7 pb-7 pt-5" novalidate>
-                <div class="space-y-3">
-                    <div>
-                        <label for="ga-name" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">{{ __('Your name') }}</label>
-                        <input id="ga-name" name="name" type="text" autocomplete="name" maxlength="120" required placeholder="Jane Doe"
-                            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500">
-                    </div>
-                    <div>
-                        <label for="ga-email" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">{{ __('Email address') }}</label>
-                        <input id="ga-email" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@company.com"
-                            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500">
-                    </div>
-                </div>
-                @if (\App\Support\Recaptcha::isEnabled())
-                    <div id="ga-captcha-modal-slot" class="mt-4 flex justify-center"></div>
-                @endif
-                <p id="ga-email-error" role="alert" class="mt-3 hidden text-[13px] font-medium text-rose-600"></p>
-                <div class="mt-5 flex flex-col gap-2 sm:flex-row-reverse">
-                    <button type="submit" id="ga-email-submit"
-                        class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">
-                        <svg id="ga-email-spinner" class="hidden h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span id="ga-email-label">{{ __('Email me my audit') }}</span>
-                    </button>
-                    <button type="button" id="ga-email-cancel" class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900">
-                        {{ __('Cancel') }}
-                    </button>
-                </div>
-                <p class="mt-3 text-center text-xs text-slate-400">{{ __('We\'ll only use it to send your report and occasional product tips.') }}</p>
-            </form>
-        </div>
-    </div>
+    
 
     {{-- ── Signup gate modal (3rd audit) ──────────────────────── --}}
     <div id="ga-signup-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
@@ -478,8 +355,8 @@
                     </div>
                     <p class="text-xs text-slate-500 mb-5">{{ __('Free forever. No card required.') }}</p>
                     <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
-                        @foreach ([__('1 website'), __('1 team seat'), __('20k crawl budget'), __('20 tracked keywords'), __('50 keyword searches/mo'), __('25k AI tokens/mo'), __('2 long-form articles'), config('services.wordpress_plugin.coming_soon') ? __('WordPress plugin (coming soon)') : __('WordPress plugin'), __('GA4 + GSC integration')] as $item)
-                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ $item }}</li>
+                        @foreach ($featuresFor('trial') as $item)
+                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ __($item) }}</li>
                         @endforeach
                     </ul>
                     <a href="{{ route('register') }}" class="block w-full py-2.5 text-center rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:border-slate-400 hover:text-slate-900 transition-all">{{ __('Start free') }}</a>
@@ -512,8 +389,8 @@
                         <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">{{ __('Billed monthly.') }}</p>
                     @endif
                     <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
-                        @foreach ([__('3 websites'), __('1 team seat'), __('100k crawl budget'), __('100 tracked keywords'), __('250 keyword searches/mo'), __('60k AI tokens/mo'), __('5 long-form articles'), config('services.wordpress_plugin.coming_soon') ? __('WordPress plugin (coming soon)') : __('WordPress plugin'), __('GA4 + GSC integration')] as $item)
-                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ $item }}</li>
+                        @foreach ($featuresFor('solo') as $item)
+                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ __($item) }}</li>
                         @endforeach
                     </ul>
                     <a data-url-annual="{{ $wbCta('solo', 'annual') }}"
@@ -550,8 +427,8 @@
                         <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">{{ __('Billed monthly.') }}</p>
                     @endif
                     <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
-                        @foreach ([__('All Solo features'), __('10 websites'), __('3 team seats'), __('300k crawl budget'), __('500 tracked keywords'), __('1,000 keyword searches/mo'), __('150k AI tokens/mo'), __('15 long-form articles'), __('Scheduled reports')] as $item)
-                            <li class="flex items-center justify-center gap-2 sm:justify-start {{ $item === __('All Solo features') ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
+                        @foreach ($featuresFor('pro') as $item)
+                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ __($item) }}</li>
                         @endforeach
                     </ul>
                     <a data-url-annual="{{ $wbCta('pro', 'annual') }}"
@@ -587,8 +464,8 @@
                         <p class="text-xs text-slate-500 mb-5" x-show="billing === 'monthly'" style="display:none">{{ __('Billed monthly.') }}</p>
                     @endif
                     <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
-                        @foreach ([__('All Pro features'), __('30 websites'), __('10 team seats'), __('1M crawl budget'), __('2,000 tracked keywords'), __('4,000 keyword searches/mo'), __('600k AI tokens/mo'), __('50 long-form articles'), __('White-label reports')] as $item)
-                            <li class="flex items-center justify-center gap-2 sm:justify-start {{ $item === __('All Pro features') ? 'font-semibold' : '' }}">{!! $ck('') !!}{{ $item }}</li>
+                        @foreach ($featuresFor('agency') as $item)
+                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ __($item) }}</li>
                         @endforeach
                     </ul>
                     <a data-url-annual="{{ $wbCta('agency', 'annual') }}"
@@ -605,8 +482,8 @@
                     </div>
                     <p class="text-xs text-slate-500 mb-5">{{ __('Contact us for pricing.') }}</p>
                     <ul class="space-y-2 mb-7 flex-grow text-[15px] text-slate-700 sm:text-sm">
-                        @foreach ([__('Unlimited websites'), __('Unlimited team seats'), __('Custom crawl budget'), __('Unlimited keywords'), __('SSO & custom integrations'), __('Dedicated support + SLA'), __('White-label reports'), config('services.wordpress_plugin.coming_soon') ? __('WordPress plugin (coming soon)') : __('WordPress plugin'), __('GA4 + GSC integration')] as $item)
-                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ $item }}</li>
+                        @foreach ($featuresFor('enterprise') as $item)
+                            <li class="flex items-center justify-center gap-2 sm:justify-start">{!! $ck('') !!}{{ __($item) }}</li>
                         @endforeach
                     </ul>
                     <a href="{{ route('contact') }}" class="block w-full py-2.5 text-center rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:border-slate-400 hover:text-slate-900 transition-all">{{ __('Contact us') }}</a>

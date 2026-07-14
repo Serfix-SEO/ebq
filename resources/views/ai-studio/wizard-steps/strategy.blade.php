@@ -148,7 +148,7 @@
                             </button>
                         </template>
                     </div>
-                    <p class="mt-2 text-[10px] text-slate-400" x-show="keywordSuggestions().length > 0">{{ __('Volumes come from the keyword data cache — missing ones are being looked up and appear on your next visit to this step.') }}</p>
+                    <p class="mt-2 text-[10px] text-slate-400" x-show="keywordSuggestions().length > 0">{{ __('Missing volumes are being looked up and appear on your next visit to this step.') }}</p>
                 </div>
             </section>
 

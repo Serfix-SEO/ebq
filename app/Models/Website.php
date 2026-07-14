@@ -688,7 +688,21 @@ class Website extends Model
      */
     public function isInitialCrawl(): bool
     {
-        return $this->isCrawling() && ! $this->hasCompletedCrawl();
+        if ($this->hasCompletedCrawl()) {
+            return false;
+        }
+        // A run is actively fetching or finalizing.
+        if ($this->isCrawling()) {
+            return true;
+        }
+        // Queued window: the first crawl has been dispatched (on subscribe /
+        // autostart) but its CrawlRun row doesn't exist yet — the chain is still
+        // queued, syncing sitemaps, or waiting on a free worker. The RUNNING run is
+        // only created once CrawlWebsitePagesJob actually starts on the worker, so
+        // without this a brand-new site reads "all caught up" (empty widgets, no
+        // banner) for the seconds/minutes before that row appears. Bounded by the
+        // crawl_site's age so a crawl that never starts can't spin the banner forever.
+        return $this->crawlSite?->created_at?->gt(now()->subHours(6)) === true;
     }
 
     /**

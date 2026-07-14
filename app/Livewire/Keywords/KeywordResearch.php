@@ -18,18 +18,42 @@ use Livewire\Component;
  */
 class KeywordResearch extends Component
 {
-    private const TABS = ['ideas', 'volume', 'gap'];
+    private const TABS = ['ideas', 'volume'];
 
     #[Url]
     public string $tab = 'ideas';
+
+    /**
+     * Cross-PAGE handoff: the standalone Competitor Gap page (own Orbit
+     * route since 2026-07-14, so its Livewire events can't reach this
+     * component) sends keywords via `?kw=` instead.
+     */
+    #[Url]
+    public string $kw = '';
 
     /** @var array{target?: string, keywords?: list<string>, mode?: ?string, nonce?: string} */
     public array $handoff = [];
 
     public function mount(): void
     {
+        // Competitor Gap left the hub for its own page — old ?tab=gap
+        // bookmarks/links land there.
+        if ($this->tab === 'gap') {
+            $this->redirectRoute('keyword-gap.index');
+
+            return;
+        }
         if (! in_array($this->tab, self::TABS, true)) {
             $this->tab = 'ideas';
+        }
+
+        if ($this->kw !== '') {
+            $this->handoff = [
+                'target' => $this->tab,
+                'keywords' => [$this->kw],
+                'mode' => $this->tab === 'ideas' ? 'seeds' : null,
+                'nonce' => (string) Str::uuid(),
+            ];
         }
     }
 

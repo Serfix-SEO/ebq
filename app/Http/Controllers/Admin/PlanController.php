@@ -106,6 +106,9 @@ class PlanController extends Controller
             'max_seats' => 'nullable|integer|min:0|max:9999',
             // null / empty = N/A. Display-only, no per-seat billing engine.
             'extra_seat_price_usd' => 'nullable|integer|min:0|max:99999',
+            // Site Explorer lookups. null / empty limit = unlimited.
+            'site_explorer_limit' => 'nullable|integer|min:0|max:99999',
+            'site_explorer_window_hours' => 'nullable|integer|min:1|max:168',
             'features' => 'nullable|string|max:8000',
             'display_order' => 'required|integer|min:0|max:9999',
             'is_active' => 'sometimes|boolean',

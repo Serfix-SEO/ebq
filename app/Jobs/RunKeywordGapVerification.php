@@ -32,7 +32,7 @@ class RunKeywordGapVerification implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 1800;
 
-    public function __construct(public readonly string $analysisId)
+    public function __construct(public readonly string $analysisId, public readonly ?string $bucket = null)
     {
         $this->onQueue(\App\Support\Queues::INTERACTIVE);
     }
@@ -44,7 +44,7 @@ class RunKeywordGapVerification implements ShouldBeUnique, ShouldQueue
 
     public function handle(KeywordGapService $service): void
     {
-        $service->verify($this->analysisId);
+        $service->verify($this->analysisId, $this->bucket);
     }
 
     public function failed(?\Throwable $e): void

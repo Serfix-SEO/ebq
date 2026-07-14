@@ -141,6 +141,26 @@
                         Account-wide page budget. Leave blank for <strong>unlimited</strong>.
                     </p>
                 </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Site Explorer lookups</label>
+                    <input type="number" name="site_explorer_limit" value="{{ old('site_explorer_limit', $plan->site_explorer_limit) }}"
+                           min="0" max="99999"
+                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+                           placeholder="leave blank for unlimited" />
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Max backlink-report lookups per window. Leave blank for <strong>unlimited</strong>.
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Site Explorer window (hours)</label>
+                    <input type="number" name="site_explorer_window_hours" value="{{ old('site_explorer_window_hours', $plan->site_explorer_window_hours) }}"
+                           min="1" max="168"
+                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+                           placeholder="24" />
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Rolling window for the lookup limit (e.g. <strong>1</strong> = per hour, <strong>24</strong> = per day).
+                    </p>
+                </div>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">

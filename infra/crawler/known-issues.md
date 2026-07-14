@@ -342,6 +342,36 @@ cached as one unit, so that's still a single query pass per version, not per req
   cached/sticky (re-evaluated fresh every `SiteIssueDetector` pass), this self-corrects on
   the next crawl with no separate "recheck" mechanism needed: if x.com starts returning a
   real 404 instead of 403, the next run flags it.
+- **Live-but-slow external links false-flagged `broken_external` on transport errors
+  (fixed 2026-07-13).** bestproservicesdubai.com reported 5 "broken" external links that
+  were all live — 4× `cURL error 28: Connection timed out after 8000ms` to UAE-government
+  hosts (`inquiry.mohre.gov.ae`, `www.mohre.gov.ae`, `eservices.mohre.gov.ae`) + 1
+  `An error was encountered while creating the response` to `www.wam.ae`. Two defects:
+  (1) `LinkChecker::getFallback()` (the GET+proxy retry) only ran for the four
+  `FALLBACK_STATUSES` (403/405/429/501) — a HEAD that failed at the **transport layer**
+  (timeout/reset/TLS/DNS) got `status = null` with **no GET attempt at all**, even though
+  many hosts reject/hang on HEAD but serve GET fine. (2) `SiteIssueDetector::detectBrokenExternalLinks()`
+  treated `status === null` identically to a real 4xx/5xx and raised `broken_external` —
+  but "couldn't reach it" is not "it's dead". Slow-but-alive government/enterprise sites
+  (heavy TLS, datacenter-IP blocking) routinely time out our 8s HEAD without being broken.
+  Fix: (a) `LinkChecker` now runs the GET+proxy fallback for transport errors too, with a
+  more generous last-chance `GET_TIMEOUT = 15s` (`LinkChecker.php:18` const, `:116` else-branch);
+  (b) `LinkChecker::check()` rows carry a `guard_blocked` flag — `true` only for a
+  DETERMINISTIC pre-flight `SafeHttpGuard` rejection (malformed/unsafe URL, e.g.
+  `http://info@host` → `single_label_host`), which IS a reliable "broken" verdict, unlike an
+  inconclusive network null; (c) `SiteIssueDetector` now flags `broken_external` **only** on a
+  CONFIRMED HTTP error (`status !== null && status >= 400`) OR `guard_blocked` — a bare null
+  status is logged (`crawler.broken_external.unverifiable_skip`) and never persisted. Net rule:
+  we only claim a link is dead when we have positive evidence (a 4xx/5xx response, or a URL
+  that can't resolve), never on a failure-to-verify. Self-corrects on the next crawl (findings
+  re-evaluated fresh, stale ones auto-resolve). Cleanup: the 5 inconclusive false positives
+  were resolved directly; the one genuine malformed link (`http://info@bestproservicesdubai`)
+  was kept. Test: `CrawlerPipelineTest::test_broken_external_ignores_inconclusive_timeouts_but_flags_confirmed_dead`.
+  **Deploy note:** this code runs on the **worker box** (`AnalyzeSiteJob` → `SiteIssueDetector`
+  → `LinkChecker`), so it needs the web→worker rsync + Horizon `--force-recreate`, not an FPM
+  restart. NOTE: `PageAuditService::checkLinks()` has parallel HEAD-with-fallback logic (the
+  page-audit broken-link checker) and was **not** touched here — if that surface shows the
+  same transport-error false positive, port this fix there too.
 - **Cross-site stale-render bleed in the dashboard (confirmed 2026-06-23, not yet fixed).**
   User saw a soulfamburger.com finding (wa.me redirect) while viewing childdaycaretracy.com's
   crawl report. Ruled out as a data bug — confirmed via direct DB query and

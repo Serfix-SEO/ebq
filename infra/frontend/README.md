@@ -29,6 +29,16 @@ assets in `resources/{js,css}`. Marketing + meet are separate surfaces (see
 - Blade pulls assets with `@vite([...])`, **guarded by `! app()->environment('testing')`**
   (`layouts/app.blade.php:11`, `guest.blade.php:13`, `marketing/page.blade.php:78`) so
   the test suite never needs a manifest.
+- **`build.emptyOutDir: false`** (`vite.config.js`, added 2026-07-14) — Vite's default
+  wipes `public/build/assets/` before every build, deleting the previous build's
+  hashed files. Microsoft Clarity (`resources/views/partials/clarity.blade.php`)
+  session recordings reference the EXACT hashed CSS/JS filename in effect when the
+  recording was made; deleting it means old recordings 404 fetching their stylesheet
+  and play back with broken CSS. Now old hashed files just accumulate at their
+  original path (small — ~200KB/build) so old recordings keep resolving; `manifest.json`
+  is still overwritten each build and only points at the CURRENT files, so live pages
+  are unaffected. No retention/cleanup cron exists yet — revisit if `public/build/`
+  grows large.
 - Tailwind scans `@source` globs in `app.css:8-11` — includes
   `storage/framework/views/*.php` (compiled Blade) and all `**/*.blade.php`/`**/*.js`,
   so utility classes used **anywhere** (incl. Livewire placeholder HTML strings) are kept.

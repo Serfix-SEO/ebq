@@ -80,6 +80,19 @@ class WebsitesList extends Component
             // Subscribe to the shared crawl_site: charge the cap and crawl only if
             // the domain isn't already covered (else instantly reuse the shared data).
             app(\App\Services\Crawler\CrawlSiteBootstrapper::class)->subscribeWebsite($website);
+
+            // Same landing as onboarding (ConnectGoogle::finishOnboarding):
+            // pin the NEW site as current and drop the user on the overview
+            // hub's Explorer tab. That page kicks the initial Site Explorer
+            // generation on first view (freshness-gated — a domain another
+            // account already analyzed serves the shared snapshot free), the
+            // crawl + GSC/GA imports queued above run in the background, and
+            // the Site Health / Statistics tabs show their real
+            // processing / needs-action pills for whatever isn't connected.
+            session(['current_website_id' => $website->id]);
+            $this->redirectRoute('website-overview', ['tab' => 'explorer']);
+
+            return;
         }
 
         $this->reset(['domain', 'gaSelection', 'gscSelection', 'showForm', 'fetchError']);

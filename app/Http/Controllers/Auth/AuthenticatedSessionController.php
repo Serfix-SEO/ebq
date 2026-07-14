@@ -32,10 +32,23 @@ class AuthenticatedSessionController extends Controller
                 session(['current_website_id' => $websiteId]);
             }
         }
-        $fallback = $user ? $user->firstAccessibleRoute($websiteId) : 'dashboard';
         if ($user) {
             $logger->log('auth.login', userId: $user->id, meta: ['ip' => $request->ip()]);
         }
+
+        // Public tool gate → return to the tool result (safe local path only).
+        $redirect = (string) $request->input('redirect', '');
+        if ($redirect !== '' && str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//')) {
+            return redirect()->to($redirect);
+        }
+
+        // Came from the homepage "Analyze website" funnel → back to that report.
+        $analyzeDomain = (string) $request->session()->pull('analyze_domain', '');
+        if ($analyzeDomain !== '') {
+            return redirect()->route('report.view', ['url' => $analyzeDomain]);
+        }
+
+        $fallback = $user ? $user->firstAccessibleRoute($websiteId) : 'dashboard';
 
         return redirect()->intended(route($fallback, absolute: false));
     }

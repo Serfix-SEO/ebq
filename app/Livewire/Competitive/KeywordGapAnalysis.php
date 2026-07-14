@@ -2,29 +2,55 @@
 
 namespace App\Livewire\Competitive;
 
-use App\Exceptions\QuotaExceededException;
 use App\Livewire\Keywords\Concerns\TracksKeyword;
 use App\Models\KeywordGapAnalysis as GapAnalysis;
 use App\Models\KeywordGapRow;
 use App\Models\Website;
 use App\Services\Competitive\CompetitorDiscoveryService;
 use App\Services\Competitive\KeywordGapService;
-use App\Services\Competitive\OpportunityScoreService;
 use App\Support\KeywordFinderLocations;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 /**
- * Keyword Gap Analysis UI. Pre-fills competitor inputs from auto-discovery,
- * dispatches the run, polls until the async discovery aggregates, then shows
- * the Missing / Weak / Strength (or Shared) buckets with opportunity scores.
+ * Keyword Gap Analysis UI. Competitors come from the website's Site Explorer
+ * snapshot (DataForSEO Labs organic competitors, ranked by shared keywords —
+ * already paid for, so the picker is a free cache read) as one-click
+ * suggestions, with SERP auto-discovery as the fallback source and a manual
+ * input for anything else. Dispatches the run, polls until the async
+ * discovery aggregates, then shows the Missing / Weak / Strength (or Shared)
+ * buckets with opportunity scores.
  */
 class KeywordGapAnalysis extends Component
 {
     use TracksKeyword;
 
-    /** @var array<int, string> */
-    public array $competitors = ['', '', ''];
+    /** Selected competitor domains (canonical run input). @var list<string> */
+    public array $competitors = [];
+
+    /**
+     * One-click suggestions from the Site Explorer snapshot: each item is
+     * {domain, shared_keywords, avg_position, opr_score}. Empty when the
+     * site has no snapshot yet.
+     *
+     * @var array<int, array{domain: string, shared_keywords: ?int, avg_position: ?float, opr_score: ?float}>
+     */
+    public array $suggested = [];
+
+    /** Manual "add a competitor" input. */
+    public string $manualDomain = '';
+
+    /**
+     * Completed results collapse the picker into a compact summary bar;
+     * "Change competitors" flips this to bring the picker back (results
+     * stay visible until the new run replaces them).
+     */
+    public bool $editingCompetitors = false;
+
+    public function changeCompetitors(): void
+    {
+        $this->editingCompetitors = true;
+    }
 
     public string $country = 'us';
 
@@ -33,12 +59,6 @@ class KeywordGapAnalysis extends Component
     public string $status = '';
 
     public ?string $errorMessage = null;
-
-    /** Upgrade CTA shown alongside a quota-limit error. */
-    public ?string $upgradeUrl = null;
-
-    /** rowId => 'ok' once a row's score has been refined this session. */
-    public array $refinedRows = [];
 
     public ?string $verifyNotice = null;
 
@@ -60,11 +80,75 @@ class KeywordGapAnalysis extends Component
         if ($website === null) {
             return;
         }
-        // Pre-fill from auto-discovered competitors.
-        $top = $discovery->resultsFor($website->id)->take(3)->pluck('competitor_domain')->all();
-        foreach ($top as $i => $domain) {
-            $this->competitors[$i] = $domain;
+
+        // Primary source: the Site Explorer snapshot's organic competitors
+        // (read directly — NEVER via ReportViewController::resolve(), which
+        // would dispatch a billed generation as a side effect of opening a
+        // keyword-research tab). Top rows are already sorted by shared
+        // keywords, exactly the relevance order a gap analysis wants.
+        $domain = (string) $website->normalized_domain;
+        $snapshot = $domain !== '' ? \App\Models\WebsiteReportSnapshot::forDomain($domain) : null;
+        $rows = is_array($snapshot?->payload['competitors'] ?? null) ? $snapshot->payload['competitors'] : [];
+        foreach (array_slice($rows, 0, 12) as $row) {
+            $d = trim((string) ($row['domain'] ?? ''));
+            if ($d === '') {
+                continue;
+            }
+            $this->suggested[] = [
+                'domain' => $d,
+                'shared_keywords' => isset($row['shared_keywords']) ? (int) $row['shared_keywords'] : null,
+                'avg_position' => isset($row['avg_position']) && $row['avg_position'] !== null ? (float) $row['avg_position'] : null,
+                'opr_score' => isset($row['opr_score']) && $row['opr_score'] !== null ? (float) $row['opr_score'] : null,
+            ];
         }
+
+        // Pre-select the top suggestions; fall back to SERP auto-discovery
+        // when the site has no Site Explorer snapshot yet.
+        $max = $this->maxCompetitors();
+        if ($this->suggested !== []) {
+            $this->competitors = array_column(array_slice($this->suggested, 0, $max), 'domain');
+        } else {
+            $this->competitors = $discovery->resultsFor($website->id)
+                ->take($max)->pluck('competitor_domain')->all();
+        }
+    }
+
+    public function toggleCompetitor(string $domain): void
+    {
+        $domain = trim($domain);
+        if ($domain === '') {
+            return;
+        }
+        $this->errorMessage = null;
+
+        if (in_array($domain, $this->competitors, true)) {
+            $this->competitors = array_values(array_diff($this->competitors, [$domain]));
+
+            return;
+        }
+        if (count($this->competitors) >= $this->maxCompetitors()) {
+            $this->errorMessage = __('You can compare up to :max competitors per run — deselect one first.', ['max' => $this->maxCompetitors()]);
+
+            return;
+        }
+        $this->competitors[] = $domain;
+    }
+
+    public function addManualCompetitor(): void
+    {
+        $domain = \App\Models\CompetitorBacklink::extractDomain(trim($this->manualDomain));
+        if ($domain === '') {
+            $this->errorMessage = __('Enter a valid competitor domain.');
+
+            return;
+        }
+        $this->manualDomain = '';
+        $this->toggleCompetitor($domain);
+    }
+
+    private function maxCompetitors(): int
+    {
+        return max(1, (int) config('services.competitive.gap_max_competitors', 3));
     }
 
     private function website(): ?Website
@@ -101,7 +185,7 @@ class KeywordGapAnalysis extends Component
 
     public function run(KeywordGapService $service): void
     {
-        $this->reset(['errorMessage', 'analysisId', 'status', 'page']);
+        $this->reset(['errorMessage', 'analysisId', 'status', 'page', 'editingCompetitors']);
 
         $website = $this->website();
         if ($website === null) {
@@ -163,55 +247,16 @@ class KeywordGapAnalysis extends Component
         return $this->analysisId !== null && $this->status === GapAnalysis::STATUS_COLLECTING;
     }
 
-    /** Refine one row's opportunity score with a live SERP lookup (cost-gated). */
-    public function computeLive(string $rowId, OpportunityScoreService $opportunity): void
-    {
-        $this->errorMessage = null;
-        $this->upgradeUrl = null;
+    // NOTE: a per-row "refine" action (computeLive → OpportunityScoreService::liveScore)
+    // was removed 2026-07-14 — it was a strict subset of the batch "Verify"
+    // flow (same SERP call, score-only, no position capture / re-bucketing)
+    // with a label that explained nothing.
 
-        $website = $this->website();
-        $analysis = $this->analysisId ? GapAnalysis::find($this->analysisId) : null;
-        $row = KeywordGapRow::find($rowId);
-        if ($website === null || $analysis === null || $row === null || $row->keyword_gap_analysis_id !== $analysis->id) {
-            return;
-        }
-
-        try {
-            $result = $opportunity->liveScore(
-                $row->keyword,
-                KeywordFinderLocations::serperGl($analysis->country),
-                $row->search_volume,
-                $row->our_position,
-                $website->id,
-                Auth::id(),
-            );
-        } catch (QuotaExceededException $e) {
-            $this->errorMessage = $e->userMessage;
-            $this->upgradeUrl = $e->upgradeUrl;
-
-            return;
-        }
-
-        if ($result === null) {
-            $this->errorMessage = 'Couldn’t fetch live data for that keyword. Please try again shortly.';
-
-            return;
-        }
-
-        $row->forceFill([
-            'opportunity_score' => $result['score'],
-            'score_components' => $result['components'],
-        ])->save();
-        $this->refinedRows[$rowId] = 'ok';
-    }
-
-    /** Send a gap-row keyword to the Volume tab (research hub). */
-    public function sendToVolume(string $rowId): void
-    {
-        $this->handoffRow($rowId, 'volume');
-    }
-
-    /** Send a gap-row keyword to the Ideas tab as a seed (research hub). */
+    /**
+     * Expand a gap-row keyword into related ideas (research hub, Ideas tab).
+     * NOTE: there is deliberately no "send to Volume" — volume is already a
+     * column in the gap table, so that handoff was a dead end.
+     */
     public function sendToIdeas(string $rowId): void
     {
         $this->handoffRow($rowId, 'ideas');
@@ -223,15 +268,14 @@ class KeywordGapAnalysis extends Component
         if ($row === null || $row->keyword_gap_analysis_id !== $this->analysisId) {
             return;
         }
-        $this->dispatch(
-            'research-handoff',
-            target: $target,
-            mode: $target === 'ideas' ? 'seeds' : null,
-            keywords: [$row->keyword],
-        );
+        // Gap lives on its own page now (not inside the research hub), so a
+        // Livewire event can't reach the hub component — navigate to it with
+        // the keyword as a query param instead (KeywordResearch::mount()
+        // turns ?kw= into the same preset the event used to carry).
+        $this->redirectRoute('keyword-research.index', ['tab' => $target, 'kw' => $row->keyword]);
     }
 
-    /** Verify the Missing bucket against the live SERP (batch, cost-gated). */
+    /** Verify the CURRENT bucket tab against the live SERP (batch, cost-gated). */
     public function verifyRankings(KeywordGapService $service): void
     {
         $this->verifyNotice = null;
@@ -240,7 +284,7 @@ class KeywordGapAnalysis extends Component
             return;
         }
 
-        $queued = $service->startVerification($analysis);
+        $queued = $service->startVerification($analysis, $this->tab);
         if ($queued === 0) {
             $this->verifyNotice = 'Nothing left to verify in this bucket.';
         }
@@ -250,6 +294,43 @@ class KeywordGapAnalysis extends Component
     {
         return $this->analysisId !== null
             && GapAnalysis::query()->where('id', $this->analysisId)->value('verify_status') === GapAnalysis::VERIFY_STATUS_VERIFYING;
+    }
+
+    /**
+     * Per-source progress rows for the collecting teaser: one entry per
+     * discovery source with a human state (cached / running / done / failed).
+     *
+     * @return array<int, array{domain: string, role: string, state: string}>
+     */
+    private function collectingProgress(?GapAnalysis $analysis): array
+    {
+        if ($analysis === null || $analysis->status !== GapAnalysis::STATUS_COLLECTING) {
+            return [];
+        }
+        $entries = is_array($analysis->request_ids) ? $analysis->request_ids : [];
+        $ids = array_values(array_filter(array_map(fn ($r) => $r['id'] ?? null, $entries)));
+        $statuses = \App\Models\KeywordApiRequest::query()
+            ->whereIn('request_id', $ids)
+            ->pluck('status', 'request_id');
+
+        return array_map(function ($r) use ($statuses) {
+            $state = 'running';
+            if (($r['cache_key'] ?? null) !== null) {
+                $state = 'cached';
+            } elseif (($s = $statuses[$r['id'] ?? ''] ?? null) !== null) {
+                $state = match ($s) {
+                    \App\Models\KeywordApiRequest::STATUS_COMPLETED => 'done',
+                    \App\Models\KeywordApiRequest::STATUS_FAILED => 'failed',
+                    default => 'running',
+                };
+            }
+
+            return [
+                'domain' => (string) ($r['domain'] ?? $r['url'] ?? ''),
+                'role' => (string) ($r['role'] ?? 'competitor'),
+                'state' => $state,
+            ];
+        }, $entries);
     }
 
     public function render()
@@ -281,6 +362,7 @@ class KeywordGapAnalysis extends Component
             'totalPages' => $totalPages,
             'countryOptions' => KeywordFinderLocations::countryOptions(),
             'maxCompetitors' => (int) config('services.competitive.gap_max_competitors', 3),
+            'progress' => $this->collectingProgress($analysis),
         ]);
     }
 }

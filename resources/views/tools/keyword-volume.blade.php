@@ -39,7 +39,7 @@
             <div class="relative mx-auto mt-10 max-w-2xl">
                 <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -inset-y-10 sm:-inset-x-8 -z-10 bg-[radial-gradient(55%_60%_at_50%_0%,rgba(242,100,25,0.20),transparent_70%)] blur-2xl"></div>
 
-                <form id="kv-form" class="text-start" data-action="{{ route('guest-volume.store') }}" novalidate>
+                <form id="kv-form" data-tool-gate-form class="text-start" data-action="{{ route('guest-volume.store') }}" novalidate>
                     <div class="flex flex-col rounded-[20px] bg-white p-2 shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)] ring-1 ring-slate-200/80 transition focus-within:ring-2 focus-within:ring-orange-500/70 sm:flex-row sm:items-center sm:divide-x sm:divide-slate-200/70 divide-y divide-slate-100 sm:divide-y-0">
                         <div class="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5">
                             <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-100">
@@ -90,57 +90,11 @@
                     </p>
                 </form>
 
-                <div id="kv-success" class="hidden rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)]">
-                    <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
-                    </span>
-                    <h3 class="mt-5 text-lg font-semibold text-slate-900">{{ __('Check your inbox') }}</h3>
-                    <p id="kv-success-msg" class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">{{ __('We’ve emailed your volume report. It lands in a minute.') }}</p>
-                    <a href="{{ route('register') }}" class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Create a free account for bulk research →') }}</a>
-                </div>
+                
             </div>
         </div>
     </section>
-
-    {{-- ── Email modal (2nd check) ── --}}
-    <div id="kv-email-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-        <div id="kv-email-backdrop" class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
-        <div role="dialog" aria-modal="true" aria-labelledby="kv-email-title" class="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5">
-            <div class="px-7 pt-7">
-                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-100">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
-                </span>
-                <h2 id="kv-email-title" class="mt-4 text-xl font-semibold tracking-tight text-slate-900">{{ __('We’ll email you this report') }}</h2>
-                <p id="kv-email-modal-msg" class="mt-2 text-sm leading-6 text-slate-600">{{ __('This one’s on us — tell us where to send your volume report and we’ll deliver it in about a minute.') }}</p>
-            </div>
-            <form id="kv-email-form" class="px-7 pb-7 pt-5" novalidate>
-                <div class="space-y-3">
-                    <div>
-                        <label for="kv-name" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">{{ __('Your name') }}</label>
-                        <input id="kv-name" name="name" type="text" autocomplete="name" maxlength="120" required placeholder="{{ __('Jane Doe') }}"
-                            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500">
-                    </div>
-                    <div>
-                        <label for="kv-email" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">{{ __('Email address') }}</label>
-                        <input id="kv-email" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="{{ __('you@company.com') }}"
-                            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500">
-                    </div>
-                </div>
-                @if (\App\Support\Recaptcha::isEnabled())
-                    <div id="kv-captcha-modal-slot" class="mt-4 flex justify-center"></div>
-                @endif
-                <p id="kv-email-error" role="alert" class="mt-3 hidden text-[13px] font-medium text-rose-600"></p>
-                <div class="mt-5 flex flex-col gap-2 sm:flex-row-reverse">
-                    <button type="submit" id="kv-email-submit"
-                        class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">
-                        <svg id="kv-email-spinner" class="hidden h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span id="kv-email-label">{{ __('Email me my report') }}</span>
-                    </button>
-                    <button type="button" id="kv-email-cancel" class="rounded-xl px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">{{ __('Cancel') }}</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    
 
     {{-- ── What you get ── --}}
     <section class="border-t border-slate-200 bg-slate-50">
@@ -222,7 +176,7 @@
                     if (r.status === 202 && r.data.emailed) { toggleModal(emailModal, false); showSuccess(r.data.message); return; }
                     if (r.status === 202 && r.data.results_url) { window.location.href = r.data.results_url; return; }
                     if (r.data && r.data.require === 'email') { setLoading(false); setEmailLoading(false); openEmailModal(r.data.message); return; }
-                    if (r.data && r.data.require === 'signup') { window.location.href = r.data.register_url || '{{ route('register') }}'; return; }
+                    if (r.data && r.data.require === 'signup') { window.showToolGate(form); return; }
                     var msg = r.data.message; var errs = r.data.errors || {};
                     if (!msg) { var f = Object.keys(errs)[0]; if (f && errs[f] && errs[f][0]) msg = errs[f][0]; }
                     msg = msg || @json(__('Something went wrong. Please try again.'));
@@ -246,4 +200,5 @@
             }
         })();
     </script>
+    @include('partials.tool-gate')
 </x-marketing.page>

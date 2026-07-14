@@ -799,7 +799,7 @@
                             ],
                             [
                                 __('What happens if I disconnect integrations?'),
-                                __('Existing data is preserved. New syncs pause until you reconnect. Scheduled reports can use cached data; alerts pause to avoid false signals.'),
+                                __('Existing data is preserved. New syncs pause until you reconnect. Scheduled reports keep working with your existing data; alerts pause to avoid false signals.'),
                             ],
                             [
                                 __('Do you support team access?'),

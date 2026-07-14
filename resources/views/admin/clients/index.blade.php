@@ -329,8 +329,8 @@
                             <td class="px-3 py-2.5 text-xs text-slate-600" title="{{ $client->last_activity_at ?? '' }}">
                                 {{ $relTime($client->last_activity_at) }}
                             </td>
-                            <td class="px-3 py-2.5 text-xs text-slate-500" title="{{ $client->created_at?->format('Y-m-d H:i') }}">
-                                {{ $client->created_at?->format('M j, Y') }}
+                            <td class="px-3 py-2.5 text-xs text-slate-500" title="{{ format_user_datetime($client->created_at, 'M j, Y g:i A T') }}">
+                                {{ format_user_datetime($client->created_at, 'M j, Y g:i A') }}
                             </td>
                             <td class="px-3 py-2.5 text-right">
                                 <div class="inline-flex items-center gap-1">

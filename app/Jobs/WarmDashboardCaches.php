@@ -93,7 +93,8 @@ class WarmDashboardCaches implements ShouldBeUnique, ShouldQueue
         };
 
         // /dashboard
-        $warm('action-queue', fn () => PriorityActionQueue::payload($this->websiteId));
+        $crawlInitial = $website->isInitialCrawl();
+        $warm('action-queue', fn () => PriorityActionQueue::payload($this->websiteId, null, ! $crawlInitial));
         $warm('country-filter', fn () => CountryFilter::payload($this->websiteId));
 
         // /statistics

@@ -17,7 +17,7 @@ use Illuminate\View\View;
 /**
  * Public, no-signup SEO audit driven from the marketing landing page.
  *
- * A visitor submits a URL + keyword; we queue a {@see RunGuestPageAudit} job
+ * A signed-in user submits a URL + keyword; we queue a {@see RunGuestPageAudit} job
  * (lite, no GSC/GA, no paid Serper/Lighthouse) and hand back an unguessable
  * token. The browser polls {@see status()} and lands on {@see show()} — which
  * renders the report and upsells the full GSC/GA-powered audit.
@@ -29,18 +29,16 @@ class GuestAuditController extends Controller
 
     private const PER_DAY = 20;
 
-    /**
-     * Progressive friction, counted per-browser via a signed cookie:
-     *   audit #1  → free, no email
-     *   audit #2  → require email, then email the report link
-     *   audit #3+ → block, push free-plan signup
-     */
-    private const COUNT_COOKIE = 'ebq_guest_audits';
-
-    private const COUNT_COOKIE_MINUTES = 525600; // ~1 year
-
     public function store(Request $request, SafeHttpGuard $guard): JsonResponse
     {
+        // Public tools require an account: anonymous submit runs nothing (no API)
+        // and returns require:signup so the page shows the blurred gate + modal.
+        if (auth()->guest()) {
+            return response()->json([
+                'results_url' => route('tool.preview', array_merge(['tool' => 'audit'], $request->only(['url', 'keyword', 'country']))),
+            ], 202);
+        }
+
         $ip = (string) $request->ip();
 
         $minuteKey = 'guest-audit:m:'.$ip;
@@ -87,77 +85,20 @@ class GuestAuditController extends Controller
                 'errors' => ['url' => ['That URL can’t be audited. Enter a public website address (https://…).']],
             ], 422);
         }
-
-        // Progressive friction by browser. $prior = audits already run from this
-        // browser; this attempt is the ($prior + 1)th.
-        $prior = max(0, (int) $request->cookie(self::COUNT_COOKIE, 0));
-        $attempt = $prior + 1;
-
-        // 3rd+ audit → block and push free signup (no audit runs, no captcha, no rate-limit hit).
-        if ($attempt >= 3) {
-            return response()->json([
-                'require' => 'signup',
-                'message' => 'You’ve used your free audits. Create a free account to keep auditing — no credit card, and you’ll unlock live keyword positions, Core Web Vitals, and continuous tracking once you connect your site.',
-                'register_url' => route('register'),
-            ]);
-        }
-
-        // 2nd audit → require name + email; the report is delivered to that
-        // email (not shown on screen). Ask for the email *before* validating the
-        // captcha so this round-trip doesn't burn the token.
-        $email = null;
-        $name = null;
-        if ($attempt >= 2) {
-            $email = trim((string) $request->input('email', ''));
-            if ($email === '') {
-                return response()->json([
-                    'require' => 'email',
-                    'message' => 'This is your last free audit — tell us where to send it.',
-                ]);
-            }
-            // Validate name + email *before* the captcha so a typo here never
-            // consumes the single-use captcha token (no re-prompt on retry).
-            $request->validate([
-                'name' => ['required', 'string', 'max:120'],
-                'email' => ['required', 'email', 'max:255'],
-            ]);
-            $name = trim((string) $request->input('name', ''));
-        }
-
-        // Final check before running — validate the captcha exactly once, only on
-        // an otherwise-valid submit, so it's never re-run by an earlier round-trip.
-        if (Recaptcha::isEnabled()) {
-            $request->validate(['g-recaptcha-response' => ['required', 'string', new ValidRecaptcha]]);
-        }
-
         RateLimiter::hit($minuteKey, 60);
         RateLimiter::hit($dayKey, 86400);
 
-        $audit = GuestPageAudit::start($validated['url'], $validated['keyword'], $ip, $gl, $email, $name);
+        // Every user is authenticated here (guests short-circuit above), so
+        // there is no email/signup friction — run and show the result.
+        $audit = GuestPageAudit::start($validated['url'], $validated['keyword'], $ip, $gl, null, null);
         RunGuestPageAudit::dispatch($audit->id);
 
-        // Capture the marketing lead (name + email) on the email-gated audit.
-        if ($email !== null) {
-            Lead::capture($email, $name, $audit->id);
-        }
-
-        // 2nd audit → delivered by email only; confirm on screen, do NOT reveal results.
-        if ($email !== null) {
-            return response()->json([
-                'token' => $audit->token,
-                'emailed' => true,
-                'email' => $email,
-                'message' => "We’ve emailed your audit to {$email}. It lands in a minute — check your inbox (and spam, just in case).",
-            ], 202)->cookie(self::COUNT_COOKIE, (string) $attempt, self::COUNT_COOKIE_MINUTES);
-        }
-
-        // 1st audit → shown on screen.
         return response()->json([
             'token' => $audit->token,
             'status_url' => route('guest-audit.status', $audit),
             'results_url' => route('guest-audit.show', $audit),
             'emailed' => false,
-        ], 202)->cookie(self::COUNT_COOKIE, (string) $attempt, self::COUNT_COOKIE_MINUTES);
+        ], 202);
     }
 
     /** Lightweight poll target for the results page / hero JS. */

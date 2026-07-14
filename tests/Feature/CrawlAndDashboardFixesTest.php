@@ -183,4 +183,67 @@ class CrawlAndDashboardFixesTest extends TestCase
             ->call('discover')
             ->assertSet('errorMessage', 'Select a website first.');
     }
+
+    // ---- Initial-crawl queued window: a brand-new site must read "crawling",
+    //      not "all caught up", before the RUNNING run row exists. ----
+
+    public function test_is_initial_crawl_covers_the_queued_window(): void
+    {
+        [$w] = $this->site('fresh.com');
+
+        // Fresh crawl_site, no CrawlRun yet (chain still queued / syncing sitemaps).
+        $this->assertTrue($w->isInitialCrawl(), 'queued first crawl reads as in-progress');
+
+        // A completed crawl closes the window even if the crawl_site is young.
+        CrawlRun::create(['crawl_site_id' => $w->crawl_site_id, 'trigger' => 'manual',
+            'status' => 'completed', 'started_at' => now(), 'finished_at' => now()]);
+        $this->assertFalse($w->fresh()->isInitialCrawl(), 'a completed crawl ends the initial state');
+    }
+
+    public function test_is_initial_crawl_expires_for_a_stale_never_started_crawl(): void
+    {
+        [$w, $cs] = $this->site('stuck.com');
+        // No run ever appeared and the crawl_site is old → don't spin the banner forever.
+        \App\Models\CrawlSite::where('id', $cs)->update(['created_at' => now()->subHours(7)]);
+
+        $this->assertFalse($w->fresh()->isInitialCrawl());
+    }
+
+    public function test_crawl_banner_shows_getting_started_during_the_queued_window(): void
+    {
+        $owner = User::factory()->create();
+        $w = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'queued.com']);
+        $w->refresh();
+
+        $this->actingAs($owner);
+        session(['current_website_id' => $w->id]);
+
+        // No CrawlRun exists yet — the banner must stand in rather than stay blank.
+        Livewire::test(\App\Livewire\CrawlBanner::class)
+            ->assertSee('We’re setting up your site')
+            ->assertDontSee('pages crawled');
+    }
+
+    public function test_priority_action_queue_excludes_crawl_issues_during_the_queued_window(): void
+    {
+        $owner = User::factory()->create();
+        $w = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'queued-paq.com']);
+        $w->refresh();
+
+        $this->actingAs($owner);
+        session(['current_website_id' => $w->id]);
+
+        // The component is #[Lazy]; without this only the placeholder renders.
+        Livewire::withoutLazyLoading();
+
+        // During the first crawl (queued), crawl-derived issues aren't final
+        // yet, so the confident "You're all caught up" empty state must NOT
+        // show — but the queue itself stays visible (it may still have real
+        // GSC/rank-tracking-derived items unrelated to crawl state) and shows
+        // an explicit "still crawling" state instead of a misleading empty one.
+        Livewire::test(\App\Livewire\Dashboard\PriorityActionQueue::class)
+            ->assertSee('Priority Action Queue')
+            ->assertDontSee("You're all caught up")
+            ->assertSee('Crawl in progress');
+    }
 }

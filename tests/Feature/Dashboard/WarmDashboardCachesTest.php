@@ -45,12 +45,15 @@ class WarmDashboardCachesTest extends TestCase
         $this->assertNotNull(Cache::get($key), 'KPI cache must be warmed');
         $this->assertSame(42, Cache::get($key)['clicks']['current']);
 
-        // Country filter + top-countries + action-queue keys hot too.
+        // Country filter + top-countries + action-queue keys hot too. This
+        // brand-new website has no crawl history, so isInitialCrawl() is
+        // true and the warmed action-queue payload excludes crawl issues
+        // (includeCrawlIssues=0) — see WarmDashboardCaches::handle().
         $this->assertNotNull(Cache::get("country_filter:{$website->id}:v{$version}"));
         $this->assertNotNull(Cache::get("top_countries:{$website->id}:v{$version}"));
         $this->assertNotNull(Cache::get(sprintf(
-            'action-queue:v3:%s:%d:%d:%s:%s',
-            $website->id, $version, \App\Services\RankCache::version($website->id), 'all', app()->getLocale()
+            'action-queue:v4:%s:%d:%d:%s:%s:%d',
+            $website->id, $version, \App\Services\RankCache::version($website->id), 'all', app()->getLocale(), 0
         )));
     }
 

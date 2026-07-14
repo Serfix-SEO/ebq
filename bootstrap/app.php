@@ -84,12 +84,28 @@ return Application::configure(basePath: dirname(__DIR__))
         // HttpException, not TokenMismatchException — Handler::prepareException()
         // converts it BEFORE render callbacks run.
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, \Illuminate\Http\Request $request) {
-            if ($e->getStatusCode() === 419 && $request->routeIs('admin.impersonation.stop')) {
+            if ($e->getStatusCode() !== 419) {
+                return null;
+            }
+
+            if ($request->routeIs('admin.impersonation.stop')) {
                 return redirect()
                     ->route(auth()->check() ? 'dashboard' : 'login')
                     // Dedicated key: rendered by the app layout next to the
                     // impersonation banner ('error' is only shown on billing).
                     ->with('impersonation_notice', 'That page had expired — please click "Return to admin" again.');
+            }
+
+            // Logout with a stale CSRF token (session/sidebar left open past
+            // SESSION_LIFETIME, or the token rotated in another tab) used to
+            // dead-end on the raw 419 page. Same recovery as impersonation-stop
+            // above — CSRF verification still runs normally; this only
+            // redirects to a fresh page (which carries a valid token) instead
+            // of a dead-end error, so the next logout click just works.
+            if ($request->routeIs('logout')) {
+                return redirect()
+                    ->route(auth()->check() ? 'dashboard' : 'login')
+                    ->with('session_notice', 'Your session had expired — please try logging out again.');
             }
         });
     })->create();

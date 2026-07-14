@@ -30,26 +30,50 @@
                 $current = request()->route()?->getName() ?? '';
                 $currentWebsiteId = (string) session('current_website_id', '');
                 $authUser = auth()->user();
-                $navItems = [
-                    ['route' => 'dashboard', 'feature' => 'dashboard', 'label' => __('Dashboard'), 'icon' => 'M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'],
-                    ['route' => 'statistics', 'feature' => 'dashboard', 'label' => __('Statistics'), 'icon' => 'M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6zM13.5 3v7.5H21A7.5 7.5 0 0013.5 3z'],
-                    ['route' => 'keywords.index', 'feature' => 'keywords', 'label' => __('Keywords'), 'icon' => 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z'],
-                    ['route' => 'keyword-research.index', 'feature' => 'keywords', 'label' => __('Keyword Research'), 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z'],
-                    ['route' => 'rank-tracking.index', 'feature' => 'rank_tracking', 'label' => __('Rank Tracking'), 'icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'],
-                    ['route' => 'pages.index', 'feature' => 'pages', 'label' => __('Pages'), 'icon' => 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z'],
-                    ['route' => 'sitemaps.index', 'feature' => 'sitemaps', 'label' => __('Sitemaps'), 'icon' => 'M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z'],
-                    ['route' => 'link-structure.index', 'feature' => 'link_structure', 'label' => __('Link Explorer'), 'icon' => 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'],
-                    ['route' => 'custom-audit.index', 'feature' => 'audits', 'label' => __('Audits'), 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z'],
-                    ['route' => 'pagespeed.index', 'feature' => 'audits', 'label' => __('PageSpeed Insights'), 'icon' => 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z'],
-                    ['route' => 'reports.index', 'feature' => 'reports', 'label' => __('Reports'), 'icon' => 'M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5'],
-                    ['route' => 'ai-studio.index', 'feature' => 'ai_studio', 'label' => __('AI Studio'), 'badge' => __('Beta'), 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z'],
-                    ['route' => 'websites.index', 'feature' => null, 'label' => __('Websites'), 'icon' => 'M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'],
-                    ['route' => 'team.index', 'feature' => 'team', 'label' => __('Team'), 'icon' => 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.433-2.554M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z'],
-                    ['route' => 'settings.index', 'feature' => 'settings', 'label' => __('Settings'), 'icon' => 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z'],
-                    // Subscription / billing — top-level since plan management
-                    // is a per-user global concern (not per-website). Heroicon
-                    // credit-card outline matches the existing icon language.
-                    ['route' => 'billing.show', 'feature' => null, 'label' => __('Billing'), 'icon' => 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z'],
+                // Grouped sidebar (2026-07-13): "Pulse" = per-site health/crawl/
+                // audit signals, "Orbit" = keyword-orbit tools (research, tracking).
+                // Ungrouped items (last group, null label) render with no header,
+                // same as before. Item shape unchanged — grouping is presentation
+                // only, feature-gating/active-state logic is untouched.
+                $navGroups = [
+                    [
+                        'label' => 'Pulse',
+                        'items' => [
+                            ['route' => 'dashboard', 'feature' => 'dashboard', 'label' => __('Site Health'), 'icon' => 'M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'],
+                            ['route' => 'statistics', 'feature' => 'dashboard', 'label' => __('Statistics'), 'icon' => 'M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6zM13.5 3v7.5H21A7.5 7.5 0 0013.5 3z'],
+                            ['route' => 'site-explorer', 'feature' => null, 'label' => __('Explorer'), 'icon' => 'M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z'],
+                            ['route' => 'backlinks.index', 'feature' => null, 'label' => __('Backlinks'), 'icon' => 'M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25'],
+                            ['route' => 'competitors.index', 'feature' => null, 'label' => __('Competitors'), 'icon' => 'M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 002.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 012.916.52 6.003 6.003 0 01-5.395 4.972m0 0a6.726 6.726 0 01-2.749 1.35m0 0a6.772 6.772 0 01-3.044 0'],
+                            ['route' => 'pagespeed.index', 'feature' => 'audits', 'label' => __('Page Speed'), 'icon' => 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z'],
+                            ['route' => 'pages.index', 'feature' => 'pages', 'label' => __('Site Links'), 'icon' => 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z'],
+                            ['route' => 'custom-audit.index', 'feature' => 'audits', 'label' => __('Page Audit'), 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z'],
+                            ['route' => 'link-structure.index', 'feature' => 'link_structure', 'label' => __('Link Graph'), 'icon' => 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'],
+                        ],
+                    ],
+                    [
+                        'label' => 'Orbit',
+                        'items' => [
+                            ['route' => 'keywords.index', 'feature' => 'keywords', 'label' => __('Keywords'), 'icon' => 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z'],
+                            ['route' => 'keyword-research.index', 'feature' => 'keywords', 'label' => __('Keyword Research'), 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z'],
+                            ['route' => 'keyword-gap.index', 'feature' => 'keywords', 'label' => __('Competitor Gap'), 'icon' => 'M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5'],
+                            ['route' => 'rank-tracking.index', 'feature' => 'rank_tracking', 'label' => __('Ranking'), 'icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'],
+                        ],
+                    ],
+                    [
+                        'label' => null,
+                        'items' => [
+                            ['route' => 'sitemaps.index', 'feature' => 'sitemaps', 'label' => __('Sitemaps'), 'icon' => 'M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z'],
+                            ['route' => 'reports.index', 'feature' => 'reports', 'label' => __('Reports'), 'icon' => 'M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5'],
+                            ['route' => 'ai-studio.index', 'feature' => 'ai_studio', 'label' => __('AI Studio'), 'badge' => __('Beta'), 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z'],
+                            ['route' => 'websites.index', 'feature' => null, 'label' => __('Websites'), 'icon' => 'M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'],
+                            ['route' => 'team.index', 'feature' => 'team', 'label' => __('Team'), 'icon' => 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.433-2.554M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z'],
+                            ['route' => 'settings.index', 'feature' => 'settings', 'label' => __('Settings'), 'icon' => 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z'],
+                            // Subscription / billing — top-level since plan management
+                            // is a per-user global concern (not per-website). Heroicon
+                            // credit-card outline matches the existing icon language.
+                            ['route' => 'billing.show', 'feature' => null, 'label' => __('Billing'), 'icon' => 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z'],
+                        ],
+                    ],
                 ];
                 // The three plugin-management pages (releases, adoption,
                 // feature flags) are unified behind a single "WordPress
@@ -95,6 +119,7 @@
                     ['route' => 'admin.leads.index', 'label' => 'Leads'],
                     ['route' => 'admin.bug-reports.index', 'label' => 'Bug Reports'],
                     ['route' => 'admin.usage.index', 'label' => 'API Usage'],
+                    ['route' => 'admin.site-explorer-usage.index', 'label' => 'Site Explorer Usage'],
                     ['route' => 'admin.proxies.index', 'label' => 'Proxies'],
                     [
                         'route' => 'admin.settings',
@@ -133,35 +158,121 @@
                     ],
                 ];
             @endphp
-            <nav class="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-                @foreach ($navItems as $item)
-                    @php
-                        $visible = true;
+            {{-- One pass: filter + decorate every group's items once, reused
+                 by both the inline/button rendering below AND the flyout's
+                 JSON item map — a single source of truth so the two never
+                 drift (two independently-filtered loops previously caused
+                 items to bleed between groups' teleported panels). --}}
+            @php
+                $filteredGroups = collect($navGroups)->map(function ($group) use ($authUser, $currentWebsiteId, $current) {
+                    $items = collect($group['items'])->filter(function ($item) use ($authUser, $currentWebsiteId) {
                         if (! empty($item['admin_only']) && (! $authUser || ! $authUser->is_admin)) {
-                            $visible = false;
+                            return false;
                         }
-                        if ($visible && $authUser && $item['feature'] !== null && $currentWebsiteId !== '') {
-                            $visible = $authUser->hasFeatureAccess($item['feature'], $currentWebsiteId);
+                        if ($authUser && $item['feature'] !== null && $currentWebsiteId !== '') {
+                            return $authUser->hasFeatureAccess($item['feature'], $currentWebsiteId);
                         }
-                    @endphp
-                    @continue (! $visible)
-                    @php $active = str_starts_with($current, explode('.', $item['route'])[0]); @endphp
-                    <a href="{{ route($item['route']) }}"
-                        @class([
-                            'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition',
-                            'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100' => $active,
-                            'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200' => !$active,
-                        ])>
-                        @if ($active)
-                            <span aria-hidden="true" class="absolute start-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-e-full bg-orange-600 dark:bg-orange-400"></span>
-                        @endif
-                        <svg @class(['h-[17px] w-[17px] flex-shrink-0', 'text-slate-900 dark:text-slate-100' => $active, 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300' => !$active]) xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}" /></svg>
-                        {{ $item['label'] }}
-                        @if (! empty($item['badge']))
-                            <span class="ms-auto rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">{{ $item['badge'] }}</span>
-                        @endif
-                    </a>
+                        return true;
+                    })->map(function ($item) use ($current) {
+                        $item['href'] = route($item['route']);
+                        $item['active'] = str_starts_with($current, explode('.', $item['route'])[0]);
+                        return $item;
+                    })->values();
+                    return ['label' => $group['label'], 'items' => $items];
+                })->filter(fn ($g) => $g['items']->isNotEmpty())->values();
+
+                $flyoutGroups = $filteredGroups->filter(fn ($g) => $g['label'])->mapWithKeys(fn ($g) => [
+                    $g['label'] => $g['items']->map(fn ($i) => [
+                        'href' => $i['href'],
+                        'label' => $i['label'],
+                        'icon' => $i['icon'],
+                        'active' => $i['active'],
+                        'badge' => $i['badge'] ?? null,
+                    ])->values()->all(),
+                ]);
+            @endphp
+            <nav class="flex-1 space-y-0.5 overflow-y-auto px-3 py-4"
+                x-data="{ openGroup: null, flyoutTop: 0, flyoutLeft: 0, groups: {{ Illuminate\Support\Js::from($flyoutGroups) }} }"
+                @keydown.escape.window="openGroup = null">
+                @foreach ($filteredGroups as $group)
+                    @if ($group['label'])
+                        @php
+                            $groupKey = "'".addslashes($group['label'])."'";
+                            $groupActive = $group['items']->contains('active', true);
+                        @endphp
+                        {{-- Grouped section: click expands a flyout submenu to the
+                             side (not inline below) — x-teleport moves the shared
+                             panel to <body> so it escapes this <nav>'s
+                             overflow-y-auto clipping. Position is computed from
+                             the button's own rect at click time, RTL-aware. --}}
+                        <div class="relative" @class(['mt-4' => ! $loop->first])>
+                            <button type="button" data-flyout-toggle
+                                @click="
+                                    if (openGroup === {{ $groupKey }}) { openGroup = null; return; }
+                                    const r = $el.getBoundingClientRect();
+                                    const rtl = document.documentElement.dir === 'rtl';
+                                    flyoutTop = Math.min(r.top, window.innerHeight - 260);
+                                    flyoutLeft = rtl ? (r.left - 232) : (r.right + 8);
+                                    openGroup = {{ $groupKey }};
+                                "
+                                :aria-expanded="openGroup === {{ $groupKey }}"
+                                @class([
+                                    'flex w-full items-center justify-between rounded-lg px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] transition',
+                                    'text-slate-500 dark:text-slate-300' => $groupActive,
+                                    'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300' => ! $groupActive,
+                                ])
+                                :class="{ 'bg-slate-100 dark:bg-slate-800': openGroup === {{ $groupKey }} }">
+                                <span class="flex items-center gap-1.5">
+                                    {{ $group['label'] }}
+                                    @if ($groupActive)
+                                        <span aria-hidden="true" class="h-1 w-1 rounded-full bg-orange-600 dark:bg-orange-400"></span>
+                                    @endif
+                                </span>
+                                <svg class="h-3 w-3 flex-shrink-0 rtl:-scale-x-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                            </button>
+                        </div>
+                    @else
+                        @foreach ($group['items'] as $item)
+                            <a href="{{ $item['href'] }}"
+                                @class([
+                                    'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition',
+                                    'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100' => $item['active'],
+                                    'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200' => !$item['active'],
+                                ])>
+                                @if ($item['active'])
+                                    <span aria-hidden="true" class="absolute start-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-e-full bg-orange-600 dark:bg-orange-400"></span>
+                                @endif
+                                <svg @class(['h-[17px] w-[17px] flex-shrink-0', 'text-slate-900 dark:text-slate-100' => $item['active'], 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300' => !$item['active']]) xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}" /></svg>
+                                {{ $item['label'] }}
+                                @if (! empty($item['badge']))
+                                    <span class="ms-auto rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">{{ $item['badge'] }}</span>
+                                @endif
+                            </a>
+                        @endforeach
+                    @endif
                 @endforeach
+
+                <template x-teleport="body">
+                    <div x-show="openGroup" x-cloak
+                        @click.outside="if (! $event.target.closest('[data-flyout-toggle]')) openGroup = null"
+                        x-transition.opacity.duration.100ms
+                        :style="`top: ${flyoutTop}px; left: ${flyoutLeft}px;`"
+                        class="fixed z-50 w-56 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+                        style="display:none" role="menu">
+                        <p class="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400" x-text="openGroup"></p>
+                        <template x-for="(item, idx) in (groups[openGroup] || [])" :key="idx">
+                            <a :href="item.href" @click="openGroup = null" role="menuitem"
+                                class="group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition"
+                                :class="item.active ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'">
+                                <svg class="h-[17px] w-[17px] flex-shrink-0" :class="item.active ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" /></svg>
+                                <span x-text="item.label"></span>
+                                <template x-if="item.badge">
+                                    <span class="ms-auto rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" x-text="item.badge"></span>
+                                </template>
+                            </a>
+                        </template>
+                    </div>
+                </template>
 
                 @if ($authUser?->is_admin)
                     <div class="px-3 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Admin</div>
@@ -284,6 +395,9 @@
             <main class="min-w-0 flex-1 overflow-x-hidden p-4 md:p-8">
                 @if (session('impersonation_notice'))
                     <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ session('impersonation_notice') }}</div>
+                @endif
+                @if (session('session_notice'))
+                    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">{{ session('session_notice') }}</div>
                 @endif
                 @if (session()->has('impersonator_id'))
                     <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">

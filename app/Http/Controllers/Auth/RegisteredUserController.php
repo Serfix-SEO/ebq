@@ -47,6 +47,8 @@ class RegisteredUserController extends Controller
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'dial_code' => ['nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\DialCodes::validCodes())],
+            'phone' => ['nullable', 'string', 'min:5', 'max:20', 'regex:/^[0-9()\-.\s]+$/'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'invite' => ['nullable', 'string', 'max:128'],
         ];
@@ -55,11 +57,16 @@ class RegisteredUserController extends Controller
             $rules['g-recaptcha-response'] = ['required', 'string', new ValidRecaptcha];
         }
 
-        $validated = $request->validate($rules);
+        $validated = $request->validate($rules, [
+            'g-recaptcha-response.required' => 'Please complete the reCAPTCHA to continue.',
+        ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'phone' => ! empty($validated['phone'])
+                ? trim(($validated['dial_code'] ?? '').' '.trim($validated['phone']))
+                : null,
             'password' => $validated['password'],
         ]);
 
@@ -88,6 +95,22 @@ class RegisteredUserController extends Controller
                 'plan'     => $pendingPlan,
                 'interval' => $pendingInterval !== 'annual' ? $pendingInterval : null,
             ]));
+        }
+
+        // Public tool gate: return to the tool result the visitor was viewing
+        // (safe local path only — never an open redirect).
+        $redirect = (string) $request->input('redirect', '');
+        if ($redirect !== '' && str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//')) {
+            return redirect()->to($redirect);
+        }
+
+        // Homepage "Analyze website" funnel: a domain the visitor entered
+        // before signing up. Generate + show their report immediately (the
+        // report view is auth-gated but NOT verified-gated, so first value
+        // lands before email verification).
+        $analyzeDomain = (string) $request->session()->pull('analyze_domain', '');
+        if ($analyzeDomain !== '') {
+            return redirect()->route('report.view', ['url' => $analyzeDomain]);
         }
 
         return redirect()->route('verification.notice');

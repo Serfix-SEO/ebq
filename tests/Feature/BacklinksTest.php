@@ -38,6 +38,11 @@ class BacklinksTest extends TestCase
 
     public function test_onboarded_user_can_view_backlinks_page(): void
     {
+        // /backlinks is the read-only Site Explorer backlink view since
+        // 2026-07-14 — the legacy manual "Add backlink" CRUD was unrouted.
+        // No snapshot exists for this factory domain and DataForSEO isn't
+        // configured in tests, so the "unavailable" state renders (never
+        // the old CRUD form, never a provider call).
         $user = User::factory()->create();
         $website = Website::factory()->create(['user_id' => $user->id]);
 
@@ -45,7 +50,8 @@ class BacklinksTest extends TestCase
             ->withSession(['current_website_id' => $website->id])
             ->get(route('backlinks.index'))
             ->assertOk()
-            ->assertSee('Add backlink')
-            ->assertSee('Bulk edit by date');
+            ->assertSee('Backlinks')
+            ->assertDontSee('Add backlink')
+            ->assertDontSee('Bulk edit by date');
     }
 }

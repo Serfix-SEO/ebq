@@ -105,6 +105,8 @@ class WebsiteTeamAccessTest extends TestCase
         $this->post(route('register'), [
             'name' => 'Joiner',
             'email' => 'joiner@example.com',
+            'dial_code' => '+1',
+            'phone' => '5551234567',
             'password' => 'password',
             'password_confirmation' => 'password',
             'invite' => $plain,

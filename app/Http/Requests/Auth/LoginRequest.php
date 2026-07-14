@@ -36,6 +36,16 @@ class LoginRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'g-recaptcha-response.required' => 'Please complete the reCAPTCHA to continue.',
+        ];
+    }
+
+    /**
      * @throws ValidationException
      */
     public function authenticate(): void

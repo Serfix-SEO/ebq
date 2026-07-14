@@ -87,6 +87,21 @@ if (! function_exists('format_user_now')) {
     }
 }
 
+if (! function_exists('current_website')) {
+    /**
+     * The session-pinned "current" website for the authed user, validated
+     * against access, falling back to their oldest accessible website.
+     * Thin wrapper around WebsiteTabStatus::currentWebsite() — lets plain
+     * `Route::view()` pages (dashboard/statistics/site-explorer have no
+     * controller) resolve a website to feed <x-website-tabs> without each
+     * duplicating the session/access lookup.
+     */
+    function current_website(): ?\App\Models\Website
+    {
+        return app(\App\Services\WebsiteTabStatus::class)->currentWebsite(auth()->user());
+    }
+}
+
 if (! function_exists('plugin_download_url')) {
     /**
      * URL to the packaged WordPress plugin ZIP. Routed through Laravel so the

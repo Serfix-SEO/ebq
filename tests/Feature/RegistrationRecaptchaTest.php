@@ -20,6 +20,8 @@ class RegistrationRecaptchaTest extends TestCase
         $response = $this->post(route('register'), [
             'name' => 'Tester',
             'email' => 'nocaptcha@example.com',
+            'dial_code' => '+1',
+            'phone' => '5551234567',
             'password' => 'password',
             'password_confirmation' => 'password',
         ]);
@@ -36,6 +38,8 @@ class RegistrationRecaptchaTest extends TestCase
         $response = $this->from(route('register'))->post(route('register'), [
             'name' => 'Tester',
             'email' => 'needs-token@example.com',
+            'dial_code' => '+1',
+            'phone' => '5551234567',
             'password' => 'password',
             'password_confirmation' => 'password',
         ]);
@@ -61,6 +65,8 @@ class RegistrationRecaptchaTest extends TestCase
         $response = $this->post(route('register'), [
             'name' => 'Tester',
             'email' => 'verified-captcha@example.com',
+            'dial_code' => '+1',
+            'phone' => '5551234567',
             'password' => 'password',
             'password_confirmation' => 'password',
             'g-recaptcha-response' => 'test-token',

@@ -10,7 +10,7 @@
         {{-- Quota banner (credit-billed provider only) --}}
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/40">
             <p class="text-xs text-slate-500 dark:text-slate-400">
-                {{ __('Bulk-lookup volume, CPC, competition & trend. Already-cached keywords are') }} <span class="font-semibold text-emerald-600 dark:text-emerald-400">{{ __('free') }}</span> {{ __('— you’re only charged for new ones.') }}
+                {{ __('Bulk-lookup volume, CPC, competition & trend. Recently looked-up keywords are') }} <span class="font-semibold text-emerald-600 dark:text-emerald-400">{{ __('free') }}</span> {{ __('— only new keywords use credits.') }}
             </p>
             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700">
                 <svg class="h-3.5 w-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
@@ -36,7 +36,7 @@
                     @if ($usingFinder)
                         {{ __('Up to 100 keywords. A lookup usually takes 20–60 seconds.') }}
                     @else
-                        {{ __('Up to 100 keywords. Each new (uncached) keyword uses 1 Keywords Everywhere credit.') }}
+                        {{ __('Up to 100 keywords. Each new keyword uses 1 lookup credit.') }}
                     @endif
                 </p>
             </div>
@@ -124,12 +124,7 @@
                             $peak = $series->max() ?: 1;
                         @endphp
                         <tr class="transition hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                            <td class="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
-                                {{ $r['keyword'] }}
-                                @if (! $usingFinder && $r['from_cache'])
-                                    <span class="ms-1.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" title="{{ __('Served from cache — no credit used') }}">{{ __('cached') }}</span>
-                                @endif
-                            </td>
+                            <td class="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{{ $r['keyword'] }}</td>
                             <td class="px-4 py-3 text-right font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $r['volume'] !== null ? number_format($r['volume']) : '—' }}</td>
                             <td class="px-4 py-3 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ $r['cpc'] !== null ? $r['currency'].' '.number_format((float) $r['cpc'], 2) : '—' }}</td>
                             <td class="px-4 py-3 text-right font-semibold {{ $compClass }}">{{ $compLabel }}</td>
@@ -162,7 +157,7 @@
             @if ($usingFinder)
                 {{ __('Monthly search volume, competition and top-of-page bids from Google Keyword Planner.') }}
             @else
-                {{ __('Data from Keywords Everywhere (Google Keyword Planner). Cached values stay fresh for') }} {{ (int) config('services.keywords_everywhere.fresh_days', 30) }} {{ __('days and are shared across Keywords, Rank Tracking and Search Console imports.') }}
+                {{ __('Values refresh every') }} {{ (int) config('services.keywords_everywhere.fresh_days', 30) }} {{ __('days and are shared across Keywords, Rank Tracking and Search Console imports.') }}
             @endif
         </p>
     @elseif ($hasRun && ! $this->isPolling())

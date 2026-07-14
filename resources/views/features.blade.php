@@ -1,6 +1,6 @@
 <x-marketing.page
     title="Features — Serfix"
-    description="Cross-signal insights, rank tracking, page audits, backlink impact, anomaly alerts, reporting, and the WordPress plugin — all built into one workspace."
+    description="Site Explorer backlink intelligence, cross-signal insights, keyword research, rank tracking, site audits, AI content, white-label reporting, and the WordPress plugin — all in one workspace."
     active="features"
 >
     {{-- ── Hero ──────────────────────────────────────────────── --}}
@@ -11,20 +11,23 @@
                 {{ __('Every signal, every action, in one workspace.') }}
             </h1>
             <p class="mx-auto mt-5 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
-                {{ __('Serfix joins Search Console, Analytics, ranking, audits, and backlinks into a single decision surface. Each module is built to answer: what should we ship next, and what changed after we did?') }}
+                {{ __('Serfix joins Search Console, Analytics, rankings, audits, backlinks, and AI content into a single decision surface. Each module answers the same question: what should we ship next, and what changed after we did?') }}
             </p>
             <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Start free trial') }}</a>
-                <a href="#insights" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">{{ __('Explore features') }}</a>
+                <a href="#site-explorer" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">{{ __('Explore features') }}</a>
             </div>
 
             {{-- Anchor pill nav --}}
             <nav aria-label="{{ __('Feature sections') }}" class="mx-auto mt-12 flex max-w-4xl flex-wrap items-center justify-center gap-2 text-xs font-medium">
                 @foreach ([
+                    ['#site-explorer', __('Site Explorer')],
                     ['#insights', __('Insights')],
+                    ['#keywords', __('Keyword research')],
                     ['#rank-tracking', __('Rank tracking')],
-                    ['#audits', __('Page audits')],
+                    ['#audits', __('Site audits')],
                     ['#backlinks', __('Backlinks')],
+                    ['#ai-studio', __('AI Studio')],
                     ['#alerts', __('Alerts')],
                     ['#reporting', __('Reporting')],
                     ['#wordpress', __('WordPress')],
@@ -36,7 +39,80 @@
         </div>
     </section>
 
-    {{-- ── 1. Cross-signal insights ─────────────────────────── --}}
+    {{-- ── 1. Site Explorer ─────────────────────────────────── --}}
+    <section id="site-explorer" class="bg-slate-50/60 py-20 sm:py-24">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Site Explorer') }} <span class="ms-2 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-700">{{ __('New') }}</span></p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Any domain\'s full backlink & authority profile.') }}</h2>
+                    <p class="mt-4 text-[15px] leading-7 text-slate-600">
+                        {{ __('Type a domain — yours or a competitor\'s — and get Domain Authority, Page Authority, spam score, popularity rank, the complete backlink profile with anchors, and the organic competitors that share its keywords. One lookup, one page.') }}
+                    </p>
+                    <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Domain Authority, Page Authority, spam & popularity scores') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Referring domains, IPs & subnets with active-vs-lost history') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Anchor-text breakdown: branded, naked, generic, exact') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Organic competitors ranked by shared keywords') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Share as a public link or a white-label PDF') }}</li>
+                    </ul>
+                </div>
+
+                {{-- Mockup: Site Explorer report --}}
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                        <div>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Site Explorer · competitor.com') }}</p>
+                            <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('Backlink & authority report') }}</p>
+                        </div>
+                        <span class="rounded-md bg-orange-50 px-2 py-1 text-[11px] font-semibold text-orange-700 ring-1 ring-orange-100">{{ __('Top 1M · 59.6%') }}</span>
+                    </div>
+                    <div class="mt-4 grid grid-cols-4 gap-2">
+                        @foreach ([
+                            [__('DA'), '41', 'orange'],
+                            [__('PA'), '38', 'orange'],
+                            [__('Authority'), '47', 'emerald'],
+                            [__('Spam'), '3%', 'emerald'],
+                        ] as [$l, $v, $tone])
+                            <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 text-center">
+                                <p @class([
+                                    'text-lg font-semibold tabular-nums',
+                                    'text-orange-600' => $tone === 'orange',
+                                    'text-emerald-600' => $tone === 'emerald',
+                                ])>{{ $v }}</p>
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $l }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="mt-2.5 grid grid-cols-3 gap-2">
+                        @foreach ([[__('Backlinks'), '24,318'], [__('Ref. domains'), '1,842'], [__('Dofollow'), '22%']] as [$l, $v])
+                            <div class="rounded-lg border border-slate-200 bg-white p-2.5 text-center">
+                                <p class="text-sm font-semibold tabular-nums text-slate-900">{{ $v }}</p>
+                                <p class="text-[10px] font-medium uppercase tracking-wider text-slate-500">{{ $l }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Organic competitors') }}</p>
+                        <ul class="mt-2 space-y-1.5 text-[12px]">
+                            @foreach ([
+                                ['nickfinder.com', '477', '5.5'],
+                                ['lingojam.com', '280', '11.4'],
+                                ['stylish-names.net', '254', '10.0'],
+                            ] as [$d, $kw, $pos])
+                                <li class="flex items-center justify-between rounded-md bg-white px-3 py-1.5 ring-1 ring-slate-200">
+                                    <span class="font-medium text-slate-800">{{ $d }}</span>
+                                    <span class="tabular-nums text-slate-500">{{ $kw }} {{ __('shared kw') }} · {{ __('pos') }} {{ $pos }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {{-- ── 2. Cross-signal insights ─────────────────────────── --}}
     <section id="insights" class="bg-white py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
@@ -50,7 +126,7 @@
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Joins GSC × GA4 × audits × backlinks per page') }}</li>
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Per-country and per-device segmentation') }}</li>
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Daily refresh with anomaly callouts') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('One-click export to CSV or weekly report') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Every insight feeds the Priority Action Queue') }}</li>
                     </ul>
                 </div>
 
@@ -83,8 +159,65 @@
         </div>
     </section>
 
-    {{-- ── 2. Rank tracking ──────────────────────────────────── --}}
-    <section id="rank-tracking" class="bg-slate-50/60 py-20 sm:py-24">
+    {{-- ── 3. Keyword research ──────────────────────────────── --}}
+    <section id="keywords" class="bg-slate-50/60 py-20 sm:py-24">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+                <div class="order-last lg:order-first">
+                    {{-- Mockup: keyword table --}}
+                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="border-b border-slate-200 px-5 py-3">
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Keyword ideas · "project management"') }}</p>
+                            <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('Live search volumes') }}</p>
+                        </div>
+                        <table class="min-w-full text-[12px]">
+                            <thead class="bg-slate-50/60 text-[10px] uppercase tracking-wider text-slate-500">
+                                <tr>
+                                    <th class="px-4 py-2 text-left font-semibold">{{ __('Keyword') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('Volume') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('CPC') }}</th>
+                                    <th class="px-3 py-2 text-right font-semibold">{{ __('Comp.') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach ([
+                                    [__('project management software'), '74,000', '$18.40', __('High')],
+                                    [__('best project management tools'), '22,200', '$14.10', __('High')],
+                                    [__('free project management app'), '9,900', '$7.25', __('Med')],
+                                    [__('project tracker template'), '5,400', '$3.60', __('Low')],
+                                    [__('agile project planning'), '2,900', '$6.80', __('Med')],
+                                ] as [$k, $v, $c, $comp])
+                                    <tr class="hover:bg-slate-50/60">
+                                        <td class="px-4 py-2.5 font-medium text-slate-800">{{ $k }}</td>
+                                        <td class="px-3 py-2.5 text-right tabular-nums text-slate-600">{{ $v }}</td>
+                                        <td class="px-3 py-2.5 text-right tabular-nums text-slate-600">{{ $c }}</td>
+                                        <td class="px-3 py-2.5 text-right text-slate-600">{{ $comp }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Keyword research') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Real volumes, gaps, and clusters — not guesses.') }}</h2>
+                    <p class="mt-4 text-[15px] leading-7 text-slate-600">
+                        {{ __('Expand seed keywords into ideas with live search volumes, CPC, and competition. Gap analysis shows the queries competitors rank for that you don\'t, and clustering groups everything into pages you can actually build.') }}
+                    </p>
+                    <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Keyword ideas with volume, CPC & competition') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Competitor keyword-gap analysis with opportunity scoring') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Your own GSC queries enriched with volumes automatically') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('One-click: track it, brief it, or send it to AI Studio') }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {{-- ── 4. Rank tracking ──────────────────────────────────── --}}
+    <section id="rank-tracking" class="bg-white py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div class="order-last lg:order-first">
@@ -127,73 +260,71 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Rank tracking') }}</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('SERP-accurate ranks with click overlays.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        {{ __('Real positions captured per device and country. Serfix overlays GSC clicks for the same query so you instantly see when a rank gain stops producing traffic — and which SERP feature is to blame.') }}
+                        {{ __('Real positions captured from live SERPs per country and device. Serfix overlays GSC clicks for the same query so you instantly see when a rank gain stops producing traffic.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Country, device, language, and city targeting') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Competitor positions captured every check') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('SERP-feature flags and PAA capture') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Custom intervals + on-demand re-checks') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Country and device targeting per keyword') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Position history with GSC click & CTR overlays') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Custom check intervals + on-demand re-checks') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Rank drops feed the anomaly detector automatically') }}</li>
                     </ul>
                 </div>
             </div>
         </div>
     </section>
 
-    {{-- ── 3. Page audits ────────────────────────────────────── --}}
-    <section id="audits" class="bg-white py-20 sm:py-24">
+    {{-- ── 5. Site audits ────────────────────────────────────── --}}
+    <section id="audits" class="bg-slate-50/60 py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Page audits') }}</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Core Web Vitals, on-page, and content in one pass.') }}</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Site & page audits') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('A full-site crawler plus deep single-page audits.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        {{ __('On-demand audits combine mobile + desktop CWV with a deep HTML analyzer and keyword-strategy review tailored to the page\'s target query. Output is a prioritized recommendation list — not a 200-row spreadsheet.') }}
+                        {{ __('Serfix crawls your whole site on an adaptive schedule, scores its health, and turns every issue into a ranked fix list. Page-level audits add mobile + desktop Core Web Vitals, on-page checks, and a keyword-strategy review for the target query.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Site health score with issues ranked by severity') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Orphan pages, broken links, redirects & internal-link map') }}</li>
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Full CWV: LCP, CLS, INP, TBT, FCP, TTFB') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('SEO checks: meta, headings, schema, hreflang, alt') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Content: word count, reading grade, top keywords') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('One-click resubmit via Google Indexing API') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Adaptive recrawl — busy sites more often, static less') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Everything lands in one Priority Action Queue') }}</li>
                     </ul>
                 </div>
 
                 <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Audit · /blog/saas-seo-guide') }}</p>
-                            <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('Mobile · Score 72') }}</p>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('Site audit · example.com') }}</p>
+                            <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('Health score 86 · 1,240 pages') }}</p>
                         </div>
-                        <span class="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-100">{{ __('Needs work') }}</span>
+                        <span class="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">{{ __('Healthy') }}</span>
                     </div>
                     <div class="mt-4 grid grid-cols-3 gap-2.5">
                         @foreach ([
-                            [__('LCP'), '2.8s', 'amber'],
-                            [__('CLS'), '0.04', 'emerald'],
-                            [__('INP'), '180ms', 'emerald'],
-                            [__('TBT'), '410ms', 'amber'],
-                            [__('FCP'), '1.6s', 'emerald'],
-                            [__('TTFB'), '720ms', 'amber'],
+                            [__('Critical'), '3', 'rose'],
+                            [__('Warnings'), '27', 'amber'],
+                            [__('Notices'), '64', 'slate'],
                         ] as [$l, $v, $tone])
-                            <div class="rounded-lg border border-slate-200 bg-white p-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $l }}</p>
+                            <div class="rounded-lg border border-slate-200 bg-white p-3 text-center">
                                 <p @class([
-                                    'mt-1 text-base font-semibold tabular-nums',
-                                    'text-emerald-600' => $tone === 'emerald',
-                                    'text-amber-600' => $tone === 'amber',
+                                    'text-xl font-semibold tabular-nums',
                                     'text-rose-600' => $tone === 'rose',
+                                    'text-amber-600' => $tone === 'amber',
+                                    'text-slate-900' => $tone === 'slate',
                                 ])>{{ $v }}</p>
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $l }}</p>
                             </div>
                         @endforeach
                     </div>
                     <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Top recommendations') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Priority action queue') }}</p>
                         <ul class="mt-3 space-y-2 text-[12px]">
                             @foreach ([
-                                ['rose', __('Render-blocking CSS — split into critical + async (180KB)')],
-                                ['amber', __('Image alt missing on 7 images')],
-                                ['amber', __('Canonical tag missing')],
-                                ['slate', __('Add 2 internal links from /pricing')],
+                                ['rose', __('12 pages return 404 but still receive internal links')],
+                                ['amber', __('Duplicate titles across 8 category pages')],
+                                ['amber', __('LCP over 2.5s on 5 top-traffic pages')],
+                                ['slate', __('34 orphan pages with zero inbound links')],
                             ] as [$tone, $text])
                                 <li class="flex items-start gap-2.5">
                                     <span @class([
@@ -212,8 +343,8 @@
         </div>
     </section>
 
-    {{-- ── 4. Backlinks ──────────────────────────────────────── --}}
-    <section id="backlinks" class="bg-slate-50/60 py-20 sm:py-24">
+    {{-- ── 6. Backlinks ──────────────────────────────────────── --}}
+    <section id="backlinks" class="bg-white py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
                 <div class="order-last lg:order-first">
@@ -257,22 +388,79 @@
 
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Backlinks') }}</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Track every link, prove every lift.') }}</h2>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Track every link, prove every lift, win the next one.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        {{ __('Bulk import or manual entry. Serfix verifies presence, anchor, and rel — then measures click delta on the target page in the 28 days after the link goes live.') }}
+                        {{ __('Serfix verifies each link\'s presence, anchor, and rel — then measures the click delta on the target page in the 28 days after it went live. Prospecting mines the domains linking to your competitors but not to you, and drafts the outreach email for you.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Live verification of presence + anchor + rel') }}</li>
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Pre/post 28-day click delta per target page') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Filters: DA, spam, dofollow, anchor, date') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Competitor backlink prospecting (Pro+)') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Competitor backlink prospecting with a workflow: new → contacted → converted') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('AI-drafted outreach emails per prospect (Pro+)') }}</li>
                     </ul>
                 </div>
             </div>
         </div>
     </section>
 
-    {{-- ── 5. Anomaly alerts ─────────────────────────────────── --}}
+    {{-- ── 7. AI Studio ──────────────────────────────────────── --}}
+    <section id="ai-studio" class="bg-slate-50/60 py-20 sm:py-24">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('AI Studio') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Content that starts from your search data.') }}</h2>
+                    <p class="mt-4 text-[15px] leading-7 text-slate-600">
+                        {{ __('The blog-post wizard plans, outlines, and drafts long-form articles in the background — seeded by the keywords you already rank for or want to. Dozens of focused writing tools handle titles, metas, rewrites, briefs, and internal-link suggestions.') }}
+                    </p>
+                    <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Guided blog-post wizard: keyword → outline → full draft') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Drafts generate asynchronously — start one, keep working') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Internal-link suggestions from your own crawl graph') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Title, meta, rewrite & brief tools with usage pooling per plan') }}</li>
+                    </ul>
+                </div>
+
+                {{-- Mockup: writer wizard --}}
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                        <div>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ __('AI Writer · blog post wizard') }}</p>
+                            <p class="mt-0.5 text-sm font-semibold text-slate-900">{{ __('"agile project planning" · 1,800 words') }}</p>
+                        </div>
+                        <span class="rounded-md bg-orange-50 px-2 py-1 text-[11px] font-semibold text-orange-700 ring-1 ring-orange-100">{{ __('Drafting…') }}</span>
+                    </div>
+                    <ul class="mt-4 space-y-2 text-[12px]">
+                        @foreach ([
+                            ['done', __('Keyword & intent analysis')],
+                            ['done', __('Competing SERP outline review')],
+                            ['done', __('H2/H3 outline approved')],
+                            ['active', __('Writing sections (4 of 7)')],
+                            ['todo', __('Internal links & meta description')],
+                        ] as [$state, $step])
+                            <li class="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
+                                @if ($state === 'done')
+                                    <span class="flex h-4 w-4 flex-none items-center justify-center rounded-full bg-emerald-100 text-[9px] font-bold text-emerald-700">✓</span>
+                                @elseif ($state === 'active')
+                                    <span class="h-4 w-4 flex-none animate-pulse rounded-full border-2 border-orange-400"></span>
+                                @else
+                                    <span class="h-4 w-4 flex-none rounded-full border-2 border-slate-200"></span>
+                                @endif
+                                <span @class(['text-slate-700', 'font-semibold text-slate-900' => $state === 'active'])>{{ $step }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <div class="mt-4 flex flex-wrap gap-1.5">
+                        @foreach ([__('Titles'), __('Meta descriptions'), __('Rewrites'), __('Briefs'), __('FAQs'), __('Summaries')] as $chip)
+                            <span class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600">{{ $chip }}</span>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {{-- ── 8. Anomaly alerts ─────────────────────────────────── --}}
     <section id="alerts" class="bg-white py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
@@ -312,7 +500,7 @@
         </div>
     </section>
 
-    {{-- ── 6. Reporting ──────────────────────────────────────── --}}
+    {{-- ── 9. Reporting ──────────────────────────────────────── --}}
     <section id="reporting" class="bg-slate-50/60 py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
@@ -342,27 +530,32 @@
                                 <li>• {{ __('1 indexing fail still earning impressions') }}</li>
                             </ul>
                         </div>
+                        <div class="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-[11px] text-slate-500">
+                            <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+                            <span class="truncate font-mono">serfix.io/r/x8Tq…</span>
+                            <span class="ms-auto rounded bg-white px-1.5 py-0.5 font-semibold text-slate-600 ring-1 ring-slate-200">{{ __('Copy link') }}</span>
+                        </div>
                     </div>
                 </div>
 
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{{ __('Reporting') }}</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Executive-ready, zero rework.') }}</h2>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Executive-ready. White-label. Shareable.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        {{ __('Daily, weekly, or monthly. Every report includes YoY, top gainers/losers, traffic-source concentration, and the top-5 actionable insights.') }}
+                        {{ __('Daily, weekly, or monthly growth reports by email with a branded PDF attached — plus live report pages you can share with any client as a public link. Your logo, your colors, your domain story.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Per-website recipient lists, multi-stakeholder') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Custom date ranges with in-app preview') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Scheduled auto-send in website timezone') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('White-label PDF export (Agency plan)') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Scheduled email reports with branded PDF attachment') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Public share links — clients view reports without an account') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('White-label branding: logo, company name, accent color') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Send from your own Gmail, Outlook, or SMTP') }}</li>
                     </ul>
                 </div>
             </div>
         </div>
     </section>
 
-    {{-- ── 7. WordPress ──────────────────────────────────────── --}}
+    {{-- ── 10. WordPress ─────────────────────────────────────── --}}
     <section id="wordpress" class="bg-white py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
@@ -372,15 +565,15 @@
                         <span class="ms-2 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-700">{{ __('Coming soon') }}</span>
                     @endif
                     </p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('Surface insights where editors write.') }}</h2>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">{{ __('A full Serfix HQ inside wp-admin.') }}</h2>
                     <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        {{ __('The Serfix plugin embeds rank, click, and content opportunity context inside Gutenberg, the post list, and the WordPress dashboard. Connect with one click; tokens are website-scoped and never live in browser JS.') }}
+                        {{ __('The Serfix plugin brings rank, click, and opportunity context into Gutenberg and the post list — plus complete Site Audit and Keyword Finder tabs, so editors act on SEO without leaving WordPress. One-click connect; tokens are website-scoped and never live in browser JS.') }}
                     </p>
                     <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Gutenberg sidebar with rank, clicks, opportunities') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Site Audit & Keyword Finder tabs inside wp-admin') }}</li>
                         <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Posts list column with 30-day clicks + position') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('WP dashboard widget with insight counts') }}</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Per-website Sanctum tokens, challenge-response') }}</li>
+                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>{{ __('Per-website Sanctum tokens, challenge-response pairing') }}</li>
                     </ul>
                 </div>
 
@@ -413,8 +606,8 @@
                             </div>
                         </div>
                         <div class="rounded-lg border border-amber-100 bg-amber-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">{{ __('Cannibalization') }}</p>
-                            <p class="mt-1 text-[11px] text-slate-700">{{ __('Splits with /blog/seo-tools-guide') }}</p>
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">{{ __('Site audit') }}</p>
+                            <p class="mt-1 text-[11px] text-slate-700">{{ __('Health 86 · 3 critical issues to review') }}</p>
                         </div>
                         <div class="rounded-lg border border-orange-100 bg-orange-50/60 p-3">
                             <p class="text-[10px] font-semibold uppercase tracking-wider text-orange-700">{{ __('Striking distance') }}</p>
@@ -426,7 +619,7 @@
         </div>
     </section>
 
-    {{-- ── 8. Integrations ──────────────────────────────────── --}}
+    {{-- ── 11. Integrations ──────────────────────────────────── --}}
     <section id="integrations" class="bg-slate-50/60 py-20 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center">
@@ -439,9 +632,9 @@
                     [__('Google Search Console'), __('Clicks, impressions, position, CTR by query × page × device × country.')],
                     [__('Google Analytics 4'), __('Users, sessions, bounce rate with source/medium attribution.')],
                     [__('Google Indexing API'), __('Per-page verdict, coverage, last-crawl. Resubmit from the UI.')],
-                    [__('Core Web Vitals'), __('Mobile + desktop performance scores piped into audits.')],
-                    [__('SERP data'), __('Live SERP capture for rank tracking with feature extraction.')],
-                    [__('Email + Slack'), __('Reports and alerts via SMTP, Postmark, Resend, or Slack.')],
+                    [__('Backlink & authority index'), __('Domain Authority, backlink profiles, and popularity ranks from trusted third-party indexes.')],
+                    [__('Core Web Vitals & SERP data'), __('Mobile + desktop performance scores and live SERP capture for rank tracking.')],
+                    [__('Gmail, Outlook & SMTP'), __('Reports and alerts sent from your own mailbox or SMTP relay.')],
                 ] as [$t, $d])
                     <article class="bg-white p-6">
                         <h3 class="text-base font-semibold text-slate-900">{{ $t }}</h3>
@@ -457,11 +650,19 @@
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
             <div class="rounded-3xl border border-slate-200 bg-slate-50/60 px-6 py-14 text-center sm:px-12">
                 <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{{ __('See Serfix on your own data.') }}</h2>
-                <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">{{ __('Connect your first website and run an action-ready report in minutes.') }}</p>
+                <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">{{ __('Analyze your website, connect Search Console, and get an action-ready report in minutes.') }}</p>
                 <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                     <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Start free trial') }}</a>
                     <a href="{{ route('pricing') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">{{ __('View pricing') }}</a>
                 </div>
+                <p class="mt-6 text-xs text-slate-500">
+                    {{ __('Or try the free tools first:') }}
+                    <a href="{{ url('/') }}" class="font-medium text-orange-600 hover:underline">{{ __('Site Explorer') }}</a> ·
+                    <a href="{{ route('tools.audit') }}" class="font-medium text-orange-600 hover:underline">{{ __('SEO Audit') }}</a> ·
+                    <a href="{{ route('tools.pagespeed') }}" class="font-medium text-orange-600 hover:underline">{{ __('PageSpeed') }}</a> ·
+                    <a href="{{ route('tools.rank-tracker') }}" class="font-medium text-orange-600 hover:underline">{{ __('Rank Checker') }}</a> ·
+                    <a href="{{ route('tools.keyword-volume') }}" class="font-medium text-orange-600 hover:underline">{{ __('Volume Checker') }}</a>
+                </p>
             </div>
         </div>
     </section>

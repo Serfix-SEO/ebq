@@ -212,11 +212,11 @@ class ConnectGoogle extends Component
         // components read the right website_id on first render.
         session(['current_website_id' => $website->id]);
 
-        // One-shot flag so the dashboard shows the welcome / "pulling your
-        // data" modal once. flash() clears it after the next request.
+        // One-shot flag so the overview hub shows the welcome banner once.
+        // flash() clears it after the next request.
         session()->flash('just_onboarded', true);
 
-        $this->redirectRoute('dashboard');
+        $this->redirectRoute('website-overview');
     }
 
     private function fetchGoogleData(): void

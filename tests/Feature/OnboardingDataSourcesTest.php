@@ -111,7 +111,7 @@ class OnboardingDataSourcesTest extends TestCase
         $this->assertSame(0, Website::where('user_id', $user->id)->count());
     }
 
-    public function test_skip_for_now_creates_sourceless_website_and_redirects_to_dashboard(): void
+    public function test_skip_for_now_creates_sourceless_website_and_redirects_to_overview(): void
     {
         Queue::fake();
 
@@ -123,7 +123,7 @@ class OnboardingDataSourcesTest extends TestCase
             ->test(ConnectGoogle::class)
             ->set('domain', 'example.com')
             ->call('skipForNow')
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('website-overview'));
 
         $website = Website::where('user_id', $user->id)->firstOrFail();
         $this->assertSame('example.com', $website->domain);

@@ -44,9 +44,16 @@ class ActionQueueService
      * Ranked, grouped action rows for the queue. Empty groups are dropped.
      * Sorted by severity tier (critical → high → growth), then by impact desc.
      *
+     * @param  bool  $includeCrawlIssues  False while the site's first crawl is
+     *                                     still in progress (queued/running/
+     *                                     finalizing) — crawl findings aren't
+     *                                     final yet, but GSC/rank-tracking-derived
+     *                                     items (cannibalization, rank drops,
+     *                                     quick wins, etc.) are independent of
+     *                                     crawl state and should still show.
      * @return array<int, array{key: string, title: string, description: string, count: int, severity: string, impact: float, impact_label: ?string, action_label: string}>
      */
-    public function groupedActions(string $websiteId, ?string $country = null): array
+    public function groupedActions(string $websiteId, ?string $country = null, bool $includeCrawlIssues = true): array
     {
         $cannibalization = $this->reports->cannibalizationReport($websiteId, null, null, self::COUNT_LIMIT, $country);
         $striking = $this->reports->strikingDistance($websiteId, null, null, self::COUNT_LIMIT, $country);
@@ -80,8 +87,11 @@ class ActionQueueService
                 self::SEV_GROWTH, count($quickWins), 0.0, __('View')),
         ];
 
-        // Merge crawl-derived issues (broken links, orphans, on-page, etc.).
-        $items = array_merge($items, $this->crawl->actionGroups($websiteId));
+        // Merge crawl-derived issues (broken links, orphans, on-page, etc.) —
+        // skipped while the first crawl hasn't produced final results yet.
+        if ($includeCrawlIssues) {
+            $items = array_merge($items, $this->crawl->actionGroups($websiteId));
+        }
 
         $items = array_values(array_filter($items, fn (array $i): bool => $i['count'] > 0));
 

@@ -12,6 +12,7 @@ use App\Models\KeywordMetric;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\KeywordFinder\KeywordFinderPool;
+use App\Services\KeywordFinder\KeywordIdeasMonthlyCache;
 use App\Services\KeywordMetricsService;
 use App\Support\KeywordFinderLocations;
 use App\Support\KeywordProviderConfig;
@@ -73,26 +74,50 @@ class KeywordGapService
 
         $requests = [];
 
-        // Our own site first. website-mode works with NO Google connection.
-        $ourReq = $this->pool->dispatchIdeas(
-            ['url' => $ourUrl, 'scope' => 'site'],
-            userId: $userId,
-            websiteId: $website->id,
-            countryKey: $country,
-        );
-        // If our-site discovery can't even dispatch AND we have no GSC to fall
-        // back on, the run is unusable.
-        if ($ourReq->status === KeywordApiRequest::STATUS_FAILED && ! $website->hasGsc()) {
-            $analysis->forceFill([
-                'status' => KeywordGapAnalysis::STATUS_FAILED,
-                'error' => $ourReq->error ?: 'Could not analyse your website. Please try again shortly.',
-            ])->save();
+        // Shared cross-user discovery cache (same store the Ideas tab and the
+        // WP plugin read): a domain ANY platform user already discovered this
+        // month is served from cache instead of re-querying a keyword server.
+        // Cached entries carry `cache_key` instead of a request `id` and are
+        // instantly "finished" for the poller.
+        $cachedEntry = function (string $url, string $role) use ($country): ?array {
+            [$mode, $payload] = $this->pool->buildIdeasPayload(['url' => $url, 'scope' => 'site'], $country);
+            $key = KeywordIdeasMonthlyCache::key($mode, $payload);
+            if (KeywordIdeasMonthlyCache::get($key) === null) {
+                return null;
+            }
 
-            return $analysis;
+            return ['id' => null, 'cache_key' => $key, 'role' => $role, 'url' => $url, 'domain' => CompetitorBacklink::extractDomain($url)];
+        };
+
+        // Our own site first. website-mode works with NO Google connection.
+        if (($entry = $cachedEntry($ourUrl, 'ours')) !== null) {
+            $requests[] = $entry;
+        } else {
+            $ourReq = $this->pool->dispatchIdeas(
+                ['url' => $ourUrl, 'scope' => 'site'],
+                userId: $userId,
+                websiteId: $website->id,
+                countryKey: $country,
+            );
+            // If our-site discovery can't even dispatch AND we have no GSC to fall
+            // back on, the run is unusable.
+            if ($ourReq->status === KeywordApiRequest::STATUS_FAILED && ! $website->hasGsc()) {
+                $analysis->forceFill([
+                    'status' => KeywordGapAnalysis::STATUS_FAILED,
+                    'error' => $ourReq->error ?: 'Could not analyse your website. Please try again shortly.',
+                ])->save();
+
+                return $analysis;
+            }
+            $requests[] = ['id' => $ourReq->request_id, 'role' => 'ours', 'url' => $ourUrl, 'domain' => CompetitorBacklink::extractDomain($ourUrl)];
         }
-        $requests[] = ['id' => $ourReq->request_id, 'role' => 'ours', 'url' => $ourUrl, 'domain' => CompetitorBacklink::extractDomain($ourUrl)];
 
         foreach ($competitors as $url) {
+            if (($entry = $cachedEntry($url, 'competitor')) !== null) {
+                $requests[] = $entry;
+
+                continue;
+            }
             $req = $this->pool->dispatchIdeas(
                 ['url' => $url, 'scope' => 'site'],
                 userId: $userId,
@@ -127,12 +152,14 @@ class KeywordGapService
 
         $reqs = is_array($analysis->request_ids) ? $analysis->request_ids : [];
         $ids = array_values(array_filter(array_map(fn ($r) => $r['id'] ?? null, $reqs)));
+        // Cache-served entries (no request id) are finished by definition.
+        $cachedCount = count(array_filter($reqs, fn ($r) => ($r['id'] ?? null) === null && ($r['cache_key'] ?? null) !== null));
 
         $statuses = KeywordApiRequest::query()
             ->whereIn('request_id', $ids)
             ->pluck('status', 'request_id');
 
-        $finished = $statuses->filter(fn ($s) => in_array($s, [KeywordApiRequest::STATUS_COMPLETED, KeywordApiRequest::STATUS_FAILED], true))->count();
+        $finished = $cachedCount + $statuses->filter(fn ($s) => in_array($s, [KeywordApiRequest::STATUS_COMPLETED, KeywordApiRequest::STATUS_FAILED], true))->count();
         if ($finished !== $analysis->completed_requests) {
             $analysis->forceFill(['completed_requests' => $finished])->save();
         }
@@ -148,8 +175,10 @@ class KeywordGapService
         // On timeout, only proceed if we actually have usable "our" data —
         // otherwise everything would falsely look "missing".
         if (! $allDone) {
-            $ourId = collect($reqs)->firstWhere('role', 'ours')['id'] ?? null;
-            $ourReady = $ourId !== null && ($statuses[$ourId] ?? null) === KeywordApiRequest::STATUS_COMPLETED;
+            $ourEntry = collect($reqs)->firstWhere('role', 'ours') ?? [];
+            $ourId = $ourEntry['id'] ?? null;
+            $ourReady = ($ourEntry['cache_key'] ?? null) !== null
+                || ($ourId !== null && ($statuses[$ourId] ?? null) === KeywordApiRequest::STATUS_COMPLETED);
             if (! $ourReady && ! $analysis->website?->hasGsc()) {
                 $analysis->forceFill([
                     'status' => KeywordGapAnalysis::STATUS_FAILED,
@@ -201,11 +230,29 @@ class KeywordGapService
         $competitorKeywords = [];
 
         foreach ($reqs as $r) {
-            $req = $byId->get($r['id'] ?? '');
-            if (! $req instanceof KeywordApiRequest || $req->status !== KeywordApiRequest::STATUS_COMPLETED) {
-                continue;
+            // Cache-served entry → keywords straight from the shared monthly
+            // discovery cache (no keyword-server round-trip happened at all).
+            if (($r['cache_key'] ?? null) !== null) {
+                $keywords = $this->keywordsFromRows(KeywordIdeasMonthlyCache::get((string) $r['cache_key']) ?? []);
+            } else {
+                $req = $byId->get($r['id'] ?? '');
+                if (! $req instanceof KeywordApiRequest || $req->status !== KeywordApiRequest::STATUS_COMPLETED) {
+                    continue;
+                }
+                $keywords = $this->keywordsFromResult($req);
+                // Warm the shared cache for everyone: the NEXT gap run (any
+                // user), Ideas-tab lookup, or plugin call for this domain is
+                // now a free cache hit for the rest of the month.
+                $rows = $req->result['results'] ?? null;
+                if (is_array($rows) && $rows !== []) {
+                    KeywordIdeasMonthlyCache::put(
+                        KeywordIdeasMonthlyCache::key((string) $req->mode, is_array($req->payload) ? $req->payload : []),
+                        array_values(array_filter($rows, 'is_array')),
+                    );
+                }
             }
-            foreach ($this->keywordsFromResult($req) as $kw) {
+
+            foreach ($keywords as $kw) {
                 $lower = mb_strtolower($kw);
                 if (($r['role'] ?? '') === 'ours') {
                     $ourKeywords[$lower] ??= $kw;
@@ -371,10 +418,11 @@ class KeywordGapService
     }
 
     /**
-     * Begin live-SERP verification of the Missing bucket. Returns the number of
-     * rows queued (0 = nothing to verify / already running / not completed).
+     * Begin live-SERP verification of one bucket (defaults to the config
+     * bucket set — Missing). Returns the number of rows queued (0 = nothing
+     * to verify / already running / not completed).
      */
-    public function startVerification(KeywordGapAnalysis $analysis): int
+    public function startVerification(KeywordGapAnalysis $analysis, ?string $bucket = null): int
     {
         if ($analysis->status !== KeywordGapAnalysis::STATUS_COMPLETED) {
             return 0;
@@ -385,7 +433,7 @@ class KeywordGapService
 
         $candidates = KeywordGapRow::query()
             ->where('keyword_gap_analysis_id', $analysis->id)
-            ->whereIn('bucket', $this->verifyBuckets())
+            ->whereIn('bucket', $this->bucketsFor($bucket))
             ->whereNull('verified_at')
             ->count();
         $target = min($candidates, $this->verifyMax());
@@ -400,7 +448,7 @@ class KeywordGapService
             'verify_error' => null,
         ])->save();
 
-        RunKeywordGapVerification::dispatch($analysis->id);
+        RunKeywordGapVerification::dispatch($analysis->id, $bucket);
 
         return $target;
     }
@@ -411,7 +459,7 @@ class KeywordGapService
      * recompute the opportunity score from the SAME response. Quota-safe: a
      * plan-cap hit stops the batch, persists what's done, and records a message.
      */
-    public function verify(string $analysisId): void
+    public function verify(string $analysisId, ?string $bucket = null): void
     {
         $analysis = KeywordGapAnalysis::find($analysisId);
         if ($analysis === null || $analysis->verify_status !== KeywordGapAnalysis::VERIFY_STATUS_VERIFYING) {
@@ -426,7 +474,7 @@ class KeywordGapService
 
         $rows = KeywordGapRow::query()
             ->where('keyword_gap_analysis_id', $analysis->id)
-            ->whereIn('bucket', $this->verifyBuckets())
+            ->whereIn('bucket', $this->bucketsFor($bucket))
             ->whereNull('verified_at')
             ->orderByDesc('search_volume')
             ->limit($this->verifyMax())
@@ -440,7 +488,7 @@ class KeywordGapService
                 break;
             }
 
-            [$compPos, $ourPos] = $this->positionsFromSerp($serp, $competitorDomains, $ourDomain);
+            [$compPos, $ourPos, $compDomain] = $this->positionsFromSerp($serp, $competitorDomains, $ourDomain);
 
             // Real SERP position wins; fall back to any existing (GSC) position.
             $effectiveOurPos = $ourPos !== null ? (float) $ourPos : $row->our_position;
@@ -458,6 +506,7 @@ class KeywordGapService
                 'bucket' => $bucket,
                 'our_position' => $effectiveOurPos,
                 'competitor_position' => $compPos,
+                'competitor_domain' => $compDomain,
                 'opportunity_score' => $score['score'],
                 'score_components' => $score['components'],
                 'verified_at' => now(),
@@ -485,18 +534,20 @@ class KeywordGapService
     }
 
     /**
-     * Best competitor position + best our position from a cached SERP payload.
+     * Best competitor position (+ which competitor it was) and best our
+     * position from a cached SERP payload.
      *
      * @param  array<string, mixed>|null  $serp
      * @param  list<string>  $competitorDomains
-     * @return array{0: ?int, 1: ?int}  [competitorPosition, ourPosition]
+     * @return array{0: ?int, 1: ?int, 2: ?string}  [competitorPosition, ourPosition, competitorDomain]
      */
     private function positionsFromSerp(?array $serp, array $competitorDomains, string $ourDomain): array
     {
         $compPos = null;
+        $compDomain = null;
         $ourPos = null;
         if (! is_array($serp)) {
-            return [null, null];
+            return [null, null, null];
         }
         foreach ($serp['organic'] ?? [] as $r) {
             if (! is_array($r)) {
@@ -512,13 +563,14 @@ class KeywordGapService
             }
             if (in_array($d, $competitorDomains, true) && ($compPos === null || $pos < $compPos)) {
                 $compPos = $pos;
+                $compDomain = $d;
             }
             if ($d === $ourDomain && ($ourPos === null || $pos < $ourPos)) {
                 $ourPos = $pos;
             }
         }
 
-        return [$compPos, $ourPos];
+        return [$compPos, $ourPos, $compDomain];
     }
 
     /** @return list<string> */
@@ -531,6 +583,25 @@ class KeywordGapService
         }
 
         return $buckets;
+    }
+
+    /**
+     * Buckets a verification pass targets: the explicitly requested bucket
+     * (per-tab "Verify" button, 2026-07-14 — verification is available on
+     * every position-bearing tab, not just Missing), else the config default.
+     *
+     * @return list<string>
+     */
+    private function bucketsFor(?string $bucket): array
+    {
+        $valid = [
+            KeywordGapAnalysis::BUCKET_MISSING,
+            KeywordGapAnalysis::BUCKET_WEAK,
+            KeywordGapAnalysis::BUCKET_STRENGTH,
+            KeywordGapAnalysis::BUCKET_SHARED,
+        ];
+
+        return in_array($bucket, $valid, true) ? [$bucket] : $this->verifyBuckets();
     }
 
     private function verifyMax(): int
@@ -586,12 +657,19 @@ class KeywordGapService
     private function keywordsFromResult(KeywordApiRequest $req): array
     {
         $results = $req->result['results'] ?? [];
-        if (! is_array($results)) {
-            return [];
-        }
+
+        return $this->keywordsFromRows(is_array($results) ? $results : []);
+    }
+
+    /**
+     * @param  array<int, mixed>  $rows  result rows (each with a `keyword` key)
+     * @return list<string> distinct keyword strings
+     */
+    private function keywordsFromRows(array $rows): array
+    {
         $out = [];
         $seen = [];
-        foreach ($results as $row) {
+        foreach ($rows as $row) {
             if (! is_array($row)) {
                 continue;
             }

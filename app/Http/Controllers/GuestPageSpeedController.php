@@ -17,11 +17,8 @@ use Illuminate\View\View;
 /**
  * Public, no-signup PageSpeed test driven from the marketing site.
  *
- * Same progressive friction as {@see GuestAuditController}, counted per
- * browser via a signed cookie:
- *   test #1  → free, shown on screen
- *   test #2  → require name + email, delivered by email (not shown)
- *   test #3+ → block, push free-plan signup
+ * Requires a signed-in account: anonymous visitors get a blurred sample
+ * preview + signup modal; authenticated users run it directly.
  */
 class GuestPageSpeedController extends Controller
 {
@@ -29,12 +26,16 @@ class GuestPageSpeedController extends Controller
 
     private const PER_DAY = 15;
 
-    private const COUNT_COOKIE = 'ebq_guest_pagespeed';
-
-    private const COUNT_COOKIE_MINUTES = 525600; // ~1 year
-
     public function store(Request $request, SafeHttpGuard $guard, LighthouseClient $lighthouse): JsonResponse
     {
+        // Public tools require an account: anonymous submit runs nothing (no API)
+        // and returns require:signup so the page shows the blurred gate + modal.
+        if (auth()->guest()) {
+            return response()->json([
+                'results_url' => route('tool.preview', array_merge(['tool' => 'pagespeed'], $request->only(['url']))),
+            ], 202);
+        }
+
         $ip = (string) $request->ip();
 
         $minuteKey = 'guest-pagespeed:m:'.$ip;
@@ -67,69 +68,23 @@ class GuestPageSpeedController extends Controller
                 'errors' => ['url' => ['That URL can’t be tested. Enter a public website address (https://…).']],
             ], 422);
         }
-
-        $prior = max(0, (int) $request->cookie(self::COUNT_COOKIE, 0));
-        $attempt = $prior + 1;
-
-        // 3rd+ → block, push signup.
-        if ($attempt >= 3) {
-            return response()->json([
-                'require' => 'signup',
-                'message' => 'You’ve used your free PageSpeed tests. Create a free account to keep testing — no credit card — and unlock continuous monitoring, full audits and live Search Console data.',
-                'register_url' => route('register'),
-            ]);
-        }
-
-        // 2nd → require name + email; delivered by email.
-        $email = null;
-        $name = null;
-        if ($attempt >= 2) {
-            $email = trim((string) $request->input('email', ''));
-            if ($email === '') {
-                return response()->json([
-                    'require' => 'email',
-                    'message' => 'This is your last free test — tell us where to send it.',
-                ]);
-            }
-            $request->validate([
-                'name' => ['required', 'string', 'max:120'],
-                'email' => ['required', 'email', 'max:255'],
-            ]);
-            $name = trim((string) $request->input('name', ''));
-        }
-
-        // Validate the captcha exactly once, only on an otherwise-valid submit.
-        if (Recaptcha::isEnabled()) {
-            $request->validate(['g-recaptcha-response' => ['required', 'string', new ValidRecaptcha]]);
-        }
-
         RateLimiter::hit($minuteKey, 60);
         RateLimiter::hit($dayKey, 86400);
 
-        $row = GuestPageSpeed::start($validated['url'], $ip, $email, $name);
-        // One job per strategy so each gets a full worker cycle (heavy sites
-        // need 40s+ per strategy); they run in parallel and coordinate on a
-        // row lock to finalize the report.
+        // Every user is authenticated here (guests short-circuit above), so
+        // there is no email/signup friction — run and show the result.
+        // One job per strategy so each gets a full worker cycle; they run in
+        // parallel and coordinate on a row lock to finalize the report.
+        $row = GuestPageSpeed::start($validated['url'], $ip, null, null);
         RunGuestPageSpeedStrategy::dispatch($row->id, 'mobile');
         RunGuestPageSpeedStrategy::dispatch($row->id, 'desktop');
-
-        if ($email !== null) {
-            Lead::capture($email, $name, null, Lead::SOURCE_GUEST_PAGESPEED);
-
-            return response()->json([
-                'token' => $row->token,
-                'emailed' => true,
-                'email' => $email,
-                'message' => "We’ve emailed your PageSpeed report to {$email}. It lands in a minute — check your inbox (and spam, just in case).",
-            ], 202)->cookie(self::COUNT_COOKIE, (string) $attempt, self::COUNT_COOKIE_MINUTES);
-        }
 
         return response()->json([
             'token' => $row->token,
             'status_url' => route('guest-pagespeed.status', $row),
             'results_url' => route('guest-pagespeed.show', $row),
             'emailed' => false,
-        ], 202)->cookie(self::COUNT_COOKIE, (string) $attempt, self::COUNT_COOKIE_MINUTES);
+        ], 202);
     }
 
     public function status(GuestPageSpeed $guestPageSpeed): JsonResponse

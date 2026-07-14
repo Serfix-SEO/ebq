@@ -133,6 +133,41 @@ class CrawlerPipelineTest extends TestCase
         $this->assertGreaterThan(0, (int) $run->pages_fetched);
     }
 
+    /**
+     * A confirmed 4xx external link is flagged broken_external; an external link
+     * that only times out / errors at the transport layer is INCONCLUSIVE and must
+     * NOT be flagged (regression: bestproservicesdubai.com's live mohre.gov.ae /
+     * wam.ae links were reported broken purely on cURL error 28 timeouts).
+     */
+    public function test_broken_external_ignores_inconclusive_timeouts_but_flags_confirmed_dead(): void
+    {
+        Queue::fake([MatchRedirectFor404Job::class]);
+        $this->allowAllGuard();
+
+        $r = fn (string $b, int $s = 200) => Http::response($b, $s);
+        Http::fake([
+            'https://example.com/sitemap.xml' => $r('<?xml version="1.0"?><urlset><url><loc>https://example.com/</loc></url></urlset>'),
+            'https://dead.iana.org/x' => $r('gone', 404),
+            // Both the HEAD and the GET fallback time out — pure transport failure.
+            'https://slow.iana.org/*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: Connection timed out after 8000 milliseconds'),
+            'https://example.com*' => $r('<html><head><title>Home Page Title Here</title><meta name="description" content="A perfectly reasonable homepage meta description for tests."></head><body><h1>Hi</h1><p>'.str_repeat('word ', 60).'</p><a href="https://dead.iana.org/x">dead</a> <a href="https://slow.iana.org/y">slow</a></body></html>'),
+            '*' => $r('<html><body>fb</body></html>'),
+        ]);
+
+        $user = User::factory()->create();
+        $website = Website::factory()->withBothSources()->create(['user_id' => $user->id, 'domain' => 'example.com']);
+        $website->sitemaps()->create(['path' => 'https://example.com/sitemap.xml', 'source' => 'manual']);
+
+        $this->runCrawl($website);
+
+        $broken = CrawlFinding::where('crawl_site_id', $website->crawl_site_id)
+            ->where('type', 'broken_external')->where('status', 'open')
+            ->pluck('affected_url')->all();
+
+        $this->assertContains('https://dead.iana.org/x', $broken, 'confirmed 404 must be flagged');
+        $this->assertNotContains('https://slow.iana.org/y', $broken, 'a timeout is not proof of a dead link');
+    }
+
     public function test_recrawl_uses_conditional_get_and_hash_skip(): void
     {
         $this->allowAllGuard();

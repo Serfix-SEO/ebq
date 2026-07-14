@@ -1,4 +1,9 @@
 <x-layouts.app>
+    @php $currentWebsite = current_website(); @endphp
+    @if ($currentWebsite)
+        <x-website-tabs :website="$currentWebsite" active="statistics" class="mb-6" />
+    @endif
+
     <div class="space-y-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>

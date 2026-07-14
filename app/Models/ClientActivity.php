@@ -17,6 +17,7 @@ class ClientActivity extends Model
     protected $fillable = [
         'user_id',
         'actor_user_id',
+        'is_impersonated',
         'website_id',
         'type',
         'provider',
@@ -29,6 +30,7 @@ class ClientActivity extends Model
         return [
             'meta' => 'array',
             'units_consumed' => 'integer',
+            'is_impersonated' => 'boolean',
         ];
     }
 

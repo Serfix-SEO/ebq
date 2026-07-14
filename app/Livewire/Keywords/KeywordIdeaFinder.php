@@ -4,11 +4,18 @@ namespace App\Livewire\Keywords;
 
 use App\Livewire\Keywords\Concerns\TracksKeyword;
 use App\Models\KeywordApiRequest;
+use App\Models\SearchConsoleData;
+use App\Models\Website;
 use App\Services\KeywordFinder\KeywordFinderPool;
 use App\Services\KeywordFinder\KeywordIdeasMonthlyCache;
+use App\Services\KeywordResearch\AiKeywordClusterService;
+use App\Services\KeywordResearch\KeywordIntentClassifier;
+use App\Services\KeywordResearch\KeywordTermGrouper;
 use App\Support\KeywordFinderLocations;
 use App\Support\KeywordProviderConfig;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Livewire\Component;
 
 /**
@@ -80,11 +87,51 @@ class KeywordIdeaFinder extends Component
     /** Competition filter: all | low | medium | high. */
     public string $comp = 'all';
 
+    /** Free-text "keyword does NOT contain" filter. */
+    public string $excludeText = '';
+
+    /** Only question-style keywords (how/what/why/…). */
+    public bool $questionsOnly = false;
+
+    /** Intent filter: all | informational | commercial | transactional | navigational | other. */
+    public string $intent = 'all';
+
+    /** Active term-group filter from the Groups rail ('' = all keywords). */
+    public string $groupTerm = '';
+
     public int $perPage = 25;
 
     public int $page = 1;
 
+    // ── Selection & bulk actions ─────────────────────────────────────────────
+    /** @var list<string> selected keywords (lowercased) */
+    public array $selected = [];
+
+    // ── AI clustering ────────────────────────────────────────────────────────
+    /** 'list' | 'clusters' */
+    public string $viewMode = 'list';
+
+    /** keyword(lowercased) => cluster label, set by clusterWithAi(). */
+    public ?array $clusterMap = null;
+
+    public ?string $clusterError = null;
+
+    /** Stable identity of the current result set (the monthly-cache key). */
+    public ?string $resultSetKey = null;
+
     private const MAX_SEEDS = 20;
+
+    private const MAX_TRACK_BATCH = 50;
+
+    /**
+     * Memoized normalizeRow() output for the current $results, keyed on the
+     * results array itself (spl_object-free — array identity via count+hash
+     * would be overkill; a single-request instance property is enough since
+     * results only change via run()/poll(), which reset this cache below).
+     *
+     * @var list<array<string, mixed>>|null
+     */
+    private ?array $normalizedCache = null;
 
     /** Prefill + auto-run from a research-hub handoff (seed keywords). */
     public function mount(): void
@@ -97,20 +144,25 @@ class KeywordIdeaFinder extends Component
         }
     }
 
-    /** Hand the keyword off to the Volume tab (research hub). */
-    public function sendToVolume(string $keyword): void
-    {
-        $keyword = trim($keyword);
-        if ($keyword !== '') {
-            $this->dispatch('research-handoff', target: 'volume', keywords: [$keyword]);
-        }
-    }
-
     /** Reset to the first page whenever a filter/page-size changes. */
     public function updated(string $name): void
     {
-        if (in_array($name, ['filterText', 'minVolume', 'maxVolume', 'comp', 'perPage'], true)) {
+        if (in_array($name, ['filterText', 'excludeText', 'minVolume', 'maxVolume', 'comp', 'questionsOnly', 'intent', 'perPage'], true)) {
             $this->page = 1;
+        }
+    }
+
+    /** Pick (or clear) a term group from the Groups rail. */
+    public function setGroup(string $term): void
+    {
+        $this->groupTerm = $this->groupTerm === $term ? '' : $term;
+        $this->page = 1;
+    }
+
+    public function setViewMode(string $mode): void
+    {
+        if (in_array($mode, ['list', 'clusters'], true)) {
+            $this->viewMode = $mode === 'clusters' && $this->clusterMap === null ? 'list' : $mode;
         }
     }
 
@@ -136,7 +188,10 @@ class KeywordIdeaFinder extends Component
 
     public function run(KeywordFinderPool $pool): void
     {
-        $this->reset(['requestId', 'status', 'results', 'errorMessage', 'page', 'pendingCacheKey']);
+        $this->reset([
+            'requestId', 'status', 'results', 'errorMessage', 'page', 'pendingCacheKey',
+            'selected', 'clusterMap', 'clusterError', 'viewMode', 'groupTerm', 'resultSetKey',
+        ]);
         $this->hasRun = false;
         $this->fromCache = false;
 
@@ -181,6 +236,7 @@ class KeywordIdeaFinder extends Component
         // again once the month turns over.
         [$mode, $normalizedPayload] = $pool->buildIdeasPayload($opts);
         $cacheKey = KeywordIdeasMonthlyCache::key($mode, $normalizedPayload);
+        $this->resultSetKey = $cacheKey;
         $cached = KeywordIdeasMonthlyCache::get($cacheKey);
         if ($cached !== null) {
             $this->results = $cached;
@@ -268,6 +324,24 @@ class KeywordIdeaFinder extends Component
     }
 
     /**
+     * normalizeRow() over the whole raw result set, memoized per request.
+     * processedResults() calls this up to 3x per render (main rows + the
+     * group-rail pass with groupTerm cleared + AI clustering) — without the
+     * cache, that's the same intent-classification regex work over the full
+     * set repeated 3x on every group click, which is what made it lag.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function allNormalizedRows(): array
+    {
+        if ($this->normalizedCache === null) {
+            $this->normalizedCache = array_map(fn ($r) => $this->normalizeRow($r), array_filter($this->results, 'is_array'));
+        }
+
+        return $this->normalizedCache;
+    }
+
+    /**
      * Normalise a raw API row into a stable, sortable/filterable shape.
      *
      * @param  array<string, mixed>  $r
@@ -284,8 +358,10 @@ class KeywordIdeaFinder extends Component
             ? strtolower($compStr)
             : ($idx === null ? 'unknown' : ($idx < 34 ? 'low' : ($idx < 67 ? 'medium' : 'high')));
 
+        $keyword = (string) ($r['keyword'] ?? '');
+
         return [
-            'keyword' => (string) ($r['keyword'] ?? ''),
+            'keyword' => $keyword,
             'volume' => $vol,
             'competitionIndex' => $idx,
             'competition' => $compStr ?? ucfirst($level),
@@ -293,7 +369,18 @@ class KeywordIdeaFinder extends Component
             'low' => $low,
             'high' => $high,
             'cpc' => $high, // high top-of-page bid drives the "CPC" sort
+            'intent' => KeywordIntentClassifier::classify($keyword),
+            'is_question' => KeywordIntentClassifier::isQuestion($keyword),
+            'cluster' => $this->clusterMap[mb_strtolower(trim($keyword))] ?? null,
         ];
+    }
+
+    /** Whole-word term match ("shoe" must not match "snowshoeing"). */
+    private function keywordHasTerm(string $keyword, string $term): bool
+    {
+        $kw = ' '.implode(' ', preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($keyword), -1, PREG_SPLIT_NO_EMPTY) ?: []).' ';
+
+        return str_contains($kw, ' '.mb_strtolower($term).' ');
     }
 
     /**
@@ -303,14 +390,18 @@ class KeywordIdeaFinder extends Component
      */
     private function processedResults(): array
     {
-        $rows = array_map(fn ($r) => $this->normalizeRow($r), array_filter($this->results, 'is_array'));
+        $rows = $this->allNormalizedRows();
 
         $text = mb_strtolower(trim($this->filterText));
-        $rows = array_values(array_filter($rows, function (array $r) use ($text): bool {
+        $exclude = mb_strtolower(trim($this->excludeText));
+        $rows = array_values(array_filter($rows, function (array $r) use ($text, $exclude): bool {
             if ($r['keyword'] === '') {
                 return false;
             }
             if ($text !== '' && ! str_contains(mb_strtolower($r['keyword']), $text)) {
+                return false;
+            }
+            if ($exclude !== '' && str_contains(mb_strtolower($r['keyword']), $exclude)) {
                 return false;
             }
             if ($this->minVolume !== null && ($r['volume'] ?? 0) < $this->minVolume) {
@@ -320,6 +411,15 @@ class KeywordIdeaFinder extends Component
                 return false;
             }
             if ($this->comp !== 'all' && $r['comp_level'] !== $this->comp) {
+                return false;
+            }
+            if ($this->questionsOnly && ! $r['is_question']) {
+                return false;
+            }
+            if ($this->intent !== 'all' && $r['intent'] !== $this->intent) {
+                return false;
+            }
+            if ($this->groupTerm !== '' && ! $this->keywordHasTerm($r['keyword'], $this->groupTerm)) {
                 return false;
             }
 
@@ -339,6 +439,120 @@ class KeywordIdeaFinder extends Component
         return $rows;
     }
 
+    // ── Selection & bulk actions ─────────────────────────────────────────────
+
+    public function toggleSelected(string $keyword): void
+    {
+        $key = mb_strtolower(trim($keyword));
+        if ($key === '') {
+            return;
+        }
+        if (in_array($key, $this->selected, true)) {
+            $this->selected = array_values(array_diff($this->selected, [$key]));
+        } else {
+            $this->selected[] = $key;
+        }
+    }
+
+    /** Select/deselect every row on the current page. */
+    public function toggleSelectPage(): void
+    {
+        $pageKeys = array_map(
+            fn ($r) => mb_strtolower($r['keyword']),
+            array_slice($this->processedResults(), ($this->page - 1) * $this->perPage, $this->perPage),
+        );
+        $allSelected = $pageKeys !== [] && array_diff($pageKeys, $this->selected) === [];
+        $this->selected = $allSelected
+            ? array_values(array_diff($this->selected, $pageKeys))
+            : array_values(array_unique(array_merge($this->selected, $pageKeys)));
+    }
+
+    public function clearSelected(): void
+    {
+        $this->selected = [];
+    }
+
+    /** Add every selected keyword to the rank tracker (capped per batch). */
+    public function trackSelected(): void
+    {
+        $this->trackNotice = null;
+        $batch = array_slice($this->selected, 0, self::MAX_TRACK_BATCH);
+        $created = 0;
+        $existing = 0;
+
+        foreach ($batch as $keyword) {
+            $result = $this->trackOne($keyword);
+            if ($result === null) {
+                return; // trackOne set the error notice — stop early.
+            }
+            $result ? $created++ : $existing++;
+        }
+
+        $skipped = count($this->selected) - count($batch);
+        $this->trackNotice = sprintf(
+            'Rank tracker: %d added, %d already tracked.%s',
+            $created,
+            $existing,
+            $skipped > 0 ? ' '.$skipped.' skipped (max '.self::MAX_TRACK_BATCH.' per batch).' : '',
+        );
+        $this->selected = [];
+    }
+
+    /** Copy the selected keywords to the clipboard (via a browser event). */
+    public function copySelected(): void
+    {
+        if ($this->selected !== []) {
+            $this->dispatch('copy-to-clipboard', text: implode("\n", $this->selected));
+        }
+    }
+
+    // ── AI clustering ────────────────────────────────────────────────────────
+
+    /**
+     * One batched LLM call → named topic clusters (month-cached, no re-bill
+     * on repeat views). $force bypasses the cache — the user's escape hatch
+     * to retry a clustering they're unhappy with, rate-limited since each
+     * attempt is a real LLM call.
+     */
+    public function clusterWithAi(AiKeywordClusterService $service, bool $force = false): void
+    {
+        $this->clusterError = null;
+
+        if (! $service->isAvailable()) {
+            $this->clusterError = __('AI clustering is temporarily unavailable.');
+
+            return;
+        }
+
+        if (count(array_filter($this->results, 'is_array')) < 6) {
+            $this->clusterError = __('Not enough keywords to cluster meaningfully — try broader seeds for more results.');
+
+            return;
+        }
+
+        if ($force) {
+            $rateKey = 'kw-recluster:'.Auth::id();
+            if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($rateKey, 5)) {
+                $this->clusterError = __('Too many reclustering attempts. Try again in a few minutes.');
+
+                return;
+            }
+            \Illuminate\Support\Facades\RateLimiter::hit($rateKey, 600);
+        }
+
+        $rows = array_map(fn ($r) => $this->normalizeRow($r), array_filter($this->results, 'is_array'));
+        $map = $service->cluster($rows, $this->resultSetKey ?? 'adhoc', $force);
+
+        if ($map === null) {
+            $this->clusterError = __('Could not cluster these keywords — try again in a moment.');
+
+            return;
+        }
+
+        $this->clusterMap = $map;
+        $this->viewMode = 'clusters';
+    }
+
     /** Stream the filtered+sorted results as a CSV download. */
     public function export()
     {
@@ -347,28 +561,133 @@ class KeywordIdeaFinder extends Component
 
         return response()->streamDownload(function () use ($rows): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Keyword', 'Avg monthly searches', 'Competition', 'Competition index', 'Low top-of-page bid', 'High top-of-page bid']);
+            fputcsv($out, ['Keyword', 'Avg monthly searches', 'Competition', 'Competition index', 'Low top-of-page bid', 'High top-of-page bid', 'Intent', 'Cluster']);
             foreach ($rows as $r) {
-                fputcsv($out, [$r['keyword'], $r['volume'], $r['competition'], $r['competitionIndex'], $r['low'], $r['high']]);
+                fputcsv($out, [$r['keyword'], $r['volume'], $r['competition'], $r['competitionIndex'], $r['low'], $r['high'], $r['intent'], $r['cluster'] ?? '']);
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    private function currentWebsite(): ?Website
+    {
+        $websiteId = session('current_website_id');
+        if ($websiteId === null || $websiteId === '' || ! Auth::user()?->canViewWebsiteId($websiteId)) {
+            return null;
+        }
+
+        return Website::find($websiteId);
+    }
+
+    /**
+     * Search Console clicks/impressions/position for the current website, for
+     * exactly the given keywords, over the last 28 full days (lag-aware —
+     * ends yesterday, mirrors the dashboard's stats-window convention).
+     * Matched case-insensitively against GSC's own query text.
+     *
+     * @param  list<string>  $keywords
+     * @return array<string, array{clicks:int, impressions:int, position:float}>  lowercased keyword => metrics
+     */
+    private function gscMetricsFor(array $keywords): array
+    {
+        $keywords = array_values(array_unique(array_filter(array_map('trim', $keywords))));
+        $website = $this->currentWebsite();
+        if ($keywords === [] || $website === null) {
+            return [];
+        }
+
+        $end = Carbon::yesterday();
+        $start = $end->copy()->subDays(27);
+
+        $rows = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->forDateRange($start->toDateString(), $end->toDateString())
+            ->whereIn(DB::raw('LOWER(query)'), array_map('mb_strtolower', $keywords))
+            ->select(
+                DB::raw('LOWER(query) as q'),
+                DB::raw('SUM(clicks) as clicks'),
+                DB::raw('SUM(impressions) as impressions'),
+                DB::raw('AVG(position) as position'),
+            )
+            ->groupBy('q')
+            ->get();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[$row->q] = [
+                'clicks' => (int) $row->clicks,
+                'impressions' => (int) $row->impressions,
+                'position' => round((float) $row->position, 1),
+            ];
+        }
+
+        return $out;
     }
 
     public function render()
     {
         $processed = $this->processedResults();
         $total = count($processed);
+        $totalVolume = array_sum(array_map(fn ($r) => (int) ($r['volume'] ?? 0), $processed));
         $totalPages = max(1, (int) ceil($total / max(1, $this->perPage)));
         $this->page = min(max(1, $this->page), $totalPages);
         $rows = array_slice($processed, ($this->page - 1) * $this->perPage, $this->perPage);
 
+        // Groups rail reflects every filter EXCEPT the active group itself, so
+        // switching groups never dead-ends (mirror of how Keyword Magic works).
+        $savedGroup = $this->groupTerm;
+        $this->groupTerm = '';
+        $groupSource = $this->processedResults();
+        $this->groupTerm = $savedGroup;
+        $termGroups = KeywordTermGrouper::groups($groupSource);
+
+        // Clusters view: group the filtered rows by AI cluster label.
+        $clusters = [];
+        if ($this->viewMode === 'clusters' && $this->clusterMap !== null) {
+            foreach ($processed as $r) {
+                $label = $r['cluster'] ?? __('Other');
+                $clusters[$label] ??= ['label' => $label, 'rows' => [], 'volume' => 0];
+                $clusters[$label]['rows'][] = $r;
+                $clusters[$label]['volume'] += (int) ($r['volume'] ?? 0);
+            }
+            // "Other" is explicitly the noise bucket — always last regardless
+            // of its accumulated volume, so real topic clusters lead.
+            uasort($clusters, function ($a, $b) {
+                $aOther = $a['label'] === __('Other');
+                $bOther = $b['label'] === __('Other');
+                if ($aOther !== $bOther) {
+                    return $aOther ? 1 : -1;
+                }
+
+                return $b['volume'] <=> $a['volume'];
+            });
+        }
+
+        $pageKeys = array_map(fn ($r) => mb_strtolower($r['keyword']), $rows);
+        $pageAllSelected = $pageKeys !== [] && array_diff($pageKeys, $this->selected) === [];
+
+        // GSC metrics replace the old per-row Volume/Track/Brief action links —
+        // "does the site already show up for this idea, and how" is far more
+        // actionable than static buttons (Track is now covered by bulk-select,
+        // Brief required a target page these rows never have).
+        $displayedKeywords = $this->viewMode === 'clusters'
+            ? array_column($processed, 'keyword')
+            : array_column($rows, 'keyword');
+        $hasGsc = $this->currentWebsite()?->hasGsc() ?? false;
+        $gscMetrics = $hasGsc ? $this->gscMetricsFor($displayedKeywords) : [];
+
         return view('livewire.keywords.keyword-idea-finder', [
+            'hasGsc' => $hasGsc,
+            'gscMetrics' => $gscMetrics,
             'languageOptions' => KeywordFinderLocations::languageOptions(),
             'locationNames' => KeywordFinderLocations::locationNames(),
             'rows' => $rows,
             'totalResults' => $total,
+            'totalVolume' => $totalVolume,
             'totalPages' => $totalPages,
+            'termGroups' => $termGroups,
+            'clusters' => array_values($clusters),
+            'pageAllSelected' => $pageAllSelected,
         ]);
     }
 }

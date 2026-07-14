@@ -55,6 +55,15 @@ client-errors (404/410/400/403/…) mean genuinely dead/forbidden. A block respo
 longer overwrites `http_status` on the page row (`PageCrawlProcessor`), so a captcha/429 hit
 can't masquerade as the page itself being broken.
 
+**`broken_external` requires positive evidence, never a failed-to-verify** (2026-07-13):
+`detectBrokenExternalLinks()` raises the finding only on a CONFIRMED HTTP error
+(`status >= 400`) or a DETERMINISTIC `SafeHttpGuard` rejection (malformed/unsafe URL —
+`LinkChecker` row `guard_blocked = true`). A **null** status (HEAD+GET+proxy all timed out /
+reset / TLS-failed) is inconclusive and is logged (`crawler.broken_external.unverifiable_skip`),
+not flagged — slow-but-alive government/enterprise hosts were being reported dead purely on
+8s HEAD timeouts. `LinkChecker` also now runs its GET+proxy fallback (15s) for transport
+errors, not just for 403/405/429/501. See known-issues § "Live-but-slow external links".
+
 **Duplicate-title/meta/content skip if same `canonical_url`** (2026-07-03): pages that all
 canonicalize to one URL are intentional dedup (pagination, filters, print views), not a bug —
 `detectDuplicateField`/`detectDuplicateContent` skip the group when `canonical_url` is

@@ -1,5 +1,11 @@
 # Backlinks subsystem
 
+> **Note (2026-07-13):** the customer-facing backlink/authority **report** is a separate,
+> richer path — it uses **DataForSEO** (full backlink profile) + **Moz** (DA/PA/Spam), a shared
+> per-domain cache (`website_report_snapshots`), and its own `ReportFreshnessGate`. See
+> [../reports/client-report.md](../reports/client-report.md). The Keywords-Everywhere paths
+> below still power the in-app Backlinks manager, prospecting, and impact attribution.
+
 Two distinct backlink datasets, one vendor (Keywords Everywhere), one freshness rule:
 
 - **Own backlinks** (`backlinks` table) — the tracked site's inbound links, synced from KE +

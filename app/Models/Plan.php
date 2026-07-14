@@ -71,6 +71,10 @@ class Plan extends Model
         // Display-only per-seat add-on price. No per-seat billing engine
         // exists; stored so the admin UI and marketing pages can show it.
         'extra_seat_price_usd',
+        // Site Explorer (backlink report) lookup throttle: max lookups per
+        // rolling window. null limit = unlimited. Editable in the admin Plan editor.
+        'site_explorer_limit',
+        'site_explorer_window_hours',
         'features',
         // Sparse map of bullet-index => YouTube URL for the optional
         // explainer video shown next to a marketing bullet. Kept separate
@@ -105,11 +109,29 @@ class Plan extends Model
             'max_websites' => 'integer',
             'max_crawl_pages' => 'integer',
             'max_seats' => 'integer',
+            'site_explorer_limit' => 'integer',
+            'site_explorer_window_hours' => 'integer',
             'extra_seat_price_usd' => 'integer',
             'display_order' => 'integer',
             'is_active' => 'boolean',
             'is_highlighted' => 'boolean',
         ];
+    }
+
+    /**
+     * Max Site Explorer lookups allowed in the window. Null = unlimited.
+     */
+    public function siteExplorerLimit(): ?int
+    {
+        return $this->site_explorer_limit;
+    }
+
+    /**
+     * Rolling window (hours) for the Site Explorer lookup limit. Default 24.
+     */
+    public function siteExplorerWindowHours(): int
+    {
+        return max(1, (int) ($this->site_explorer_window_hours ?: 24));
     }
 
     /**

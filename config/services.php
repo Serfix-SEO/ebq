@@ -170,6 +170,74 @@ return [
         'fresh_days' => (int) env('COMPETITOR_BACKLINKS_FRESH_DAYS', 30),
     ],
 
+    // DataForSEO Backlinks API — the primary backlink-profile provider for the
+    // customer-facing report (referring domains/IPs/subnets, anchors, dofollow
+    // split, active/lost history, competitors, 0-1000 `rank` authority proxy).
+    // Pay-as-you-go: $0.024/request + $0.06/1000 rows. Basic-auth (login:pass).
+    // CREDENTIALS LIVE IN .env ON BOTH BOXES — never commit them.
+    'dataforseo' => [
+        'login' => env('DATAFORSEO_LOGIN'),
+        'password' => env('DATAFORSEO_PASSWORD'),
+        'base_url' => env('DATAFORSEO_BASE_URL', 'https://api.dataforseo.com/v3'),
+        // Sandbox returns free mock data. Used automatically when an ADMIN is
+        // logged in (so their testing never bills), and forceable via
+        // DATAFORSEO_FORCE_SANDBOX for local/dev testing.
+        'sandbox_base_url' => env('DATAFORSEO_SANDBOX_BASE_URL', 'https://sandbox.dataforseo.com/v3'),
+        'force_sandbox' => (bool) env('DATAFORSEO_FORCE_SANDBOX', false),
+        // Bounded top-N cap per row-returning endpoint (referring_domains,
+        // anchors, backlinks). Holds per-report cost flat regardless of site
+        // size — a 10x bigger site does NOT cost 10x bounded.
+        'row_limit' => (int) env('DATAFORSEO_ROW_LIMIT', 1000),
+        // 1000 = DataForSEO's hard per-request max (verified live). Raised
+        // from 100 (2026-07-13): the $0.024 base request fee is paid either
+        // way, and the marginal cost of the extra 900 rows is only
+        // $0.000036 each (~$0.03 more per report) — far more data almost
+        // free once the request is already being made. We only DISPLAY the
+        // top 15/10 (see ClientReportService::topPages/competitorRows), but
+        // pulling the full 1000 lets our own explicit sort find the true
+        // best rows instead of trusting whatever order the API happened to
+        // return within a shallow 100-row window.
+        'pages_limit' => (int) env('DATAFORSEO_PAGES_LIMIT', 1000),
+        'competitors_limit' => (int) env('DATAFORSEO_COMPETITORS_LIMIT', 1000),
+        'history_months' => (int) env('DATAFORSEO_HISTORY_MONTHS', 12),
+        'timeout' => (int) env('DATAFORSEO_TIMEOUT_S', 60),
+    ],
+
+    // Open PageRank (by Keywords Everywhere) — global popularity rank + 0-10
+    // score + monthly history per domain. Bulk endpoint accepts up to 100
+    // domains/call; free tier 30k domains/mo. Used for the report's Popularity
+    // rank and to enrich competitors + backlink sources. Bearer auth.
+    'openpagerank' => [
+        'key' => env('OPENPAGERANK_API_KEY'),
+        'base_url' => env('OPENPAGERANK_BASE_URL', 'https://openpagerank.keywordseverywhere.com/v1'),
+        'timeout' => (int) env('OPENPAGERANK_TIMEOUT_S', 30),
+    ],
+
+    // Shared per-domain report cache freshness. A domain's snapshot is served
+    // free until it is older than `default_ttl_days`; a paid user owning the
+    // domain shortens that to `paid_ttl_days` (monthly refresh). See
+    // App\Services\ReportFreshnessGate.
+    'report' => [
+        'default_ttl_days' => (int) env('REPORT_DEFAULT_TTL_DAYS', 90),
+        'paid_ttl_days' => (int) env('REPORT_PAID_TTL_DAYS', 30),
+    ],
+
+    // Moz Links API — real Domain Authority + Page Authority + Spam Score for
+    // the report's headline gauges. 1 url_metrics call = 1 row = one URL's
+    // DA/PA/Spam. Account is on the FREE tier (50 rows/mo) — call ONCE per
+    // report on the client's own domain only; DataForSEO `rank` covers all
+    // competitor / referring-domain scores. Auth = HTTP Basic of
+    // access_id:secret_key. CREDENTIALS LIVE IN .env — never commit them.
+    'moz' => [
+        // Either supply the base64 `access_id:secret` token directly, OR the
+        // two parts. The client prefers `token` when present.
+        'token' => env('MOZ_API_TOKEN'),
+        'access_id' => env('MOZ_ACCESS_ID'),
+        'secret_key' => env('MOZ_SECRET_KEY'),
+        'base_url' => env('MOZ_BASE_URL', 'https://lsapi.seomoz.com/v2'),
+        'timeout' => (int) env('MOZ_TIMEOUT_S', 30),
+    ],
+
     // Competitive Keyword Intelligence module (gap analysis, competitor
     // auto-discovery, opportunity scoring). All knobs are cost controls for
     // the SERP (Serper) + keyword-finder fan-out — keep the caps conservative.

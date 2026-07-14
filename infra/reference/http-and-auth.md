@@ -159,6 +159,19 @@ Default `web`-group protection. Exempt: the 3 webhooks (`bootstrap/app.php:25`).
 tool POSTs keep CSRF (the Blade forms ship a token). The plugin API has no `web` group
 so CSRF never applies there.
 
+**Stale-token 419 recovery** (`bootstrap/app.php`, exceptions handler) — a bare 419
+error page is a dead end for the ONE action a user reaches for specifically because
+they're leaving (`logout`) or already mid-recovery (`admin.impersonation.stop`), both
+easily hit after a tab sits open past `SESSION_LIFETIME` (120min default) or the token
+rotates in another tab. A dedicated `render()` callback for the 419 `HttpException`
+(must hook the HTTP exception, not `TokenMismatchException` — `Handler::prepareException()`
+converts it before render callbacks run) redirects those two routes to a fresh page
+carrying a valid token instead — CSRF verification still runs normally, this only
+turns "dead end" into "click again and it works." Flash key `session_notice` (logout)
+/ `impersonation_notice` (impersonation-stop), rendered in `layouts/app.blade.php`
+and, for `session_notice` only, `auth/login.blade.php` too (a stale-session logout
+can land on either depending on whether `auth()->check()` still holds).
+
 ### Throttle / rate limiters
 - Named limiter **`oauth`** — `AppServiceProvider.php:77`: 20/min keyed by user id
   (fallback IP). Applied to all OAuth + SSO + CAP routes.

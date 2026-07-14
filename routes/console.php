@@ -12,6 +12,9 @@ Schedule::command('ebq:sync-daily-data')->daily();
 Schedule::command('ebq:detect-traffic-drops')->dailyAt('07:30');
 Schedule::command('ebq:send-reports')->dailyAt('08:00');
 Schedule::command('ebq:track-rankings')->hourly();
+// Monthly refresh of report snapshots for paid-owned domains (30-day cadence).
+// Free/anonymous domains refresh lazily on query (90-day TTL) instead.
+Schedule::command('ebq:refresh-paid-reports')->dailyAt('04:15');
 // Nightly auto-discovery of backlink prospects from each website's recent
 // page audits. Idempotent + freshness-gated, so re-runs are KE-safe.
 Schedule::command('ebq:auto-discover-prospects')->dailyAt('03:30');

@@ -55,11 +55,28 @@ view (`pages` / `rank_tracking` / `keywords` / `audits`).
 ```
 Dashboard
   └─ Livewire/Dashboard/PriorityActionQueue   (#[Lazy] widget)
-       ├─ hides while the site's FIRST crawl runs (isInitialCrawl) — :72
-       │    (most actions are crawl-derived; the crawl banner stands in)
-       ├─ Cache::remember 'action-queue:{id}:{version}:{country}' 600s — :99
+       ├─ NEVER hides outright (fixed 2026-07-13). While the site's first
+       │    crawl is queued/running/finalizing (Website::isInitialCrawl()),
+       │    it calls groupedActions(includeCrawlIssues: false) — crawl_*
+       │    groups are excluded (not final yet) but GSC/rank-tracking-derived
+       │    groups (cannibalization, rank_drops, quick_wins, etc.) still show,
+       │    since those don't depend on crawl state. The empty state is
+       │    three-way: "Crawl in progress" (still initial), "Still finalizing
+       │    your results" (crawl completed <60s ago — recentlyFinishedCrawl(),
+       │    a settling grace window), or genuine "You're all caught up".
+       │    Previously hid the WHOLE card (including non-crawl items) for as
+       │    long as isInitialCrawl()'s queued-window covered a brand-new site
+       │    (up to 6h) — a real regression once that window was widened to
+       │    cover the pre-crawl queued state, caught via a failing test
+       │    (a tracked rank-drop keyword on a not-yet-crawled site read as
+       │    "You're all caught up").
+       ├─ Cache::remember 'action-queue:v4:{id}:{version}:{rankVersion}:
+       │    {country}:{locale}:{includeCrawlIssues}' 86400s — PriorityActionQueue::payload()
        │    version = ReportCache::version(id), so a finished crawl /
-       │    GSC sync / rank result busts it
+       │    GSC sync / rank result busts it. includeCrawlIssues is IN the key
+       │    (v4) — a site flipping in/out of its initial-crawl window must not
+       │    read the other state's cached shape. WarmDashboardCaches passes
+       │    the same flag (computed from the SAME isInitialCrawl() check).
        └─ groupedActions() → row click navigates to ↓
 
 Livewire/SiteIssues  (dedicated paginated detail page for one group)
@@ -107,6 +124,17 @@ younger than `$maxAgeHours` (default 24h) instead of running a new one.
 
 - **The queue hides during the first crawl** (`isInitialCrawl`) — without this it
   would render empty/half-baked because most actions are crawl-derived.
+  `Website::isInitialCrawl()` (`app/Models/Website.php:689`) covers the **queued
+  window too**, not just an active RUNNING run: the `CrawlRun` row is only created
+  once `CrawlWebsitePagesJob` starts on the worker, so between subscribe-dispatch
+  (`SyncSitemaps` → `CrawlWebsitePagesJob` chain) and that job running there is no
+  running crawl. Before 2026-07-13 the gate was `isCrawling() && !hasCompletedCrawl()`,
+  so a brand-new client hitting the dashboard in that gap saw **"You're all caught up"**
+  (empty queue) with **no crawl banner**. Now: no completed crawl AND (a run is
+  running OR the `crawl_site` was created <6h ago) → in-progress. `CrawlBanner`
+  renders a "We're setting up your site" stand-in for that same queued window;
+  `SiteHealthStats` gate aligned to `isInitialCrawl()`. Bounded by crawl_site age so
+  a crawl that never starts can't spin the banner forever.
 - **Counts are uncapped on purpose** but the source methods default to 50 — always
   pass `COUNT_LIMIT` when you want the true total.
 - **Crawl groups paginate from the DB; non-crawl groups paginate in-memory** — the

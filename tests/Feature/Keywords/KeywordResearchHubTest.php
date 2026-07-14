@@ -33,7 +33,23 @@ class KeywordResearchHubTest extends TestCase
     {
         $this->actingAs(User::factory()->create());
 
-        Livewire::test(KeywordResearch::class, ['tab' => 'gap'])->assertSet('tab', 'gap');
+        Livewire::test(KeywordResearch::class, ['tab' => 'volume'])->assertSet('tab', 'volume');
+
+        // Gap left the hub for its own page (2026-07-14) — old ?tab=gap
+        // deep links redirect there.
+        Livewire::test(KeywordResearch::class, ['tab' => 'gap'])
+            ->assertRedirect(route('keyword-gap.index'));
+    }
+
+    public function test_kw_query_param_becomes_a_preset_handoff(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $component = Livewire::test(KeywordResearch::class, ['tab' => 'volume', 'kw' => 'running shoes']);
+
+        $handoff = $component->get('handoff');
+        $this->assertSame('volume', $handoff['target']);
+        $this->assertSame(['running shoes'], $handoff['keywords']);
     }
 
     public function test_handoff_switches_tab_and_stores_payload(): void
@@ -115,6 +131,7 @@ class KeywordResearchHubTest extends TestCase
 
         $this->get('/keyword-volume')->assertRedirect('/keyword-research?tab=volume');
         $this->get('/keyword-ideas')->assertRedirect('/keyword-research?tab=ideas');
-        $this->get('/competitive')->assertRedirect('/keyword-research?tab=gap');
+        // Gap has its own page since 2026-07-14.
+        $this->get('/competitive')->assertRedirect('/keyword-gap');
     }
 }

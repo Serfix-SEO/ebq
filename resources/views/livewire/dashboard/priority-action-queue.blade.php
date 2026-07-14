@@ -8,9 +8,13 @@
 @endphp
 
 <div>
-    {{-- Hidden during the site's first crawl (crawl-derived); the crawl banner
-         stands in. Reappears via the `crawl-state-changed` listener on finish. --}}
-    @unless ($hide)
+    {{-- Always shown — GSC/rank-tracking-derived items (rank drops,
+         cannibalization, quick wins, etc.) don't depend on crawl state, so
+         hiding the whole card during the first crawl used to hide real, ready
+         data. Crawl-derived items are simply excluded from $items until the
+         crawl finishes (see PriorityActionQueue::render()); the empty state
+         below distinguishes "still crawling" from "just finished, settling"
+         from a genuine "nothing to do". --}}
     <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-2">
@@ -40,7 +44,26 @@
             </div>
         </div>
 
-        @if (count($items) === 0)
+        @if (count($items) === 0 && $crawlInitial)
+            {{-- First crawl still queued/running/finalizing — crawl-derived
+                 issues aren't counted yet (see render()). The crawl banner
+                 above already shows progress; poll so this section catches up
+                 the moment the crawl finishes without a manual refresh. --}}
+            <div wire:poll.15s class="mt-6 rounded-lg border border-dashed border-amber-200 bg-amber-50/40 px-4 py-10 text-center dark:border-amber-500/30 dark:bg-amber-500/5">
+                <div class="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-amber-200 border-t-amber-500 dark:border-amber-500/30 dark:border-t-amber-400"></div>
+                <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Crawl in progress') }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Crawl-derived issues (broken links, on-page problems, orphan pages) will appear here once your first crawl finishes.') }}</p>
+            </div>
+        @elseif (count($items) === 0 && $justFinished)
+            {{-- Crawl JUST completed — findings/scores may still be settling.
+                 Poll quickly so this self-corrects the moment they land,
+                 instead of asserting "all caught up" with zero evidence yet. --}}
+            <div wire:poll.5s class="mt-6 rounded-lg border border-dashed border-amber-200 bg-amber-50/40 px-4 py-10 text-center dark:border-amber-500/30 dark:bg-amber-500/5">
+                <div class="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-amber-200 border-t-amber-500 dark:border-amber-500/30 dark:border-t-amber-400"></div>
+                <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Still finalizing your results') }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Your crawl just finished — we’re scoring pages and checking for issues. This updates automatically.') }}</p>
+            </div>
+        @elseif (count($items) === 0)
             <div class="mt-6 rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center dark:border-slate-700">
                 <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ __("You're all caught up") }}</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('No priority actions right now. We re-check your data every day.') }}</p>
@@ -101,5 +124,4 @@
             </ul>
         @endif
     </div>
-    @endunless
 </div>

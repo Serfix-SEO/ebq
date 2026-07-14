@@ -51,6 +51,11 @@ class CrawlBanner extends Component
         $website = $this->website();
         $crawl = $website?->runningCrawl();
 
+        // First crawl dispatched but its run row isn't up yet (queued / syncing
+        // sitemaps / waiting on a worker). Show a "getting started" banner so a
+        // brand-new site never falls through to the empty "all caught up" state.
+        $initialPending = $crawl === null && $website?->isInitialCrawl() === true;
+
         // When the running crawl appears or clears, notify any crawl-derived
         // widgets on the page to re-evaluate (hide on start, reappear on finish).
         $currentId = $crawl?->id ?? 0;
@@ -79,15 +84,17 @@ class CrawlBanner extends Component
 
         return view('livewire.crawl-banner', [
             'crawl' => $crawl,
+            'initialPending' => $initialPending,
             'cap' => $cap,
             'crawled' => $crawled,
             'total' => $total,
             // Plan allowance left = cap minus what this run has crawled into the window.
             'remainingCap' => $cap > 0 ? max(0, $cap - $crawled) : null,
-            // Poll fast (10s) while a crawl is in flight; slow (30s) when idle. We still
-            // poll when idle so the banner appears when a crawl starts, but the old
-            // unconditional 10s poll hammered every page for every user even when idle.
-            'pollInterval' => $crawl ? 10 : 30,
+            // Poll fast (10s) while a crawl is in flight OR queued (so we catch the run
+            // starting); slow (30s) when idle. We still poll when idle so the banner
+            // appears when a crawl starts, but the old unconditional 10s poll hammered
+            // every page for every user even when idle.
+            'pollInterval' => ($crawl || $initialPending) ? 10 : 30,
         ]);
     }
 }

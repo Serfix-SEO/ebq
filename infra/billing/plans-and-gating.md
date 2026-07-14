@@ -159,8 +159,16 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
      `TrialStatus::isExpired()` user ("auto-applied, no code needed"); plan cards render
      strikethrough originals + discounted first-payment prices. The **public /pricing page**
      does the same for logged-in expired users (banner + strikethrough cards), and so does the
-     **home page pricing section** (`landing.blade.php` — prices there are HARDCODED, keep in
-     sync with the DB plans). `pricing` + `landing` are allowlisted in `EnsureTrialNotExpired`
+     **home page pricing section** (`landing.blade.php` — **prices are still HARDCODED**, keep
+     in sync with the DB plans manually. **Feature bullets are DB-driven since 2026-07-14** —
+     `$featuresFor(slug)` pulls `Plan::publicFeatures()` for the 5 tiers from a single
+     `Plan::ordered()->get()->keyBy('slug')` query, the exact same source `/pricing` renders, so
+     the two pages can no longer drift on feature text (they DID: the homepage's old hardcoded
+     arrays included a fabricated "All Solo/Pro features" bullet that doesn't exist in the real
+     `plans.features` column, and were missing bullets /pricing actually has). Prices are NOT
+     included in this fix — still 5 sets of hardcoded `$14/$19/$37/...` strings per plan/interval,
+     a real remaining drift risk if `Admin\PlanController` changes a price without updating this
+     file). `pricing` + `landing` are allowlisted in `EnsureTrialNotExpired`
      so locked users can browse them — CTAs land on billing.checkout which auto-applies (the
      landing CTAs route authed users to checkout instead of /register). The marketing navbar
      (`components/marketing/page.blade.php`) shows Dashboard/Log out for authed users.
@@ -168,6 +176,19 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
      unconditionally; otherwise the ?promo=/session code applies; the campaign code (and only
      it) resolves to its promotion-code ID (cached 1h) → `withPromotionCode()`; any other/absent
      code falls back to `allowPromotionCodes()` (Stripe forbids combining the two).
+- **Extended to guests / all new signups (2026-07-14)**: `pricing.blade.php` and
+  `landing.blade.php` used to gate their strikethrough display on `$authed &&
+  isWinbackEligible(...)` — a GUEST (i.e. every prospective new signup, the actual target
+  audience) never saw the discount at all, only existing logged-in trial users did. Since
+  every signup lands on the Trial plan and is `isWinbackEligible()` from minute one, the gate
+  is now `$winbackCode !== '' && (! $authed || isWinbackEligible(auth()->user()))` on both
+  pages — guests see it unconditionally (once the promo code is configured), a logged-in
+  trial user still sees it, and a logged-in subscribed/comped user still does NOT (showing a
+  discount that doesn't apply to them would be misleading). No backend/checkout change needed
+  — `BillingController`'s auto-apply logic already keyed off the same `isWinbackEligible()`
+  and already covered every new signup once they register (trial-tier by default). Test:
+  `TrialCleanupTest::test_billing_page_shows_winback_banner_for_trial_tier_users` (logged-out
+  assertions flipped from `assertDontSee` to `assertSee`).
 - Tests: `tests/Feature/TrialCleanupTest.php` (stages, anchor, dedupe, shared-crawl safety,
   exemptions, lockout, team-member exemptions, re-add countdown restart, stale anchor,
   h24 winback offer, onboarding lockout redirect + trial-expired panel + impersonation note).

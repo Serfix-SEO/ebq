@@ -72,4 +72,7 @@
             </div>
         @endif
     </section>
+    @if ($teaser ?? false)
+        @include('partials.report-teaser-modal', ['redirect' => $teaserRedirect ?? ''])
+    @endif
 </x-marketing.page>

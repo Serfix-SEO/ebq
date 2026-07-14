@@ -24,6 +24,7 @@ GSC/GA/rank/audit halves and how they merge.
 | [insights.md](./insights.md) | **Start here.** `ReportDataService` — every insight method (cannibalization, striking distance, content decay, quick wins, indexing fails), its heuristic + magic thresholds, the GSC lag-aware date logic, the dollar-upside math, and the 24h version-keyed cache. |
 | [action-queue.md](./action-queue.md) | `ActionQueueService` — merging 5 GSC reports + rank drops + page audits + crawl findings into one severity-ranked queue. The dashboard widget, the `SiteIssues` detail page, and the `StrikingDistanceFixService` "fix this keyword" playbook. |
 | [growth-reports.md](./growth-reports.md) | The emailed report (`SendGrowthReports` → `ReportMailDispatcher` → `GrowthReportMail` + PDF), white-label branding/transport routing, and the anomaly subsystem (`DetectTrafficDrops` → `TrafficAnomalyDetector` → `TrafficDropAlert`). Plus the `GenerateAiInsights` placeholder. |
+| [client-report.md](./client-report.md) | The customer-facing **backlink/authority report** (Mangools-style) + homepage **"Analyze website" funnel**. DataForSEO + Moz providers, the shared per-domain `website_report_snapshots` cache with paid/free freshness tiers, public `/r/{token}` share page + PDF, and the no-anonymous-API signup funnel (with phone). |
 
 ## Key components
 

@@ -16,6 +16,12 @@ use Illuminate\Support\Facades\Http;
 class LinkChecker
 {
     private const TIMEOUT = 8;
+
+    /** Last-chance GET is given more room: a slow-but-alive host (e.g. a
+     *  government/enterprise site behind heavy TLS) routinely exceeds the fast
+     *  bulk HEAD timeout without being dead. */
+    private const GET_TIMEOUT = 15;
+
     private const CONCURRENCY = 10;
 
     /** Statuses that can be a block/rate-limit false positive rather than a real dead link. */
@@ -28,8 +34,10 @@ class LinkChecker
 
     /**
      * @param  array<int,array{href:string,anchor?:string}>  $links
-     * @return array<int,array{href:string,anchor:string,status:?int,error:?string,redirected:bool,final_url:?string,chain:int}>
+     * @return array<int,array{href:string,anchor:string,status:?int,error:?string,redirected:bool,final_url:?string,chain:int,guard_blocked:bool}>
      *         Only problematic links (status>=400, transport error, or redirected) are returned.
+     *         A null status means "could not verify" (timeout/transport error), NOT
+     *         "confirmed dead" — unless guard_blocked is true (deterministic bad URL).
      */
     public function check(array $links, int $max = 200): array
     {
@@ -55,8 +63,10 @@ class LinkChecker
             $check = $this->guard->check($link['href']);
             if (! $check['ok']) {
                 // Mailto/tel/relative would have been filtered upstream; a guard
-                // failure here means a genuinely unfetchable/unsafe target.
-                $problems[] = $this->row($link, null, $check['reason'] ?? 'blocked', false, null, 0);
+                // failure here means a genuinely unfetchable/unsafe target. This is a
+                // DETERMINISTIC verdict (malformed/unsafe URL), not a network guess —
+                // mark it so the caller can distinguish it from an inconclusive timeout.
+                $problems[] = $this->row($link, null, $check['reason'] ?? 'blocked', false, null, 0, true);
 
                 continue;
             }
@@ -114,11 +124,22 @@ class LinkChecker
                     $redirected = $chain > 0;
                     $finalUrl = $redirected ? (string) end($history) : null;
                 } else {
+                    // HEAD failed at the transport layer (timeout, connection reset,
+                    // TLS, DNS). That is NOT proof of a dead link: many hosts reject or
+                    // hang on HEAD but serve GET fine, and a slow-but-alive host can
+                    // simply exceed our fast HEAD timeout. Give the URL a real GET
+                    // (direct, then proxied) before trusting the failure. If GET yields
+                    // a definitive status, the HEAD error is moot; if GET is also
+                    // unreachable, $status stays null (inconclusive, not "broken").
                     $error = $resp instanceof \Throwable ? $resp->getMessage() : 'unknown';
+                    $status = $this->getFallback($link['href']);
+                    if ($status !== null) {
+                        $error = null;
+                    }
                 }
 
                 if ($status === null || $status >= 400 || $redirected) {
-                    $problems[] = $this->row($link, $status, $error, $redirected, $finalUrl, $chain);
+                    $problems[] = $this->row($link, $status, $error, $redirected, $finalUrl, $chain, false);
                 }
             }
         }
@@ -155,7 +176,7 @@ class LinkChecker
     private function fetchGetStatus(string $url, ?string $proxy): ?int
     {
         try {
-            return Http::timeout(self::TIMEOUT)
+            return Http::timeout(self::GET_TIMEOUT)
                 ->connectTimeout(self::TIMEOUT)
                 ->withUserAgent(CrawlFetcher::UA)
                 ->withOptions(array_filter(['proxy' => $proxy], static fn ($v) => $v !== null))
@@ -168,9 +189,13 @@ class LinkChecker
 
     /**
      * @param  array{href:string,anchor:string}  $link
-     * @return array{href:string,anchor:string,status:?int,error:?string,redirected:bool,final_url:?string,chain:int}
+     * @param  bool  $guardBlocked  True only for a deterministic pre-flight guard
+     *                              rejection (malformed/unsafe URL) — a reliable
+     *                              "broken" verdict, unlike an inconclusive null
+     *                              status from a network timeout/transport error.
+     * @return array{href:string,anchor:string,status:?int,error:?string,redirected:bool,final_url:?string,chain:int,guard_blocked:bool}
      */
-    private function row(array $link, ?int $status, ?string $error, bool $redirected, ?string $finalUrl, int $chain): array
+    private function row(array $link, ?int $status, ?string $error, bool $redirected, ?string $finalUrl, int $chain, bool $guardBlocked): array
     {
         return [
             'href' => $link['href'],
@@ -180,6 +205,7 @@ class LinkChecker
             'redirected' => $redirected,
             'final_url' => $finalUrl,
             'chain' => $chain,
+            'guard_blocked' => $guardBlocked,
         ];
     }
 }

@@ -14,12 +14,16 @@
     $registerUrl   = route('register');
     $featuresUrl   = route('features');
 
-    // Trial-winback: logged-in expired users see the same strikethrough
-    // pricing as the billing page (checkout auto-applies the discount, so
-    // the numbers shown here are exactly what Stripe charges).
+    // Trial-winback (2026-07-14: extended to every new signup, not just
+    // logged-in trial users): every signup starts on the Trial plan, so a
+    // guest browsing pricing WILL be eligible the moment they register —
+    // show the same strikethrough pricing to them too, matching exactly
+    // what checkout auto-applies. Only suppressed for a logged-in user who
+    // is ALREADY ineligible (subscribed or comped onto a paid plan) — showing
+    // a discount that doesn't apply to them would be misleading, not aspirational.
     $winbackCode    = (string) config('services.stripe.winback_promo_code');
     $winbackPercent = (int) config('services.stripe.winback_promo_percent');
-    $winbackActive  = $winbackCode !== '' && $authed && \App\Support\TrialStatus::isWinbackEligible(auth()->user());
+    $winbackActive  = $winbackCode !== '' && (! $authed || \App\Support\TrialStatus::isWinbackEligible(auth()->user()));
     $fmtMoney       = fn (float $v) => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
     $contactUrl    = route('contact');
     $refundUrl     = route('refund-policy');

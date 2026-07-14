@@ -99,7 +99,7 @@ keyword-research · rank-tracking
 below a 5-site cohort.
 
 ### Reports, action queue & anomaly ✅
-[reports/](./reports/README.md) → insights · action-queue · growth-reports
+[reports/](./reports/README.md) → insights · action-queue · growth-reports · client-report
 — `ActionQueueService` merges crawl findings + GSC reports + rank drops + audits into one
 ranked queue. (`GenerateAiInsights` is still a stub.) Branded PDF exports (Growth Report +
 the crawler's Site Audit) both go through `ReportBranding`/`ReportBrandingResolver`
@@ -188,6 +188,17 @@ complete as of 2026-07-07 — admin panel stays English-only.
 7. **Use `/root/.ssh/id_ed25519_worker`** for the worker box — never repurpose other
    services' credentials.
 8. **Use the code-review-graph MCP tools first** for exploration (per `CLAUDE.md`).
+9. **Client-facing copy: never expose internal state or plumbing.** No "cached" /
+   "served from cache" / "cache warming", no credit/cost mechanics, no vendor names
+   (Keywords Everywhere, DataForSEO, Moz, Serper…), no "we're rebuilding / outdated /
+   migration in progress" in ANY client-visible string (UI, emails, banners, empty
+   states, errors). Cached and fresh results must be indistinguishable to clients —
+   a cached result just appears fast, with the same wording as a fresh one (e.g. the
+   gap teaser says "keywords collected" for both). Neutral, forward-looking copy only
+   ("Coming soon", "temporarily unavailable"). Admin-only surfaces (`/admin/*`) are
+   internal and MAY show cache/cost/vendor detail. Repeated user correction
+   (2026-07-10 "rebuilding" copy, 2026-07-13 "cached" pills, 2026-07-14 "served from
+   cache" in the gap teaser) — treat as a hard rule, not a style preference.
 
 ---
 
@@ -255,6 +266,98 @@ known gaps were flagged during the sweep:
 ---
 
 ## Knowledge changelog
+
+- **2026-07-13 (post-signup landing hub + Priority Action Queue false "all caught
+  up" — follow-up to the queued-window fix above)** — Two changes:
+  1. **New post-signup landing page.** `ConnectGoogle::finishOnboarding()`
+     (`app/Livewire/Onboarding/ConnectGoogle.php:207`) now redirects to
+     `route('website-overview')` instead of `dashboard`. New
+     `WebsiteOverviewController` (`app/Http/Controllers/WebsiteOverviewController.php`)
+     + `resources/views/website-overview.blade.php`: a single website-scoped page with
+     a top tab bar — **Site Explorer** (auto-generates the DataForSEO/Moz backlink
+     report for the site's own domain, no typing needed, via the SAME resolve logic
+     as the standalone `/report/view` page — factored out to
+     `ReportViewController::resolve()` + a shared partial `reports/_status.blade.php`),
+     **Site Health** (embeds the existing `crawl-banner` /
+     `dashboard.site-health-stats` / `dashboard.priority-action-queue` Livewire
+     components unchanged), **Traffic Statistics** (GA4) and **GSC Performance**,
+     each showing a real, checked pill — `processing` / `needs_action` / `ready` —
+     computed in `WebsiteOverviewController::tabStatus()` from the SAME signals the
+     rest of the app already uses (`isInitialCrawl()`, `hasGa()`/`hasGsc()`,
+     `AnalyticsData::exists()`, `ReportDataService::lastSafeReportDate()` — never
+     inferred from whether a cache happens to be warm). The old dashboard
+     "just_onboarded" welcome modal is removed (dead: the flash flag is now
+     consumed by the hub page instead).
+  2. **Real regression from the queued-window fix, caught by a failing test.** The
+     broadened `isInitialCrawl()` (queued window, up to 6h on ANY brand-new site,
+     even one with zero crawl activity) made `PriorityActionQueue`'s outright
+     `@unless($hide)` card-hiding **far more aggressive** than before — it now hid
+     the ENTIRE queue, including GSC/rank-tracking-derived items (cannibalization,
+     `rank_drops`, `quick_wins`, etc.) that don't depend on crawl state at all, for
+     up to 6 real hours on a brand-new site. Caught via
+     `tests/Feature/Dashboard/ActionQueueTest.php`'s
+     `component renders groups linking to issue detail page` (a tracked rank-drop
+     keyword on a not-yet-crawled site read as "You're all caught up" — literally
+     the class of bug reported). Fix: the queue is **never hidden outright** anymore.
+     `ActionQueueService::groupedActions()` gained `$includeCrawlIssues` (default
+     true) — `PriorityActionQueue::render()` passes `false` while
+     `isInitialCrawl()` is true, so crawl_* groups are excluded (not final yet) but
+     everything else still shows. Empty state is now three-way: **"Crawl in
+     progress"** (still initial), **"Still finalizing your results"** (crawl
+     completed <60s ago — `recentlyFinishedCrawl()`, a settling grace window for any
+     residual cache-propagation lag), or genuine **"You're all caught up"**. Cache
+     key bumped `v3`→`v4` (includeCrawlIssues is now part of the key — a site
+     flipping in/out of its initial-crawl window must not read the other state's
+     cached shape); `WarmDashboardCaches` computes the same flag from the same
+     `isInitialCrawl()` check. **Landmine hit twice while building this**: the
+     first two implementations passed `$crawlInitial` directly where
+     `$includeCrawlIssues` was expected (backwards — should be `! $crawlInitial`)
+     in both `PriorityActionQueue::render()` and `WarmDashboardCaches::handle()`;
+     both silently produced empty-but-not-hidden queues and were only caught by
+     re-running the full affected test list, not by `php -l`/`view:cache`. Tests:
+     `ActionQueueTest`, `CrawlAndDashboardFixesTest`, `LinkStructureTest`,
+     `WarmDashboardCachesTest` (existing tests updated, not new ones — they'd
+     encoded the old hide-everything behavior as correct). Docs:
+     [reports/action-queue.md](./reports/action-queue.md),
+     [reports/client-report.md](./reports/client-report.md).
+
+- **2026-07-13 (live external links false-flagged `broken_external` on transport
+  timeouts)** — Client bestproservicesdubai.com reported 5 "broken" outbound links
+  that were all live (UAE-gov `*.mohre.gov.ae` + `wam.ae`, all `cURL error 28`
+  8s-HEAD timeouts). Root cause: `LinkChecker`'s GET+proxy fallback only ran for
+  403/405/429/501 statuses — a transport-level HEAD failure got `status = null` with
+  no GET retry — and `SiteIssueDetector::detectBrokenExternalLinks()` treated null
+  (couldn't-verify) identically to a real 4xx/5xx. Fix: GET+proxy fallback now also
+  covers transport errors (15s last-chance timeout); `LinkChecker` rows carry a
+  `guard_blocked` flag (deterministic malformed-URL rejection = reliably broken);
+  `broken_external` is raised ONLY on a confirmed `status >= 400` OR `guard_blocked`,
+  never on a bare null (logged `crawler.broken_external.unverifiable_skip`). Positive
+  evidence required to call a link dead. Worker-box change (rsync + Horizon
+  `--force-recreate`, no FPM restart). 5 false positives resolved directly; genuine
+  malformed link kept. Test in `CrawlerPipelineTest`. Docs:
+  [crawler/known-issues.md](./crawler/known-issues.md),
+  [crawler/findings-and-scoring.md](./crawler/findings-and-scoring.md).
+
+- **2026-07-13 (new client saw "all caught up" instead of "crawling in progress")** —
+  A brand-new client landing on the dashboard right after signup saw the Priority
+  Action Queue's empty state ("You're all caught up") with **no crawl banner**, even
+  though their first crawl was queued. Root cause: the "initial crawl in progress"
+  signal was derived purely from a **RUNNING `CrawlRun` row**, which
+  `CrawlWebsitePagesJob` only creates once it starts on the worker
+  (`app/Jobs/CrawlWebsitePagesJob.php:92`). `CrawlSiteBootstrapper::subscribeWebsite`
+  dispatches a `SyncSitemaps → CrawlWebsitePagesJob` chain, so between subscribe and
+  that job running (queue latency / sitemap sync / worker backlog) `isCrawling()` and
+  `hasCompletedCrawl()` are both false → banner blank + queue empty. Fix: broadened
+  `Website::isInitialCrawl()` (`app/Models/Website.php:689`) to also return true in the
+  **queued window** — no completed crawl AND the `crawl_site` was created <6h ago (age
+  bound so a never-started crawl can't spin forever). `CrawlBanner` now renders a
+  "We're setting up your site" stand-in for that window and polls 10s (to catch the run
+  starting); `SiteHealthStats`'s `$partial` gate aligned to `isInitialCrawl()`. Note:
+  `crawl_sites.status` (pending|crawling|ready|blocked) is **decorative** — nothing
+  branches on it, so the fix keys off run-state + crawl_site age, not status. Tests:
+  `tests/Feature/CrawlAndDashboardFixesTest.php` (4 new). Web-only UI change (FPM
+  restart, no worker rsync needed — the worker never calls `isInitialCrawl()`). Docs:
+  [reports/action-queue.md](./reports/action-queue.md) § Gotchas.
 
 - **2026-07-11 (blog-post wizard: full input coverage — language/H1/LSI/strategy
   selections; writer prompt v25)** — owner QA found the writer ignored most wizard
@@ -1260,6 +1363,14 @@ known gaps were flagged during the sweep:
   `10.0.0.3`; **MariaDB** not MySQL; Mistral LLM; co-located Postal/Jitsi). 46 docs total.
   Flagged prod risks: `APP_ENV=local` + `APP_DEBUG=true`, stale `MAIL_HOST`, un-versioned
   worker compose file.
+- **2026-07-13** — Shipped the customer-facing **backlink/authority report** + homepage
+  **"Analyze website" funnel**. New providers `DataForSeoBacklinkClient` (backlink profile) +
+  `MozLinksClient` (DA/PA/Spam, free tier). Shared per-domain cache `website_report_snapshots`
+  with `ReportFreshnessGate` tiers (90d default / 30d paid-owned) + `GenerateWebsiteReport` job +
+  `ebq:refresh-paid-reports` cron. One `ClientReportService` payload → public `/r/{token}` share
+  page + `ClientReportPdfRenderer` PDF (fixed light "paper", arc-`<path>` SVG gauges — dompdf-safe).
+  Funnel: anonymous Analyze calls NO provider API (blurred teaser + signup modal); `users.phone`
+  added, required at signup. Docs: [reports/client-report.md](./reports/client-report.md).
 - **2026-06-16** — Created this knowledge entry point (`infra/main.md`) + the maintenance
   protocol. Renamed `arch/` → `infra/`. Crawler subsystem fully documented under
   `infra/crawler/` (8 docs) following the shared single-crawl-store re-architecture; added

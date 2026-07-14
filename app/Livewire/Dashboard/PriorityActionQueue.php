@@ -66,18 +66,44 @@ class PriorityActionQueue extends Component
 
     public function render()
     {
-        // Hide the queue while the site's first crawl is in progress — most of
-        // its actions are crawl-derived, so it would be empty or half-baked. The
-        // crawl-in-progress banner stands in until the crawl completes.
-        $hide = $this->hasAccess()
-            && \App\Models\Website::find($this->websiteId)?->isInitialCrawl() === true;
+        $website = $this->hasAccess() ? \App\Models\Website::find($this->websiteId) : null;
 
-        $items = ! $hide && $this->hasAccess() ? $this->groupedActions() : [];
+        // While the site's first crawl hasn't produced final results yet,
+        // exclude crawl-derived items (their counts aren't final) — but still
+        // show GSC/rank-tracking-derived items (cannibalization, rank drops,
+        // quick wins, etc.), which don't depend on crawl state at all. The
+        // queue itself is never hidden outright: hiding it entirely used to
+        // hide real, ready data (e.g. a tracked keyword's rank drop) for as
+        // long as isInitialCrawl()'s queued-window covers a brand-new site,
+        // which reads as "nothing to see" when there may be real actions.
+        $crawlInitial = $website?->isInitialCrawl() === true;
+
+        $items = $this->hasAccess() ? $this->groupedActions(! $crawlInitial) : [];
 
         return view('livewire.dashboard.priority-action-queue', [
             'items' => $items,
-            'hide' => $hide,
+            'crawlInitial' => $crawlInitial,
+            // An empty queue right as a crawl JUST completed reads as "still
+            // finalizing" rather than a confident "you're all caught up" — a
+            // brand-new site whose crawl finished a moment ago showed the
+            // latter with zero issues before anything had a chance to settle,
+            // which reads as "no issues found" when it may just not be ready
+            // yet. Narrow grace window (60s), never affects an established site.
+            'justFinished' => ! $crawlInitial && count($items) === 0 && $this->recentlyFinishedCrawl($website),
         ]);
+    }
+
+    private function recentlyFinishedCrawl(?\App\Models\Website $website): bool
+    {
+        if ($website?->crawl_site_id === null) {
+            return false;
+        }
+
+        $finishedAt = \App\Models\CrawlRun::where('crawl_site_id', $website->crawl_site_id)
+            ->where('status', \App\Models\CrawlRun::STATUS_COMPLETED)
+            ->max('finished_at');
+
+        return $finishedAt !== null && \Illuminate\Support\Carbon::parse($finishedAt)->gt(now()->subSeconds(60));
     }
 
     private function hasAccess(): bool
@@ -88,11 +114,11 @@ class PriorityActionQueue extends Component
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function groupedActions(): array
+    private function groupedActions(bool $includeCrawlIssues): array
     {
         $country = $this->country !== '' ? $this->country : null;
 
-        return self::payload($this->websiteId, $country);
+        return self::payload($this->websiteId, $country, $includeCrawlIssues);
     }
 
     /**
@@ -102,16 +128,18 @@ class PriorityActionQueue extends Component
      * (since the 2026-06-28 split rank syncs no longer bump ReportCache).
      * Locale is in the key too — titles/descriptions are __() output, so an
      * en-first warm must never freeze Arabic viewers for the 24h TTL.
+     * $includeCrawlIssues is in the key too (v4) — a site flipping in/out of
+     * its initial-crawl window must not read the other state's cached shape.
      */
-    public static function payload(string $websiteId, ?string $country = null): array
+    public static function payload(string $websiteId, ?string $country = null, bool $includeCrawlIssues = true): array
     {
         $version = \App\Services\ReportCache::version($websiteId);
         $rankVersion = \App\Services\RankCache::version($websiteId);
 
         return Cache::remember(
-            sprintf('action-queue:v3:%s:%d:%d:%s:%s', $websiteId, $version, $rankVersion, $country ?? 'all', app()->getLocale()),
+            sprintf('action-queue:v4:%s:%d:%d:%s:%s:%d', $websiteId, $version, $rankVersion, $country ?? 'all', app()->getLocale(), $includeCrawlIssues ? 1 : 0),
             86400,
-            fn (): array => app(ActionQueueService::class)->groupedActions($websiteId, $country),
+            fn (): array => app(ActionQueueService::class)->groupedActions($websiteId, $country, $includeCrawlIssues),
         );
     }
 }

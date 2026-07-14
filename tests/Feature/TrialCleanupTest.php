@@ -220,9 +220,13 @@ class TrialCleanupTest extends TestCase
             ->assertSee('Log out')
             ->assertSee('billing/checkout?plan=pro');
 
+        // Since 2026-07-14 the discount is shown to GUESTS too, not just
+        // logged-in trial users — every new signup starts on the Trial plan
+        // and will be eligible for it the moment they register, so pricing
+        // pages should advertise it upfront rather than only after signup.
         auth()->logout();
-        $this->get(route('pricing'))->assertOk()->assertDontSee('line-through');
-        $this->get(route('landing'))->assertOk()->assertDontSee('SAVE30')->assertSee('Sign in');
+        $this->get(route('pricing'))->assertOk()->assertSee('line-through')->assertSee('SAVE30');
+        $this->get(route('landing'))->assertOk()->assertSee('SAVE30')->assertSee('Sign in');
 
         // Since 2026-07-10 ACTIVE trial users get the same straight discount
         // (isWinbackEligible), with in-trial copy instead of "trial has ended".

@@ -549,7 +549,20 @@ class SiteIssueDetector
                     'website_id' => $website->id, 'run_id' => $run->id, 'href' => $href, 'status' => $status,
                 ]);
             }
-            if (($status === null || $status >= 400) && ! $isUntrustedAntibotBlock && ! $isAccessBlocked) {
+            // A null status is INCONCLUSIVE (timeout / connection reset / TLS / DNS) —
+            // the HEAD+GET+proxy pass could not verify the link, and "couldn't reach it"
+            // is not "it's dead". Slow-but-alive hosts (government/enterprise sites,
+            // datacenter-IP blockers) routinely land here, so reporting them broke real,
+            // working links (bestproservicesdubai.com → live mohre.gov.ae/wam.ae pages).
+            // Only a CONFIRMED HTTP error (>=400) or a DETERMINISTIC guard rejection
+            // (malformed/unsafe URL, e.g. http://info@host) counts as broken.
+            $isConfirmedDead = ($status !== null && $status >= 400) || ! empty($p['guard_blocked']);
+            if ($status === null && empty($p['guard_blocked'])) {
+                Log::info('crawler.broken_external.unverifiable_skip', [
+                    'website_id' => $website->id, 'run_id' => $run->id, 'href' => $href, 'error' => $p['error'],
+                ]);
+            }
+            if ($isConfirmedDead && ! $isUntrustedAntibotBlock && ! $isAccessBlocked) {
                 $this->pending['broken_external|'.CrawlFinding::hashUrl($href)] = $this->row(
                     $website->id, $run->id, $fromId,
                     CrawlFinding::CATEGORY_BROKEN_LINK, 'broken_external', 'medium', 0.0, $href,

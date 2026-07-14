@@ -1,5 +1,6 @@
+{{-- Competitor Gap moved to its own Orbit page (/keyword-gap, 2026-07-14). --}}
 @php
-    $tabs = ['ideas' => __('Ideas'), 'volume' => __('Volume'), 'gap' => __('Competitor Gap')];
+    $tabs = ['ideas' => __('Ideas'), 'volume' => __('Volume')];
 @endphp
 
 <div>
@@ -19,14 +20,8 @@
     <div class="mt-6">
         @if ($tab === 'ideas')
             <livewire:keywords.keyword-idea-finder :preset="$preset" :key="'kr-ideas-'.$nonce" />
-        @elseif ($tab === 'volume')
-            <livewire:keywords.keyword-volume-finder :preset="$preset" :key="'kr-volume-'.$nonce" />
         @else
-            <div class="mb-4 flex justify-end">
-                <a href="{{ route('competitive.competitors') }}"
-                    class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200">{{ __('Find competitors') }} →</a>
-            </div>
-            <livewire:competitive.keyword-gap-analysis :key="'kr-gap-'.$nonce" />
+            <livewire:keywords.keyword-volume-finder :preset="$preset" :key="'kr-volume-'.$nonce" />
         @endif
     </div>
 </div>

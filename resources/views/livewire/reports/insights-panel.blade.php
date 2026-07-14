@@ -303,7 +303,7 @@
             @elseif ($tab === 'quick_wins')
                 <x-insights.card :title="__('Quick wins')" :description="__('Low-competition keywords with real search volume where you either don\'t rank or rank outside the top 10. Sorted by search volume and how winnable they look.')">
                     @if (empty($data['quick_wins']))
-                        <x-insights.empty-state :title="__('No quick wins surfaced yet')" :body="__('Either our keyword intelligence hasn\'t filled in for your queries yet, or everything with real volume is already in your top 10. Check back in a day or two as the cache warms up.')" />
+                        <x-insights.empty-state :title="__('No quick wins surfaced yet')" :body="__('Either our keyword intelligence hasn\'t filled in for your queries yet, or everything with real volume is already in your top 10. Check back in a day or two as keyword data fills in.')" />
                     @else
                         <x-insights.scroll-area>
                             <table class="min-w-full text-left text-xs">
