@@ -4,7 +4,8 @@ namespace App\Services\Competitive;
 
 use App\Exceptions\QuotaExceededException;
 use App\Models\CompetitorBacklink;
-use App\Services\CompetitorBacklinkService;
+use App\Services\OpenPageRankClient;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Transparent 0–100 keyword opportunity score: how easy AND worthwhile a
@@ -22,7 +23,7 @@ class OpportunityScoreService
 {
     public function __construct(
         private SerpCache $serp,
-        private CompetitorBacklinkService $backlinks,
+        private OpenPageRankClient $opr,
     ) {
     }
 
@@ -143,19 +144,17 @@ class OpportunityScoreService
         }
         $domains = array_slice(array_keys($domains), 0, 10);
 
-        // Ensure DA is cached for these domains (background refresh for misses).
-        $this->backlinks->queueRefresh($domains, $websiteId, $ownerUserId);
-        $das = [];
-        foreach ($domains as $d) {
-            $da = CompetitorBacklink::query()
-                ->forDomain($d)
-                ->whereNotNull('domain_authority')
-                ->max('domain_authority');
-            if ($da !== null) {
-                $das[] = (int) $da;
-            }
-        }
-        $avgDa = $das !== [] ? array_sum($das) / count($das) : null;
+        // Top-10 authority from Open PageRank (free tier, one bulk call for
+        // all 10, cached 7 days per domain set). This REPLACED the old
+        // CompetitorBacklinkService::queueRefresh() path, which fetched each
+        // SERP domain's BACKLINKS from Keywords Everywhere at 50 credits per
+        // domain just to derive a DA number — a single gap verification pass
+        // billed thousands of KE credits sweeping random SERP domains
+        // (ssa.gov, support.google.com…) through the backlink API
+        // (found 2026-07-14 on the admin usage page). OPR score is 0–10 →
+        // ×10 for the 0–100 DA-like scale score() expects; per-domain
+        // fallback to any historically-cached CompetitorBacklink DA.
+        $avgDa = $this->avgAuthority($domains);
 
         $features = [
             'answerBox' => isset($json['answerBox']),
@@ -166,6 +165,49 @@ class OpportunityScoreService
         ];
 
         return $this->score($avgDa, $features, $volume, $ourPosition);
+    }
+
+    /**
+     * Average 0–100 authority for a set of SERP domains: Open PageRank score
+     * ×10 (free bulk endpoint, cached 7 days per domain set), falling back
+     * per-domain to any historically-cached CompetitorBacklink DA. Null when
+     * nothing is known — score() treats that as neutral.
+     *
+     * @param  list<string>  $domains
+     */
+    private function avgAuthority(array $domains): ?float
+    {
+        if ($domains === []) {
+            return null;
+        }
+
+        $sorted = $domains;
+        sort($sorted);
+        $metrics = Cache::remember(
+            'opr-serp-authority:'.md5(implode('|', $sorted)),
+            now()->addDays(7),
+            fn (): array => $this->opr->metricsFor($domains),
+        );
+
+        $values = [];
+        foreach ($domains as $d) {
+            $score = $metrics[$d]['score']
+                ?? ($metrics[OpenPageRankClient::registrable($d)]['score'] ?? null);
+            if ($score !== null) {
+                $values[] = min(100.0, (float) $score * 10);
+
+                continue;
+            }
+            $da = CompetitorBacklink::query()
+                ->forDomain($d)
+                ->whereNotNull('domain_authority')
+                ->max('domain_authority');
+            if ($da !== null) {
+                $values[] = (float) $da;
+            }
+        }
+
+        return $values !== [] ? array_sum($values) / count($values) : null;
     }
 
     private function clamp(float $v, float $min = 0.0, float $max = 1.0): float
