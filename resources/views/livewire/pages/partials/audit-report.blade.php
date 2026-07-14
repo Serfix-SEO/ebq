@@ -636,24 +636,6 @@
                             </div>
                         @endif
                         @if (! empty($benchmark['competitors']))
-                            @php
-                                // Batch-load cached competitor backlinks once per render — no N+1.
-                                $competitorDomains = [];
-                                foreach ($benchmark['competitors'] as $_cRow) {
-                                    if (isset($_cRow['url']) && is_string($_cRow['url'])) {
-                                        $d = \App\Models\CompetitorBacklink::extractDomain($_cRow['url']);
-                                        if ($d !== '') $competitorDomains[$d] = true;
-                                    }
-                                }
-                                $competitorDomains = array_keys($competitorDomains);
-                                $competitorBacklinks = $competitorDomains === []
-                                    ? collect()
-                                    : \App\Models\CompetitorBacklink::query()
-                                        ->whereIn('competitor_domain', $competitorDomains)
-                                        ->orderByDesc('domain_authority')
-                                        ->get()
-                                        ->groupBy('competitor_domain');
-                            @endphp
                             <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
                                 <table class="w-full min-w-[320px] text-xs">
                                     <thead>
@@ -661,7 +643,6 @@
                                             <th class="px-3 py-2 text-start">{{ __('Page') }}</th>
                                             <th class="px-3 py-2 text-end">{{ __('Flesch') }}</th>
                                             <th class="px-3 py-2 text-start">{{ __('Grade band') }}</th>
-                                            <th class="px-3 py-2 text-start">{{ __('Top backlinks') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -669,15 +650,12 @@
                                             <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">{{ __('This page (audited)') }}</td>
                                             <td class="px-3 py-2 text-end tabular-nums font-semibold text-slate-900 dark:text-slate-100">{{ is_numeric($benchmark['your_flesch'] ?? null) ? $benchmark['your_flesch'] : '—' }}</td>
                                             <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ data_get($advanced, 'readability.grade') ?? '—' }}</td>
-                                            <td class="px-3 py-2 text-slate-400">—</td>
                                         </tr>
                                         @foreach ($benchmark['competitors'] as $row)
                                             @php
                                                 $_compDomain = isset($row['url']) && is_string($row['url'])
                                                     ? \App\Models\CompetitorBacklink::extractDomain($row['url'])
                                                     : '';
-                                                $_compLinks = $_compDomain !== '' ? ($competitorBacklinks[$_compDomain] ?? collect()) : collect();
-                                                $_compLinkCount = $_compLinks->count();
                                             @endphp
                                             <tr>
                                                 <td class="max-w-[200px] px-3 py-2">
@@ -691,41 +669,6 @@
                                                 </td>
                                                 <td class="px-3 py-2 text-end tabular-nums text-slate-800 dark:text-slate-100">{{ is_numeric($row['flesch'] ?? null) ? $row['flesch'] : '—' }}</td>
                                                 <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ $row['grade'] ?? '—' }}</td>
-                                                <td class="px-3 py-2">
-                                                    @if ($_compLinkCount === 0)
-                                                        <span class="text-[10px] text-slate-400" title="{{ __('Competitor backlinks will appear here once the background fetch completes. If this has stayed blank for more than a few minutes, the queue worker may not be running — re-open this page to re-queue.') }}">{{ __('pending…') }}</span>
-                                                    @else
-                                                        <details class="group/cblk">
-                                                            <summary class="cursor-pointer list-none text-[10px] font-semibold text-orange-600 transition hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300 [&::-webkit-details-marker]:hidden">
-                                                                <span class="inline-flex items-center gap-1">
-                                                                    {{ $_compLinkCount }} {{ $_compLinkCount === 1 ? __('link') : __('links') }}
-                                                                    <svg class="h-3 w-3 transition-transform group-open/cblk:rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-                                                                </span>
-                                                            </summary>
-                                                            <ul class="mt-2 max-h-64 space-y-1.5 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-2 text-[10px] dark:border-slate-700 dark:bg-slate-800/40">
-                                                                @foreach ($_compLinks->take(10) as $_link)
-                                                                    <li class="flex items-start gap-2">
-                                                                        @if ($_link->domain_authority !== null)
-                                                                            <span class="mt-0.5 inline-flex h-5 w-7 shrink-0 items-center justify-center rounded bg-orange-100 text-[9px] font-bold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300" title="{{ __('Referring domain authority (0–100)') }}">{{ $_link->domain_authority }}</span>
-                                                                        @endif
-                                                                        <div class="min-w-0 flex-1">
-                                                                            <a href="{{ $_link->referring_page_url }}" target="_blank" rel="noopener noreferrer" class="block truncate font-medium text-slate-800 hover:text-orange-600 dark:text-slate-200 dark:hover:text-orange-400" title="{{ $_link->referring_page_url }}">{{ $_link->referring_domain ?: \Illuminate\Support\Str::limit($_link->referring_page_url, 60) }}</a>
-                                                                            @if ($_link->anchor_text)
-                                                                                <p class="truncate text-slate-500 dark:text-slate-400" title="{{ $_link->anchor_text }}">“{{ \Illuminate\Support\Str::limit($_link->anchor_text, 80) }}”</p>
-                                                                            @endif
-                                                                            @if ($_link->backlink_type)
-                                                                                <span class="me-1 inline-flex items-center rounded bg-slate-200 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300">{{ $_link->backlink_type }}</span>
-                                                                            @endif
-                                                                        </div>
-                                                                    </li>
-                                                                @endforeach
-                                                                @if ($_compLinkCount > 10)
-                                                                    <li class="pt-1 text-[9px] text-slate-400">{{ __('showing 10 of') }} {{ $_compLinkCount }}</li>
-                                                                @endif
-                                                            </ul>
-                                                        </details>
-                                                    @endif
-                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>

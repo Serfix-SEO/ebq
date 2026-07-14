@@ -4,7 +4,6 @@ namespace App\Livewire\Pages;
 
 use App\Mail\PageAuditReportMail;
 use App\Models\PageAuditReport;
-use App\Support\AuditConfig;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -65,27 +64,9 @@ class PageAuditDetail extends Component
 
     public function render()
     {
-        // Stale-while-revalidate: if this audit's competitor domains aren't
-        // cached yet, queue a background refresh so the backlinks disclosure
-        // populates on the next view. Safe to call every render — the service
-        // no-ops for domains that are already fresh.
-        $competitors = data_get($this->pageAuditReport->result, 'benchmark.competitors', []);
-        if (AuditConfig::competitorKeywordsEverywhereEnabled() && is_array($competitors) && $competitors !== []) {
-            $domains = [];
-            foreach ($competitors as $row) {
-                if (isset($row['url']) && is_string($row['url'])) {
-                    $d = \App\Models\CompetitorBacklink::extractDomain($row['url']);
-                    if ($d !== '') $domains[$d] = true;
-                }
-            }
-            if ($domains !== []) {
-                app(\App\Services\CompetitorBacklinkService::class)->queueRefresh(
-                    array_keys($domains),
-                    websiteId: $this->pageAuditReport->website_id,
-                    ownerUserId: \Illuminate\Support\Facades\Auth::id(),
-                );
-            }
-        }
+        // NOTE: the competitor-backlink lazy refresh that lived here was
+        // removed 2026-07-14 with the paid-KE suppression — page audits no
+        // longer show a competitor backlink table at all.
 
         return view('livewire.pages.page-audit-detail');
     }

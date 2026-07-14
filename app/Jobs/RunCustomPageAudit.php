@@ -2,11 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Models\CompetitorBacklink;
 use App\Models\CustomPageAudit;
-use App\Services\CompetitorBacklinkService;
 use App\Services\PageAuditService;
-use App\Support\AuditConfig;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -98,7 +95,6 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
 
         if ($report->status === 'completed') {
             $audit->markCompleted($report);
-            $this->queueCompetitorBacklinks($report);
 
             return;
         }
@@ -111,48 +107,9 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
         );
     }
 
-    /**
-     * After a successful audit, kick off a background fetch of up to 50
-     * backlinks for each unique competitor domain mentioned in the SERP
-     * benchmark. Skips any domain already cached fresh — no credits spent.
-     */
-    private function queueCompetitorBacklinks(\App\Models\PageAuditReport $report): void
-    {
-        if (! AuditConfig::competitorKeywordsEverywhereEnabled()) {
-            return;
-        }
-
-        $competitors = data_get($report->result, 'benchmark.competitors', []);
-        if (! is_array($competitors) || $competitors === []) {
-            return;
-        }
-
-        $domains = [];
-        foreach ($competitors as $row) {
-            if (! is_array($row) || empty($row['url']) || ! is_string($row['url'])) {
-                continue;
-            }
-            $domain = CompetitorBacklink::extractDomain($row['url']);
-            if ($domain !== '') {
-                $domains[$domain] = true;
-            }
-        }
-
-        if ($domains === []) {
-            return;
-        }
-
-        // Carry website + audit-trigger user into the activity log so the
-        // admin usage page attributes the KE backlink calls to the right
-        // client (website owner is resolved server-side from website_id).
-        $audit = \App\Models\CustomPageAudit::query()->find($this->auditId);
-
-        app(CompetitorBacklinkService::class)->queueRefresh(
-            array_keys($domains),
-            websiteId: $report->website_id,
-            ownerUserId: $audit?->user_id,
-        );
-    }
+    // NOTE: the post-audit competitor-backlink fetch (paid KE, 50 credits per
+    // domain) was removed 2026-07-14 — page audits no longer show a
+    // competitor backlink table.
 
     /**
      * Called by the queue worker when the job throws past the retry budget
