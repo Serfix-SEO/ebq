@@ -119,7 +119,22 @@
                                             <span class="font-medium text-slate-800 dark:text-slate-200">{{ $r->other_domain }}</span>
                                         </span>
                                     </td>
-                                    <td class="max-w-xs truncate px-3 py-2.5 text-xs text-slate-500">{{ $r->from_path ?? '—' }}</td>
+                                    <td class="max-w-xs px-3 py-2.5 text-xs">
+                                        @php
+                                            // from_path is always the FROM domain's path. The FROM
+                                            // domain is the referrer (inbound) or the searched site (outbound).
+                                            $srcDomain = $f['direction'] === 'inbound' ? $r->other_domain : $f['domain'];
+                                            $srcUrl = $r->from_path ? 'https://'.$srcDomain.$r->from_path : null;
+                                        @endphp
+                                        @if ($srcUrl)
+                                            <a href="{{ $srcUrl }}" target="_blank" rel="nofollow noopener" title="{{ $srcUrl }}" class="inline-flex max-w-full items-center gap-1 truncate text-orange-600 hover:underline dark:text-orange-400">
+                                                <span class="truncate">{{ $r->from_path }}</span>
+                                                <svg class="h-3 w-3 flex-none" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                                            </a>
+                                        @else
+                                            <span class="text-slate-400">—</span>
+                                        @endif
+                                    </td>
                                     <td class="px-3 py-2.5 text-right">
                                         <span @class(['rounded-full px-2 py-0.5 text-[10px] font-medium', 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $r->dofollow, 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' => ! $r->dofollow])>{{ $r->dofollow ? 'dofollow' : 'nofollow' }}</span>
                                     </td>

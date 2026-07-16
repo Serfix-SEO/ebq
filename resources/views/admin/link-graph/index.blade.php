@@ -194,10 +194,12 @@
                         @forelse ($recent as $e)
                             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                                 <td class="px-5 py-2.5">
-                                    <span class="flex items-center gap-2">
+                                    @php $srcUrl = 'https://'.$e->from_domain.($e->from_path ?? ''); @endphp
+                                    <a href="{{ $srcUrl }}" target="_blank" rel="nofollow noopener" title="{{ $srcUrl }}" class="group flex items-center gap-2 font-medium text-slate-700 hover:text-orange-600 hover:underline dark:text-slate-300 dark:hover:text-orange-400">
                                         <img src="https://www.google.com/s2/favicons?domain={{ urlencode($e->from_domain) }}&sz=32" alt="" class="h-4 w-4 flex-none rounded-sm bg-slate-100" loading="lazy" onerror="this.style.visibility='hidden'">
-                                        <span class="truncate font-medium text-slate-700 dark:text-slate-300">{{ $e->from_domain }}{{ $e->from_path && $e->from_path !== '/' ? \Illuminate\Support\Str::limit($e->from_path, 32) : '' }}</span>
-                                    </span>
+                                        <span class="truncate">{{ $e->from_domain }}{{ $e->from_path && $e->from_path !== '/' ? \Illuminate\Support\Str::limit($e->from_path, 32) : '' }}</span>
+                                        <svg class="h-3 w-3 flex-none opacity-0 transition group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                                    </a>
                                 </td>
                                 <td class="px-3 py-2.5">
                                     <span class="inline-flex items-center gap-1.5">
