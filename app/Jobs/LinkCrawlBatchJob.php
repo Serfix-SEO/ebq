@@ -7,41 +7,46 @@ use App\Services\Crawler\CrawlFetcher;
 use App\Services\Crawler\DomainRateLimiter;
 use App\Services\Crawler\ProxyPool;
 use App\Services\LinkGraph\EdgeRecorder;
+use App\Services\LinkGraph\FrontierClaimer;
 use App\Services\LinkGraph\LinkCrawlBudget;
 use App\Support\Audit\HtmlAuditor;
 use App\Support\Crawler\BlockDetector;
 use App\Support\Crawler\RobotsTxtParser;
-use Illuminate\Bus\Batchable;
+use App\Support\LinkCrawlToggle;
+use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Fetches a batch of frontier URLs and deposits their OUTBOUND links into the
- * permanent link graph. Per URL: robots.txt check → per-host politeness
- * (DomainRateLimiter) → SSRF-guarded fetch (proxy-first) → extract external
- * links → EdgeRecorder::record. Depth-0 (homepage) rows also enqueue a few
- * internal links (bounded per host) so we see more of the site's outbound
- * links. Every page charges the shared daily budget.
+ * One concurrent crawl worker: atomically CLAIMS a batch of due frontier URLs
+ * (FrontierClaimer — no two batches ever grab the same URL) and deposits their
+ * OUTBOUND links into the permanent link graph. Per URL: robots.txt → per-host
+ * politeness (DomainRateLimiter) → block-aware proxy-first fetch → extract
+ * external links → EdgeRecorder::record. Depth-0 homepages seed a few internal
+ * pages. Every page charges the shared daily budget.
  *
- * Reuses the site-audit crawler's whole toolchain — this job only adds the
- * frontier bookkeeping.
+ * SELF-REPLACING: when a batch claims work, it dispatches ONE replacement batch
+ * before crawling — so the fleet stays saturated with no pass barrier (the
+ * slowest domain only slows its own batch). The dispatcher tops up the rest.
+ * Runs on the dedicated `link-crawl` queue.
  */
 class LinkCrawlBatchJob implements ShouldQueue
 {
-    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300;
 
     public int $tries = 1;
 
-    /** @param  list<int>  $ids  link_crawl_frontier row ids */
-    public function __construct(public array $ids)
+    public function __construct()
     {
+        $this->onQueue(Queues::LINK_CRAWL);
     }
 
     public function handle(
@@ -51,12 +56,23 @@ class LinkCrawlBatchJob implements ShouldQueue
         EdgeRecorder $edges,
         LinkCrawlBudget $budget,
         BlockDetector $blockDetector,
+        FrontierClaimer $claimer,
     ): void {
-        if (! \App\Support\LinkCrawlToggle::enabled() || $budget->exhausted()) {
+        if (! LinkCrawlToggle::enabled() || $budget->exhausted()) {
             return;
         }
 
-        $rows = LinkCrawlFrontier::query()->whereIn('id', $this->ids)->where('status', 'pending')->get();
+        $rows = $claimer->claim((int) config('crawler.link_crawl.batch_size', 20));
+        if ($rows->isEmpty()) {
+            return; // frontier drained — do NOT self-replace (pool winds down)
+        }
+
+        // Keep the fleet saturated: one working batch → one successor. Guarded
+        // by enabled/budget/claim-empty above, so the loop self-terminates when
+        // work or budget runs out. Dispatched up front so a mid-crawl crash
+        // still leaves a successor (the crashed batch's rows get reaped).
+        self::dispatch();
+
         $maxAttempts = (int) config('crawler.link_crawl.max_attempts', 3);
         $retryAfter = (int) config('crawler.link_crawl.retry_after_hours', 72);
         $recrawlDays = (int) config('crawler.link_crawl.recrawl_days', 30);
@@ -64,12 +80,15 @@ class LinkCrawlBatchJob implements ShouldQueue
 
         foreach ($rows as $row) {
             if ($budget->exhausted()) {
-                break;
+                // Release the unfetched claim so it isn't stranded until reaping.
+                $this->reschedule($row, $maxAttempts, 1);
+
+                continue;
             }
 
             try {
                 if ($this->robotsBlocks($fetcher, $row->host, $row->url)) {
-                    $row->update(['status' => 'blocked']);
+                    $this->finish($row, 'blocked');
 
                     continue;
                 }
@@ -77,11 +96,10 @@ class LinkCrawlBatchJob implements ShouldQueue
                 [$res, $blocked] = $this->fetchWithPolicy($fetcher, $rateLimiter, $pool, $blockDetector, $row);
 
                 if ($blocked !== null) {
-                    // WAF/Cloudflare/anti-bot ban on this domain. Never spend
-                    // more of the crawl on it — mark blocked (revisited on the
-                    // recrawl cycle, when its cooldown has long expired), don't
-                    // burn budget/retries chasing a wall.
-                    $row->update(['status' => 'blocked']);
+                    // WAF/Cloudflare/anti-bot ban on this domain — mark blocked
+                    // (revisited on the recrawl cycle, cooldown long expired);
+                    // don't burn budget/retries chasing a wall.
+                    $this->finish($row, 'blocked');
 
                     continue;
                 }
@@ -96,16 +114,11 @@ class LinkCrawlBatchJob implements ShouldQueue
                 $edges->record($row->url, $links['external'] ?? [], EdgeRecorder::SOURCE_OWN_CRAWL);
                 $budget->consume(1);
 
-                // Homepage → seed a few internal pages to find more outbound links.
                 if ((int) $row->depth === 0) {
                     $this->enqueueInternal($row->host, $links['internal'] ?? []);
                 }
 
-                $row->update([
-                    'status' => 'done',
-                    'attempts' => $row->attempts + 1,
-                    'next_at' => now()->addDays($recrawlDays),
-                ]);
+                $this->finish($row, 'done', attempts: $row->attempts + 1, nextAt: now()->addDays($recrawlDays));
             } catch (\Throwable $e) {
                 $this->reschedule($row, $maxAttempts, $retryAfter);
             }
@@ -118,10 +131,9 @@ class LinkCrawlBatchJob implements ShouldQueue
 
     /**
      * Fetch with the full anti-block policy (mirrors PageCrawlProcessor::
-     * fetchWithPolicy): per-domain rate throttle, proxy-first (never expose
-     * the box IP if the pool has one), classify the response for
-     * Cloudflare/WAF/anti-bot blocks, engage WAF slow-mode, record blocks
-     * fleet-wide so every box backs off that domain, and one proxy retry.
+     * fetchWithPolicy): per-domain throttle, proxy-first, classify for
+     * Cloudflare/WAF/anti-bot blocks, WAF slow-mode, fleet-wide block cooldown,
+     * one proxy retry.
      *
      * @return array{0: array<string,mixed>, 1: ?string}  [response, blockReason|null]
      */
@@ -135,8 +147,6 @@ class LinkCrawlBatchJob implements ShouldQueue
         $timeout = (int) config('crawler.timeout', 20);
         $domain = $row->host;
 
-        // Per-server per-domain politeness; also eases to slow-mode if the
-        // domain is already flagged blocked/WAF fleet-wide.
         $rateLimiter->throttle($domain);
 
         $useProxies = (bool) config('crawler.use_proxies', true);
@@ -154,8 +164,6 @@ class LinkCrawlBatchJob implements ShouldQueue
             if ($proxy !== null && ($res['ok'] ?? false)) {
                 $pool->markSuccess($proxy);
             }
-            // Detect Cloudflare/Akamai/etc on a SUCCESSFUL fetch → slow-mode
-            // (1 req / 2s) so we stay under the WAF's radar next time.
             if (($res['ok'] ?? false) && ($waf = $blockDetector->detectWaf(['headers' => $res['headers'] ?? []])) !== null
                 && ! $rateLimiter->isWafProtected($domain)) {
                 $rateLimiter->recordWaf($domain, $waf);
@@ -164,14 +172,11 @@ class LinkCrawlBatchJob implements ShouldQueue
             return [$res, null];
         }
 
-        // Blocked. Record fleet-wide so other boxes go cautious on this domain.
         $rateLimiter->recordBlock($domain);
         if ($proxy !== null) {
             $pool->markFailure($proxy);
         }
 
-        // One proxy retry if we went direct and the pool has an IP (a fresh
-        // egress IP often clears a soft block).
         if ($useProxies && $proxy === null && $pool->available()) {
             $retryProxy = $pool->pick();
             if ($retryProxy !== null) {
@@ -197,6 +202,7 @@ class LinkCrawlBatchJob implements ShouldQueue
         $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
         $robots = Cache::remember('linkcrawl:robots:'.$host, now()->addHours(6), function () use ($fetcher, $host) {
             $res = $fetcher->fetch('https://'.$host.'/robots.txt', [], 10);
+
             return ($res['ok'] ?? false) && (int) ($res['status'] ?? 0) === 200 ? (string) ($res['body'] ?? '') : '';
         });
 
@@ -226,7 +232,6 @@ class LinkCrawlBatchJob implements ShouldQueue
                 break;
             }
             $u = (string) ($link['href'] ?? '');
-            // Same-host http(s) pages only; skip the homepage we already have.
             $h = strtolower((string) parse_url($u, PHP_URL_HOST));
             if ($u === '' || $h !== strtolower($host) || rtrim($u, '/') === 'https://'.$host) {
                 continue;
@@ -248,11 +253,34 @@ class LinkCrawlBatchJob implements ShouldQueue
         }
     }
 
+    /** Terminal state for a claimed row — always clears the lease. */
+    private function finish(LinkCrawlFrontier $row, string $status, ?int $attempts = null, ?Carbon $nextAt = null): void
+    {
+        $update = ['status' => $status, 'lease_id' => null, 'leased_until' => null];
+        if ($attempts !== null) {
+            $update['attempts'] = $attempts;
+        }
+        if ($nextAt !== null) {
+            $update['next_at'] = $nextAt;
+        }
+        $row->update($update);
+    }
+
+    /** Transient failure: back to `pending` (lease cleared) for retry, or `failed` at the cap. */
     private function reschedule(LinkCrawlFrontier $row, int $maxAttempts, int $retryAfterHours): void
     {
         $attempts = $row->attempts + 1;
-        $row->update($attempts >= $maxAttempts
-            ? ['status' => 'failed', 'attempts' => $attempts]
-            : ['attempts' => $attempts, 'next_at' => now()->addHours($retryAfterHours)]);
+        if ($attempts >= $maxAttempts) {
+            $this->finish($row, 'failed', attempts: $attempts);
+
+            return;
+        }
+        $row->update([
+            'status' => 'pending',
+            'attempts' => $attempts,
+            'next_at' => now()->addHours(max(1, $retryAfterHours)),
+            'lease_id' => null,
+            'leased_until' => null,
+        ]);
     }
 }

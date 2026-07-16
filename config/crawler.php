@@ -170,9 +170,15 @@ return [
         // + a few internal pages is plenty.
         'max_pages_per_host' => (int) env('LINK_CRAWL_MAX_PAGES_PER_HOST', 12),
         'internal_links_followed' => (int) env('LINK_CRAWL_INTERNAL_FOLLOWED', 6),
-        // Pass/batch sizing (mirrors the site-audit crawler's shape).
+        // Concurrent-frontier sizing. `batch_size` = URLs one batch job claims
+        // + crawls; `target_in_flight` = how many batch jobs the dispatcher
+        // keeps queued so every fleet worker stays busy (no barrier). Each
+        // finished batch self-replaces 1:1, the dispatcher tops up the rest.
+        // `lease_minutes` = how long a claimed row is held before the reaper
+        // may reclaim it (must exceed a batch's realistic runtime).
         'batch_size' => (int) env('LINK_CRAWL_BATCH_SIZE', 20),
-        'pages_per_pass' => (int) env('LINK_CRAWL_PAGES_PER_PASS', 500),
+        'target_in_flight' => (int) env('LINK_CRAWL_TARGET_IN_FLIGHT', 40),
+        'lease_minutes' => (int) env('LINK_CRAWL_LEASE_MINUTES', 10),
         // Seeding: how many important domains to (re)queue per seed run.
         'seed_domains_per_run' => (int) env('LINK_CRAWL_SEED_DOMAINS', 3000),
         'recrawl_days' => (int) env('LINK_CRAWL_RECRAWL_DAYS', 30),

@@ -134,8 +134,8 @@
                         </a>
                     @endforeach
                 </div>
-                <div class="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-center dark:border-slate-800">
-                    @foreach (['done' => 'Crawled', 'pending' => 'Queued', 'blocked' => 'Blocked', 'failed' => 'Failed'] as $st => $lbl)
+                <div class="mt-4 grid grid-cols-3 gap-3 border-t border-slate-100 pt-3 text-center dark:border-slate-800">
+                    @foreach (['done' => 'Crawled', 'pending' => 'Queued', 'in_progress' => 'In flight', 'blocked' => 'Blocked', 'failed' => 'Failed'] as $st => $lbl)
                         <div><p class="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $fmt($c['frontier'][$st] ?? 0) }}</p><p class="text-[10px] uppercase tracking-wider text-slate-400">{{ $lbl }}</p></div>
                     @endforeach
                 </div>

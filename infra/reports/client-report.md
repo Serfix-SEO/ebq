@@ -134,15 +134,26 @@ fleet):
   work-list (distinct from `website_pages`, which is crawl_site_id-scoped).
 - `ebq:seed-link-crawl` (scheduled 01:20) — queues homepages of important
   domains (tier=active, then times_seen, then cc harmonic rank).
-- `LinkCrawlPassJob` → `LinkCrawlBatchJob`: per URL robots.txt (cached 6h) →
-  DomainRateLimiter politeness → proxy-first fetch → HtmlAuditor::links() →
+- **Concurrent frontier (no pass barrier).** `FrontierClaimer` atomically
+  claims N due `pending` rows under a lease (`lease_id` + `leased_until`;
+  portable select-then-guarded-UPDATE so two workers never grab the same URL —
+  the loser just wins fewer). `LinkCrawlBatchJob` claims its own rows at run
+  time, and when it gets work it dispatches ONE successor before crawling
+  (self-replacing 1:1) → the fleet stays saturated and a slow/WAF domain only
+  slows its own batch. Per URL: robots.txt (cached 6h) → DomainRateLimiter
+  politeness → BlockDetector-aware proxy-first fetch (Cloudflare/WAF detection,
+  block cooldown, WAF slow-mode, one proxy retry) → HtmlAuditor::links() →
   `EdgeRecorder::record(url, external, SOURCE_OWN_CRAWL)`; depth-0 homepages
-  seed ≤`max_pages_per_host` internal pages. Self-chains via the batch
-  finally hook while work + budget remain.
+  seed ≤`max_pages_per_host` internal pages. Terminal states clear the lease.
+- **Dedicated `link-crawl` queue** (Queues::LINK_CRAWL) added to `$crawlPool`
+  after `crawl` — same I/O-bound workers, Horizon auto-balance shares capacity
+  so link crawl neither starves nor is starved by site audits.
+- `ebq:link-crawl-dispatch` (every minute) — tops the queue up to
+  `target_in_flight` (default 40) batch jobs; the seed from cold + refill after
+  the pool winds down. `ebq:reap-link-crawl-leases` (every 3 min) — returns
+  crashed workers' expired leases to `pending` (crash recovery).
 - `App\Services\LinkGraph\LinkCrawlBudget` — Redis daily page cap
   (`daily_budget`, default 150k, fleet-wide).
-- `ebq:link-crawl-supervisor` (every 3 min) — restarts the pass chain when the
-  cache heartbeat is absent and due work exists.
 
 **To activate:** `LINK_CRAWL_ENABLED=true` on BOTH boxes + Horizon restart
 (box B runs the crawl queue). ACTIVATED 2026-07-16.

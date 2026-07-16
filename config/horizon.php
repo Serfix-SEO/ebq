@@ -25,7 +25,11 @@ $webPool = [
 ];
 $crawlPool = [
     'connection' => 'redis',
-    'queue' => ['crawl'],
+    // `crawl` first = site audits (user-facing) win on ties; `link-crawl`
+    // (Tier-1.5 background) shares the same I/O-bound workers and Horizon's
+    // auto-balance shifts capacity to whichever queue has backlog — so link
+    // crawl saturates spare capacity without starving audits.
+    'queue' => ['crawl', 'link-crawl'],
     'balance' => 'auto',
     'autoScalingStrategy' => 'size',
     // Crawling is I/O-bound (workers spend ~all their page-cycle WAITING on network/DB,

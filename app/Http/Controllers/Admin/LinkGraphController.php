@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\LinkCrawlPassJob;
+use App\Jobs\LinkCrawlBatchJob;
 use App\Models\LinkCrawlFrontier;
 use App\Services\LinkGraph\LinkCrawlBudget;
+use App\Support\LinkCrawlToggle;
+use App\Support\Queues;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\View\View;
@@ -33,10 +34,11 @@ class LinkGraphController extends Controller
         $since = now()->subDays($days - 1)->startOfDay();
 
         // ── Live crawler status ─────────────────────────────────
-        $enabled = \App\Support\LinkCrawlToggle::enabled();
+        $enabled = LinkCrawlToggle::enabled();
         $envOn = (bool) config('crawler.link_crawl.enabled');
-        $paused = \App\Support\LinkCrawlToggle::runtimePaused();
-        $running = Cache::has(LinkCrawlPassJob::HEARTBEAT_KEY);
+        $paused = LinkCrawlToggle::runtimePaused();
+        // "Running" = batches in flight on the dedicated queue.
+        $running = $this->queueSize(Queues::LINK_CRAWL) > 0;
 
         $frontier = LinkCrawlFrontier::query()
             ->selectRaw('status, count(*) c')
@@ -117,7 +119,7 @@ class LinkGraphController extends Controller
                 'crawled_today' => $crawledToday,
                 'budget_spent' => $budget->spent(),
                 'budget_limit' => $budget->limit(),
-                'queue_depth' => $this->queueSize('crawl'),
+                'queue_depth' => $this->queueSize(Queues::LINK_CRAWL),
                 'frontier' => $frontier,
                 'frontier_due' => $frontierDue,
             ],
@@ -134,16 +136,20 @@ class LinkGraphController extends Controller
     public function toggle(Request $request): RedirectResponse
     {
         // Runtime pause/resume (honored by LinkCrawlToggle::enabled(), which
-        // all jobs guard on). The env flag stays the master kill switch.
+        // all jobs + the dispatcher guard on). The env flag stays the master
+        // kill switch. On resume, seed the pool immediately (the every-minute
+        // dispatcher would otherwise be the first refill).
         $on = $request->boolean('enabled');
         if ($on) {
-            \App\Support\LinkCrawlToggle::resume();
+            LinkCrawlToggle::resume();
             if (config('crawler.link_crawl.enabled')) {
-                LinkCrawlPassJob::dispatch();
+                $target = max(1, (int) config('crawler.link_crawl.target_in_flight', 40));
+                for ($i = 0; $i < $target; $i++) {
+                    LinkCrawlBatchJob::dispatch();
+                }
             }
         } else {
-            \App\Support\LinkCrawlToggle::pause();
-            Cache::forget(LinkCrawlPassJob::HEARTBEAT_KEY);
+            LinkCrawlToggle::pause();
         }
 
         return back()->with('status', 'Link crawler '.($on ? 'resumed' : 'paused').'.');

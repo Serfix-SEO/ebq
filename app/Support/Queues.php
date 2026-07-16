@@ -31,6 +31,11 @@ final class Queues
 
     public const CRAWL = 'crawl';
 
+    /** Tier-1.5 link crawler — dedicated queue so it neither starves nor is
+     *  starved by the latency-sensitive site-audit `crawl` queue; served by
+     *  the same crawl workers (added to $crawlPool, after `crawl`). */
+    public const LINK_CRAWL = 'link-crawl';
+
     public const CRAWL_FINALIZE = 'crawl-finalize';
 
     public const FLEET = 'fleet';
