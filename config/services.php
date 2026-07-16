@@ -226,6 +226,49 @@ return [
     'report' => [
         'default_ttl_days' => (int) env('REPORT_DEFAULT_TTL_DAYS', 90),
         'paid_ttl_days' => (int) env('REPORT_PAID_TTL_DAYS', 30),
+        // Short TTL for partial / no_data / mid-enrichment snapshots so a
+        // growing site auto-upgrades to a full report quickly.
+        'partial_ttl_days' => (int) env('REPORT_PARTIAL_TTL_DAYS', 10),
+
+        // Topical Trust enrichment: after a full report lands, classify the
+        // top referring domains into topics (one LLM call, homepage
+        // titles/descriptions fetched free via CrawlFetcher) and patch a
+        // "topical_trust" section into the payload. Purely additive — views
+        // are fully guarded, so disabling just hides the section.
+        'topical_trust' => [
+            'enabled' => (bool) env('REPORT_TOPICAL_TRUST_ENABLED', true),
+            // Fixed-taxonomy classification with homepage-snippet evidence is
+            // flash-class work — the cheap tier matches the premium tier on
+            // this task (~10× cheaper; A/B checked 2026-07-16). Empty = the
+            // provider's default model.
+            'model' => env('REPORT_TOPICAL_TRUST_MODEL', ''),
+            // ALL referring domains get classified (user decision 2026-07-16),
+            // processed in self-chaining batches so no single queue job runs
+            // long (retry_after must stay > job timeout — see infra docs).
+            'batch' => (int) env('REPORT_TOPICAL_TRUST_BATCH', 25),
+            'total_cap' => (int) env('REPORT_TOPICAL_TRUST_TOTAL_CAP', 1000),
+        ],
+
+        // Empty-domain enrichment: when DataForSEO has nothing for a domain,
+        // build a partial report from free/cheap signals instead of a dead
+        // end (Open PageRank + Moz + self-hosted keyword fleet + LLM
+        // junk-check + SERP competitor tally). The kill switch restores the
+        // old terminal no_data behavior exactly.
+        'enrichment' => [
+            'enabled' => (bool) env('REPORT_ENRICHMENT_ENABLED', true),
+            // When true, only domains attached as someone's Website enrich;
+            // arbitrary Site Explorer lookups stay terminal no_data.
+            'attached_only' => (bool) env('REPORT_ENRICHMENT_ATTACHED_ONLY', false),
+            // Max keyword rows surfaced per section (site keywords / competitor
+            // opportunities / GSC queries). The fleet returns hundreds; tables
+            // scroll, so show a generous slice.
+            'keyword_rows' => (int) env('REPORT_ENRICHMENT_KEYWORD_ROWS', 100),
+            'max_pages' => (int) env('REPORT_ENRICHMENT_MAX_PAGES', 3),
+            'serp_query_cap' => (int) env('REPORT_ENRICHMENT_SERP_CAP', 8),
+            'llm_max_tokens' => (int) env('REPORT_ENRICHMENT_LLM_MAX_TOKENS', 1200),
+            'ideas_timeout_minutes' => (int) env('REPORT_ENRICHMENT_IDEAS_TIMEOUT_MIN', 12),
+            'poll_seconds' => (int) env('REPORT_ENRICHMENT_POLL_SECONDS', 30),
+        ],
     ],
 
     // Moz Links API — real Domain Authority + Page Authority + Spam Score for
@@ -262,6 +305,9 @@ return [
         'gap_collect_timeout_minutes' => (int) env('COMPETITIVE_GAP_COLLECT_TIMEOUT_MINUTES', 5),
         // Max keywords verified against the live SERP per gap analysis.
         'gap_verify_max' => (int) env('COMPETITIVE_GAP_VERIFY_MAX', 25),
+        // Per-pass cap on FREE cached-SERP verifications (no Serper spend —
+        // bounded by job runtime, not billing).
+        'gap_verify_cached_max' => (int) env('COMPETITIVE_GAP_VERIFY_CACHED_MAX', 150),
         // Also verify Shared/Weak rows (not just Missing) when true.
         'gap_verify_include_shared' => (bool) env('COMPETITIVE_GAP_VERIFY_INCLUDE_SHARED', false),
         // TTL (days) for the shared, cross-client SERP cache (serp_results).

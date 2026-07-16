@@ -27,6 +27,39 @@ class RankTrackerConfig
     /**
      * Build a full HTTPS URL from the connected domain and a path fragment.
      */
+    /**
+     * Parse a single "target" input (bare domain, domain/path, or full URL)
+     * into its host and, when a real path is present, the full https target
+     * URL. `url` is null for a domain-only input (match any URL on the host).
+     *
+     * @return array{host: string, url: ?string}
+     */
+    public static function parseTarget(string $input): array
+    {
+        $raw = trim($input);
+        if ($raw === '') {
+            return ['host' => '', 'url' => null];
+        }
+
+        $parseable = preg_match('#^https?://#i', $raw) ? $raw : 'https://'.$raw;
+        $parts = parse_url($parseable);
+        $host = self::normalizeHost((string) ($parts['host'] ?? ''));
+        if ($host === '') {
+            return ['host' => '', 'url' => null];
+        }
+
+        $path = (string) ($parts['path'] ?? '');
+        if (! empty($parts['query'])) {
+            $path .= '?'.$parts['query'];
+        }
+        if (! empty($parts['fragment'])) {
+            $path .= '#'.$parts['fragment'];
+        }
+        $path = ($path === '' || $path === '/') ? '' : $path;
+
+        return ['host' => $host, 'url' => $path === '' ? null : 'https://'.$host.$path];
+    }
+
     public static function normalizeTargetUrl(string $domain, ?string $pathOrUrl): ?string
     {
         $pathOrUrl = trim((string) $pathOrUrl);

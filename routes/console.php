@@ -15,6 +15,13 @@ Schedule::command('ebq:track-rankings')->hourly();
 // Monthly refresh of report snapshots for paid-owned domains (30-day cadence).
 // Free/anonymous domains refresh lazily on query (90-day TTL) instead.
 Schedule::command('ebq:refresh-paid-reports')->dailyAt('04:15');
+// Free-feed refresh of the accumulating domain-intelligence store (Open
+// PageRank bulk + local CC sidecar) — independent of client lifecycle.
+Schedule::command('ebq:refresh-domain-metrics')->monthlyOn(3, '02:40')->withoutOverlapping();
+// Tier-1.5 link crawler (no-op unless LINK_CRAWL_ENABLED=true): reseed the
+// frontier daily, keep the pass chain alive every few minutes.
+Schedule::command('ebq:seed-link-crawl')->dailyAt('01:20')->withoutOverlapping();
+Schedule::command('ebq:link-crawl-supervisor')->everyThreeMinutes()->withoutOverlapping();
 // Nightly auto-discovery of backlink prospects from each website's recent
 // page audits. Idempotent + freshness-gated, so re-runs are KE-safe.
 Schedule::command('ebq:auto-discover-prospects')->dailyAt('03:30');

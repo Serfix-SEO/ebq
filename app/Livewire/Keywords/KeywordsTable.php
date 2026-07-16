@@ -151,6 +151,29 @@ class KeywordsTable extends Component
             }
         }
 
-        return view('livewire.keywords.keywords-table', compact('rows', 'cannibalized', 'tracked', 'keMetrics', 'languages'));
+        // Fallback keyword suggestions (Site Explorer enrichment: keyword-server
+        // + competitor opportunities) when this site has no usable GSC data —
+        // not connected, no rows, or only scrap auth/nav queries. Mirrors the
+        // report so /keywords is never a dead end. Only on the unfiltered first
+        // page, so filtering/sorting a real list never triggers it.
+        $suggestions = null;
+        if ($this->websiteId
+            && $this->search === ''
+            && ($rows instanceof \Illuminate\Contracts\Pagination\Paginator ? $rows->currentPage() === 1 : true)
+            && Auth::user()?->canViewWebsiteId($this->websiteId)) {
+            $website = \App\Models\Website::find($this->websiteId);
+            if ($website !== null) {
+                $topQueries = $rows instanceof \Illuminate\Contracts\Pagination\Paginator
+                    ? $rows->getCollection()->pluck('query')->map(fn ($q) => (string) $q)->all()
+                    : [];
+                $needsFallback = $topQueries === []
+                    || \App\Support\KeywordJunkHeuristic::mostlyJunk($topQueries, (string) $website->domain);
+                if ($needsFallback) {
+                    $suggestions = app(\App\Services\Keywords\WebsiteKeywordSuggestions::class)->for($website);
+                }
+            }
+        }
+
+        return view('livewire.keywords.keywords-table', compact('rows', 'cannibalized', 'tracked', 'keMetrics', 'languages', 'suggestions'));
     }
 }

@@ -36,13 +36,18 @@ class ConnectGoogle extends Component
         $user = Auth::user();
         $this->googleConnected = (bool) $user?->googleAccounts()->exists();
 
+        // Prefill the domain regardless of Google state — it may come from
+        // the OAuth-bounce stash below OR from the Site Explorer signup
+        // funnel (RegisteredUserController stashes the analyzed domain here
+        // on the pay-first path so the user never has to retype it).
+        $this->domain = (string) session()->pull('onboarding.domain', $this->domain);
+
         if ($this->googleConnected) {
             $this->step = 2;
             // Restore any in-progress selections that were stashed before
             // bouncing out to OAuth to connect an extra account.
             $this->gaSelection = (string) session()->pull('onboarding.ga_selection', $this->gaSelection);
             $this->gscSelection = (string) session()->pull('onboarding.gsc_selection', $this->gscSelection);
-            $this->domain = (string) session()->pull('onboarding.domain', $this->domain);
             $this->fetchGoogleData();
         }
     }

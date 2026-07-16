@@ -29,6 +29,7 @@ class WebsiteReportSnapshot extends Model
         'backlinks_total',
         'dataforseo_cost_usd',
         'payload',
+        'enrichment_state',
         'status',
         'fetched_at',
     ];
@@ -40,6 +41,7 @@ class WebsiteReportSnapshot extends Model
     {
         return [
             'payload' => 'array',
+            'enrichment_state' => 'array',
             'fetched_at' => 'datetime',
             'dataforseo_cost_usd' => 'float',
         ];

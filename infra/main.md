@@ -267,6 +267,26 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-16 (Trust Score / Citation Score — own authority metrics)** — New
+  0–100 TF/CF-analogue scores computed deterministically from data already in
+  the report payload (zero new provider cost). Pure
+  `app/Services/Reports/AuthorityScoreCalculator.php` + curated
+  `config/trusted_seed_domains.php`; wired compute-on-write
+  (`ClientReportService::assemble()`/`assemblePartial()`) + backfill-on-read
+  (`withTraffic()` choke point) with deliberately NO `PAYLOAD_SCHEMA` bump so
+  cached snapshots gain scores without paid regeneration. UI: `/backlinks`
+  ring cards + band pills, `/competitors` pill, report web/PDF 6-up gauges.
+  Never label these "Trust Flow"/"Citation Flow" (Majestic trademarks).
+  Same change also shipped: **Common Crawl web-graph SQLite sidecar**
+  (`ebq:import-cc-webgraph`, 121M domains, harmonic+PageRank percentiles feed
+  formula v2), **Topical Trust enrichment** (`EnrichTopicalTrustJob`, one LLM
+  call, topics cached forever in `domain_metrics`), **domain-intelligence
+  asset** (`domain_metrics`+`domain_metric_history`, monthly
+  `ebq:refresh-domain-metrics` free-feed sweep, churn-proof), and **Tier-1
+  passive link graph** (`EdgeRecorder` → `link_domains/link_urls/link_edges`
+  from crawls/enrichment; worker box B needs deploy+Horizon restart).
+  Details: `infra/reports/client-report.md` § "Trust Score / Citation Score".
+
 - **2026-07-13 (post-signup landing hub + Priority Action Queue false "all caught
   up" — follow-up to the queued-window fix above)** — Two changes:
   1. **New post-signup landing page.** `ConnectGoogle::finishOnboarding()`
@@ -1363,6 +1383,23 @@ known gaps were flagged during the sweep:
   `10.0.0.3`; **MariaDB** not MySQL; Mistral LLM; co-located Postal/Jitsi). 46 docs total.
   Flagged prod risks: `APP_ENV=local` + `APP_DEBUG=true`, stale `MAIL_HOST`, un-versioned
   worker compose file.
+- **2026-07-15** — **Site Explorer funnel now attaches the domain + empty-domain partial
+  reports.** New `WebsiteAttachService` (extracted WebsitesList recipe) runs at signup /
+  zero-website signin, so the funnel domain gets a real Website + crawl + GSC import (pay-first
+  branch hands the domain to onboarding via `session('onboarding.domain')` instead of orphaning
+  it). A null DataForSEO summary no longer dead-ends: `ReportEnrichmentService` +
+  `EnrichEmptyReportJob`/`FinalizeReportEnrichmentJob` build a `status='partial'` report
+  (OPR + Moz + self-hosted keyword fleet + one-call LLM junk-keyword check + capped SerpCache
+  competitor tally), 10-day `partial_ttl_days`, source-badged sections, kill switch
+  `REPORT_ENRICHMENT_ENABLED`. Also surfaced paid-but-hidden DataForSEO data (top_pages section,
+  summary `profile_details`, competitor `organic_keywords`; `etv` deliberately excluded) and an
+  async "Estimated keywords" section on full reports. Same-day follow-ups: SERP
+  competitor discovery runs on EVERY enrichment (not just the junk-keyword fallback);
+  GSC-connected owners see their REAL Search Console queries instead of estimates
+  (render-time merge, never in the shared snapshot); keyword sections render above
+  competitors for new sites / below for established; Keyword Gap deep-research links
+  (own-site context only); admin "Remove report cache" on /admin/site-explorer-usage.
+  Docs: [reports/client-report.md](./reports/client-report.md).
 - **2026-07-13** — Shipped the customer-facing **backlink/authority report** + homepage
   **"Analyze website" funnel**. New providers `DataForSeoBacklinkClient` (backlink profile) +
   `MozLinksClient` (DA/PA/Spam, free tier). Shared per-domain cache `website_report_snapshots`

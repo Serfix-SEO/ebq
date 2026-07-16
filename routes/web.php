@@ -35,6 +35,7 @@ Route::view('/', 'landing')->name('landing');
 Route::view('/features', 'features')->name('features');
 Route::view('/wordpress-plugin', 'wordpress-plugin')->name('wordpress-plugin');
 Route::view('/pricing', 'pricing')->name('pricing');
+Route::view('/trust-score', 'trust-score')->name('trust-score');
 Route::view('/website-revamp', 'website-revamp')->name('website-revamp');
 Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
@@ -58,6 +59,15 @@ Route::post('/analyze', [\App\Http\Controllers\WebsiteAnalyzeController::class, 
 // Report view. Guests see a blurred MOCK teaser + signup modal (no API call);
 // authed (NOT verified-gated) users see the real report — first value lands
 // right after signup, before email verification.
+Route::get('/report/status', [\App\Http\Controllers\ReportViewController::class, 'status'])
+    ->middleware(['auth', 'throttle:60,1'])
+    ->name('report.status');
+Route::get('/report/disavow', \App\Http\Controllers\ReportDisavowController::class)
+    ->middleware(['auth', 'throttle:20,1'])
+    ->name('report.disavow');
+Route::get('/report/anchor-links', [\App\Http\Controllers\ReportViewController::class, 'anchorLinks'])
+    ->middleware(['auth', 'throttle:10,1'])
+    ->name('report.anchor-links');
 Route::get('/report/view', [\App\Http\Controllers\ReportViewController::class, 'show'])
     ->middleware('throttle:60,1')
     ->name('report.view');
@@ -208,6 +218,9 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::redirect('/competitive', '/keyword-gap')->name('competitive.index');
     // Competitor auto-discovery — reachable from the Gap tab.
     Route::view('/competitive/competitors', 'competitive.competitors')->middleware('feature:keywords')->name('competitive.competitors');
+    // Competitor Discovery — find competitors for ANY url (keyword-fleet → LLM
+    // junk-check → crawl-if-scrap → SERP tally). Orbit menu.
+    Route::view('/competitor-discovery', 'competitor-discovery')->middleware('feature:keywords')->name('competitor-discovery.index');
     Route::view('/rank-tracking', 'rank-tracking.index')->middleware('feature:rank_tracking')->name('rank-tracking.index');
     Route::get('/rank-tracking/{keywordId}', fn (string $keywordId) => view('rank-tracking.show', ['keywordId' => $keywordId]))
         ->middleware('feature:rank_tracking')
@@ -336,6 +349,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/crawler', [\App\Http\Controllers\Admin\CrawlerController::class, 'index'])->name('crawler.index');
 
+    // Link-graph engine dashboard (Tier-1.5 crawler + discovery analytics).
+    Route::get('/link-graph', [\App\Http\Controllers\Admin\LinkGraphController::class, 'index'])->name('link-graph.index');
+    Route::post('/link-graph/toggle', [\App\Http\Controllers\Admin\LinkGraphController::class, 'toggle'])->name('link-graph.toggle');
+    Route::post('/link-graph/reseed', [\App\Http\Controllers\Admin\LinkGraphController::class, 'reseed'])->name('link-graph.reseed');
+
     // Ops dashboard: failed jobs + never-crawled stuck sites + queue depths.
     // Companion to the ebq:failed-jobs-alert mailed digest (2026-07-06 incident).
     Route::get('/ops', [\App\Http\Controllers\Admin\OpsController::class, 'index'])->name('ops.index');
@@ -374,6 +392,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/bug-reports/{bugReport}/resolve', [\App\Http\Controllers\Admin\BugReportController::class, 'resolve'])->name('bug-reports.resolve');
     Route::get('/usage', [AdminUsageController::class, 'index'])->name('usage.index');
     Route::get('/site-explorer-usage', [AdminSiteExplorerUsageController::class, 'index'])->name('site-explorer-usage.index');
+    Route::post('/site-explorer-usage/clear-cache', [AdminSiteExplorerUsageController::class, 'clearCache'])->name('site-explorer-usage.clear-cache');
     Route::get('/plugin-releases', [AdminPluginReleaseController::class, 'index'])->name('plugin-releases.index');
     Route::post('/plugin-releases/toggle-updates', [AdminPluginReleaseController::class, 'toggleUpdates'])->name('plugin-releases.toggle-updates');
     Route::post('/plugin-releases', [AdminPluginReleaseController::class, 'store'])->name('plugin-releases.store');

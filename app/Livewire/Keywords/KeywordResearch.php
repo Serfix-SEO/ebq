@@ -31,7 +31,16 @@ class KeywordResearch extends Component
     #[Url]
     public string $kw = '';
 
-    /** @var array{target?: string, keywords?: list<string>, mode?: ?string, nonce?: string} */
+    /**
+     * Cross-page website handoff: a site URL to run keyword discovery on
+     * directly (website mode). Used by the /keywords fallback "Explore all
+     * keyword ideas" deep-link so the full sort/filter/group/AI-cluster
+     * surface opens pre-loaded with the site's (or a competitor's) keywords.
+     */
+    #[Url]
+    public string $url = '';
+
+    /** @var array{target?: string, keywords?: list<string>, mode?: ?string, url?: ?string, scope?: ?string, nonce?: string} */
     public array $handoff = [];
 
     public function mount(): void
@@ -45,6 +54,21 @@ class KeywordResearch extends Component
         }
         if (! in_array($this->tab, self::TABS, true)) {
             $this->tab = 'ideas';
+        }
+
+        // Website deep-link (e.g. /keywords "Explore all keyword ideas") wins
+        // over a seed handoff: open the Ideas tab in website mode on the URL.
+        if ($this->url !== '') {
+            $this->tab = 'ideas';
+            $this->handoff = [
+                'target' => 'ideas',
+                'mode' => 'website',
+                'url' => $this->url,
+                'scope' => 'site',
+                'nonce' => (string) Str::uuid(),
+            ];
+
+            return;
         }
 
         if ($this->kw !== '') {
@@ -95,6 +119,8 @@ class KeywordResearch extends Component
         return [
             'keywords' => $this->handoff['keywords'] ?? [],
             'mode' => $this->handoff['mode'] ?? null,
+            'url' => $this->handoff['url'] ?? null,
+            'scope' => $this->handoff['scope'] ?? null,
         ];
     }
 

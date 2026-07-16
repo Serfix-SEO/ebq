@@ -117,6 +117,38 @@ class KeywordGapVerifyTest extends TestCase
         $this->assertSame(2, KeywordGapRow::whereNotNull('verified_at')->count());
     }
 
+    public function test_cached_serps_verify_for_free_beyond_the_live_cap(): void
+    {
+        config(['services.competitive.gap_verify_max' => 1, 'services.competitive.gap_verify_cached_max' => 150]);
+        Queue::fake();
+        $website = $this->website();
+        $analysis = $this->analysis($website);
+        $analysis->forceFill(['verify_status' => 'verifying', 'verify_total' => 4])->save();
+
+        // 3 keywords already have FRESH cached SERPs (free); 2 are misses.
+        foreach (['c1', 'c2', 'c3', 'm1', 'm2'] as $i => $k) {
+            $this->row($analysis->id, $k, (5 - $i) * 100);
+        }
+        foreach (['c1', 'c2', 'c3'] as $k) {
+            \App\Models\SerpCacheEntry::create([
+                'query_hash' => \App\Models\SerpCacheEntry::hash($k, 'us'), 'gl' => 'us', 'query' => $k,
+                'payload' => ['organic' => [['link' => 'https://rival.com/', 'position' => 2, 'domain' => 'rival.com']]],
+                'fetched_at' => now(), 'expires_at' => now()->addDays(7),
+            ]);
+        }
+
+        // Live budget = 1 -> Serper hit exactly once for the first miss.
+        $serper = Mockery::mock(SerperSearchClient::class);
+        $serper->shouldReceive('query')->times(1)->andReturn(['organic' => [['link' => 'https://rival.com/', 'position' => 5]]]);
+        $this->app->instance(SerperSearchClient::class, $serper);
+
+        app(KeywordGapService::class)->verify($analysis->id);
+
+        // All 3 cached rows verified for free + 1 live = 4; the 2nd miss stays unverified.
+        $this->assertSame(4, KeywordGapRow::whereNotNull('verified_at')->count());
+        $this->assertNull(KeywordGapRow::where('keyword', 'm2')->first()->verified_at);
+    }
+
     public function test_quota_mid_run_stops_and_records_partial(): void
     {
         Queue::fake();

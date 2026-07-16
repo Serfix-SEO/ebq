@@ -37,6 +37,13 @@ class KeywordIntentClassifier
     private const TRANSACTIONAL = [
         'buy', 'price', 'prices', 'pricing', 'cost', 'cheap', 'cheapest', 'discount', 'coupon', 'deal',
         'deals', 'order', 'for sale', 'near me', 'hire', 'quote', 'free trial', 'subscription', 'purchase',
+        // Tool / "do it now" nouns — "name generator", "logo maker", "pdf
+        // converter", "mortgage calculator" are use-a-tool (do) intent. Only
+        // NOUNS here on purpose: bare verbs (create/make/generate) would wrongly
+        // pull how-to queries ("how to make money") out of informational, since
+        // transactional is matched first.
+        'generator', 'maker', 'creator', 'tool', 'editor', 'builder', 'converter', 'calculator', 'finder',
+        'randomizer', 'randomiser', 'checker', 'picker', 'analyzer', 'analyser', 'translator', 'planner',
     ];
 
     private const NAVIGATIONAL = [

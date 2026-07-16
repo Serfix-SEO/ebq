@@ -37,13 +37,21 @@ Cross-tenant shared cache (plain `HasUlids`, central connection, like
 
 **Freshness — `App\Services\ReportFreshnessGate`:** a snapshot is fresh while
 younger than its TTL — **90 days default**, **30 days when the domain is a
-`Website` owned by an `isPro()` account** (`ttlDaysFor()` / `isPaidOwned()`).
-Fresh snapshots are served with NO provider call.
+`Website` owned by an `isPro()` account** (`ttlDaysFor()` / `isPaidOwned()`),
+and **10 days (`partial_ttl_days`) whenever the snapshot is NOT a full report**
+(status `partial` / `no_data` / `enriching`) so a young site that gains real
+backlink data auto-upgrades to a full report on the next view. Fresh snapshots
+are served with NO provider call.
 
 **Generation — `App\Jobs\GenerateWebsiteReport`** (`tries=1`, `uniqueFor=1800`,
 queue `default`): freshness-gated; fetches DataForSEO (bounded) + Moz (own
 domain), assembles via `ClientReportService::assemble()`, upserts the snapshot.
-Never caches a broken report (aborts if DataForSEO summary is null). Paid-owned
+Never caches a broken report. **A null DataForSEO summary no longer dead-ends
+(2026-07-15):** eligible domains (non-sandbox + `REPORT_ENRICHMENT_ENABLED`) go
+`status='enriching'` and hand off to the empty-domain enrichment pipeline below;
+`no_data` is now written only for ineligible cases. A completed FULL generation
+also dispatches `EnrichEmptyReportJob(keywordsOnly: true)` so every report gains
+an "Estimated keywords" section from the self-hosted keyword fleet. Paid-owned
 domains are refreshed monthly by `ebq:refresh-paid-reports` (`RefreshPaidReports`,
 scheduled `dailyAt('04:15')`, mirrors the TrackRankings due-filter pattern).
 
@@ -77,6 +85,242 @@ PDF: `App\Services\Reports\ClientReportPdfRenderer` (mirrors `ReportPdfRenderer`
 A4 portrait, `isRemoteEnabled`). **dompdf-SVG spike passed** — arc-path rings +
 rect bars render (verified: valid `%PDF-`).
 
+## Backlinks list = ALL links, top-1000 by rank (2026-07-16)
+
+`DataForSeoBacklinkClient::backlinksSample()` fetches `mode=as_is` (was
+`one_per_domain`): every live link, capped at the 1000-row request limit,
+rank-sorted. Same single request/cost. Rationale: grouped mode hid links
+whose anchors appeared in the anchors aggregate (e.g. 富88 on
+enviromiddleeast.com) — read as a data bug. The one-per-domain view still
+exists as a **client-side toggle** ("All links / One per domain") in the
+backlinks tables — rows arrive rank-sorted, so first-row-per-domain ≡ the old
+grouped sample (dup rows marked lazily from `data-domain` by
+`reports/partials/table-tools.blade.php`, which also owns filter + sort +
+anchor→backlinks search). Zero-match filters show an honest note with the
+top-1000 cap; nothing is silently hidden. Old snapshots keep grouped data
+until their natural regeneration.
+
+## Per-plan backlink-row economics (2026-07-16)
+
+Three plan knobs in `api_limits.report.*` (admin → Plans, validated in
+`Admin\PlanController`), all RENDER/consumption-side — the shared snapshot
+always stores the full 1,000-row fetch (fetch-side caps would poison the
+cross-tenant cache for <$0.05/report savings):
+- `monthly_backlink_rows` — Ahrefs-style monthly row quota (trial 1,000 /
+  solo 100k / pro 500k / agency 1.2M / enterprise unlimited). Metered by
+  `app/Services/Reports/BacklinkRowQuota.php` via UsageMeter provider
+  `backlink_rows` (subscription-anchored windows, ClientActivity rows,
+  reserve→log(release) pair). Charged ONCE per (user, domain, window) —
+  repeat views free (cache-deduped). Exhausted → 25-row teaser + "monthly
+  limit reached" banner; partial → "Showing X of Y (N of M monthly rows
+  used)" + upgrade link. Wired in `ReportViewController::resolve()`
+  (`payload['_backlink_view']`); public shares uncapped.
+- `max_backlink_rows` — per-view render cap (default/seeded 1,000).
+- `allow_link_drilldown` — the paid per-anchor index fetch (trial 0 = 403 +
+  upgrade hint; others 1; enterprise null = allowed).
+
+## Tier-1.5 targeted link crawler (2026-07-16, dormant)
+
+Actively crawls tracked domains (domain_metrics) to discover their OUTBOUND
+links, feeding the permanent link graph — the "hunt on purpose" upgrade over
+Tier-1's passive harvest. **OFF by default** (`LINK_CRAWL_ENABLED`, config
+`crawler.link_crawl.*`); a new outbound web crawler activates deliberately.
+
+Pieces (all reuse the site-audit toolchain — CrawlFetcher, ProxyPool,
+DomainRateLimiter, RobotsTxtParser, EdgeRecorder, the Bus::batch
+self-perpetuating pass pattern; runs on the `crawl` queue / box B + ephemeral
+fleet):
+- `link_crawl_frontier` table + `App\Models\LinkCrawlFrontier` — flat host/URL
+  work-list (distinct from `website_pages`, which is crawl_site_id-scoped).
+- `ebq:seed-link-crawl` (scheduled 01:20) — queues homepages of important
+  domains (tier=active, then times_seen, then cc harmonic rank).
+- `LinkCrawlPassJob` → `LinkCrawlBatchJob`: per URL robots.txt (cached 6h) →
+  DomainRateLimiter politeness → proxy-first fetch → HtmlAuditor::links() →
+  `EdgeRecorder::record(url, external, SOURCE_OWN_CRAWL)`; depth-0 homepages
+  seed ≤`max_pages_per_host` internal pages. Self-chains via the batch
+  finally hook while work + budget remain.
+- `App\Services\LinkGraph\LinkCrawlBudget` — Redis daily page cap
+  (`daily_budget`, default 150k, fleet-wide).
+- `ebq:link-crawl-supervisor` (every 3 min) — restarts the pass chain when the
+  cache heartbeat is absent and due work exists.
+
+**To activate:** `LINK_CRAWL_ENABLED=true` on BOTH boxes + Horizon restart
+(box B runs the crawl queue). ACTIVATED 2026-07-16.
+
+**Admin dashboard** `/admin/link-graph` (`Admin\LinkGraphController`, nav "Link
+Graph"): live crawler status (running/idle/paused via cache heartbeat), domains
+crawled today, daily-budget bar, frontier breakdown, **new-backlinks-per-day
+bar chart with day-range (7/14/30/90) + source filters**, edges-by-source
+split, most-linked-to domains, recent-discovery feed. Pause/resume without an
+env edit via `App\Support\LinkCrawlToggle` (runtime cache override that all
+job guards honor; env flag stays the master kill switch) + a reseed button.
+Tests: `tests/Feature/LinkCrawlTest.php`.
+
+## Link-risk / toxicity layer + disavow export (2026-07-16)
+
+`app/Services/Reports/BacklinkToxicityScorer.php` — deterministic risk
+interpretation over the backlink profile, run on EVERY read inside
+`ClientReportService::scored()` (pure payload math, old snapshots gain it
+instantly). Signals: (1) link-selling / hacked-site / gambling / pharma
+anchor regexes (telegram handles, "hacked", "seo backlinks", CJK gambling
+terms…), (2) link networks — ≥3 numbered-stem sibling domains
+(link-legion-23.xyz…) with no authority, (3) disposable-TLD + zero-authority
+combos (supporting signal → 'medium'). Output: per-row `tox`/`tox_why` on
+backlinks / top_referring_domains / anchors rows + `payload['link_risk']`
+(level high|medium|null, toxic_domains ≤500 for the disavow file,
+toxic_anchor_examples, exact_pct with over_optimized ≥40% flag).
+
+UI: red/amber "link risk" panel (reports/partials/link-risk.blade.php) on
+/backlinks + report web view with counts, top sold-link anchors, penalty-risk
+warning, and a **Download disavow file** button; ⚠ Toxic / Risky chips on
+flagged rows in all backlink/referring/anchor tables. Disavow export:
+`GET /report/disavow?url=` (`ReportDisavowController`, auth+throttle,
+read-only) → Google-format `domain:` lines with review-first header.
+Tests: `tests/Feature/BacklinkToxicityTest.php`.
+
+## TrustSignal / CiteSignal / TopicSignal (2026-07-16)
+
+**Proprietary metric names (user decision 2026-07-16):** UI says **TrustSignal
+(TS)**, **CiteSignal (CS)**, **TopicSignal (TT)** — payload keys stay
+`scores.trust/citation/topical` and row keys `ts`/`cs`. Table column headers
+may use the short forms Trust/Citation. Old internal doc references to "Trust
+Score/Citation Score" mean TS/CS.
+
+**TopicSignal (scores.topical):** `TT = round(TS · (0.4 + 0.6·relevant_pct/100))`,
+null until a TrustSignal AND a topical sample exist. Deterministic — topical
+inputs live in the payload (topics classified once, cached forever). Computed
+in `AuthorityScoreCalculator::withTopicalScore()` on EVERY augment call (not
+gated by scores.version, because the topical section fills batch-by-batch
+after the scores are stamped).
+
+**Topical classification covers ALL referring domains** (user chose full
+coverage): `EnrichTopicalTrustJob` self-chains in batches
+(`services.report.topical_trust.batch`=25, `total_cap`=1000, MAX_ROUNDS 60
+backstop) — each run classifies the next uncached batch, merges into
+`payload.topical_trust.rows`, recomputes topics/relevant_pct over everything
+so far, stamps `sample`/`total`, and re-dispatches itself until done. The UI
+shows "N of M referring domains analyzed" with a spinner and polls
+`report.status` (`topical_done`/`topical_total`), reloading once complete.
+Pending stub (`topical_trust.pending`, stamped by GenerateWebsiteReport) is
+cleared on every job bail-out so the spinner can never get stuck; the read
+side also expires stubs older than 30 min. NO full-page reload loops anywhere
+— all pending UIs (report build progress stepper, backlinks pending, topical
+cards) poll the tiny authed JSON endpoint `GET /report/status` and reload
+exactly once when ready.
+
+Our own Majestic-TF/CF-analogue 0–100 metrics, computed **deterministically from
+data already in the payload** — zero new provider cost. `App\Services\Reports\
+AuthorityScoreCalculator` (pure, no I/O; seeds injectable for tests):
+
+- **Citation Score** (popularity): weighted blend, weights renormalize when a
+  component is missing — OPR `popularity.score×10` (w .50) + `gauges.
+  authority_score` (DataForSEO rank/10, w .30) + `min(100, 100·log10(1+
+  referring_domains)/6)` (w .20).
+- **Trust Score** (quality): weighted mean (null if <2 components) of
+  inverse spam (.25), strong-referrer share — rows with `rank≥300 or opr≥4.0`,
+  `min(100, 250·share)`, needs ≥3 rows (.25), dofollow `min(100, pct·1.25)`
+  (.15), IP/subnet diversity `min(1, avg(ips/rd,subnets/rd)/0.8)·100` (.15),
+  gov/edu/mil TLD share ×1000 (.10), curated seed matches ×20
+  (`config/trusted_seed_domains.php`, registrable-domain matching, deduped)
+  (.10). **Ceiling: `TS ≤ CS+10`** (55 when CS null) — keeps pairs plausible.
+- Per-row scores on `top_referring_domains`/`backlinks`/`competitors` (v3):
+  `cs` = blend of OPR (.40) + CC PageRank percentile (.35) + DataForSEO rank
+  (.25), renormalized; `ts` = the row domain's CC harmonic-centrality
+  percentile, with a floor of 85 for curated seed domains, null (renders "—")
+  when neither is known. Row percentiles are batch-stashed as
+  `cc_citation`/`cc_trust` by `ClientReportService::stashRowCcRanks()` (one
+  chunked sidecar lookup per payload). Dashboard referring-domains table +
+  report web/PDF tables show separate Trust and Citation columns.
+
+**Wiring — compute-on-write + backfill-on-read, deliberately NO
+`PAYLOAD_SCHEMA` bump** (a bump triggers paid DataForSEO regeneration via
+`ReportViewController::resolve()`; scores need no new provider data):
+`augment()` runs at the end of `assemble()`/`assemblePartial()` AND first thing
+in `withTraffic()` — the single read choke point (report view, `/backlinks`,
+`/competitors`, public share, PDF export) — so every pre-score cached snapshot
+gains scores in-memory on first render, no migration, no write-back. Idempotent
+via `payload['scores']['version']`; **formula changes MUST bump
+`AuthorityScoreCalculator::VERSION`**.
+
+UI: `/backlinks` gets two ring cards ("Link quality"/"Link popularity",
+i18n'd in `lang/en.json`+`ar.json`) and band-colored pills (≥60 emerald /
+30–59 amber / <30 rose — all classes verified in the compiled Tailwind
+bundle) replacing the old `opr/10` Authority cells (which remain as
+fallback when `cs` is null); `/competitors` same pill; report web+PDF gauge
+rows are 6-up with Trust/Citation first (report bodies stay hardcoded
+English by convention).
+
+**Trademark rule: never label these "Trust Flow"/"Citation Flow" or mention
+Majestic in client-facing copy.** Tests:
+`tests/Unit/AuthorityScoreCalculatorTest.php` (exact-value fixtures),
+`BacklinksTest::test_scores_are_backfilled_onto_pre_score_snapshots_without_regeneration`,
+`ClientReportTest::test_assemble_emits_trust_and_citation_scores`.
+
+### Common Crawl web-graph sidecar (formula v2 input)
+
+`app/Services/Reports/CcDomainRanks.php` reads a **read-only SQLite sidecar**
+at `storage/app/cc-domain-ranks.sqlite` (~121M domains: harmonic-centrality
+rank = trust signal, PageRank rank = citation signal; percentile =
+`100·(1−log10(rank)/log10(N))`, N from the sidecar `meta` table; registrable-
+domain fallback). Built by **`ebq:import-cc-webgraph`** (quarterly, manual —
+pass the new `--release=` name from the CC blog; heavy lifting is
+`zcat|awk|sort|sqlite3` at C speed — the **sort stage is load-bearing**: the
+table is WITHOUT ROWID keyed by domain, and unsorted input degrades to random
+b-tree inserts that run ~10× slower at 121M rows (observed live 2026-07-16;
+sorted full import ≈ 20 min). Temp-file + atomic rename so readers never see
+a half-built DB; `--top`/`--total` for trimmed imports;
+`--snapshot-history` also updates `domain_metrics` cc ranks + appends history
+rows). Deliberately SQLite NOT MariaDB — 121M rows would blow the 2G InnoDB
+buffer pool. `ClientReportService::scored()` stashes the target's percentiles
+into `payload['cc']` before augment; absent sidecar/domain → calculator
+weights renormalize (v1-equivalent behavior). Quarterly data refreshes do NOT
+bump the formula VERSION; formula changes do.
+
+### Topical Trust enrichment (payload `topical_trust`)
+
+`app/Jobs/EnrichTopicalTrustJob.php`, dispatched from `GenerateWebsiteReport`
+after the ready write, config-gated `services.report.topical_trust.enabled`
+(`REPORT_TOPICAL_TRUST_ENABLED`, default on; `max_domains` 15). Flow: top
+referring domains → homepage title/meta via `CrawlFetcher` (free,
+SSRF-guarded) → **one** `completeJson` call (fixed 15-topic taxonomy +
+`relevant` bool vs the target site) → guarded payload patch (same pattern as
+ReportEnrichmentService; failure = section absent). Topics are **cached
+permanently in `domain_metrics.topic`** — each domain is ever classified once
+platform-wide, so LLM cost decays toward zero. Deliberately does NOT feed the
+Trust Score number (scores stay deterministic). Renders as topic chips +
+relevance bar on `/backlinks` + report web body (`topical_trust` fully
+guarded). Tests: `tests/Feature/EnrichTopicalTrustJobTest.php`.
+
+### Domain-intelligence asset (`domain_metrics` + history)
+
+`app/Services/DomainIntel/DomainMetricsRecorder.php` harvests every non-
+sandbox report generation (main + top-100 referring + top-25 competitor
+domains) into `domain_metrics` — COALESCE upserts (nulls never erase),
+`times_seen` increments, `first_seen_at` write-once, tier only promotes
+(active = owned website). **Rows are never deleted on client churn** — free
+feeds keep their history growing. `domain_metric_history` is append-only
+`(domain, source, captured_on)` — sources `opr | cc_harmonic | cc_pagerank`.
+Monthly `ebq:refresh-domain-metrics` (scheduled `monthlyOn(3, 02:40)`) sweeps
+stale domains through the free OPR bulk API (quota governor: staleness-first,
+`times_seen`-ordered, default cap 28k of the 30k/mo free quota) + re-reads the
+local CC sidecar. Tests: `tests/Feature/DomainMetricsRecorderTest.php`.
+
+### Tier-1 link graph (passive edge harvesting)
+
+`app/Services/LinkGraph/EdgeRecorder.php` deposits external outlinks of pages
+we ALREADY fetch into append-only tables `link_domains` (registrable-domain
+dictionary) / `link_urls` (from-page, sha1-path-hash unique) / `link_edges`
+(unique `from+to+source`, sources `own_crawl | cc_wat | enrichment`,
+dofollow sticky-true, `first_seen`/`last_seen`, never deleted). Call sites:
+`PageCrawlProcessor` (post-analysis, every crawled page) +
+`ReportEnrichmentService::fetchPageText()` homepage fetch. `HtmlAuditor::
+links()` now carries a `nofollow` bool per link. Recorder NEVER throws
+(internally caught) — a failure can't break the parent crawl. Growth ~2–4
+GB/yr; schema deliberately ports to ClickHouse unchanged (BIGINT id
+dictionaries, source tags, append-only). **Worker box B runs the crawler —
+deploy + Horizon restart required there for edge collection to start.**
+Tests: `tests/Feature/EdgeRecorderTest.php`.
+
 ## Surfaces & routes
 
 - **Public share** — `GET /r/{token}` → `PublicReportController` (`throttle:60,1`).
@@ -105,8 +349,21 @@ teaser** (`ClientReportService::sampleTeaserPayload()` — illustrative numbers,
 persisted) behind an inline signup modal (name/email/**phone**/password → `POST
 /register`). Only a signed-IN Analyze dispatches `GenerateWebsiteReport`.
 
-Post-signup, `RegisteredUserController` redirects to `report.view?url=<analyze_domain>`
-(authed → real report generates; a self-refreshing pending page polls until ready).
+**Post-signup the funnel domain is ATTACHED, not just shown (2026-07-15).**
+`RegisteredUserController::store()` pulls `analyze_domain` ONCE before any branch,
+runs `App\Services\WebsiteAttachService::attach()` (the extracted
+`WebsitesList::addWebsite()` recipe: `Website::updateOrCreate` + 365-day
+`ebq:import-historical` + `CrawlSiteBootstrapper::subscribeWebsite` + session pin —
+so crawl/Site Health/GSC-import start immediately and the onboarding gate is
+satisfied), then redirects to `report.view?url=<analyze_domain>` (still auth-only,
+NOT verified-gated — first value before email verification). The **pay-first
+branch no longer orphans the domain**: it stashes it as `session('onboarding.domain')`,
+which `ConnectGoogle::mount()` now prefills unconditionally (was Google-connected-only).
+Signin attaches too, but ONLY for accounts with zero websites (existing users
+looking up a competitor must not silently spend a plan slot). `WebsitesList::addWebsite()`
+now delegates to the same service and thereby gained the previously-missing
+`canAddWebsite()` plan gate (blocked → billing, mirroring onboarding).
+Tests: `tests/Feature/RegisterFunnelAttachTest.php`.
 
 ## Site Explorer (dashboard entry) + per-plan lookup limits
 
@@ -231,6 +488,254 @@ Health / Statistics tab pills show processing / needs-action per source. Re-addi
 existing domain keeps the old no-redirect behavior. Test:
 `tests/Feature/AddWebsiteFlowTest.php`.
 
+## Empty-domain enrichment — partial reports for young sites (2026-07-15)
+
+When DataForSEO's backlink index has nothing for a domain (brand-new site), the
+report no longer dead-ends on "No backlink data". State machine on
+`website_report_snapshots.status` (+ additive `enrichment_state` JSON column):
+
+```
+summary!==null -> 'ready'                        (full report, unchanged)
+summary===null:
+  eligible   -> 'enriching' --EnrichEmptyReportJob--> await stages --Finalize--> 'partial'
+                 (partial TTL 10d lapses -> regenerate -> 'ready' or re-enrich)
+  ineligible -> 'no_data'   (terminal; only sandbox / kill-switch now)
+```
+
+Invariant: **payload non-empty iff status ∈ {ready, partial}** — every
+`empty($snapshot->payload)` consumer stays correct unmodified.
+
+**Pipeline** — `App\Services\Reports\ReportEnrichmentService` (all provider calls
+container-injected, jobs thin):
+1. `bootstrap()` (via `EnrichEmptyReportJob`, `tries=1`, unique): Open PageRank
+   popularity (free) + Moz DA/PA (free tier, own domain) + ≤3 pages fetched via
+   `CrawlFetcher`/`HtmlAuditor` (SSRF-guarded) + **self-hosted keyword fleet**
+   `KeywordFinderPool::dispatchIdeas(url, scope=site)` (monthly-cache-checked;
+   NEVER the paid KeywordsEverywhere API).
+2. `FinalizeReportEnrichmentJob` polls (30s self-redispatch, ≤40 attempts /
+   2×12min budget — always terminates). Own keywords completed → ONE
+   `LlmClient::completeJson` call (active provider, `report_enrichment` source)
+   classifies **genuine vs boilerplate** ("signup/login" — Google Ads noise on
+   content-less new sites) AND generates 5-10 realistic search queries from the
+   page text.
+3. Competitors are discovered for EVERY enrichment (2026-07-15, not just the
+   fallback path): ≤8 (`serp_query_cap`) `SerpCache::organic()` calls on the
+   LLM's queries tally competitor domains (giants filtered via
+   `App\Support\GiantDomains`, extracted from CompetitorDiscoveryService;
+   scoring reuses `CompetitorDiscoveryService::score()`), OPR-ranked; the tally
+   fills `competitors` (competitorRows-compatible shape — KeywordGapAnalysis reads
+   it). Genuine keywords → payload `keywords` (cap 25). Boilerplate/empty → the
+   best competitor's site keywords additionally become `keyword_opportunities`.
+4. `finalize()` = atomic conditional UPDATE `WHERE status='enriching'` →
+   'partial' (KeywordGapService::maybeAggregate claim pattern; two-box safe).
+   EVERY failure path finalizes with whatever exists (minimum: popularity +
+   gauges) — never a stuck row; short TTL is the extra self-heal.
+
+**Payload additions** (`ClientReportService::assemblePartial()` — `assemble()`'s
+shape + `keywords`, `keyword_opportunities`, `meta:{partial, opportunity_source,
+sources}`). `meta.sources` drives the **data-source badges**: keywords =
+"Estimated" (planner) or "From Google Search Console" (real), keyword_opportunities =
+"From a similar site: X", partial competitors = "Found via related search results" —
+every non-direct data point is tagged in web + PDF renderers, plus a "looks like a
+new website — we gathered the closest available data" banner.
+
+**Payload schema versioning + self-heal (2026-07-15):** `ClientReportService::PAYLOAD_SCHEMA`
+(=2) is stamped into every payload's `meta.schema`. `ReportViewController::resolve()` serves a
+present payload WITHOUT a freshness check (only empty payloads regen), so a snapshot generated
+before a schema bump would keep serving old sections until its TTL lapsed. Fix: when resolve()
+serves a payload whose `meta.schema` is behind `PAYLOAD_SCHEMA`, it dispatches ONE background
+`GenerateWebsiteReport(force: true)` (ShouldBeUnique dedups; the regen rewrites the current
+schema, so it bills at most once per domain) and keeps rendering the current payload — new
+sections appear on the next view. `isFresh()` stays TTL-only (billing/cron/dedup semantics
+unchanged); schema staleness is a SEPARATE view-path trigger. Bump `PAYLOAD_SCHEMA` whenever
+assemble()/assemblePartial() emit a new section. `ClientReportService::isPayloadCurrent()`.
+
+**GSC merge is cached — do NOT run it uncached (2026-07-15).** `withTraffic()`'s two
+Search Console aggregates (traffic strip + top-25 queries) are heavy GROUP BYs over
+`search_console_data`; on a large site the 30-day window is 500k+ rows and each pass
+takes ~10-17s (measured 46s combined on namesforfreefire.com, 572k rows/window),
+which was blocking the report page on every view. Now bundled in one
+`Cache::remember('client-report-gsc:{websiteId}:{ReportCache::version}', 24h)` via
+`gscBundle()` — version-keyed so the nightly GSC sync's `ReportCache::flushWebsite()`
+busts it (same invalidation the dashboard/Insights aggregates use). Cold view ~29s,
+warm ~8ms. TRADEOFF: the first view after a sync (version bump) still pays the cold
+cost once; pre-warm large sites if that matters. `gscTopQueries()` is the GSC keyword
+override (see below); it MUST stay inside the cached bundle.
+
+**GSC-first keywords (2026-07-15):** `withTraffic()` also swaps the keyword section —
+a GSC-connected owner sees their REAL top Search Console queries (last 30d, by
+clicks; `gscTopQueries()`, columns Clicks/Impressions/Avg position) instead of the
+planner estimates. Merged at render time only, like the traffic strip — GSC data is
+private and never enters the cross-tenant snapshot; non-owner viewers still see the
+estimated set. **Section placement:** keyword tables render ABOVE competitors for
+partial (new-site) reports — they're the headline value there — and BELOW competitors
+for full reports (`reports/partials/report-keywords.blade.php`, included at one of two
+slots in web-body; same ordering in the PDF `_body`). Own-site authed views (feature
+`keywords`) get "Run a Keyword Gap analysis" deep-research links under the keyword +
+competitors sections (`gapUrl`, passed from `_status` — never on public shares /
+competitor lookups).
+
+**Config** (`config/services.php` → `report.partial_ttl_days` + `report.enrichment.*`):
+`REPORT_ENRICHMENT_ENABLED` (kill switch → exact old terminal-no_data behavior),
+`REPORT_ENRICHMENT_ATTACHED_ONLY` (default false — ALL authed lookups enrich),
+`max_pages` 3, `serp_query_cap` 8, `llm_max_tokens` 1200, `ideas_timeout_minutes`
+12, `poll_seconds` 30. Costs: DataForSEO **zero** in enrichment; Serper metered
+(`serp_api`, 7-day shared SerpCache); LLM metered to the owner website's user
+when the domain is attached; keyword fleet ~free; NOTE Moz free tier (50
+rows/mo) is now also consumed by empty-domain enrichments — monitor.
+
+**Views:** `_status.blade.php` gets an `enriching` pending variant;
+`web-body.blade.php` + PDF `_body.blade.php` add the partial banner, keyword
+sections, source badges, a "Top pages by backlinks" section and a "Link profile
+details" section (see below); `backlinks.blade.php` shows a neutral
+"no backlinks discovered yet" card for partial payloads;
+`WebsiteTabStatus::explorerStatus()` maps enriching → processing.
+
+Tests: `tests/Feature/ReportEnrichmentTest.php`.
+
+## Competitor Discovery page + flexible Keyword Gap target (2026-07-15)
+
+**Competitor Discovery** (`/competitor-discovery`, Orbit nav, `feature:keywords`) — find
+competitors for ANY url, SERP-minimally. `App\Livewire\Competitive\CompetitorFinder` +
+`App\Jobs\DiscoverCompetitorsJob` reuse the report-enrichment pipeline via new PUBLIC methods
+on `ReportEnrichmentService`: `keywordIdeasFor()` / `keywordRowsFor()` (fleet, monthly-cache-first),
+`keywordsGenuine()` (cheap keyword-only LLM junk-check — no page fetch), and
+`discoverCompetitorsFor()` which is the SERP-saver: **genuine keywords ARE the SERP queries (no
+crawl, no query-gen); only scrap keywords (login/signup/…) trigger a 3-page crawl + LLM query
+generation**, then one capped `SerpCache` tally (cap `report.enrichment.serp_query_cap`, default 8).
+Async: page dispatches keyword ideas → polls the fleet request → dispatches the discovery job →
+polls a shared 7-day result cache (`DiscoverCompetitorsJob::cacheKey`). Directory noise still
+passes `GiantDomains` (clutch.co / semrush directories not filtered — known).
+
+**Gap reports are revisit-able (2026-07-15):** analyses were always persisted
+(`keyword_gap_analyses` + rows, `expires_at` = gap cache days) but the page forgot them.
+Now `KeywordGapAnalysis::mount()` (and every target-URL change) restores the target's most
+recent COMPLETED analysis instantly — zero keyword-fleet/SERP spend on revisit. The summary
+bar gained: a saved-report history picker (last 8 per target; foreign-URL runs readable ONLY
+by their creating user — `analysesForTarget()`/`loadAnalysis()` gates), "generated X ago" +
+a "May be outdated" pill past expires_at, and an explicit **Refresh** (`refreshAnalysis()`,
+deliberately bypasses `latestFresh` for a fresh billed run). Restored reports open with the
+verification banner dismissed (no re-shout); a new verify pass re-arms it. Old analyses stay
+readable forever (read of stored rows) — expiry only governs the auto-reuse cache.
+
+## Per-plan usage caps for research spend (2026-07-15)
+
+The dormant UsageMeter caps are now ARMED: every active plan's `api_limits` defines
+`serper.monthly_calls` (100/1k/4k/12k trial→agency), `mistral.monthly_tokens` (research-LLM
+pool, 50k/250k/1M/4M — distinct from ai_studio tokens), and the previously-unenforced
+`keyword_research.monthly_searches` (50/250/1k/4k) is now REAL: `UsageMeter` gained the
+`keyword_finder` provider and `KeywordFinderPool::dispatch()` gates + logs every metered
+dispatch (`keyword_finder.dispatch` activity rows, reserve→release symmetric with serper).
+Enterprise = null = unlimited. Seeded via PlanSeeder (updateOrCreate); admin plan editor
+already validates all three keys.
+
+**Metering policy:** only user-INITIATED lookups spend quota — idea/volume finder, gap runs
+(1 + N competitors dispatches), Competitor Discovery page, gap inline find (billed user id now
+threaded through `DiscoverCompetitorsJob` → `discoverCompetitorsFor`/`tallyCompetitors`/
+`keywordsGenuine`, fixing the unattributed-in-jobs bypass). Platform-initiated spend stays
+UNmetered by design: report enrichment (funnel/new-site, `meter:false` when no billed user)
+and `KeywordMetricsService`'s automatic volume cache-warming. Cache hits never spend (metering
+sits inside the live clients). Quota errors surface as the pool's friendly failed-request
+message; UI shows "N live checks / keyword searches left this month" next to the gap Verify
+button and on the Competitor Discovery form (owner's quota for team members). Tests:
+`tests/Feature/PlanUsageCapsTest.php`.
+
+**Gap verification is cache-first (2026-07-15):** `KeywordGapService::verify()` walks EVERY
+unverified candidate (volume-first) instead of `LIMIT 25`: keywords whose SERP is already
+fresh in the cross-tenant `serp_cache` verify for FREE (new `SerpCache::cached()` peek — never
+calls Serper; cap `gap_verify_cached_max`, default 150/pass, bounded by job runtime not spend),
+while true cache misses spend the live budget (`gap_verify_max`, 25). `startVerification` sizes
+`verify_total` as cached+live (`SerpCache::freshCount()`, one hash whereIn). A quota hit now
+zeroes the live budget but KEEPS verifying the free cached rows. Result: Weak/Strength fill out
+far beyond 25 rows per click at identical Serper cost. Also: the Shared tab stays visible after
+verification while unverified shared rows remain (was hidden → rows stranded).
+
+**Keyword Gap flexible target** — `KeywordGapAnalysis` gained a target URL input (default the
+current site). Owned domain → loads its snapshot competitors (unchanged). Foreign URL →
+`targetIsForeign`, competitors cleared for manual add + a "Find competitors" link to the discovery
+page pre-filled. `KeywordGapService::start()` now delegates to `startForTarget(?Website, $ourUrl, …)`;
+a null website runs the keyword-fleet-only Missing/Shared path (no GSC → no Weak/Strength). Migration
+`…make_website_id_nullable_on_keyword_gap` makes `keyword_gap_analyses.website_id` nullable (additive).
+Downstream `aggregate()`/`verify()` were already `?->`-null-safe. Tests: `KeywordGapCompetitorPickerTest`,
+`ReportEnrichmentTest` (discover_competitors_*).
+
+## /keywords fallback to enrichment suggestions (2026-07-15)
+
+`KeywordsTable` (`app/Livewire/Keywords/KeywordsTable.php`, the `/keywords` page) sources
+keywords ONLY from `search_console_data`, so a site with no usable GSC data was a dead end
+("No keyword data yet"). It now falls back to the SAME keyword suggestions the report uses.
+
+Trigger (unfiltered first page only, so sorting/searching a real list never fires it): GSC
+rows empty, OR `App\Support\KeywordJunkHeuristic::mostlyJunk($topQueries, $domain)` — a
+cheap, no-LLM detector for auth/nav/brand boilerplate (login, signup, create account, the
+brand token…; the report's LLM junk-check is the deeper paid version).
+
+`App\Services\Keywords\WebsiteKeywordSuggestions::for($website)` returns the site's shared
+`WebsiteReportSnapshot` `keywords` + `keyword_opportunities` when present (`ready`), else kicks
+the pipeline and reports `processing`: no snapshot / empty → `GenerateWebsiteReport` (freshness-
+gated; its summary-null path runs the new-site keyword+competitor enrichment); a `ready` report
+lacking a keyword section → `EnrichEmptyReportJob(keywordsOnly)` (free fleet backfill, no
+re-bill). `unavailable` when DataForSEO isn't configured. The view renders a sky "Keyword ideas
+for your site" panel (Estimated / From-a-similar-site badges + Keyword Gap link) and
+`wire:poll.10s` while processing. Jobs are `ShouldBeUnique`, so poll re-dispatches are no-ops.
+Tests: `tests/Feature/KeywordSuggestionsFallbackTest.php`.
+
+**Explore-all → full Keyword Research (2026-07-15):** the /keywords fallback shows a
+12-row preview per section, then an "Explore all keyword ideas" link that hands off to
+the existing `KeywordIdeaFinder` (the full paging / sort / 7-filter / term-group / AI-cluster
+surface) in WEBSITE mode, auto-run on the site's (or the opportunity competitor's) URL —
+no duplicate table built. Wiring: `KeywordResearch` hub gained a `#[Url] $url` that builds a
+website handoff (`presetForActiveTab()` now carries url/mode/scope); `KeywordIdeaFinder::mount()`
+gained a website-preset branch that seeds mode/url/scope and runs. Link:
+`route('keyword-research.index', ['tab'=>'ideas','url'=>'https://'.$domain])`. No site-ownership
+check (finder generates for any URL). Tests in `KeywordSuggestionsFallbackTest`.
+
+**Ready reports also get SERP competitor discovery (2026-07-15):** when DataForSEO returns
+a full report but NO competitors (`competitors=[]` — common for small domains, e.g.
+daomarketing.com), `ReportEnrichmentService::bootstrapReadyKeywords` (dispatched as
+`EnrichEmptyReportJob(keywordsOnly)`) now runs the SAME SERP discovery the new-site path uses:
+pages → LLM queries → SERP tally → competitors (merged, `sources.competitors='search_results'`)
+→ best competitor's keywords as `keyword_opportunities`. `meta.competitors_enriched=true` marks a
+single attempt so repeat /keywords views don't re-spend SERP/LLM. It ALSO backfills
+`top_pages` for free from the stored backlink sample (`ClientReportService::deriveTopPagesFromBacklinks`)
+when DataForSEO's `domain_pages` was empty — assemble() applies the same fallback for new reports.
+The async site-keyword + competitor-keyword fetches are merged by a two-slot `ready_merge`
+poller stage (`advanceReadyMerge` + `patchReadyPayload`, which never clears state mid-flight).
+
+**Ideas → real GSC auto-switch (2026-07-15):** `KeywordsTable` re-evaluates the fallback
+on every render — once a GSC sync lands real (non-junk) keywords, `needsFallback` turns false,
+the ideas panel disappears and the real GSC table shows. To make that live (not only on manual
+reload), the fallback keeps a `wire:poll` while shown: `.10s` during enrichment (processing),
+`.60s` once ideas are ready (re-checks for a sync). The poll stops the moment real GSC keywords
+drive the page (suggestions null → no wire:poll). Test: "keywords page switches from ideas to
+real gsc when synced".
+
+**Keyword row cap (2026-07-15):** all keyword sections (site keywords, competitor
+opportunities, GSC top queries) show up to `services.report.enrichment.keyword_rows`
+(env `REPORT_ENRICHMENT_KEYWORD_ROWS`, default 100) — the self-hosted fleet returns
+hundreds (856 seen), previously truncated to 25. Tables scroll. Raising the cap
+backfills existing reports for FREE: `bootstrapReadyKeywords` re-runs when the stored
+count is below the cap, re-slicing from the monthly-cached raw fleet result (no
+keyword-server call, no DataForSEO rebill).
+
+## Previously-hidden paid DataForSEO data now rendered (2026-07-15)
+
+Audit of fetched-vs-rendered found data we paid for but never showed:
+- **`top_pages`** (paid `domain_pages` endpoint) was assembled into every payload
+  but rendered NOWHERE — now a "Top pages by backlinks" section (web + PDF).
+- **Summary fields** dropped by `assemble()` — now a `profile_details` payload key
+  ("Link profile details" section): `first_seen`, `crawled_pages`,
+  `broken_backlinks`, `broken_pages`, top-10 `referring_links_tld` / `_countries`
+  / `_platform_types` / `_types` distributions. Old cached payloads simply lack
+  the key (section hidden) and fill in on TTL regeneration — no backfill.
+- **Labs competitor `metrics.organic.count`** → `organic_keywords` column on the
+  report + `/competitors` pulse tables. ⛔ `etv` (dollar traffic value) is
+  deliberately NOT surfaced — hard rule: no $ projections in the UI.
+- **Keywords on full reports**: merged asynchronously post-generation
+  (`ReportEnrichmentService::bootstrapReadyKeywords`, stage `ready_keywords`,
+  conditional UPDATE guarded on status/fetched_at so a concurrent regeneration
+  wins) — tagged "Estimated".
+
 ## Dashboard "Competitors" page — `/competitors` (Pulse nav group)
 
 Added 2026-07-14, same pattern as Backlinks below: `CompetitorsController` +
@@ -294,6 +799,16 @@ across every call in `totalCost()` (reset per instance; a queued job gets a fres
 This is a separate page from `/admin/usage` (KE/Serper/LLM) because Site Explorer isn't
 metered per-unit — cost is flat-per-generation, not per-row/per-token, so it doesn't fit the
 `UsageMeter`/rates pipeline.
+
+**Remove report cache (2026-07-15):** the page has a "Remove report cache" form + a
+per-row "Clear cache" button (`SiteExplorerUsageController::clearCache`, POST
+`admin.site-explorer-usage.clear-cache`). Deletes the domain's production AND `sbx:`
+snapshot rows plus the shared monthly keyword-ideas cache entry (the exact key
+`ReportEnrichmentService` computes), so the next lookup runs a fresh generation /
+full enrichment — built for re-testing new-site behavior. Deliberately does NOT
+touch `client_activities` (usage/cost ledger stays historically accurate); logs a
+`site_explorer.cache_cleared` activity with the admin's user_id. Next lookup is a
+fresh BILLED generation — the button warns before submitting.
 
 ## Public tools — signup/login gate (all 4 tools)
 
@@ -362,6 +877,9 @@ the analyze-hero modal) and `User::$fillable`. Email-verification flow unchanged
 - Clients: `app/Services/{DataForSeoBacklinkClient,MozLinksClient}.php`
 - Cache/gate/job: `app/Models/WebsiteReportSnapshot.php`, `app/Services/ReportFreshnessGate.php`,
   `app/Jobs/GenerateWebsiteReport.php`, `app/Console/Commands/RefreshPaidReports.php`
+- Enrichment: `app/Services/Reports/ReportEnrichmentService.php`,
+  `app/Jobs/{EnrichEmptyReportJob,FinalizeReportEnrichmentJob}.php`, `app/Support/GiantDomains.php`
+- Funnel attach: `app/Services/WebsiteAttachService.php` (used by Register/Login controllers + WebsitesList)
 - Assembly + render: `app/Services/Reports/{ClientReportService,ClientReportPdfRenderer}.php`,
   `resources/views/reports/**`, `resources/views/pdf/client-report.blade.php`
 - Surfaces: `app/Http/Controllers/{WebsiteAnalyzeController,ReportViewController,PublicReportController,ClientReportExportController,ReportShareController}.php`,

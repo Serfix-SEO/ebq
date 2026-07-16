@@ -14,10 +14,13 @@ use Illuminate\Support\Carbon;
  * Rule
  * ────
  * A domain's snapshot is fresh while it is younger than the TTL:
- *   - default `services.report.default_ttl_days` (90) for any domain, and
+ *   - default `services.report.default_ttl_days` (90) for any domain,
  *   - the shorter `services.report.paid_ttl_days` (30) when the domain is a
  *     Website owned by a paid ({@see \App\Models\User::isPro()}) account, so
- *     paid-owned sites refresh monthly for as long as they stay paid.
+ *     paid-owned sites refresh monthly for as long as they stay paid, and
+ *   - the shortest `services.report.partial_ttl_days` (10) when the snapshot
+ *     is not a full report (status partial / no_data / enriching) — a young
+ *     site that gains real backlink data auto-upgrades on the next view.
  *
  * A fresh snapshot MUST be served without calling DataForSEO / Moz.
  */
@@ -31,6 +34,11 @@ class ReportFreshnessGate
     public function paidTtlDays(): int
     {
         return max(1, (int) config('services.report.paid_ttl_days', 30));
+    }
+
+    public function partialTtlDays(): int
+    {
+        return max(1, (int) config('services.report.partial_ttl_days', 10));
     }
 
     /**
@@ -53,7 +61,15 @@ class ReportFreshnessGate
             return false;
         }
 
-        $cutoff = Carbon::now()->subDays($this->ttlDaysFor($domain));
+        $ttlDays = $this->ttlDaysFor($domain);
+        if (in_array($snapshot->status, ['partial', 'no_data', 'enriching'], true)) {
+            // Not a full report — expire sooner so growing sites upgrade.
+            // ('enriching' rows normally finalize within minutes; the short
+            // window here is purely a stuck-row self-heal.)
+            $ttlDays = min($ttlDays, $this->partialTtlDays());
+        }
+
+        $cutoff = Carbon::now()->subDays($ttlDays);
 
         return $snapshot->fetched_at->greaterThanOrEqualTo($cutoff);
     }

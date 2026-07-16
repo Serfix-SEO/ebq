@@ -79,9 +79,13 @@
 
     {{-- Error --}}
     @if ($errorMessage)
-        <div class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800">
-            {{ $errorMessage }}
-        </div>
+        @if (\App\Support\QuotaMessage::isQuota($errorMessage))
+            <x-quota-alert :message="$errorMessage" />
+        @else
+            <div class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800">
+                {{ $errorMessage }}
+            </div>
+        @endif
     @endif
 
     {{-- In-flight --}}
@@ -228,42 +232,66 @@
             </div>
         @endif
 
-        {{-- Groups rail + results --}}
+        {{-- Left rail + results. The rail follows the view: AI "Topics" nav in
+             Clusters view, algorithmic "Groups" filter in List view. --}}
         <div class="mt-3 grid gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
-            {{-- Groups rail (algorithmic term groups — instant filter) --}}
-            <div class="self-start overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="border-b border-slate-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-800">{{ __('Groups') }}</p>
-                <div class="max-h-[480px] overflow-y-auto p-1.5">
-                    <button type="button" wire:click="setGroup('')"
-                        @class([
-                            'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs',
-                            'bg-orange-600 font-semibold text-white' => $groupTerm === '',
-                            'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800' => $groupTerm !== '',
-                        ])>
-                        <span>{{ __('All keywords') }}</span>
-                    </button>
-                    @foreach ($termGroups as $g)
-                        <button type="button" wire:click="setGroup(@js($g['term']))"
-                            @class([
-                                'flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs',
-                                'bg-orange-600 font-semibold text-white' => $groupTerm === $g['term'],
-                                'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800' => $groupTerm !== $g['term'],
-                            ])>
-                            <span class="truncate">{{ $g['term'] }}</span>
-                            <span @class(['flex-none tabular-nums text-[10px]', 'text-orange-100' => $groupTerm === $g['term'], 'text-slate-400' => $groupTerm !== $g['term']])>{{ $g['count'] }}</span>
-                        </button>
-                    @endforeach
-                    @if ($termGroups === [])
-                        <p class="px-2.5 py-2 text-[11px] text-slate-400">{{ __('No shared terms found.') }}</p>
-                    @endif
+            @if ($viewMode === 'clusters' && $clusterMap !== null)
+                {{-- Topics nav (AI clusters — jump to each topic below) --}}
+                <div class="self-start overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <p class="border-b border-slate-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-800">{{ __('Topics') }}</p>
+                    <div class="max-h-[480px] overflow-y-auto p-1.5">
+                        @forelse ($clusters as $cluster)
+                            @php $isActive = ($activeTopic ?? null) === $cluster['label']; @endphp
+                            <button type="button" wire:click="setTopic(@js($cluster['label']))"
+                                @class([
+                                    'flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs',
+                                    'bg-orange-600 font-semibold text-white' => $isActive,
+                                    'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800' => ! $isActive,
+                                ])>
+                                <span class="truncate {{ ! $isActive && $cluster['label'] === __('Other') ? 'text-slate-400' : '' }}">{{ $cluster['label'] }}</span>
+                                <span @class(['flex-none tabular-nums text-[10px]', 'text-orange-100' => $isActive, 'text-slate-400' => ! $isActive])>{{ count($cluster['rows']) }}</span>
+                            </button>
+                        @empty
+                            <p class="px-2.5 py-2 text-[11px] text-slate-400">{{ __('No topics yet.') }}</p>
+                        @endforelse
+                    </div>
                 </div>
-            </div>
+            @else
+                {{-- Groups rail (algorithmic term groups — instant filter) --}}
+                <div class="self-start overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <p class="border-b border-slate-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-800">{{ __('Groups') }}</p>
+                    <div class="max-h-[480px] overflow-y-auto p-1.5">
+                        <button type="button" wire:click="setGroup('')"
+                            @class([
+                                'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs',
+                                'bg-orange-600 font-semibold text-white' => $groupTerm === '',
+                                'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800' => $groupTerm !== '',
+                            ])>
+                            <span>{{ __('All keywords') }}</span>
+                        </button>
+                        @foreach ($termGroups as $g)
+                            <button type="button" wire:click="setGroup(@js($g['term']))"
+                                @class([
+                                    'flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs',
+                                    'bg-orange-600 font-semibold text-white' => $groupTerm === $g['term'],
+                                    'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800' => $groupTerm !== $g['term'],
+                                ])>
+                                <span class="truncate">{{ $g['term'] }}</span>
+                                <span @class(['flex-none tabular-nums text-[10px]', 'text-orange-100' => $groupTerm === $g['term'], 'text-slate-400' => $groupTerm !== $g['term']])>{{ $g['count'] }}</span>
+                            </button>
+                        @endforeach
+                        @if ($termGroups === [])
+                            <p class="px-2.5 py-2 text-[11px] text-slate-400">{{ __('No shared terms found.') }}</p>
+                        @endif
+                    </div>
+                </div>
+            @endif
 
             <div class="min-w-0">
                 @if ($viewMode === 'clusters')
-                    {{-- Clusters view: AI-labelled topic groups --}}
+                    {{-- Clusters view: the selected topic only (Topics nav switches) --}}
                     <div class="space-y-4">
-                        @forelse ($clusters as $cluster)
+                        @forelse ($visibleClusters as $cluster)
                             @php $isOther = $cluster['label'] === __('Other'); @endphp
                             <div @class([
                                 'overflow-hidden rounded-xl border shadow-sm dark:bg-slate-900',

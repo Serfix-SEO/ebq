@@ -3,6 +3,8 @@
 namespace App\Services\Reports;
 
 use App\Models\Website;
+use App\Services\ReportCache;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,6 +22,110 @@ use Illuminate\Support\Facades\DB;
  */
 class ClientReportService
 {
+    private AuthorityScoreCalculator $scoreCalculator;
+
+    private CcDomainRanks $ccRanks;
+
+    public function __construct(?AuthorityScoreCalculator $scoreCalculator = null, ?CcDomainRanks $ccRanks = null)
+    {
+        $this->scoreCalculator = $scoreCalculator ?? new AuthorityScoreCalculator();
+        $this->ccRanks = $ccRanks ?? new CcDomainRanks();
+    }
+
+    /**
+     * Add Trust/Citation scores to a payload: stash the domain's Common Crawl
+     * web-graph percentiles (no-op when the sidecar isn't imported), then run
+     * the pure calculator. Skips everything when the payload already carries
+     * current-version scores, so repeated reads cost nothing.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function scored(array $payload): array
+    {
+        // CC sidecar stashes only matter for a full recompute; the augment
+        // call itself must run on EVERY read — it cheap-skips current-version
+        // payloads but always refreshes the TopicSignal score, whose topical
+        // inputs land batch-by-batch AFTER the scores were stamped. (Skipping
+        // augment here entirely left TopicSignal permanently "—" on reports
+        // whose scores were already current — bug found live 2026-07-16.)
+        if ($this->scoreCalculator->needsAugment($payload)) {
+            if (! isset($payload['cc']) && is_string($payload['domain'] ?? null)) {
+                $cc = $this->ccRanks->scoreFor($payload['domain']);
+                if ($cc !== null) {
+                    $payload['cc'] = $cc;
+                }
+            }
+
+            $payload = $this->stashRowCcRanks($payload);
+        }
+
+        // Risk interpretation layer: per-row toxicity flags + link_risk
+        // summary (feeds the red warning panel + disavow export). Pure math
+        // over payload data, recomputed on every read like TopicSignal.
+        return (new BacklinkToxicityScorer)->analyze(
+            $this->scoreCalculator->augment($payload),
+        );
+    }
+
+    /**
+     * Batch-stash CC web-graph percentiles onto every table row (referring
+     * domains / backlink sources / competitors) so the calculator can emit
+     * per-row Trust + Citation. One chunked local SQLite lookup for the whole
+     * payload; no-op when the sidecar isn't imported.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function stashRowCcRanks(array $payload): array
+    {
+        if (! $this->ccRanks->available()) {
+            return $payload;
+        }
+
+        $domainOf = function ($row): string {
+            if (! is_array($row)) {
+                return '';
+            }
+            $d = strtolower(trim((string) ($row['domain'] ?? '')));
+            if ($d !== '') {
+                return $d;
+            }
+
+            return strtolower((string) parse_url((string) ($row['url_from'] ?? ''), PHP_URL_HOST));
+        };
+
+        $sections = ['top_referring_domains', 'backlinks', 'competitors'];
+        $domains = [];
+        foreach ($sections as $section) {
+            foreach ((array) ($payload[$section] ?? []) as $row) {
+                $d = $domainOf($row);
+                if ($d !== '') {
+                    $domains[$d] = true;
+                }
+            }
+        }
+        if ($domains === []) {
+            return $payload;
+        }
+
+        $ranks = $this->ccRanks->lookupMany(array_keys($domains));
+        foreach ($sections as $section) {
+            if (! is_array($payload[$section] ?? null)) {
+                continue;
+            }
+            foreach ($payload[$section] as $i => $row) {
+                $cc = $ranks[$domainOf($row)] ?? null;
+                if ($cc !== null) {
+                    $payload[$section][$i]['cc_citation'] = $cc['citation_pct'];
+                    $payload[$section][$i]['cc_trust'] = $cc['trust_pct'];
+                }
+            }
+        }
+
+        return $payload;
+    }
+
     /**
      * We already FETCH up to `services.dataforseo.row_limit` (1000) rows per
      * endpoint — this used to display only 200 of them, silently dropping
@@ -29,6 +135,27 @@ class ClientReportService
      * than growing the page unboundedly.
      */
     private const DISPLAY_ROW_CAP = 1000;
+
+    /**
+     * Payload schema version, stamped into `meta.schema`. Bump whenever
+     * assemble()/assemblePartial() start emitting a new section so the report
+     * view can background-refresh snapshots that predate it (a fresh snapshot
+     * is otherwise served as-is, without a freshness check — see
+     * ReportViewController::resolve()). v2 (2026-07-15) added keywords,
+     * keyword_opportunities, profile_details + rendered top_pages.
+     */
+    public const PAYLOAD_SCHEMA = 2;
+
+    /**
+     * Whether a stored payload was built by the CURRENT report schema. Old
+     * payloads (no `meta.schema`) are treated as v1 → stale.
+     *
+     * @param  array<string, mixed>|null  $payload
+     */
+    public function isPayloadCurrent(?array $payload): bool
+    {
+        return (int) ($payload['meta']['schema'] ?? 1) >= self::PAYLOAD_SCHEMA;
+    }
 
     /**
      * @param  array<string, mixed>  $raw  keys: summary, history, referring_domains, anchors, domain_pages, competitors, backlinks, moz
@@ -55,7 +182,7 @@ class ClientReportService
         $opr = is_array($raw['opr'] ?? null) ? $raw['opr'] : [];
         $mainOpr = $opr[$this->target($domain)] ?? null;
 
-        return [
+        return $this->scored([
             'domain' => $domain,
             'popularity' => is_array($mainOpr) ? [
                 'rank' => $mainOpr['rank'] ?? null,
@@ -89,10 +216,139 @@ class ClientReportService
             ),
             'anchors' => $this->topAnchors(is_array($raw['anchors'] ?? null) ? $raw['anchors'] : []),
             'backlinks' => $this->backlinkRows(is_array($raw['backlinks'] ?? null) ? $raw['backlinks'] : [], $opr),
-            'top_pages' => $this->topPages(is_array($raw['domain_pages'] ?? null) ? $raw['domain_pages'] : []),
+            'top_pages' => $this->topPagesWithFallback(
+                is_array($raw['domain_pages'] ?? null) ? $raw['domain_pages'] : [],
+                is_array($raw['backlinks'] ?? null) ? $raw['backlinks'] : [],
+            ),
             'competitors' => $this->competitorRows(is_array($raw['competitors'] ?? null) ? $raw['competitors'] : [], $domain, $opr),
+            'profile_details' => $this->profileDetails($summary),
             'traffic' => null,
+            'meta' => ['schema' => self::PAYLOAD_SCHEMA],
+        ]);
+    }
+
+    /**
+     * Link-profile breakdown from summary fields we already pay for but never
+     * rendered before 2026-07-15: first-seen date, broken links, and the
+     * TLD / country / platform / link-type distributions. Never includes any
+     * $-value field (no money projections in the UI).
+     *
+     * @param  array<string, mixed>  $summary
+     * @return array<string, mixed>|null
+     */
+    private function profileDetails(array $summary): ?array
+    {
+        if ($summary === []) {
+            return null;
+        }
+
+        $topMap = function ($map, int $cap = 10): array {
+            if (! is_array($map) || $map === []) {
+                return [];
+            }
+            $out = [];
+            foreach ($map as $label => $count) {
+                if (! is_numeric($count) || (int) $count <= 0) {
+                    continue;
+                }
+                $out[] = ['label' => (string) $label, 'count' => (int) $count];
+            }
+            usort($out, static fn (array $a, array $b): int => $b['count'] <=> $a['count']);
+
+            return array_slice($out, 0, $cap);
+        };
+
+        $firstSeen = is_string($summary['first_seen'] ?? null) && $summary['first_seen'] !== ''
+            ? substr($summary['first_seen'], 0, 10)
+            : null;
+
+        $details = [
+            'first_seen' => $firstSeen,
+            'crawled_pages' => $this->int($summary['crawled_pages'] ?? null),
+            'broken_backlinks' => $this->int($summary['broken_backlinks'] ?? null),
+            'broken_pages' => $this->int($summary['broken_pages'] ?? null),
+            'tlds' => $topMap($summary['referring_links_tld'] ?? null),
+            'countries' => $topMap($summary['referring_links_countries'] ?? null),
+            'platform_types' => $topMap($summary['referring_links_platform_types'] ?? null),
+            'link_types' => $topMap($summary['referring_links_types'] ?? null),
         ];
+
+        $hasAny = $details['first_seen'] !== null
+            || $details['broken_backlinks'] !== null
+            || $details['tlds'] !== [] || $details['countries'] !== []
+            || $details['platform_types'] !== [] || $details['link_types'] !== [];
+
+        return $hasAny ? $details : null;
+    }
+
+    /**
+     * Partial payload for a domain the backlink index knows nothing about
+     * (young site). Same top-level shape as assemble() — every report-view
+     * section guard keys off these — with backlink sections empty and the
+     * enrichment sections filled in. `meta.sources` tags every section whose
+     * data is NOT a direct measurement of the site itself, so the views can
+     * badge it honestly.
+     *
+     * @param  array{opr?: ?array, moz?: ?array, keywords?: list<array<string, mixed>>,
+     *               keyword_opportunities?: list<array<string, mixed>>,
+     *               competitors?: list<array<string, mixed>>, opportunity_source?: ?string}  $raw
+     * @return array<string, mixed>
+     */
+    public function assemblePartial(string $domain, array $raw): array
+    {
+        $opr = is_array($raw['opr'] ?? null) ? $raw['opr'] : null;
+        $moz = is_array($raw['moz'] ?? null) ? $raw['moz'] : [];
+        $competitors = array_values(array_filter($raw['competitors'] ?? [], 'is_array'));
+
+        $sources = [];
+        if (! empty($raw['keywords'])) {
+            $sources['keywords'] = 'estimated';
+        }
+        if (! empty($raw['keyword_opportunities'])) {
+            $sources['keyword_opportunities'] = 'similar_site';
+        }
+        if ($competitors !== []) {
+            $sources['competitors'] = 'search_results';
+        }
+
+        return $this->scored([
+            'domain' => $domain,
+            'popularity' => $opr !== null ? [
+                'rank' => $opr['rank'] ?? null,
+                'score' => $opr['score'] ?? null,
+                'history' => $opr['history'] ?? [],
+            ] : null,
+            'gauges' => [
+                'domain_authority' => $this->clampScore($moz['domain_authority'] ?? null),
+                'page_authority' => $this->clampScore($moz['page_authority'] ?? null),
+                'spam_score' => $this->clampScore($moz['spam_score'] ?? null),
+                'authority_score' => null,
+            ],
+            'totals' => [
+                'backlinks' => null,
+                'referring_domains' => null,
+                'referring_ips' => null,
+                'referring_subnets' => null,
+            ],
+            'ratios' => ['dofollow_pct' => null, 'active_pct' => null],
+            'history' => [],
+            'anchor_types' => ['branded' => 0, 'naked' => 0, 'generic' => 0, 'exact' => 0],
+            'top_referring_domains' => [],
+            'anchors' => [],
+            'backlinks' => [],
+            'top_pages' => [],
+            'competitors' => $competitors,
+            'profile_details' => null,
+            'traffic' => null,
+            'keywords' => array_values(array_filter($raw['keywords'] ?? [], 'is_array')),
+            'keyword_opportunities' => array_values(array_filter($raw['keyword_opportunities'] ?? [], 'is_array')),
+            'meta' => [
+                'schema' => self::PAYLOAD_SCHEMA,
+                'partial' => true,
+                'opportunity_source' => $raw['opportunity_source'] ?? null,
+                'sources' => $sources,
+            ],
+        ]);
     }
 
     /**
@@ -159,13 +415,91 @@ class ClientReportService
      */
     public function withTraffic(array $payload, ?Website $website): array
     {
+        // Backfill Trust/Citation scores onto payloads cached before the
+        // scores existed (or built by an older formula version). Pure math
+        // over data already in the payload (+ a local CC-sidecar lookup) —
+        // no provider call, no schema bump, no snapshot write-back.
+        // withTraffic() is the single read choke point (report view,
+        // /backlinks, public share, PDF export), so every old snapshot gains
+        // scores on first render.
+        $payload = $this->scored($payload);
+
         if ($website === null || ! $website->hasGsc()) {
             return $payload;
         }
 
-        $payload['traffic'] = $this->trafficFor($website);
+        // Both GSC aggregates (traffic strip + top queries) are heavy GROUP BYs
+        // over search_console_data — on a large site the 30-day window can be
+        // 500k+ rows and take tens of seconds. Compute BOTH once and cache them
+        // together, version-keyed so a GSC sync busts it (mirrors
+        // ReportDataService's cached aggregates). Without this the report page
+        // re-ran the aggregation on every view.
+        $bundle = $this->gscBundle($website);
+
+        $payload['traffic'] = $bundle['traffic'];
+
+        // A GSC-connected site gets its REAL Search Console queries instead of
+        // the keyword-planner estimates. Merged at render time only (like the
+        // traffic strip) — GSC data is private and must never be written into
+        // the cross-tenant shared snapshot.
+        if (! empty($bundle['keywords'])) {
+            $payload['keywords'] = $bundle['keywords'];
+            $payload['meta'] = array_merge($payload['meta'] ?? [], [
+                'sources' => array_merge($payload['meta']['sources'] ?? [], ['keywords' => 'gsc']),
+            ]);
+        }
 
         return $payload;
+    }
+
+    /**
+     * The cached per-website GSC merge (traffic strip + top queries). Keyed by
+     * ReportCache::version so a new sync invalidates it; 24h TTL as a backstop.
+     *
+     * @return array{traffic: ?array<string, mixed>, keywords: list<array<string, mixed>>}
+     */
+    private function gscBundle(Website $website): array
+    {
+        $key = 'client-report-gsc:'.$website->id.':'.ReportCache::version((string) $website->id);
+
+        return Cache::remember($key, now()->addHours(24), fn (): array => [
+            'traffic' => $this->trafficFor($website),
+            'keywords' => $this->gscTopQueries($website),
+        ]);
+    }
+
+    /**
+     * The site's top real queries from Search Console (last 30 days, by
+     * clicks then impressions). Render-time only — never persisted to the
+     * shared snapshot.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function gscTopQueries(Website $website): array
+    {
+        try {
+            $end = now()->subDay()->toDateString();
+            $start = now()->subDays(30)->toDateString();
+
+            return DB::table('search_console_data')
+                ->where('website_id', $website->id)
+                ->whereBetween('date', [$start, $end])
+                ->selectRaw('query, COALESCE(SUM(clicks),0) as clicks, COALESCE(SUM(impressions),0) as impressions, COALESCE(AVG(position),0) as position')
+                ->groupBy('query')
+                ->orderByDesc(DB::raw('SUM(clicks)'))
+                ->orderByDesc(DB::raw('SUM(impressions)'))
+                ->limit(max(1, (int) config('services.report.enrichment.keyword_rows', 100)))
+                ->get()
+                ->map(fn ($r) => [
+                    'keyword' => (string) $r->query,
+                    'clicks' => (int) $r->clicks,
+                    'impressions' => (int) $r->impressions,
+                    'position' => round((float) $r->position, 1),
+                ])
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     /**
@@ -295,6 +629,64 @@ class ClientReportService
      * @param  list<array<string, mixed>>  $rows
      * @return list<array<string, mixed>>
      */
+    /**
+     * Top pages from the paid `domain_pages` endpoint; when it returns nothing
+     * (common for small domains — was the case for daomarketing.com), derive
+     * them from the backlink sample by counting how many backlinks point at
+     * each target page. Better than an empty "Top pages by backlinks" section.
+     *
+     * @param  list<array<string, mixed>>  $domainPages
+     * @param  list<array<string, mixed>>  $backlinks
+     * @return list<array<string, mixed>>
+     */
+    private function topPagesWithFallback(array $domainPages, array $backlinks): array
+    {
+        $pages = $this->topPages($domainPages);
+        if ($pages !== []) {
+            return $pages;
+        }
+
+        return $this->deriveTopPagesFromBacklinks($backlinks);
+    }
+
+    /**
+     * Derive "top pages by backlinks" from a backlink list (raw or the stored
+     * `payload['backlinks']` rows — both carry `url_to`) by counting how many
+     * point at each target page. Used as the fallback when DataForSEO's
+     * `domain_pages` is empty, and by the enrichment backfill to fill the
+     * section on an already-cached report without a costly regeneration.
+     *
+     * @param  list<array<string, mixed>>  $backlinks
+     * @return list<array<string, mixed>>
+     */
+    public function deriveTopPagesFromBacklinks(array $backlinks): array
+    {
+        $tally = [];
+        foreach ($backlinks as $b) {
+            $target = trim((string) ($b['url_to'] ?? ''));
+            if ($target === '') {
+                continue;
+            }
+            $tally[$target] ??= 0;
+            $tally[$target]++;
+        }
+        if ($tally === []) {
+            return [];
+        }
+
+        arsort($tally);
+        $out = [];
+        foreach (array_slice($tally, 0, 15, true) as $url => $count) {
+            $out[] = [
+                'url' => $url,
+                'referring_domains' => null, // not derivable from the sample
+                'backlinks' => $count,
+            ];
+        }
+
+        return $out;
+    }
+
     private function topPages(array $rows): array
     {
         // DataForSEO nests the actual metrics under `page_summary` — the top
@@ -376,6 +768,9 @@ class ClientReportService
                 'domain' => $domain,
                 'shared_keywords' => $this->int($r['intersections'] ?? ($r['full_domain_intersection'] ?? null)),
                 'avg_position' => isset($r['avg_position']) && is_numeric($r['avg_position']) ? round((float) $r['avg_position'], 1) : null,
+                // Labs rows carry full metrics — organic keyword count is paid
+                // for anyway; surface it. NEVER surface `etv` (a $ projection).
+                'organic_keywords' => $this->int($r['metrics']['organic']['count'] ?? null),
                 'popularity_rank' => is_array($m) ? ($m['rank'] ?? null) : null,
                 'opr_score' => is_array($m) ? ($m['score'] ?? null) : null,
             ];

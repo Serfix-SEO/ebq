@@ -108,10 +108,17 @@
                                     </button>
                                 @endcan
                             </div>
-                            <div class="mt-3">
+                            <div class="mt-3 flex flex-wrap items-center gap-1.5">
                                 <span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                                     {{ __('GA4:') }} {{ $site->ga_property_id ?: __('Not set') }}
                                 </span>
+                                @php $ss = $siteScores[strtolower($site->domain)] ?? null; @endphp
+                                @if ($ss)
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-300"
+                                          title="{{ __('TrustSignal') }} / {{ __('CiteSignal') }}">
+                                        TS {{ $ss['trust'] ?? '—' }} · CS {{ $ss['citation'] ?? '—' }}
+                                    </span>
+                                @endif
                             </div>
                         </div>
                     @endforeach

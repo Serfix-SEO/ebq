@@ -256,6 +256,8 @@ class HtmlAuditor
             $entry = [
                 'href' => $abs,
                 'anchor' => trim(preg_replace('/\s+/', ' ', $a->textContent ?? '')),
+                // rel flags matter to the link-graph recorder (dofollow edges).
+                'nofollow' => str_contains(strtolower($a->getAttribute('rel')), 'nofollow'),
             ];
 
             $host = strtolower((string) parse_url($abs, PHP_URL_HOST));

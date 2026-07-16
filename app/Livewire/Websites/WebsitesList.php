@@ -4,7 +4,6 @@ namespace App\Livewire\Websites;
 
 use App\Models\Website;
 use App\Support\GoogleSourcePool;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
@@ -60,36 +59,40 @@ class WebsitesList extends Component
         [$gscAccountId, $gscSiteUrl] = $this->splitSelection($this->gscSelection);
 
         // GA and GSC are both optional — a domain-only website is allowed.
-        // The user can connect data sources later in Settings.
-        $website = Website::updateOrCreate(
-            ['user_id' => Auth::id(), 'domain' => $this->domain],
-            [
-                'ga_property_id' => $gaPropertyId,
-                'ga_google_account_id' => $gaPropertyId !== '' ? $gaAccountId : null,
-                'gsc_site_url' => $gscSiteUrl,
-                'gsc_google_account_id' => $gscSiteUrl !== '' ? $gscAccountId : null,
-            ]
-        );
+        // The user can connect data sources later in Settings. The attach
+        // service runs the full recipe: create + historical import + shared
+        // crawl subscription + current-website pin.
+        $result = app(\App\Services\WebsiteAttachService::class)->attach(Auth::user(), $this->domain, [
+            'ga_property_id' => $gaPropertyId,
+            'ga_google_account_id' => $gaPropertyId !== '' ? $gaAccountId : null,
+            'gsc_site_url' => $gscSiteUrl,
+            'gsc_google_account_id' => $gscSiteUrl !== '' ? $gscAccountId : null,
+        ]);
 
-        if ($website->wasRecentlyCreated) {
-            Artisan::queue('ebq:import-historical', [
-                '--days' => 365,
-                '--website' => (string) $website->id,
-            ]);
+        if ($result['blocked'] === 'plan_limit') {
+            // Same treatment as onboarding: adding past the plan limit goes
+            // through billing (this component previously had no gate at all).
+            $this->redirectRoute('billing.show', navigate: false);
 
-            // Subscribe to the shared crawl_site: charge the cap and crawl only if
-            // the domain isn't already covered (else instantly reuse the shared data).
-            app(\App\Services\Crawler\CrawlSiteBootstrapper::class)->subscribeWebsite($website);
+            return;
+        }
 
+        if ($result['blocked'] === 'invalid_domain') {
+            $this->addError('domain', __('Please enter a valid domain.'));
+
+            return;
+        }
+
+        if ($result['created']) {
             // Same landing as onboarding (ConnectGoogle::finishOnboarding):
-            // pin the NEW site as current and drop the user on the overview
+            // the NEW site is pinned as current; drop the user on the overview
             // hub's Explorer tab. That page kicks the initial Site Explorer
             // generation on first view (freshness-gated — a domain another
             // account already analyzed serves the shared snapshot free), the
-            // crawl + GSC/GA imports queued above run in the background, and
-            // the Site Health / Statistics tabs show their real
-            // processing / needs-action pills for whatever isn't connected.
-            session(['current_website_id' => $website->id]);
+            // crawl + GSC/GA imports queued by the attach run in the
+            // background, and the Site Health / Statistics tabs show their
+            // real processing / needs-action pills for whatever isn't
+            // connected.
             $this->redirectRoute('website-overview', ['tab' => 'explorer']);
 
             return;
@@ -119,7 +122,38 @@ class WebsitesList extends Component
         $ownedWebsites = $user->websites()->orderBy('domain')->get();
         $sharedWebsites = $user->sharedWebsites()->with('user')->orderBy('domain')->get();
 
-        return view('livewire.websites.websites-list', compact('ownedWebsites', 'sharedWebsites'));
+        return view('livewire.websites.websites-list', compact('ownedWebsites', 'sharedWebsites'))
+            ->with('siteScores', $this->siteScores($ownedWebsites->merge($sharedWebsites)));
+    }
+
+    /**
+     * Trust/Citation score chip data per listed domain, read from the shared
+     * report snapshots (payload already carries `scores`; older cached
+     * payloads are augmented in-memory — pure math, no provider call).
+     *
+     * @return array<string, array{trust: ?int, citation: ?int}>
+     */
+    private function siteScores($websites): array
+    {
+        $domains = $websites->pluck('domain')->filter()->map(fn ($d) => strtolower($d))->unique()->values();
+        if ($domains->isEmpty()) {
+            return [];
+        }
+
+        $calc = new \App\Services\Reports\AuthorityScoreCalculator();
+        $out = [];
+        \App\Models\WebsiteReportSnapshot::query()
+            ->whereIn('normalized_domain', $domains)
+            ->where('status', 'ready')
+            ->get(['normalized_domain', 'payload'])
+            ->each(function ($s) use ($calc, &$out) {
+                $scores = $calc->augment($s->payload ?? [])['scores'] ?? null;
+                if (is_array($scores) && ($scores['trust'] !== null || $scores['citation'] !== null)) {
+                    $out[$s->normalized_domain] = ['trust' => $scores['trust'], 'citation' => $scores['citation']];
+                }
+            });
+
+        return $out;
     }
 
     private function fetchGoogleData(): void

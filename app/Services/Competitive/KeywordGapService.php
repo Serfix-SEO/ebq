@@ -47,12 +47,23 @@ class KeywordGapService
      */
     public function start(Website $website, array $competitorUrls, string $country, ?string $userId = null): KeywordGapAnalysis
     {
+        return $this->startForTarget($website, (string) $website->domain, $competitorUrls, $country, $userId);
+    }
+
+    /**
+     * Run a gap analysis for an arbitrary target URL. When $website is null the
+     * target is NOT one of the user's own sites (a foreign lookup) — there's no
+     * GSC to fall back on, so it runs the keyword-fleet-only Missing/Shared
+     * path (Weak/Strength buckets require the owned site's GSC positions).
+     */
+    public function startForTarget(?Website $website, string $ourUrl, array $competitorUrls, string $country, ?string $userId = null): KeywordGapAnalysis
+    {
         $country = $this->normalizeCountry($country);
-        $ourUrl = (string) $website->domain;
+        $ourUrl = $ourUrl !== '' ? $ourUrl : (string) $website?->domain;
         $competitors = $this->cleanUrls($competitorUrls);
 
         $analysis = KeywordGapAnalysis::create([
-            'website_id' => $website->id,
+            'website_id' => $website?->id,
             'user_id' => $userId,
             'our_url' => $ourUrl,
             'competitor_urls' => $competitors,
@@ -96,12 +107,12 @@ class KeywordGapService
             $ourReq = $this->pool->dispatchIdeas(
                 ['url' => $ourUrl, 'scope' => 'site'],
                 userId: $userId,
-                websiteId: $website->id,
+                websiteId: $website?->id,
                 countryKey: $country,
             );
             // If our-site discovery can't even dispatch AND we have no GSC to fall
             // back on, the run is unusable.
-            if ($ourReq->status === KeywordApiRequest::STATUS_FAILED && ! $website->hasGsc()) {
+            if ($ourReq->status === KeywordApiRequest::STATUS_FAILED && ! $website?->hasGsc()) {
                 $analysis->forceFill([
                     'status' => KeywordGapAnalysis::STATUS_FAILED,
                     'error' => $ourReq->error ?: 'Could not analyse your website. Please try again shortly.',
@@ -121,7 +132,7 @@ class KeywordGapService
             $req = $this->pool->dispatchIdeas(
                 ['url' => $url, 'scope' => 'site'],
                 userId: $userId,
-                websiteId: $website->id,
+                websiteId: $website?->id,
                 countryKey: $country,
             );
             // A competitor that fails to dispatch simply contributes nothing.
@@ -431,13 +442,44 @@ class KeywordGapService
             return 0;
         }
 
-        $candidates = KeywordGapRow::query()
+        // Size the pass: every candidate whose SERP is already fresh-cached is
+        // verified for FREE (capped only by the per-pass processing budget);
+        // the live-call cap applies to true cache misses alone. This is what
+        // lets Weak/Strength fill out well beyond 25 rows per click at the
+        // same Serper cost.
+        $candidateKeywords = KeywordGapRow::query()
             ->where('keyword_gap_analysis_id', $analysis->id)
             ->whereIn('bucket', $this->bucketsFor($bucket))
             ->whereNull('verified_at')
-            ->count();
-        $target = min($candidates, $this->verifyMax());
+            ->orderByDesc('search_volume')
+            ->pluck('keyword')
+            ->all();
+        $candidates = count($candidateKeywords);
+        if ($candidates === 0) {
+            return 0;
+        }
+
+        $gl = KeywordFinderLocations::serperGl($analysis->country);
+        $cached = min($this->serp->freshCount($candidateKeywords, $gl), $this->verifyCachedMax());
+        // Live budget: per-pass cap AND whatever the plan's monthly SERP quota
+        // actually has left — never promise a verify_total the quota can't fill.
+        $liveAllowance = $this->liveAllowanceFor($analysis);
+        $live = min(max(0, $candidates - $cached), $liveAllowance);
+        $target = min($candidates, $cached + $live);
         if ($target === 0) {
+            // Candidates exist but the monthly quota is spent and nothing is
+            // cached → surface the plan-limit message loudly instead of a
+            // silent no-op run.
+            if ($candidates > 0 && $liveAllowance === 0) {
+                throw new QuotaExceededException(
+                    provider: 'serp_api',
+                    limit: 0,
+                    used: 0,
+                    userMessage: __("You've used all your live ranking checks for this month. Upgrade your plan to keep verifying — already-checked results stay available."),
+                    upgradeUrl: rtrim(config('app.url'), '/').'/billing',
+                );
+            }
+
             return 0;
         }
 
@@ -472,20 +514,44 @@ class KeywordGapService
         $ourDomain = CompetitorBacklink::extractDomain($analysis->our_url);
         $competitorDomains = is_array($analysis->competitor_urls) ? $analysis->competitor_urls : [];
 
+        // Walk EVERY unverified candidate (volume-first). Fresh-cached SERPs
+        // are free — process up to verifyCachedMax() of them; true cache
+        // misses spend the live budget (verifyMax()). Rows beyond both
+        // budgets stay unverified for the next pass.
         $rows = KeywordGapRow::query()
             ->where('keyword_gap_analysis_id', $analysis->id)
             ->whereIn('bucket', $this->bucketsFor($bucket))
             ->whereNull('verified_at')
             ->orderByDesc('search_volume')
-            ->limit($this->verifyMax())
             ->get();
 
+        $liveBudget = $this->liveAllowanceFor($analysis);
+        $cachedBudget = $this->verifyCachedMax();
+
         foreach ($rows as $row) {
-            try {
-                $serp = $this->serp->organic($row->keyword, $gl, $website?->id, $analysis->user_id, 'gap_verify');
-            } catch (QuotaExceededException $e) {
-                $analysis->forceFill(['verify_error' => $e->userMessage])->save();
+            if ($liveBudget <= 0 && $cachedBudget <= 0) {
                 break;
+            }
+
+            $serp = $this->serp->cached($row->keyword, $gl);
+            if ($serp !== null) {
+                if ($cachedBudget <= 0) {
+                    continue; // cached-processing budget spent; maybe a live row later
+                }
+                $cachedBudget--;
+            } else {
+                if ($liveBudget <= 0) {
+                    continue; // no live budget — skip, stays unverified
+                }
+                try {
+                    $serp = $this->serp->organic($row->keyword, $gl, $website?->id, $analysis->user_id, 'gap_verify');
+                } catch (QuotaExceededException $e) {
+                    $analysis->forceFill(['verify_error' => $e->userMessage])->save();
+                    $liveBudget = 0;
+
+                    continue; // keep verifying the free cached rows
+                }
+                $liveBudget--;
             }
 
             [$compPos, $ourPos, $compDomain] = $this->positionsFromSerp($serp, $competitorDomains, $ourDomain);
@@ -604,9 +670,42 @@ class KeywordGapService
         return in_array($bucket, $valid, true) ? [$bucket] : $this->verifyBuckets();
     }
 
+    /**
+     * Live SERP calls this verify pass may make: the per-pass cap clamped by
+     * the billed user's remaining monthly serp quota (null limit = unlimited).
+     */
+    private function liveAllowanceFor(KeywordGapAnalysis $analysis): int
+    {
+        $allowance = $this->verifyMax();
+
+        $billed = null;
+        if ($analysis->website_id !== null) {
+            $ownerId = \Illuminate\Support\Facades\DB::table('websites')->where('id', $analysis->website_id)->value('user_id');
+            $billed = $ownerId ? \App\Models\User::find($ownerId) : null;
+        }
+        $billed ??= $analysis->user_id ? \App\Models\User::find($analysis->user_id) : null;
+        if ($billed === null) {
+            return $allowance;
+        }
+
+        $remaining = app(\App\Services\Usage\UsageMeter::class)->remaining($billed, 'serp_api');
+
+        return $remaining === null ? $allowance : min($allowance, max(0, $remaining));
+    }
+
     private function verifyMax(): int
     {
         return max(1, (int) config('services.competitive.gap_verify_max', 25));
+    }
+
+    /**
+     * Per-pass cap on FREE cached-SERP verifications — bounded only by job
+     * runtime (each row still does an OPR authority lookup + a save), not by
+     * Serper spend.
+     */
+    private function verifyCachedMax(): int
+    {
+        return max(0, (int) config('services.competitive.gap_verify_cached_max', 150));
     }
 
     /**

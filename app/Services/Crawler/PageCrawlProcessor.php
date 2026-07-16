@@ -211,6 +211,17 @@ class PageCrawlProcessor
             $this->rebuildEdges($page, $analysis['internal_links']);
         }
 
+        // Tier-1 link-graph harvest: deposit this page's external outlinks
+        // into the append-only edge store (free byproduct of a fetch that
+        // already happened; EdgeRecorder never throws).
+        if (! empty($analysis['external_links'])) {
+            app(\App\Services\LinkGraph\EdgeRecorder::class)->record(
+                (string) $page->url,
+                $analysis['external_links'],
+                \App\Services\LinkGraph\EdgeRecorder::SOURCE_OWN_CRAWL,
+            );
+        }
+
         return $significantlyChanged ? 'changed' : 'unchanged';
     }
 

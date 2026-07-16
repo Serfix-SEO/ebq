@@ -62,6 +62,7 @@ class PlanSeeder extends Seeder
                     '20,000 page crawl budget',
                     '20 tracked keywords',
                     '50 keyword searches / mo',
+                    '100 live ranking checks / mo',
                     '25,000 AI Studio tokens / mo',
                     '2 long-form articles / mo',
                     'Backlink & SERP analysis',
@@ -86,7 +87,14 @@ class PlanSeeder extends Seeder
                     'keyword_research'  => ['monthly_searches'     => 50, 'max_results_per_search' => 1000],
                     'ai_studio'         => ['monthly_tokens'       => 25000],
                     'long_form'         => ['monthly_articles'     => 2],
+                    'serper'            => ['monthly_calls'        => 100],
+                    'mistral'           => ['monthly_tokens'       => 50000],
                     'quick_win_finder'  => ['results_shown'        => 5],
+                    // Backlink report: rows are a RENDER cap (fetch always
+                    // stores the shared full 1,000 — cutting the fetch would
+                    // poison the cross-tenant snapshot and saves <$0.05/report);
+                    // drill-down = the paid per-anchor index fetch.
+                    'report'            => ['max_backlink_rows' => 1000, 'monthly_backlink_rows' => 1000, 'allow_link_drilldown' => 0],
                 ],
             ],
             [
@@ -111,6 +119,7 @@ class PlanSeeder extends Seeder
                     '100,000 page crawl budget',
                     '100 tracked keywords',
                     '250 keyword searches / mo',
+                    '1,000 live ranking checks / mo',
                     '60,000 AI Studio tokens / mo',
                     '5 long-form articles / mo',
                     'Backlink & SERP analysis',
@@ -135,7 +144,14 @@ class PlanSeeder extends Seeder
                     'keyword_research'  => ['monthly_searches'     => 250, 'max_results_per_search' => 5000],
                     'ai_studio'         => ['monthly_tokens'       => 60000],
                     'long_form'         => ['monthly_articles'     => 5],
+                    'serper'            => ['monthly_calls'        => 1000],
+                    'mistral'           => ['monthly_tokens'       => 250000],
                     'quick_win_finder'  => ['results_shown'        => 10],
+                    // Backlink report: rows are a RENDER cap (fetch always
+                    // stores the shared full 1,000 — cutting the fetch would
+                    // poison the cross-tenant snapshot and saves <$0.05/report);
+                    // drill-down = the paid per-anchor index fetch.
+                    'report'            => ['max_backlink_rows' => 1000, 'monthly_backlink_rows' => 100000, 'allow_link_drilldown' => 1],
                 ],
             ],
             [
@@ -160,6 +176,7 @@ class PlanSeeder extends Seeder
                     '300,000 page crawl budget',
                     '500 tracked keywords',
                     '1,000 keyword searches / mo',
+                    '4,000 live ranking checks / mo',
                     '150,000 AI Studio tokens / mo',
                     '15 long-form articles / mo',
                     'Scheduled reports',
@@ -185,7 +202,14 @@ class PlanSeeder extends Seeder
                     'keyword_research'  => ['monthly_searches'     => 1000, 'max_results_per_search' => 10000],
                     'ai_studio'         => ['monthly_tokens'       => 150000],
                     'long_form'         => ['monthly_articles'     => 15],
+                    'serper'            => ['monthly_calls'        => 4000],
+                    'mistral'           => ['monthly_tokens'       => 1000000],
                     'quick_win_finder'  => ['results_shown'        => 20],
+                    // Backlink report: rows are a RENDER cap (fetch always
+                    // stores the shared full 1,000 — cutting the fetch would
+                    // poison the cross-tenant snapshot and saves <$0.05/report);
+                    // drill-down = the paid per-anchor index fetch.
+                    'report'            => ['max_backlink_rows' => 1000, 'monthly_backlink_rows' => 500000, 'allow_link_drilldown' => 1],
                 ],
             ],
             [
@@ -210,6 +234,7 @@ class PlanSeeder extends Seeder
                     '1,000,000 page crawl budget',
                     '2,000 tracked keywords',
                     '4,000 keyword searches / mo',
+                    '12,000 live ranking checks / mo',
                     '600,000 AI Studio tokens / mo',
                     '50 long-form articles / mo',
                     'White-label reports',
@@ -236,7 +261,14 @@ class PlanSeeder extends Seeder
                     'keyword_research'  => ['monthly_searches'     => 4000, 'max_results_per_search' => 30000],
                     'ai_studio'         => ['monthly_tokens'       => 600000],
                     'long_form'         => ['monthly_articles'     => 50],
+                    'serper'            => ['monthly_calls'        => 12000],
+                    'mistral'           => ['monthly_tokens'       => 4000000],
                     'quick_win_finder'  => ['results_shown'        => 30],
+                    // Backlink report: rows are a RENDER cap (fetch always
+                    // stores the shared full 1,000 — cutting the fetch would
+                    // poison the cross-tenant snapshot and saves <$0.05/report);
+                    // drill-down = the paid per-anchor index fetch.
+                    'report'            => ['max_backlink_rows' => 1000, 'monthly_backlink_rows' => 1200000, 'allow_link_drilldown' => 1],
                 ],
             ],
             [

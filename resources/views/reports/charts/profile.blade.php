@@ -1,4 +1,13 @@
 @php
+    // Month labels arrive either as 'YYYY-MM' or a full datetime string —
+    // normalize to a human "Jul 2025" (raw fallback if unparseable).
+    $monthLabel = function ($v): string {
+        try {
+            return \Illuminate\Support\Carbon::parse((string) $v)->format('M Y');
+        } catch (\Throwable) {
+            return (string) $v;
+        }
+    };
     $rows = array_values($history ?? []);
     $n = count($rows);
     $maxActive = 1;
@@ -16,11 +25,16 @@
             $ah = round(($maxActive ? ((int) ($rr['active'] ?? 0) / $maxActive) : 0) * 90, 1);
             $lh = round(($maxLost ? ((int) ($rr['lost'] ?? 0) / $maxLost) : 0) * 22, 1);
         @endphp
-        <rect x="{{ round($x, 1) }}" y="{{ round($base - $ah, 1) }}" width="{{ round($bw, 1) }}" height="{{ $ah }}" rx="2" fill="#F26419"/>
-        <rect x="{{ round($x, 1) }}" y="{{ $base }}" width="{{ round($bw, 1) }}" height="{{ $lh }}" rx="2" fill="#e34948"/>
+        {{-- <title> = native hover tooltip (transparent full-height rect widens the hover target). --}}
+        <g>
+            <title>{{ $monthLabel($rr['month'] ?? '') }} — {{ number_format((int) ($rr['active'] ?? 0)) }} new, {{ number_format((int) ($rr['lost'] ?? 0)) }} lost</title>
+            <rect x="{{ round($x, 1) }}" y="0" width="{{ round($bw, 1) }}" height="{{ $h }}" fill="transparent"/>
+            <rect x="{{ round($x, 1) }}" y="{{ round($base - $ah, 1) }}" width="{{ round($bw, 1) }}" height="{{ $ah }}" rx="2" fill="#F26419"/>
+            <rect x="{{ round($x, 1) }}" y="{{ $base }}" width="{{ round($bw, 1) }}" height="{{ $lh }}" rx="2" fill="#e34948"/>
+        </g>
     @endforeach
     @if ($n > 0)
-        <text x="0" y="{{ $h - 8 }}" font-size="11" fill="#94a3b8" font-family="DejaVu Sans, sans-serif">{{ $rows[0]['month'] ?? '' }}</text>
-        <text x="{{ $w }}" y="{{ $h - 8 }}" font-size="11" fill="#94a3b8" text-anchor="end" font-family="DejaVu Sans, sans-serif">{{ $rows[$n-1]['month'] ?? '' }}</text>
+        <text x="0" y="{{ $h - 8 }}" font-size="11" fill="#94a3b8" font-family="DejaVu Sans, sans-serif">{{ $monthLabel($rows[0]['month'] ?? '') }}</text>
+        <text x="{{ $w }}" y="{{ $h - 8 }}" font-size="11" fill="#94a3b8" text-anchor="end" font-family="DejaVu Sans, sans-serif">{{ $monthLabel($rows[$n-1]['month'] ?? '') }}</text>
     @endif
 </svg>

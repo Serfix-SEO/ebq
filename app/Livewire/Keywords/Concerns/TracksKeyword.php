@@ -51,12 +51,13 @@ trait TracksKeyword
         }
 
         $website = Website::find($websiteId);
-        $domain = $website && (string) $website->domain !== '' ? (string) $website->domain : '';
+        $domain = $this->resolveTrackDomain($website);
         if ($domain === '') {
             $this->trackNotice = 'Set a target domain on the website first.';
 
             return null;
         }
+        $country = $this->resolveTrackCountry();
 
         $row = RankTrackingKeyword::updateOrCreate(
             [
@@ -64,7 +65,7 @@ trait TracksKeyword
                 'keyword_hash' => RankTrackingKeyword::hashKeyword($keyword),
                 'search_engine' => 'google',
                 'search_type' => 'organic',
-                'country' => 'us',
+                'country' => $country,
                 'language' => 'en',
                 'device' => 'desktop',
                 'location' => null,
@@ -89,5 +90,21 @@ trait TracksKeyword
         }
 
         return false;
+    }
+
+    /**
+     * Domain to track the keyword FOR. Defaults to the account's current
+     * website; components analyzing a different target (e.g. the Keyword Gap
+     * tool on a competitor URL) override this to track that target instead.
+     */
+    protected function resolveTrackDomain(?Website $website): string
+    {
+        return $website && (string) $website->domain !== '' ? (string) $website->domain : '';
+    }
+
+    /** Country for the tracked check. Overridable per component. */
+    protected function resolveTrackCountry(): string
+    {
+        return 'us';
     }
 }

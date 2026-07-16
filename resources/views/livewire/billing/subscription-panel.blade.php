@@ -131,6 +131,35 @@
         </div>
     @endif
 
+    {{-- This month's usage — used/limit for every capped provider on the plan. --}}
+    @if (! empty($usage ?? []))
+        <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ __('This month’s usage') }}</h2>
+                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Counters reset monthly. Cached results never count against your limits.') }}</p>
+            </div>
+            <div class="grid gap-4 p-5 sm:grid-cols-3">
+                @foreach ($usage as $u)
+                    @php $full = $u['used'] >= $u['limit']; @endphp
+                    <div>
+                        <div class="flex items-baseline justify-between gap-2">
+                            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ $u['label'] }}</span>
+                            <span class="text-xs tabular-nums {{ $full ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400' }}">
+                                {{ number_format($u['used']) }} / {{ number_format($u['limit']) }}
+                            </span>
+                        </div>
+                        <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                            <div class="h-full rounded-full {{ $full ? 'bg-amber-500' : ($u['pct'] >= 80 ? 'bg-orange-500' : 'bg-emerald-500') }}" style="width: {{ max(2, $u['pct']) }}%"></div>
+                        </div>
+                        @if ($full)
+                            <p class="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">{{ __('Limit reached — upgrade for more.') }}</p>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- Current plan card --}}
     @if (! $isFreePromo && $currentPlan && $subscription)
         <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">

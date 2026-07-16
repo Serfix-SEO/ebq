@@ -157,6 +157,46 @@ class SiteExplorerUsageController extends Controller
     }
 
     /**
+     * Admin action: wipe a domain's cached report so the next lookup runs a
+     * fresh generation (and, for empty domains, the full enrichment pipeline).
+     * Deletes BOTH the production and sandbox snapshot rows plus the shared
+     * monthly keyword-ideas cache entry the enrichment would otherwise reuse.
+     * Deliberately does NOT touch client_activities — the usage/cost ledger
+     * must stay historically accurate.
+     */
+    public function clearCache(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $validated = $request->validate(['domain' => ['required', 'string', 'max:255']]);
+
+        $normalized = WebsiteReportSnapshot::normalizeDomain($validated['domain']);
+        if ($normalized === '') {
+            return back()->with('cache_clear_error', 'Enter a valid domain.');
+        }
+
+        $deleted = WebsiteReportSnapshot::query()
+            ->whereIn('normalized_domain', [$normalized, 'sbx:'.$normalized])
+            ->delete();
+
+        // Shared calendar-month keyword-ideas cache (site scope, the exact key
+        // ReportEnrichmentService computes) — cleared so re-testing a new
+        // domain exercises the full pipeline, not a cached keyword list.
+        [$mode, $payload] = app(\App\Services\KeywordFinder\KeywordFinderPool::class)
+            ->buildIdeasPayload(['url' => 'https://'.$normalized, 'scope' => 'site'], 'us');
+        \Illuminate\Support\Facades\Cache::forget(
+            \App\Services\KeywordFinder\KeywordIdeasMonthlyCache::key($mode, $payload)
+        );
+
+        app(\App\Services\ClientActivityLogger::class)->log('site_explorer.cache_cleared', userId: $request->user()?->id, meta: [
+            'domain' => $normalized,
+            'snapshots_deleted' => $deleted,
+        ]);
+
+        return back()->with('cache_cleared', $deleted > 0
+            ? "Report cache for {$normalized} removed ({$deleted} snapshot".($deleted === 1 ? '' : 's').") — next lookup regenerates fresh."
+            : "No cached report existed for {$normalized} — nothing to remove.");
+    }
+
+    /**
      * Real DataForSEO cost of each domain's LATEST generation, from its
      * shared snapshot — sandbox rows never carry a cost (never billed).
      *

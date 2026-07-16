@@ -27,18 +27,6 @@ use Illuminate\Support\Str;
  */
 class CompetitorDiscoveryService
 {
-    /**
-     * Mega-domains that rank for nearly everything and are never a client's
-     * actionable "competitor". Excluded from the tally unless includeGiants.
-     *
-     * @var list<string>
-     */
-    private const GIANT_DOMAINS = [
-        'wikipedia.org', 'youtube.com', 'facebook.com', 'amazon.com', 'reddit.com',
-        'linkedin.com', 'pinterest.com', 'quora.com', 'instagram.com', 'x.com',
-        'twitter.com', 'google.com', 'tiktok.com', 'yelp.com', 'medium.com',
-    ];
-
     public function __construct(
         private SerpCache $serp,
         private OpenPageRankClient $opr,
@@ -353,15 +341,13 @@ class CompetitorDiscoveryService
         return array_slice(array_values(array_unique([...$preferred, ...$others])), 0, $cap);
     }
 
+    /**
+     * Mega-domains that rank for nearly everything and are never a client's
+     * actionable "competitor" — shared list lives in Support\GiantDomains.
+     */
     private function isGiant(string $domain): bool
     {
-        foreach (self::GIANT_DOMAINS as $giant) {
-            if ($domain === $giant || str_ends_with($domain, '.'.$giant)) {
-                return true;
-            }
-        }
-
-        return false;
+        return \App\Support\GiantDomains::isGiant($domain);
     }
 
     /** Map the website's country (or default) to a 2-letter SERP `gl`. */

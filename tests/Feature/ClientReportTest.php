@@ -112,6 +112,62 @@ class ClientReportTest extends TestCase
         $this->get('/r/'.$share->token)->assertNotFound();
     }
 
+    public function test_assemble_emits_trust_and_citation_scores(): void
+    {
+        $payload = app(\App\Services\Reports\ClientReportService::class)->assemble('example.com', [
+            'summary' => [
+                'backlinks' => 24318,
+                'referring_domains' => 1842,
+                'referring_ips' => 1650,
+                'referring_subnets' => 1400,
+                'rank' => 470,
+                'backlinks_spam_score' => 3,
+                'referring_links_attributes' => ['nofollow' => 9240],
+            ],
+            'history' => [],
+            'referring_domains' => [
+                ['domain' => 'en.wikipedia.org', 'rank' => 890, 'backlinks' => 1, 'first_seen' => '2024-03-01 00:00:00'],
+                ['domain' => 'smallblog.net', 'rank' => 120, 'backlinks' => 5, 'first_seen' => '2025-01-01 00:00:00'],
+                ['domain' => 'spamdir.xyz', 'rank' => 10, 'backlinks' => 44, 'first_seen' => '2025-06-01 00:00:00'],
+            ],
+            'anchors' => [],
+            'domain_pages' => [],
+            'competitors' => [],
+            'backlinks' => [],
+            'moz' => ['domain_authority' => 41, 'page_authority' => 38, 'spam_score' => 3],
+            'opr' => ['example.com' => ['score' => 4.7, 'rank' => 1639043, 'history' => []]],
+        ]);
+
+        $this->assertIsInt($payload['scores']['citation']);
+        $this->assertIsInt($payload['scores']['trust']);
+        $this->assertSame(\App\Services\Reports\AuthorityScoreCalculator::VERSION, $payload['scores']['version']);
+        // Per-row Citation Score lands on every referring-domain row.
+        $this->assertIsInt($payload['top_referring_domains'][0]['cs']);
+        // Trust can exceed Citation only by the plausibility margin.
+        $this->assertLessThanOrEqual($payload['scores']['citation'] + 10, $payload['scores']['trust']);
+    }
+
+    public function test_topicsignal_refreshes_on_read_even_when_scores_are_current(): void
+    {
+        // Regression (2026-07-16): a payload whose scores were already
+        // current-version short-circuited BEFORE the calculator ran, so the
+        // topical section that landed AFTER the score stamp never produced a
+        // TopicSignal — the gauge showed "—" forever.
+        $svc = app(\App\Services\Reports\ClientReportService::class);
+        $payload = [
+            'domain' => 'topical-done.test',
+            'scores' => ['trust' => 15, 'citation' => 5, 'version' => \App\Services\Reports\AuthorityScoreCalculator::VERSION],
+            'topical_trust' => ['sample' => 33, 'total' => 33, 'relevant_pct' => 30,
+                'topics' => [['topic' => 'Business & Industry', 'count' => 12]]],
+            'meta' => ['schema' => 2],
+        ];
+
+        $out = $svc->withTraffic($payload, null);
+
+        // 15 * (0.4 + 0.6*0.30) = 8.7 → 9
+        $this->assertSame(9, $out['scores']['topical']);
+    }
+
     public function test_registration_phone_is_optional(): void
     {
         $this->post('/register', [

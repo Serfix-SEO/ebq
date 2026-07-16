@@ -297,6 +297,27 @@
                 </div>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Backlink rows shown per report (render cap, enforced — fetch always stores the full 1,000)</span>
+                        <input type="number" min="10" max="1000" name="api_limits[report][max_backlink_rows]"
+                               value="{{ old('api_limits.report.max_backlink_rows', $plan->apiLimit('report.max_backlink_rows')) }}"
+                               placeholder="1000"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Backlink rows / month (Ahrefs-style row quota, enforced — charged once per domain per window)</span>
+                        <input type="number" min="0" name="api_limits[report][monthly_backlink_rows]"
+                               value="{{ old('api_limits.report.monthly_backlink_rows', $plan->apiLimit('report.monthly_backlink_rows')) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Anchor drill-down (paid index fetch): 1 = allowed, 0 = blocked (enforced)</span>
+                        <input type="number" min="0" max="1" name="api_limits[report][allow_link_drilldown]"
+                               value="{{ old('api_limits.report.allow_link_drilldown', $plan->apiLimit('report.allow_link_drilldown')) }}"
+                               placeholder="1 (allowed)"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
                         <span class="block text-xs font-medium text-slate-700">Keywords Everywhere — credits / month</span>
                         <input type="number" min="0" name="api_limits[keywords_everywhere][monthly_credits]"
                                value="{{ old('api_limits.keywords_everywhere.monthly_credits', $ke) }}"

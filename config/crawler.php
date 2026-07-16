@@ -149,4 +149,34 @@ return [
         // automatic schedule firing.
         'auto_import' => (bool) env('CRAWLER_PROXY_AUTO_IMPORT', false),
     ],
+
+    /*
+     * Tier-1.5 targeted link crawler. Actively crawls the domains we track
+     * (referring domains, competitors, client neighborhoods in
+     * domain_metrics) to discover their outbound links, depositing edges into
+     * the permanent link graph via EdgeRecorder. Runs on the `crawl` queue
+     * (worker box B / ephemeral fleet) alongside site audits.
+     *
+     * OFF by default — a new outbound web crawler must be activated
+     * deliberately on prod (flip LINK_CRAWL_ENABLED=true on BOTH boxes +
+     * restart Horizon). Everything else is a rate/scope knob.
+     */
+    'link_crawl' => [
+        'enabled' => (bool) env('LINK_CRAWL_ENABLED', false),
+        // Hard daily page budget (Redis counter, per calendar day) so the
+        // crawler can't run away — the ~100–200k/day Tier-1.5 target.
+        'daily_budget' => (int) env('LINK_CRAWL_DAILY_BUDGET', 150000),
+        // We want a domain's OUTBOUND links, not a full site crawl: homepage
+        // + a few internal pages is plenty.
+        'max_pages_per_host' => (int) env('LINK_CRAWL_MAX_PAGES_PER_HOST', 12),
+        'internal_links_followed' => (int) env('LINK_CRAWL_INTERNAL_FOLLOWED', 6),
+        // Pass/batch sizing (mirrors the site-audit crawler's shape).
+        'batch_size' => (int) env('LINK_CRAWL_BATCH_SIZE', 20),
+        'pages_per_pass' => (int) env('LINK_CRAWL_PAGES_PER_PASS', 500),
+        // Seeding: how many important domains to (re)queue per seed run.
+        'seed_domains_per_run' => (int) env('LINK_CRAWL_SEED_DOMAINS', 3000),
+        'recrawl_days' => (int) env('LINK_CRAWL_RECRAWL_DAYS', 30),
+        'retry_after_hours' => (int) env('LINK_CRAWL_RETRY_HOURS', 72),
+        'max_attempts' => (int) env('LINK_CRAWL_MAX_ATTEMPTS', 3),
+    ],
 ];

@@ -125,6 +125,12 @@ class PlanController extends Controller
             'api_limits.ai_studio.monthly_tokens' => 'nullable|integer|min:0|max:100000000',
             'api_limits.long_form.monthly_articles' => 'nullable|integer|min:0|max:10000',
             'api_limits.quick_win_finder.results_shown' => 'nullable|integer|min:0|max:1000',
+            // Report/backlink controls: rows shown per viewer (render-time
+            // cap — the shared snapshot always stores the full fetch) and
+            // whether the paid per-anchor index drill-down is allowed.
+            'api_limits.report.max_backlink_rows' => 'nullable|integer|min:10|max:1000',
+            'api_limits.report.monthly_backlink_rows' => 'nullable|integer|min:0|max:100000000',
+            'api_limits.report.allow_link_drilldown' => 'nullable|integer|in:0,1',
             // Plugin entitlement matrix. Submitted as a bag of
             // `plan_features[<key>]=on` checkbox fields; unchecked
             // boxes don't POST, so we default-fill below.

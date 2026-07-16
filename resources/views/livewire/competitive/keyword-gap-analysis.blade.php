@@ -10,14 +10,48 @@
     $verified = $analysis && $analysis->verify_status === 'completed';
     // Show position columns once we have positions — from GSC or verification.
     $showPositions = $hasGsc || $verified;
-    // After verification a no-GSC site can split weak/strength too.
-    $visibleTabs = $showPositions ? ['missing', 'weak', 'strength'] : ['missing', 'shared'];
+    // After verification a no-GSC site can split weak/strength too — but keep
+    // the Shared tab while unverified shared rows remain (verification is
+    // budgeted per pass, so a big gap re-buckets progressively; hiding the tab
+    // stranded the not-yet-verified rows).
+    $sharedLeft = (int) ($summary['shared'] ?? 0) > 0;
+    $visibleTabs = $showPositions
+        ? array_merge(['missing', 'weak', 'strength'], $sharedLeft ? ['shared'] : [])
+        : ['missing', 'shared'];
 @endphp
 
-<div @if($this->isPolling() || $this->isVerifying()) wire:poll.3000ms="poll" @endif>
+<div @if($this->isPolling() || $this->isVerifying() || $this->isFinding()) wire:poll.3000ms="poll" @endif>
     <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-        @if (! $website)
-            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Select a website to run a gap analysis.') }}</p>
+        {{-- Target website: defaults to the current site, editable to any URL.
+             Own site → competitors load from its Site Explorer report; a foreign
+             URL → manual add + a link to discover competitors. --}}
+        <div class="mb-4">
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Analyze') }}</label>
+            <div class="mt-1.5 flex items-center gap-2">
+                <div class="relative flex-1 sm:max-w-md">
+                    <svg class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918" /></svg>
+                    <input type="text" wire:model.live.debounce.500ms="targetUrl" placeholder="example.com"
+                           class="h-10 w-full rounded-lg border border-slate-300 bg-white ps-9 pe-3 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                </div>
+                {{-- Foreign target with no known competitors → discover them inline
+                     (no page navigation). --}}
+                @if ($targetIsForeign && empty($suggested) && $findStatus !== 'done')
+                    <button type="button" wire:click="findCompetitors" wire:loading.attr="disabled" wire:target="findCompetitors"
+                            @disabled($this->isFinding())
+                            class="inline-flex h-10 flex-none items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60">
+                        @if ($this->isFinding())
+                            <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            {{ __('Finding…') }}
+                        @else
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                            {{ __('Find competitors') }}
+                        @endif
+                    </button>
+                @endif
+            </div>
+        </div>
+        @if ($targetDomain === '')
+            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Enter a website URL above to run a gap analysis.') }}</p>
         @elseif ($this->isPolling())
             {{-- Collecting: the picker collapses into a live progress teaser so
                  it's obvious work is happening and where the results will land. --}}
@@ -73,7 +107,7 @@
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
                     <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                        {{ __('Gap analysis') }} · <span class="text-slate-500 dark:text-slate-400">{{ $website->domain }}</span>
+                        {{ __('Gap analysis') }} · <span class="text-slate-500 dark:text-slate-400">{{ $website?->domain ?? $targetDomain }}</span>
                         <span class="text-slate-400">{{ __('vs') }}</span>
                     </p>
                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -85,15 +119,36 @@
                         @endforeach
                         <span class="text-xs uppercase text-slate-400">{{ $analysis->country }}</span>
                         @if ($analysis->completed_at)
-                            <span class="text-xs text-slate-400">· {{ $analysis->completed_at->diffForHumans() }}</span>
+                            <span class="text-xs text-slate-400">· {{ __('generated') }} {{ $analysis->completed_at->diffForHumans() }}</span>
+                        @endif
+                        @if ($analysis->expires_at && $analysis->expires_at->isPast())
+                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-800" title="{{ __('Rankings shift over time — refresh for current data.') }}">{{ __('May be outdated') }}</span>
                         @endif
                     </div>
                 </div>
-                <button type="button" wire:click="changeCompetitors"
-                    class="inline-flex flex-none items-center gap-1.5 self-start rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700/50 sm:self-auto">
-                    <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-                    {{ __('Change competitors & re-run') }}
-                </button>
+                <div class="flex flex-none flex-wrap items-center gap-2 self-start sm:self-auto">
+                    {{-- Saved reports for this target — reopening is free (no new lookups). --}}
+                    @if ($pastAnalyses->count() > 1)
+                        <select wire:change="loadAnalysis($event.target.value)"
+                            class="h-8 max-w-[220px] rounded-lg border-slate-200 bg-white text-xs text-slate-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                            @foreach ($pastAnalyses as $pa)
+                                <option value="{{ $pa->id }}" @selected($pa->id === $analysis->id)>
+                                    {{ $pa->completed_at?->format('M j, H:i') ?? __('(running)') }} · {{ count((array) $pa->competitor_urls) }} {{ __('competitors') }}{{ $pa->verified_at ? ' · '.__('verified') : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    @endif
+                    <button type="button" wire:click="refreshAnalysis" wire:loading.attr="disabled" wire:target="refreshAnalysis"
+                        title="{{ __('Re-run with the same competitors for fresh data') }}"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700/50">
+                        <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                        {{ __('Refresh') }}
+                    </button>
+                    <button type="button" wire:click="changeCompetitors"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700/50">
+                        {{ __('Change competitors') }}
+                    </button>
+                </div>
             </div>
         @else
             {{-- Competitor picker — one-click suggestions from the Site
@@ -104,7 +159,12 @@
                  per click re-rendered the whole component, including the
                  results-table queries, and felt laggy. State syncs with the
                  next Livewire request (Run / manual add). --}}
-            <div x-data="{
+            {{-- Re-key on the suggestion set so Alpine re-inits `suggestedDomains`
+                 when inline discovery / a target change repopulates suggestions —
+                 otherwise already-suggested competitors also rendered as redundant
+                 manual chips (stale Alpine state). --}}
+            <div wire:key="gap-picker-{{ substr(md5(implode(',', array_column($suggested, 'domain'))), 0, 10) }}"
+                x-data="{
                 selected: $wire.entangle('competitors'),
                 suggestedDomains: @js(array_column($suggested, 'domain')),
                 max: {{ (int) $maxCompetitors }},
@@ -159,7 +219,18 @@
                             </button>
                         @endforeach
                     </div>
-                @else
+                @elseif ($targetIsForeign && ($this->isFinding() || $findStatus === 'done'))
+                    <div class="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+                        @if ($this->isFinding())
+                            <span class="inline-flex items-center gap-2">
+                                <span class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-orange-500"></span>
+                                {{ __('Finding competitors for :d — this updates automatically.', ['d' => $targetDomain]) }}
+                            </span>
+                        @else
+                            {{ __('No competitors found automatically — add them manually below.') }}
+                        @endif
+                    </div>
+                @elseif (! $targetIsForeign)
                     <div class="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
                         {{ __('No Site Explorer report for this website yet — open the') }}
                         <a href="{{ route('competitors.index') }}" class="font-semibold text-orange-600 hover:underline dark:text-orange-400">{{ __('Competitors page') }}</a>
@@ -202,7 +273,11 @@
                 <p class="mt-3 text-xs text-amber-600 dark:text-amber-400">{{ __('No Search Console connected — keywords reflect what each site’s content') }} <em>{{ __('targets') }}</em>{{ __(', not confirmed rankings. Connect Search Console to split shared keywords into Weak vs Strengths and unlock position data.') }}</p>
             @endunless
             @if ($errorMessage)
-                <p class="mt-3 text-sm text-red-600 dark:text-red-400">{{ $errorMessage }}</p>
+                @if (\App\Support\QuotaMessage::isQuota($errorMessage))
+                    <x-quota-alert :message="$errorMessage" />
+                @else
+                    <p class="mt-3 text-sm text-red-600 dark:text-red-400">{{ $errorMessage }}</p>
+                @endif
             @endif
             @if ($analysis?->reprocessed_at)
                 <p class="mt-3 text-xs text-emerald-600 dark:text-emerald-400">{{ __('Upgraded with your Search Console data.') }}</p>
@@ -214,6 +289,75 @@
     </div>
 
     @if ($analysis && $analysis->status === 'completed')
+        {{-- Post-verification value banner: the live check's findings, loud and
+             actionable — each chip jumps to its bucket. Dismissible; reappears
+             after the next verify pass. --}}
+        @php $vTotal = array_sum($verifiedCounts ?? []); @endphp
+        @if ($vTotal > 0 && ! $verifyBannerDismissed && ! $this->isVerifying())
+            @php
+                $vStrength = (int) ($verifiedCounts['strength'] ?? 0);
+                $vWeak = (int) ($verifiedCounts['weak'] ?? 0);
+                $vMissing = (int) ($verifiedCounts['missing'] ?? 0);
+                // Unchecked keywords still sitting in Missing — the banner counts
+                // reflect only the CHECKED slice, so say so and offer to continue.
+                $vRemaining = max(0, (int) ($summary['missing'] ?? 0) - $vMissing);
+            @endphp
+            <div class="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 shadow-sm dark:border-emerald-900 dark:from-emerald-500/10 dark:to-teal-500/10">
+                <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </span>
+                        <div>
+                            <p class="text-base font-bold text-emerald-900 dark:text-emerald-200">
+                                {{ __(':n keywords checked against Google’s live results', ['n' => number_format($vTotal)]) }}
+                            </p>
+                            <p class="mt-0.5 text-sm text-emerald-800 dark:text-emerald-300">
+                                @if ($vStrength > 0)
+                                    {{ __('Good news — you already rank well for :n of them.', ['n' => $vStrength]) }}
+                                @elseif ($vWeak > 0)
+                                    {{ __('You’re close on :n keywords — small pushes could win them.', ['n' => $vWeak]) }}
+                                @else
+                                    {{ __('These are confirmed real gaps — your competitors rank, you don’t. Prime targets.') }}
+                                @endif
+                                @if ($vRemaining > 0)
+                                    {{ __(':n keywords haven’t been checked yet.', ['n' => number_format($vRemaining)]) }}
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="dismissVerifyBanner" aria-label="{{ __('Dismiss') }}"
+                            class="flex-none self-start rounded-full p-1.5 text-emerald-700 transition hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-500/20">
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                    </button>
+                </div>
+                <div class="flex flex-wrap gap-2 border-t border-emerald-100 bg-white/60 px-5 py-3 dark:border-emerald-900/50 dark:bg-transparent">
+                    @foreach ([
+                        ['key' => 'strength', 'count' => $vStrength, 'label' => __('Strengths — you already rank'), 'chip' => 'bg-emerald-600 text-white hover:bg-emerald-700'],
+                        ['key' => 'weak', 'count' => $vWeak, 'label' => __('Weak — close to ranking'), 'chip' => 'bg-amber-500 text-white hover:bg-amber-600'],
+                        ['key' => 'missing', 'count' => $vMissing, 'label' => __('Confirmed gaps'), 'chip' => 'bg-slate-700 text-white hover:bg-slate-800'],
+                    ] as $c)
+                        @if ($c['count'] > 0)
+                            <button type="button" wire:click="setTab('{{ $c['key'] }}')"
+                                    class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold shadow-sm transition {{ $c['chip'] }}">
+                                <span class="rounded-full bg-white/25 px-1.5 tabular-nums">{{ number_format($c['count']) }}</span>
+                                {{ $c['label'] }}
+                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+                            </button>
+                        @endif
+                    @endforeach
+                    {{-- Continue the check: verify the next slice of unchecked keywords. --}}
+                    @if ($vRemaining > 0)
+                        <button type="button" wire:click="verifyMissingMore" wire:loading.attr="disabled" wire:target="verifyMissingMore"
+                                class="inline-flex items-center gap-2 rounded-full border-2 border-emerald-600 bg-white px-3.5 py-1 text-xs font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:opacity-60 dark:border-emerald-400 dark:bg-transparent dark:text-emerald-300 dark:hover:bg-emerald-500/10">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                            {{ __('Check :n more', ['n' => number_format($vRemaining)]) }}
+                        </button>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         <div class="mt-5">
             <div class="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700">
                 @foreach ($visibleTabs as $key)
@@ -232,28 +376,60 @@
             {{-- Live verification is available on every position-bearing tab —
                  Missing confirms the competitor really ranks; Weak/Strength/
                  Shared capture the real current positions for you AND them. --}}
-            <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-900/40">
-                @if ($this->isVerifying())
-                    <span class="flex items-center gap-2 text-xs text-slate-500">
-                        <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                        {{ __('Verifying live rankings…') }} {{ $analysis->verify_done }}/{{ $analysis->verify_total }}
-                    </span>
-                @else
-                    <button type="button" wire:click="verifyRankings"
-                        class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900">
-                        {{ __('Verify with live rankings') }}
-                    </button>
-                @endif
-                <span class="text-[11px] text-slate-400">
-                    @if ($tab === 'missing')
-                        {{ __('Confirms the competitor really ranks (top 10) and captures real positions.') }}
-                    @else
-                        {{ __('Checks Google right now and captures the real current positions — yours and the competitor’s.') }}
+            @if ($this->isVerifying())
+                {{-- Prominent live-verification progress: bar + counts, can't be missed. --}}
+                @php
+                    $vDone = (int) $analysis->verify_done;
+                    $vTotalRun = max(1, (int) $analysis->verify_total);
+                    $vPct = min(100, (int) round(100 * $vDone / $vTotalRun));
+                @endphp
+                <div class="mt-3 rounded-xl border border-orange-200 bg-orange-50/70 p-4 dark:border-orange-500/30 dark:bg-orange-500/10">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="flex items-center gap-2.5 text-sm font-bold text-orange-900 dark:text-orange-200">
+                            <svg class="h-4.5 w-4.5 h-5 w-5 animate-spin text-orange-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            {{ __('Checking Google’s live results…') }}
+                        </p>
+                        <span class="text-sm font-bold tabular-nums text-orange-800 dark:text-orange-300">{{ number_format($vDone) }} / {{ number_format($vTotalRun) }} · {{ $vPct }}%</span>
+                    </div>
+                    <div class="mt-2.5 h-2.5 overflow-hidden rounded-full bg-orange-100 dark:bg-orange-500/20">
+                        <div class="h-full rounded-full bg-orange-600 transition-all duration-500" style="width: {{ max(3, $vPct) }}%"></div>
+                    </div>
+                    <p class="mt-2 text-xs text-orange-800/80 dark:text-orange-300/80">{{ __('Each keyword is checked against the real search results — positions land in the table as they’re confirmed.') }}</p>
+                    @if ($verifyNotice)
+                        <p class="mt-2 flex items-start gap-1.5 text-xs font-medium text-orange-900 dark:text-orange-200">
+                            <svg class="mt-0.5 h-3.5 w-3.5 flex-none" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                            <span>{{ $verifyNotice }}</span>
+                        </p>
                     @endif
-                </span>
-            </div>
+                </div>
+            @else
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-900/40">
+                    <span class="flex items-center gap-2">
+                        <button type="button" wire:click="verifyRankings"
+                            class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900">
+                            {{ __('Verify with live rankings') }}
+                        </button>
+                        @if (($serpRemaining ?? null) !== null)
+                            <span class="text-[11px] tabular-nums {{ $serpRemaining <= 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-slate-400' }}">
+                                {{ $serpRemaining <= 0 ? __('No live checks left this month — verification can still use already-cached results') : __(':n live checks left this month', ['n' => number_format($serpRemaining)]) }}
+                            </span>
+                        @endif
+                    </span>
+                    <span class="text-[11px] text-slate-400">
+                        @if ($tab === 'missing')
+                            {{ __('Confirms the competitor really ranks (top 10) and captures real positions.') }}
+                        @else
+                            {{ __('Checks Google right now and captures the real current positions — yours and the competitor’s.') }}
+                        @endif
+                    </span>
+                </div>
+            @endif
             @if ($verified && $analysis->verify_error)
-                <p class="mt-2 text-xs text-amber-600 dark:text-amber-400">{{ __('Partial:') }} {{ $analysis->verify_error }} ({{ $analysis->verify_done }}/{{ $analysis->verify_total }} {{ __('checked.') }})</p>
+                @if (\App\Support\QuotaMessage::isQuota($analysis->verify_error))
+                    <x-quota-alert :message="$analysis->verify_error.' ('.$analysis->verify_done.'/'.$analysis->verify_total.' '.__('checked so far — the rest resume once your limit resets or you upgrade.').')'" />
+                @else
+                    <p class="mt-2 text-xs text-amber-600 dark:text-amber-400">{{ __('Partial:') }} {{ $analysis->verify_error }} ({{ $analysis->verify_done }}/{{ $analysis->verify_total }} {{ __('checked.') }})</p>
+                @endif
             @endif
             @if ($verifyNotice)
                 <p class="mt-2 text-xs text-slate-500">{{ $verifyNotice }}</p>

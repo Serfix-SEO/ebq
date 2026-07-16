@@ -114,6 +114,9 @@ class KeywordIdeaFinder extends Component
     /** keyword(lowercased) => cluster label, set by clusterWithAi(). */
     public ?array $clusterMap = null;
 
+    /** Selected topic (cluster label) in the Clusters view — null = first. */
+    public ?string $topic = null;
+
     public ?string $clusterError = null;
 
     /** Stable identity of the current result set (the monthly-cache key). */
@@ -136,6 +139,19 @@ class KeywordIdeaFinder extends Component
     /** Prefill + auto-run from a research-hub handoff (seed keywords). */
     public function mount(): void
     {
+        // Website deep-link (from the /keywords "Explore all keyword ideas"
+        // link): open in website mode on the URL and auto-run so the user
+        // lands on the full sort/filter/group/AI-cluster surface pre-loaded.
+        $presetUrl = trim((string) ($this->preset['url'] ?? ''));
+        if (($this->preset['mode'] ?? null) === 'website' && $presetUrl !== '') {
+            $this->mode = 'website';
+            $this->url = $presetUrl;
+            $this->scope = ($this->preset['scope'] ?? 'site') === 'page' ? 'page' : 'site';
+            $this->run(app(KeywordFinderPool::class));
+
+            return;
+        }
+
         $seeds = $this->preset['keywords'] ?? [];
         if (is_array($seeds) && $seeds !== []) {
             $this->mode = 'seeds';
@@ -157,6 +173,29 @@ class KeywordIdeaFinder extends Component
     {
         $this->groupTerm = $this->groupTerm === $term ? '' : $term;
         $this->page = 1;
+    }
+
+    /** Pick a topic (AI cluster) in the Clusters view. */
+    public function setTopic(string $label): void
+    {
+        $this->topic = $label;
+        $this->page = 1;
+    }
+
+    /**
+     * When a fresh result set lands, default the Groups rail to the FIRST term
+     * group (not "All") so the list opens focused on one group — same intent
+     * as the Topics nav defaulting to the first cluster. No-op once the user
+     * has picked a group (incl. explicitly choosing "All keywords").
+     */
+    private function seedDefaultGroup(): void
+    {
+        if ($this->groupTerm !== '') {
+            return;
+        }
+        $rows = array_map(fn ($r) => $this->normalizeRow($r), array_filter($this->results, 'is_array'));
+        $groups = KeywordTermGrouper::groups($rows);
+        $this->groupTerm = (string) ($groups[0]['term'] ?? '');
     }
 
     public function setViewMode(string $mode): void
@@ -243,6 +282,7 @@ class KeywordIdeaFinder extends Component
             $this->hasRun = true;
             $this->fromCache = true;
             $this->status = KeywordApiRequest::STATUS_COMPLETED;
+            $this->seedDefaultGroup();
 
             return;
         }
@@ -286,6 +326,7 @@ class KeywordIdeaFinder extends Component
         $rows = $request->result['results'] ?? [];
         $this->results = is_array($rows) ? array_values(array_filter($rows, 'is_array')) : [];
         $this->requestId = null;
+        $this->seedDefaultGroup();
 
         // Warm the shared monthly cache so the next person who searches the
         // same seeds/URL this month gets this exact result, instantly.
@@ -551,6 +592,8 @@ class KeywordIdeaFinder extends Component
 
         $this->clusterMap = $map;
         $this->viewMode = 'clusters';
+        $this->topic = null; // default to the first (highest-volume) topic
+        $this->page = 1;
     }
 
     /** Stream the filtered+sorted results as a CSV download. */
@@ -663,6 +706,18 @@ class KeywordIdeaFinder extends Component
             });
         }
 
+        // Clusters view shows ONE topic at a time — the selected one, or the
+        // first (highest-volume) topic by default. The Topics nav still lists
+        // every topic to switch between them.
+        $activeTopic = null;
+        $visibleClusters = [];
+        if ($this->viewMode === 'clusters' && $this->clusterMap !== null && $clusters !== []) {
+            $activeTopic = ($this->topic !== null && isset($clusters[$this->topic]))
+                ? $this->topic
+                : array_key_first($clusters);
+            $visibleClusters = $activeTopic !== null ? [$clusters[$activeTopic]] : [];
+        }
+
         $pageKeys = array_map(fn ($r) => mb_strtolower($r['keyword']), $rows);
         $pageAllSelected = $pageKeys !== [] && array_diff($pageKeys, $this->selected) === [];
 
@@ -671,7 +726,7 @@ class KeywordIdeaFinder extends Component
         // actionable than static buttons (Track is now covered by bulk-select,
         // Brief required a target page these rows never have).
         $displayedKeywords = $this->viewMode === 'clusters'
-            ? array_column($processed, 'keyword')
+            ? array_column($visibleClusters[0]['rows'] ?? [], 'keyword')
             : array_column($rows, 'keyword');
         $hasGsc = $this->currentWebsite()?->hasGsc() ?? false;
         $gscMetrics = $hasGsc ? $this->gscMetricsFor($displayedKeywords) : [];
@@ -687,6 +742,8 @@ class KeywordIdeaFinder extends Component
             'totalPages' => $totalPages,
             'termGroups' => $termGroups,
             'clusters' => array_values($clusters),
+            'activeTopic' => $activeTopic,
+            'visibleClusters' => $visibleClusters,
             'pageAllSelected' => $pageAllSelected,
         ]);
     }

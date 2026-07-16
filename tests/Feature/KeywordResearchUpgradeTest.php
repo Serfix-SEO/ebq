@@ -32,6 +32,17 @@ class KeywordResearchUpgradeTest extends TestCase
         // "best price" → transactional wins over commercial.
         $this->assertSame('transactional', KeywordIntentClassifier::classify('best price for iphone'));
 
+        // Tool / do-intent NOUNS → transactional (use-a-tool intent).
+        $this->assertSame('transactional', KeywordIntentClassifier::classify('name generator'));
+        $this->assertSame('transactional', KeywordIntentClassifier::classify('logo maker'));
+        $this->assertSame('transactional', KeywordIntentClassifier::classify('mortgage calculator'));
+        $this->assertSame('transactional', KeywordIntentClassifier::classify('grammar checker'));
+        $this->assertSame('transactional', KeywordIntentClassifier::classify('name randomizer'));
+        // Bare verbs are NOT triggers, so how-to queries stay informational.
+        $this->assertSame('informational', KeywordIntentClassifier::classify('how to make money'));
+        // A bare browse noun-phrase with no signal stays 'other' (un-guessable).
+        $this->assertSame('other', KeywordIntentClassifier::classify('spanish names'));
+
         $this->assertTrue(KeywordIntentClassifier::isQuestion('how to run faster'));
         $this->assertFalse(KeywordIntentClassifier::isQuestion('running shoes'));
     }

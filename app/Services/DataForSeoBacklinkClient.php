@@ -191,11 +191,38 @@ class DataForSeoBacklinkClient
      */
     public function backlinksSample(string $domain, ?int $limit = null): array
     {
+        // mode=as_is → ALL live links (top `limit` by rank), not one per
+        // referring domain. Same single request/cost; complete-for-small-
+        // sites, honestly-capped-for-big-ones ("top 1,000 links"). The
+        // one-per-domain view still exists — derived client-side from row
+        // order (rows arrive rank-sorted, first row per domain = the old
+        // grouped sample). Changed 2026-07-16: grouped mode hid links whose
+        // anchor appeared in the anchors aggregate (e.g. 富88), which read
+        // as a data bug.
         return $this->items('/backlinks/backlinks/live', [
             'target' => $this->target($domain),
             'limit' => $this->rowLimit($limit),
-            'mode' => 'one_per_domain',
+            'mode' => 'as_is',
             'backlinks_status_type' => 'live',
+        ]);
+    }
+
+    /**
+     * Links carrying ONE specific anchor — the on-demand drill-down behind
+     * "this anchor exists in the aggregate but its links aren't in the
+     * top-1000 sample" (huge profiles: spam links rank far below the cap).
+     * Tiny filtered request (~$0.024 + rows); callers cache the result.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function backlinksForAnchor(string $domain, string $anchor, int $limit = 100): array
+    {
+        return $this->items('/backlinks/backlinks/live', [
+            'target' => $this->target($domain),
+            'limit' => max(1, min(1000, $limit)),
+            'mode' => 'as_is',
+            'backlinks_status_type' => 'live',
+            'filters' => ['anchor', '=', $anchor],
         ]);
     }
 

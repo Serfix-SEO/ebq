@@ -346,8 +346,7 @@ class RankTrackingManager extends Component
     {
         $this->validate([
             'newKeyword' => 'required|string|min:1|max:500',
-            'newTargetDomain' => 'required|string|max:255',
-            'newTargetUrlPath' => 'nullable|string|max:2048',
+            'newTargetDomain' => 'required|string|max:2048',
             'newSearchEngine' => 'required|in:google',
             'newSearchType' => 'required|in:organic,news,images,videos,shopping,maps,scholar',
             'newCountry' => 'required|string|size:2',
@@ -368,12 +367,15 @@ class RankTrackingManager extends Component
             ->values()
             ->all();
 
-        $targetUrl = RankTrackerConfig::normalizeTargetUrl($this->newTargetDomain, $this->newTargetUrlPath);
-        if ($this->newTargetUrlPath !== '' && $targetUrl === null) {
-            $this->addError('newTargetUrlPath', 'Target URL must be a path on your connected domain.');
+        // Single URL input → host + optional page path.
+        $target = RankTrackerConfig::parseTarget($this->newTargetDomain);
+        if ($target['host'] === '') {
+            $this->addError('newTargetDomain', 'Enter a valid website URL, e.g. example.com or example.com/page.');
 
             return;
         }
+        $targetHost = $target['host'];
+        $targetUrl = $target['url'];
 
         // Plan cap on active tracked keywords. Only blocks brand-new
         // rows — re-saving an already-tracked combination is treated as
@@ -416,7 +418,7 @@ class RankTrackingManager extends Component
             [
                 'user_id' => $user->id,
                 'keyword' => trim($this->newKeyword),
-                'target_domain' => trim($this->newTargetDomain),
+                'target_domain' => $targetHost,
                 'target_url' => $targetUrl,
                 'depth' => RankTrackerConfig::DEFAULT_DEPTH,
                 'tbs' => null,

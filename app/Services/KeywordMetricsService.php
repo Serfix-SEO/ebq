@@ -131,6 +131,9 @@ class KeywordMetricsService
                 userId: $ownerUserId,
                 websiteId: $websiteId,
                 countryKey: $country,
+                // Automatic cache-warming triggered by merely VIEWING keyword
+                // tables — never spends the plan's search quota.
+                meter: false,
             );
 
             return 0;

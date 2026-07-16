@@ -28,6 +28,31 @@
             </div>
         </div>
 
+        @if (session('cache_cleared'))
+            <div class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ session('cache_cleared') }}</div>
+        @endif
+        @if (session('cache_clear_error'))
+            <div class="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{{ session('cache_clear_error') }}</div>
+        @endif
+
+        {{-- Remove a domain's cached report (production + sandbox snapshot +
+             shared monthly keyword-ideas entry) so the next lookup regenerates
+             fresh — mainly for re-testing new-site enrichment. --}}
+        <form method="POST" action="{{ route('admin.site-explorer-usage.clear-cache') }}"
+              class="flex flex-wrap items-end gap-2 rounded border border-slate-200 bg-white p-3"
+              onsubmit="return confirm('Remove the cached report for this domain? The next lookup will trigger a fresh (billed) generation.');">
+            @csrf
+            <label class="text-[10px] uppercase tracking-wider text-slate-500">Remove report cache
+                <input type="text" name="domain" required placeholder="example.com"
+                       class="block w-52 rounded border border-slate-300 px-2 py-1 text-xs" />
+            </label>
+            <button type="submit"
+                    class="rounded border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100">
+                Remove cache
+            </button>
+            <span class="text-[11px] text-slate-400">Deletes the shared snapshot (incl. sandbox) + keyword-ideas cache. Usage/cost history is kept. Next lookup is a fresh billed generation.</span>
+        </form>
+
         {{-- Filters --}}
         <form method="GET" class="flex flex-wrap items-end gap-2 rounded border border-slate-200 bg-white p-3">
             <div class="flex flex-wrap gap-1">
@@ -202,11 +227,22 @@
                                 </td>
                                 <td class="px-3 py-2 text-right">
                                     @if ($domain !== '')
-                                        <a href="{{ route('report.view', ['url' => $domain]) }}" target="_blank" rel="noopener"
-                                           class="inline-flex items-center gap-1 rounded border border-orange-200 bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-700 hover:bg-orange-100">
-                                            View results
-                                            <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                                        </a>
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <a href="{{ route('report.view', ['url' => $domain]) }}" target="_blank" rel="noopener"
+                                               class="inline-flex items-center gap-1 rounded border border-orange-200 bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-700 hover:bg-orange-100">
+                                                View results
+                                                <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                                            </a>
+                                            <form method="POST" action="{{ route('admin.site-explorer-usage.clear-cache') }}" class="inline"
+                                                  onsubmit="return confirm('Remove the cached report for {{ $domain }}? The next lookup will trigger a fresh (billed) generation.');">
+                                                @csrf
+                                                <input type="hidden" name="domain" value="{{ $domain }}" />
+                                                <button type="submit" title="Remove this domain's cached report"
+                                                        class="inline-flex items-center rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100">
+                                                    Clear cache
+                                                </button>
+                                            </form>
+                                        </span>
                                     @endif
                                 </td>
                             </tr>

@@ -68,7 +68,12 @@
                 <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
                      x-data="{ q: '' }">
                     <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-                        <span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ __('Organic competitors') }}</span>
+                        <span class="inline-flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
+                            {{ __('Organic competitors') }}
+                            @if (($payload['meta']['sources']['competitors'] ?? null) === 'search_results')
+                                <span class="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-800">{{ __('Found via related search results') }}</span>
+                            @endif
+                        </span>
                         <div class="flex items-center gap-3">
                             <input type="text" x-model.debounce.150ms="q" placeholder="{{ __('Filter domains…') }}"
                                    class="w-44 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
@@ -85,6 +90,7 @@
                                     <th class="border-b border-slate-100 bg-white px-3 py-2 font-medium dark:border-slate-800 dark:bg-slate-900">{{ __('Domain') }}</th>
                                     <th class="border-b border-slate-100 bg-white px-3 py-2 text-right font-medium dark:border-slate-800 dark:bg-slate-900">{{ __('Shared keywords') }}</th>
                                     <th class="border-b border-slate-100 bg-white px-3 py-2 text-right font-medium dark:border-slate-800 dark:bg-slate-900">{{ __('Avg position') }}</th>
+                                    <th class="border-b border-slate-100 bg-white px-3 py-2 text-right font-medium dark:border-slate-800 dark:bg-slate-900">{{ __('Organic keywords') }}</th>
                                     <th class="border-b border-slate-100 bg-white px-5 py-2 text-right font-medium dark:border-slate-800 dark:bg-slate-900">{{ __('Authority') }}</th>
                                 </tr>
                             </thead>
@@ -101,7 +107,15 @@
                                         </td>
                                         <td class="px-3 py-2.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ $fmt($row['shared_keywords'] ?? null) }}</td>
                                         <td class="px-3 py-2.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ isset($row['avg_position']) && $row['avg_position'] !== null ? number_format((float) $row['avg_position'], 1) : '—' }}</td>
-                                        <td class="px-5 py-2.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ $score($row['opr_score'] ?? null) }}</td>
+                                        <td class="px-3 py-2.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ $fmt($row['organic_keywords'] ?? null) }}</td>
+                                        <td class="px-5 py-2.5 text-right">
+                                            @if (is_numeric($row['cs'] ?? null))
+                                                @php $csv = (int) $row['cs']; @endphp
+                                                <span class="rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums {{ $csv >= 60 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : ($csv >= 30 ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300') }}">{{ $csv }}</span>
+                                            @else
+                                                <span class="tabular-nums text-slate-600 dark:text-slate-300">{{ $score($row['opr_score'] ?? null) }}</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -111,6 +125,8 @@
 
                 <p class="text-xs text-slate-400 dark:text-slate-500">
                     {{ __('Click a domain to open its own Site Explorer report. Competitor lookups count toward your plan’s Site Explorer limit.') }}
+                    <a href="{{ route('keyword-gap.index') }}" class="font-semibold text-orange-600 hover:underline dark:text-orange-400">{{ __('Want the deep dive? Run a Keyword Gap analysis') }}</a> —
+                    {{ __('full missing/weak/strength keyword breakdown against any of these competitors.') }}
                 </p>
             @endif
         @endif

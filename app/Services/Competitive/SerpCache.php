@@ -27,6 +27,53 @@ class SerpCache
     }
 
     /**
+     * Fresh cached SERP for a keyword, or null — NEVER calls Serper. Lets
+     * consumers (gap verification) process every already-cached keyword for
+     * free and spend their live-call budget only on true cache misses.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function cached(string $keyword, string $gl): ?array
+    {
+        $kw = trim($keyword);
+        if ($kw === '') {
+            return null;
+        }
+        $gl = strtolower(trim($gl)) ?: 'us';
+
+        $row = SerpCacheEntry::query()
+            ->where('query_hash', SerpCacheEntry::hash($kw, $gl))
+            ->where('gl', $gl)
+            ->first();
+
+        return ($row !== null && $row->isFresh()) ? $row->payload : null;
+    }
+
+    /**
+     * How many of the given keywords have a FRESH cached SERP (one query, no
+     * API calls) — used to size verification passes before running them.
+     *
+     * @param  list<string>  $keywords
+     */
+    public function freshCount(array $keywords, string $gl): int
+    {
+        $gl = strtolower(trim($gl)) ?: 'us';
+        $hashes = array_map(
+            static fn (string $k): string => SerpCacheEntry::hash(trim($k), $gl),
+            array_values(array_filter(array_map('strval', $keywords), static fn ($k) => trim((string) $k) !== '')),
+        );
+        if ($hashes === []) {
+            return 0;
+        }
+
+        return SerpCacheEntry::query()
+            ->whereIn('query_hash', $hashes)
+            ->where('gl', $gl)
+            ->where('expires_at', '>', Carbon::now())
+            ->count();
+    }
+
+    /**
      * Organic SERP for a keyword in a country. Returns the normalized payload,
      * or null if we have nothing (cache miss + live fetch failed with no stale
      * fallback). Propagates QuotaExceededException from the live call so callers

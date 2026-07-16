@@ -80,6 +80,10 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
+        // Pulled ONCE before any branch so no early return can orphan the
+        // funnel domain in session (the pay-first branch used to).
+        $analyzeDomain = (string) $request->session()->pull('analyze_domain', '');
+
         // Pay-first flow: when the user picked a paid plan on /pricing,
         // jump straight to Stripe Checkout. BillingController auto-creates
         // a placeholder Website to attach the subscription to, and after
@@ -91,6 +95,13 @@ class RegisteredUserController extends Controller
         $pendingPlan     = (string) $request->session()->pull('pending_plan', '');
         $pendingInterval = (string) $request->session()->pull('pending_plan_interval', 'annual');
         if ($pendingPlan !== '' && $this->isCheckoutablePlan($pendingPlan, $pendingInterval)) {
+            // Don't create a Website here — the placeholder flow owns that.
+            // Hand the funnel domain to post-checkout onboarding instead
+            // (ConnectGoogle::mount() prefills from this key).
+            if ($analyzeDomain !== '') {
+                $request->session()->put('onboarding.domain', $analyzeDomain);
+            }
+
             return redirect()->route('billing.checkout', array_filter([
                 'plan'     => $pendingPlan,
                 'interval' => $pendingInterval !== 'annual' ? $pendingInterval : null,
@@ -105,11 +116,14 @@ class RegisteredUserController extends Controller
         }
 
         // Homepage "Analyze website" funnel: a domain the visitor entered
-        // before signing up. Generate + show their report immediately (the
-        // report view is auth-gated but NOT verified-gated, so first value
-        // lands before email verification).
-        $analyzeDomain = (string) $request->session()->pull('analyze_domain', '');
+        // before signing up. Attach it to the new account first — that kicks
+        // the crawl subscription + historical import and satisfies the
+        // onboarding gate — then show their report immediately (the report
+        // view is auth-gated but NOT verified-gated, so first value lands
+        // before email verification).
         if ($analyzeDomain !== '') {
+            app(\App\Services\WebsiteAttachService::class)->attach($user, $analyzeDomain);
+
             return redirect()->route('report.view', ['url' => $analyzeDomain]);
         }
 

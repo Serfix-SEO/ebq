@@ -44,6 +44,14 @@ class UsageMeter
         // anyone's quota. Activity rows still log the real provider for
         // cost telemetry.
         'deepseek'            => 'mistral.monthly_tokens',
+        // Self-hosted keyword fleet dispatches (ideas/volume) — money-free but
+        // capacity-scarce (Google Ads browser fleet), so plan-capped. Only
+        // user-INITIATED dispatches meter; platform enrichment passes meter:false.
+        'keyword_finder'      => 'keyword_research.monthly_searches',
+        // Backlink rows VIEWED per month (Ahrefs-style row consumption).
+        // Charged once per (user, domain, window) by BacklinkRowQuota —
+        // repeat views of the same domain in a window are free.
+        'backlink_rows'       => 'report.monthly_backlink_rows',
     ];
 
     /**
@@ -259,6 +267,7 @@ class UsageMeter
             'serp_api'            => "You've used all {$limit} keyword-tracking lookups for this month. Upgrade your plan to keep tracking.",
             'mistral',
             'deepseek'            => "You've used all {$limit} content-writing tokens for this month. Upgrade your plan to keep writing.",
+            'keyword_finder'      => "You've used all {$limit} keyword searches for this month. Upgrade your plan to keep researching.",
             default               => "You've reached your monthly limit for {$provider}. Upgrade your plan to continue.",
         };
     }

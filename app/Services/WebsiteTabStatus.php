@@ -109,10 +109,15 @@ class WebsiteTabStatus
         $snapshot = WebsiteReportSnapshot::forDomain($domain, $sandbox);
 
         // A snapshot exists with a real payload (cache hit or a completed
-        // generation) — nothing left to wait for, including the "no
-        // provider data for this domain" terminal state.
-        if ($snapshot !== null && ($snapshot->status === 'no_data' || ! empty($snapshot->payload))) {
+        // full/partial generation) — nothing left to wait for, including the
+        // "no provider data for this domain" terminal state.
+        if ($snapshot !== null && ($snapshot->status === 'no_data' || $snapshot->status === 'partial' || ! empty($snapshot->payload))) {
             return ['state' => 'ready', 'label' => __('Ready')];
+        }
+
+        // Young-site enrichment in flight — the partial report lands shortly.
+        if ($snapshot !== null && $snapshot->status === 'enriching') {
+            return ['state' => 'processing', 'label' => __('Analyzing your site')];
         }
 
         return ['state' => 'processing', 'label' => __('Building your report')];

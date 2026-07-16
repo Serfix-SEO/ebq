@@ -43,8 +43,16 @@ class AuthenticatedSessionController extends Controller
         }
 
         // Came from the homepage "Analyze website" funnel → back to that report.
+        // Attach the domain only for accounts with NO websites yet (a signup
+        // that never completed the funnel); users with existing sites are
+        // likely researching a competitor and must not silently spend a plan
+        // slot on it.
         $analyzeDomain = (string) $request->session()->pull('analyze_domain', '');
         if ($analyzeDomain !== '') {
+            if ($user && ! $user->hasAccessibleWebsites()) {
+                app(\App\Services\WebsiteAttachService::class)->attach($user, $analyzeDomain);
+            }
+
             return redirect()->route('report.view', ['url' => $analyzeDomain]);
         }
 

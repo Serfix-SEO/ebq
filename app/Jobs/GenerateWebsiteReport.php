@@ -90,16 +90,31 @@ class GenerateWebsiteReport implements ShouldBeUnique, ShouldQueue
         try {
             $summary = $dfs->summary($normalized);
             if ($summary === null) {
-                // No provider data for this domain — record a `no_data` marker so
-                // the view stops the "building…" loop instead of retrying forever.
-                // The summary call itself still cost real money (DataForSEO bills
-                // per request regardless of whether it found data).
+                // No provider data for this domain (young site). Instead of the
+                // old terminal dead end, hand off to the enrichment pipeline
+                // which assembles a PARTIAL report from free/cheap signals
+                // (Open PageRank, Moz, self-hosted keyword fleet, SERP
+                // competitor tally). `no_data` stays the terminal marker only
+                // when enrichment is disabled/ineligible. The summary call
+                // itself still cost real money (DataForSEO bills per request
+                // regardless of whether it found data).
                 Log::warning('GenerateWebsiteReport: empty DataForSEO summary', ['domain' => $normalized]);
+
+                $eligible = ! $sandbox && (bool) config('services.report.enrichment.enabled');
+                if ($eligible && (bool) config('services.report.enrichment.attached_only')) {
+                    $eligible = \App\Models\Website::query()
+                        ->where('normalized_domain', $normalized)
+                        ->exists();
+                }
+
                 WebsiteReportSnapshot::updateOrCreate(
                     ['normalized_domain' => $storeKey],
                     [
-                        'status' => 'no_data',
+                        'status' => $eligible ? 'enriching' : 'no_data',
                         'payload' => null,
+                        'enrichment_state' => $eligible
+                            ? ['stage' => 'bootstrap', 'started_at' => now()->toIso8601String()]
+                            : null,
                         'fetched_at' => now(),
                         'domain_authority' => null, 'page_authority' => null, 'spam_score' => null,
                         'rank' => null, 'referring_domains' => null, 'backlinks_total' => null,
@@ -107,6 +122,10 @@ class GenerateWebsiteReport implements ShouldBeUnique, ShouldQueue
                     ],
                 );
                 $this->logGenerationCost($logger, $normalized, $dfs->totalCost(), $sandbox);
+
+                if ($eligible) {
+                    EnrichEmptyReportJob::dispatch($normalized);
+                }
 
                 return;
             }
@@ -146,6 +165,17 @@ class GenerateWebsiteReport implements ShouldBeUnique, ShouldQueue
 
             $payload = $service->assemble($normalized, $raw);
 
+            // Stamp the topical-relevance section as pending BEFORE the
+            // snapshot write, so the UI can show a progress card instead of
+            // nothing while EnrichTopicalTrustJob (dispatched below) fetches
+            // homepages + classifies. The job replaces this stub with the
+            // real section, or clears it when classification isn't possible.
+            if (! $sandbox
+                && (bool) config('services.report.topical_trust.enabled', true)
+                && count($payload['top_referring_domains'] ?? []) >= 3) {
+                $payload['topical_trust'] = ['pending' => true, 'queued_at' => now()->toIso8601String()];
+            }
+
             // Real cumulative cost of every DataForSEO call made for THIS
             // generation (summary/history/referring_domains/anchors/
             // domain_pages/competitors/backlinks) — Moz + Open PageRank are
@@ -164,6 +194,35 @@ class GenerateWebsiteReport implements ShouldBeUnique, ShouldQueue
                 ]),
             );
             $this->logGenerationCost($logger, $normalized, $cost, $sandbox);
+
+            // Harvest domain intelligence into the accumulating asset store
+            // (main domain + referring domains + competitors). Free byproduct;
+            // internally try/caught so it can never break the report.
+            if (! $sandbox) {
+                app(\App\Services\DomainIntel\DomainMetricsRecorder::class)
+                    ->recordReport($normalized, $payload);
+
+                // Permanent per-link storage: report payloads are OVERWRITTEN
+                // on regeneration, so every provider backlink row is also
+                // deposited into the append-only link graph (dedup per source
+                // domain, first/last seen) — paid for once, kept forever.
+                app(\App\Services\LinkGraph\EdgeRecorder::class)
+                    ->recordInbound($normalized, $payload['backlinks'] ?? []);
+            }
+
+            // Full reports get a keywords section too — sourced from the
+            // self-hosted keyword fleet (free), merged into the payload
+            // asynchronously once discovery completes.
+            if (! $sandbox && (bool) config('services.report.enrichment.enabled')) {
+                EnrichEmptyReportJob::dispatch($normalized, keywordsOnly: true);
+            }
+
+            // Topical relevance section — one LLM call over the top referring
+            // domains' homepage snippets. Additive & guarded; failure or kill
+            // switch just means the section stays absent.
+            if (! $sandbox && (bool) config('services.report.topical_trust.enabled', true)) {
+                EnrichTopicalTrustJob::dispatch($normalized);
+            }
         } catch (Throwable $e) {
             Log::warning('GenerateWebsiteReport: failed', [
                 'domain' => $normalized,

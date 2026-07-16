@@ -251,14 +251,11 @@
                         @error('newKeyword')<p class="mt-1 text-[11px] text-red-500">{{ $message }}</p>@enderror
                     </div>
                     <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">{{ __('Target URL (optional)') }}</label>
-                        <div class="flex h-9 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
-                            <span class="flex max-w-[55%] shrink-0 items-center border-e border-slate-200 bg-slate-50 px-2 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">{{ $targetUrlPrefix }}</span>
-                            <input wire:model="newTargetUrlPath" type="text" placeholder="{{ __('/page-path') }}"
-                                class="min-w-0 flex-1 border-0 bg-transparent px-2 text-xs focus:outline-none focus:ring-0 dark:text-slate-100" />
-                        </div>
-                        @error('newTargetUrlPath')<p class="mt-1 text-[11px] text-red-500">{{ $message }}</p>@enderror
-                        <p class="mt-1 text-[10px] text-slate-400">{{ __('Path on your connected domain. Leave blank to match any URL.') }}</p>
+                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">{{ __('Target website or URL') }} <span class="text-red-500">*</span></label>
+                        <input wire:model="newTargetDomain" type="text" placeholder="{{ __('example.com  or  example.com/page') }}"
+                            class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                        @error('newTargetDomain')<p class="mt-1 text-[11px] text-red-500">{{ $message }}</p>@enderror
+                        <p class="mt-1 text-[10px] text-slate-400">{{ __('Any website — defaults to your current site. Add a /path to track a specific page, or a domain to match any URL. You can track a competitor too.') }}</p>
                     </div>
                 </div>
 

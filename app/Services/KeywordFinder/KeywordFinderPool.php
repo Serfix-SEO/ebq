@@ -57,6 +57,7 @@ class KeywordFinderPool
         ?string $userId = null,
         ?string $websiteId = null,
         ?KeywordApiServer $only = null,
+        bool $meter = true,
     ): KeywordApiRequest {
         $keywords = array_values(array_filter(array_map(
             static fn ($k): string => is_string($k) ? trim($k) : '',
@@ -71,7 +72,7 @@ class KeywordFinderPool
             'language' => KeywordFinderLocations::resolveLanguage($language),
         ];
 
-        return $this->dispatch(KeywordApiRequest::TYPE_VOLUME, null, $payload, $userId, $websiteId, $only);
+        return $this->dispatch(KeywordApiRequest::TYPE_VOLUME, null, $payload, $userId, $websiteId, $only, $meter);
     }
 
     /**
@@ -84,11 +85,11 @@ class KeywordFinderPool
      *
      * @param  array{seeds?: list<string>, url?: string, scope?: string, location?: string, language?: string}  $opts
      */
-    public function dispatchIdeas(array $opts, ?string $userId = null, ?string $websiteId = null, ?KeywordApiServer $only = null, ?string $countryKey = null): KeywordApiRequest
+    public function dispatchIdeas(array $opts, ?string $userId = null, ?string $websiteId = null, ?KeywordApiServer $only = null, ?string $countryKey = null, bool $meter = true): KeywordApiRequest
     {
         [$mode, $payload] = $this->buildIdeasPayload($opts, $countryKey);
 
-        return $this->dispatch(KeywordApiRequest::TYPE_IDEAS, $mode, $payload, $userId, $websiteId, $only);
+        return $this->dispatch(KeywordApiRequest::TYPE_IDEAS, $mode, $payload, $userId, $websiteId, $only, $meter);
     }
 
     /**
@@ -142,7 +143,7 @@ class KeywordFinderPool
      *
      * @param  array<string, mixed>  $payload
      */
-    private function dispatch(string $type, ?string $mode, array $payload, ?string $userId, ?string $websiteId, ?KeywordApiServer $only = null): KeywordApiRequest
+    private function dispatch(string $type, ?string $mode, array $payload, ?string $userId, ?string $websiteId, ?KeywordApiServer $only = null, bool $meter = true): KeywordApiRequest
     {
         $request = KeywordApiRequest::create([
             'request_id' => (string) Str::uuid(),
@@ -153,6 +154,24 @@ class KeywordFinderPool
             'user_id' => $userId,
             'website_id' => $websiteId,
         ]);
+
+        // Plan cap: fleet capacity is the scarce resource (per-plan
+        // keyword_research.monthly_searches). Only user-initiated dispatches
+        // meter (platform enrichment passes meter:false); the reservation is
+        // released by the spend log after a successful ACK below.
+        $billed = null;
+        if ($meter) {
+            $billed = $this->billedUser($userId, $websiteId);
+            if ($billed !== null) {
+                try {
+                    app(\App\Services\Usage\UsageMeter::class)->assertCanSpend($billed, 'keyword_finder', 1);
+                } catch (\App\Exceptions\QuotaExceededException $e) {
+                    $request->markFailed($e->userMessage);
+
+                    return $request;
+                }
+            }
+        }
 
         // `$only` targets one specific server (admin "Test" button); otherwise
         // we walk every routable server for real load balancing + failover.
@@ -193,6 +212,18 @@ class KeywordFinderPool
                     'dispatched_at' => now(),
                 ])->save();
 
+                if ($billed !== null) {
+                    // Records the spend AND releases the assertCanSpend reservation.
+                    app(\App\Services\ClientActivityLogger::class)->log(
+                        'keyword_finder.dispatch',
+                        userId: $billed->id,
+                        websiteId: $websiteId,
+                        provider: 'keyword_finder',
+                        meta: ['type' => $type, 'mode' => $mode],
+                        unitsConsumed: 1,
+                    );
+                }
+
                 return $request;
             }
 
@@ -218,6 +249,23 @@ class KeywordFinderPool
         $request->markFailed($this->friendlyError((int) ($lastError['status'] ?? 0)));
 
         return $request;
+    }
+
+    /**
+     * Whose plan pays for a metered dispatch: the website's owner when a
+     * website is attached (team members spend the owner's quota, mirroring
+     * SerperSearchClient), else the acting user.
+     */
+    private function billedUser(?string $userId, ?string $websiteId): ?\App\Models\User
+    {
+        if ($websiteId !== null && $websiteId !== '') {
+            $ownerId = \Illuminate\Support\Facades\DB::table('websites')->where('id', $websiteId)->value('user_id');
+            if ($ownerId !== null) {
+                return \App\Models\User::find($ownerId);
+            }
+        }
+
+        return $userId ? \App\Models\User::find($userId) : null;
     }
 
     /**
