@@ -15,6 +15,24 @@
             </p>
         </div>
 
+        {{-- Live queue depths. Autoscaling keys off the `crawl` backlog ONLY;
+             `link-crawl` is background/budget-capped and never triggers paid
+             box provisioning — shown here just so it's not invisible. --}}
+        @isset($queueDepths)
+            <div class="flex flex-wrap gap-3">
+                <div class="rounded-lg border border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-800">
+                    <span class="text-xs text-slate-500">Crawl backlog</span>
+                    <span class="ml-2 font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $queueDepths['crawl'] ?? '—' }}</span>
+                    <span class="ml-1 text-[10px] text-slate-400">drives autoscale</span>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-800">
+                    <span class="text-xs text-slate-500">Link-crawl backlog</span>
+                    <span class="ml-2 font-bold tabular-nums text-orange-600 dark:text-orange-400">{{ $queueDepths['link-crawl'] ?? '—' }}</span>
+                    <span class="ml-1 text-[10px] text-slate-400">background · <a href="{{ route('admin.link-graph.index') }}" class="text-orange-600 hover:underline dark:text-orange-400">details</a></span>
+                </div>
+            </div>
+        @endisset
+
         {{-- Flash + validation (both fleets post back here) --}}
         @if (session('status'))
             <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">{{ session('status') }}</div>

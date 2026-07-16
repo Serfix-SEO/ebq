@@ -60,11 +60,25 @@ class FleetController extends Controller
         $workerSnapshots = Cache::remember('fleet:snapshots:worker', 300, fn () => $hz->listSnapshots('role=ebq-crawl-worker')['snapshots']);
         $dbSnapshots = Cache::remember('fleet:snapshots:db', 300, fn () => $hz->listSnapshots('role=ebq-db-node')['snapshots']);
 
+        // Live queue depths for the fleet header. The autoscaler scales on the
+        // `crawl` (site-audit) backlog ONLY — `link-crawl` is background,
+        // budget-capped work that deliberately does NOT drive paid box
+        // provisioning; shown here just for visibility.
+        $queueDepths = [];
+        foreach (['crawl' => \App\Support\Queues::CRAWL, 'link-crawl' => \App\Support\Queues::LINK_CRAWL] as $label => $q) {
+            try {
+                $queueDepths[$label] = (int) \Illuminate\Support\Facades\Queue::connection('redis')->size($q);
+            } catch (\Throwable) {
+                $queueDepths[$label] = null;
+            }
+        }
+
         return view('admin.fleet.index', [
             // Crawl-worker (compute) fleet — "Crawl workers" tab.
             'cfg' => AutoscalerConfig::all(),
             'serverTypes' => self::SERVER_TYPES,
             'workerSnapshots' => $workerSnapshots,
+            'queueDepths' => $queueDepths,
             // Database-shard (data) fleet — "Database shards" tab.
             'dbNodes' => DbNode::orderByDesc('is_pinned')->orderBy('role')->orderBy('id')->get(),
             'dbCfg' => DbFleetConfig::all(),
