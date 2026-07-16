@@ -91,15 +91,20 @@ class LinkGraphController extends Controller
             ->selectRaw('t.name, count(*) c, sum(link_edges.dofollow) df')
             ->groupBy('t.name')->orderByDesc('c')->limit(20)->get();
 
-        // ── Recent discoveries feed ─────────────────────────────
+        // ── Discovery feed (paginated) — honors the source + day filters,
+        //    so an admin can page through everything the crawler/enrichment/
+        //    provider pipelines have discovered, not just the latest 40.
         $recent = DB::table('link_edges')
             ->join('link_domains as f', 'f.id', '=', 'link_edges.from_domain_id')
             ->join('link_domains as t', 't.id', '=', 'link_edges.to_domain_id')
+            ->leftJoin('link_urls as fu', 'fu.id', '=', 'link_edges.from_url_id')
+            ->where('link_edges.first_seen_at', '>=', $since)
             ->when($source !== 'all', fn ($q) => $q->where('link_edges.source', $source))
             ->orderByDesc('link_edges.first_seen_at')
-            ->limit(40)
-            ->get(['f.name as from_domain', 't.name as to_domain', 'link_edges.dofollow',
-                'link_edges.anchor_class', 'link_edges.source', 'link_edges.first_seen_at']);
+            ->select(['f.name as from_domain', 't.name as to_domain', 'fu.path as from_path',
+                'link_edges.dofollow', 'link_edges.anchor_class', 'link_edges.source', 'link_edges.first_seen_at'])
+            ->paginate(50, pageName: 'feed')
+            ->withQueryString();
 
         return view('admin.link-graph.index', [
             'filters' => ['days' => $days, 'source' => $source],

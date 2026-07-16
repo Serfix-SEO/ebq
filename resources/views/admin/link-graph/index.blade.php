@@ -158,17 +158,24 @@
                 </div>
             </div>
             <div class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-                <div class="border-b border-slate-100 px-5 py-3 dark:border-slate-800"><h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Recently discovered links</h3></div>
-                <div class="max-h-96 overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Discovery feed</h3>
+                    <span class="text-xs text-slate-400">{{ $filters['source'] === 'all' ? 'all sources' : $filters['source'] }} · {{ $filters['days'] }}d · {{ number_format($recent->total()) }} links</span>
+                </div>
+                <div class="overflow-y-auto">
                     <table class="w-full text-sm">
                         <tbody>
                             @forelse ($recent as $e)
                                 <tr class="border-t border-slate-100 dark:border-slate-800">
                                     <td class="px-5 py-2">
-                                        <span class="text-slate-700 dark:text-slate-300">{{ \Illuminate\Support\Str::limit($e->from_domain, 26) }}</span>
-                                        <span class="text-slate-400"> → </span>
-                                        <span class="font-medium text-slate-900 dark:text-slate-100">{{ \Illuminate\Support\Str::limit($e->to_domain, 26) }}</span>
+                                        <div>
+                                            <span class="text-slate-600 dark:text-slate-400">{{ \Illuminate\Support\Str::limit($e->from_domain, 24) }}</span>
+                                            <span class="text-slate-400"> → </span>
+                                            <span class="font-medium text-slate-900 dark:text-slate-100">{{ \Illuminate\Support\Str::limit($e->to_domain, 24) }}</span>
+                                        </div>
+                                        @if ($e->from_path && $e->from_path !== '/')<div class="truncate text-[10px] text-slate-400">{{ \Illuminate\Support\Str::limit($e->from_path, 48) }}</div>@endif
                                     </td>
+                                    <td class="px-3 py-2 text-right text-[10px] text-slate-400">{{ $e->anchor_class ?? '—' }}</td>
                                     <td class="px-3 py-2 text-right">
                                         <span class="rounded px-1.5 py-0.5 text-[10px] font-medium" style="background: {{ ($srcColor[$e->source] ?? '#94a3b8') }}20; color: {{ $srcColor[$e->source] ?? '#64748b' }}">{{ $e->source }}</span>
                                         @if ($e->dofollow)<span class="ml-1 text-[10px] text-emerald-600">df</span>@endif
@@ -176,11 +183,14 @@
                                     <td class="px-5 py-2 text-right text-[11px] text-slate-400">{{ \Illuminate\Support\Carbon::parse($e->first_seen_at)->diffForHumans(short: true) }}</td>
                                 </tr>
                             @empty
-                                <tr><td class="px-5 py-6 text-center text-sm text-slate-400">No links yet.</td></tr>
+                                <tr><td class="px-5 py-6 text-center text-sm text-slate-400">No links in this window.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
+                @if ($recent->hasPages())
+                    <div class="border-t border-slate-100 px-4 py-3 dark:border-slate-800">{{ $recent->links() }}</div>
+                @endif
             </div>
         </div>
     </div>
