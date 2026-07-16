@@ -349,6 +349,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/crawler', [\App\Http\Controllers\Admin\CrawlerController::class, 'index'])->name('crawler.index');
 
+    // Backlink Explorer — search stored backlinks (crawler + persisted
+    // DataForSEO) from the link graph; zero new provider calls.
+    Route::get('/backlink-explorer', [\App\Http\Controllers\Admin\BacklinkExplorerController::class, 'index'])->name('backlink-explorer.index');
+    Route::get('/backlink-explorer/export', [\App\Http\Controllers\Admin\BacklinkExplorerController::class, 'export'])->name('backlink-explorer.export');
+
     // Domain intelligence — browse/search/drill the domain_metrics asset.
     Route::get('/domain-metrics', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'index'])->name('domain-metrics.index');
     Route::get('/domain-metrics/{domainMetric}', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'show'])->name('domain-metrics.show');

@@ -117,6 +117,11 @@
                         'match_routes' => ['admin.domain-metrics.'],
                     ],
                     [
+                        'route' => 'admin.backlink-explorer.index',
+                        'label' => 'Backlinks',
+                        'match_routes' => ['admin.backlink-explorer.'],
+                    ],
+                    [
                         // Unified compute + data fleet page (crawl workers + DB shards as tabs).
                         'route' => 'admin.fleet.index',
                         'label' => 'Fleet',
