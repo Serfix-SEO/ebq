@@ -349,6 +349,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/crawler', [\App\Http\Controllers\Admin\CrawlerController::class, 'index'])->name('crawler.index');
 
+    // Domain intelligence — browse/search/drill the domain_metrics asset.
+    Route::get('/domain-metrics', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'index'])->name('domain-metrics.index');
+    Route::get('/domain-metrics/{domainMetric}', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'show'])->name('domain-metrics.show');
+    Route::post('/domain-metrics/{domainMetric}/reclassify', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'reclassify'])->name('domain-metrics.reclassify');
+    Route::post('/domain-metrics/{domainMetric}/refresh', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'refresh'])->name('domain-metrics.refresh');
+
     // Link-graph engine dashboard (Tier-1.5 crawler + discovery analytics).
     Route::get('/link-graph', [\App\Http\Controllers\Admin\LinkGraphController::class, 'index'])->name('link-graph.index');
     Route::post('/link-graph/toggle', [\App\Http\Controllers\Admin\LinkGraphController::class, 'toggle'])->name('link-graph.toggle');

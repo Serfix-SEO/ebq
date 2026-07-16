@@ -112,6 +112,11 @@
                         'match_routes' => ['admin.link-graph.'],
                     ],
                     [
+                        'route' => 'admin.domain-metrics.index',
+                        'label' => 'Domains',
+                        'match_routes' => ['admin.domain-metrics.'],
+                    ],
+                    [
                         // Unified compute + data fleet page (crawl workers + DB shards as tabs).
                         'route' => 'admin.fleet.index',
                         'label' => 'Fleet',
