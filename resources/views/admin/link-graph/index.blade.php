@@ -116,13 +116,24 @@
             </div>
             <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Edges by source</h3>
+                <p class="mt-1 text-[11px] leading-tight text-slate-400">Click a source to see its links in the feed below.</p>
+                @php
+                    $srcTotal = max(1, $by_source->sum());
+                    $srcHelp = [
+                        'own_crawl' => 'Found by our Tier-1.5 crawler visiting a tracked domain',
+                        'enrichment' => 'Outbound links captured while fetching a domain for a report',
+                        'provider' => 'Backlink rows from DataForSEO, persisted permanently',
+                        'cc_wat' => 'Extracted from Common Crawl archives (future)',
+                    ];
+                @endphp
                 <div class="mt-3 space-y-2">
-                    @php $srcTotal = max(1, $by_source->sum()); @endphp
                     @foreach ($by_source->sortDesc() as $src => $cnt)
-                        <div>
+                        <a href="{{ request()->fullUrlWithQuery(['source' => $src, 'feed' => null]) }}#feed" title="{{ $srcHelp[$src] ?? '' }}"
+                           class="block rounded-lg p-1 transition hover:bg-slate-50 dark:hover:bg-slate-800/60 {{ $filters['source'] === $src ? 'bg-slate-50 ring-1 ring-orange-200 dark:bg-slate-800/60' : '' }}">
                             <div class="flex justify-between text-xs"><span class="font-medium text-slate-600 dark:text-slate-300">{{ $src }}</span><span class="tabular-nums text-slate-500">{{ $fmt($cnt) }}</span></div>
                             <div class="mt-1 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div class="h-full rounded-full" style="width: {{ max(2, round(100 * $cnt / $srcTotal)) }}%; background: {{ $srcColor[$src] ?? '#94a3b8' }}"></div></div>
-                        </div>
+                            <p class="mt-0.5 text-[10px] leading-tight text-slate-400">{{ $srcHelp[$src] ?? '' }}</p>
+                        </a>
                     @endforeach
                 </div>
             </div>
@@ -157,7 +168,7 @@
                     </table>
                 </div>
             </div>
-            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            <div id="feed" class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3 dark:border-slate-800">
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Discovery feed</h3>
                     <span class="text-xs text-slate-400">{{ $filters['source'] === 'all' ? 'all sources' : $filters['source'] }} · {{ $filters['days'] }}d · {{ number_format($recent->total()) }} links</span>
