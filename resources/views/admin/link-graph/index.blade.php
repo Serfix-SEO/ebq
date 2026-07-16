@@ -203,7 +203,7 @@
                                 </td>
                                 <td class="px-3 py-2.5">
                                     <span class="inline-flex items-center gap-1.5">
-                                        <span class="font-medium text-slate-900 dark:text-slate-100">{{ $e->to_domain }}</span>
+                                        <a href="https://{{ $e->to_domain }}/" target="_blank" rel="nofollow noopener" title="https://{{ $e->to_domain }}/" class="font-medium text-slate-900 hover:text-orange-600 hover:underline dark:text-slate-100 dark:hover:text-orange-400">{{ $e->to_domain }}</a>
                                         @if ($e->dofollow)<span class="rounded bg-emerald-50 px-1 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">df</span>@endif
                                     </span>
                                 </td>

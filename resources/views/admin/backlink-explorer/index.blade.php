@@ -114,10 +114,10 @@
                             @forelse ($rows as $r)
                                 <tr class="border-t border-slate-100 dark:border-slate-800">
                                     <td class="px-5 py-2.5">
-                                        <span class="inline-flex items-center gap-2">
+                                        <a href="https://{{ $r->other_domain }}/" target="_blank" rel="nofollow noopener" title="https://{{ $r->other_domain }}/" class="inline-flex items-center gap-2 font-medium text-slate-800 hover:text-orange-600 hover:underline dark:text-slate-200 dark:hover:text-orange-400">
                                             <img src="https://www.google.com/s2/favicons?domain={{ urlencode($r->other_domain) }}&sz=32" alt="" class="h-4 w-4 flex-none rounded-sm bg-slate-100" loading="lazy" onerror="this.style.visibility='hidden'">
-                                            <span class="font-medium text-slate-800 dark:text-slate-200">{{ $r->other_domain }}</span>
-                                        </span>
+                                            {{ $r->other_domain }}
+                                        </a>
                                     </td>
                                     <td class="max-w-xs px-3 py-2.5 text-xs">
                                         @php
