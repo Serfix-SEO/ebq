@@ -252,6 +252,34 @@ class ContentCalendar extends Component
         $this->wizardStep = 4;
     }
 
+    /**
+     * Step 4 wire:init — ensure competitor authority data exists. If the site
+     * has no usable report snapshot yet, kick off a one-time real generation
+     * (spend-metered; sandbox on staging) and let the step poll until ready.
+     */
+    public function loadCompetitors(): void
+    {
+        $website = $this->website();
+        if ($website === null) {
+            return;
+        }
+        $insights = app(ContentSetupInsights::class);
+        if ($insights->competitorAuthority($website) === null) {
+            $insights->ensureGenerating($website);
+        }
+    }
+
+    /** Poll target on step 4 while generation is in flight. */
+    public function refreshCompetitors(): void
+    {
+        // A no-op action: re-rendering re-reads the (now possibly ready) cache.
+        // Clear the memoized null so a freshly-landed snapshot is picked up.
+        $website = $this->website();
+        if ($website !== null) {
+            app(ContentSetupInsights::class)->forget($website);
+        }
+    }
+
     public function toFirstArticles(): void
     {
         $this->wizardStep = 5;
@@ -554,11 +582,17 @@ class ContentCalendar extends Component
         // ── Wizard data ──
         $wizard = [];
         if ($inWizard) {
+            $insights = null;
+            $generating = false;
+            if ($this->wizardStep === 4 && ($w = $this->website()) !== null) {
+                $svc = app(ContentSetupInsights::class);
+                $insights = $svc->competitorAuthority($w);
+                $generating = $insights === null && $svc->isGenerating($w);
+            }
             $wizard = [
                 'draftTopics' => $this->wizardStep >= 5 ? $this->draftTopics() : collect(),
-                'insights' => $this->wizardStep === 4 && $this->website()
-                    ? app(ContentSetupInsights::class)->competitorAuthority($this->website())
-                    : null,
+                'insights' => $insights,
+                'generating' => $generating,
                 'hasWebsite' => $this->website() !== null,
             ];
 

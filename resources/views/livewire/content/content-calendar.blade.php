@@ -165,49 +165,55 @@
 
                 {{-- ── Step 4: competitors ──────────────────────────── --}}
                 @elseif ($wizardStep === 4)
-                    <div class="text-center">
+                    @php $ins = $wizard['insights'] ?? null; $generating = $wizard['generating'] ?? false; @endphp
+                    <div class="text-center" @if($ins === null) wire:init="loadCompetitors" @endif>
                         <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">{{ __('Your competitors and their authority') }}</h2>
-                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('How your site\'s authority compares to others in your space.') }}</p>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('How your backlink profile compares to others in your space.') }}</p>
                     </div>
 
-                    @php $ins = $wizard['insights'] ?? null; @endphp
                     @if ($ins && ! empty($ins['competitors']))
                         @if ($ins['behind'])
-                            <div class="mx-auto mt-3 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">{{ __('Room to grow') }}</div>
+                            <div class="mx-auto mt-3 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">{{ __('Room to grow') }}</div>
                         @endif
                         <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                            <div class="rounded-xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-900 dark:bg-orange-950">
                                 <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Your referring domains') }}</div>
                                 <div class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ number_format($ins['my_referring_domains']) }}</div>
                             </div>
                             <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
-                                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Your authority score') }}</div>
-                                <div class="mt-1 text-2xl font-bold text-orange-600">{{ $ins['my_authority'] ?? '—' }}<span class="text-base text-slate-400">/100</span></div>
+                                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Competitor median') }}</div>
+                                <div class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $ins['median'] !== null ? number_format($ins['median']) : '—' }}</div>
                             </div>
                             <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
-                                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Competitor median') }}</div>
-                                <div class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $ins['median'] ?? '—' }}<span class="text-base text-slate-400">/100</span></div>
+                                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Current gap') }}</div>
+                                <div class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $ins['gap'] !== null ? $ins['gap'].'×' : '—' }}</div>
                             </div>
                         </div>
                         <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
                             <table class="w-full text-sm">
                                 <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                                    <tr><th class="px-4 py-2 text-start font-semibold">{{ __('Competitor') }}</th><th class="px-4 py-2 text-end font-semibold">{{ __('Authority') }}</th><th class="px-4 py-2 text-end font-semibold">{{ __('Shared keywords') }}</th></tr>
+                                    <tr><th class="px-4 py-2 text-start font-semibold">{{ __('Competitor') }}</th><th class="px-4 py-2 text-end font-semibold">{{ __('Referring domains') }}</th><th class="px-4 py-2 text-end font-semibold">{{ __('Authority') }}</th></tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                     @foreach ($ins['competitors'] as $c)
                                         <tr class="bg-white dark:bg-slate-900">
                                             <td class="px-4 py-2.5 text-slate-800 dark:text-slate-200">{{ $c['domain'] }}</td>
-                                            <td class="px-4 py-2.5 text-end font-medium text-slate-800 dark:text-slate-200">{{ $c['authority'] ?? '—' }}</td>
-                                            <td class="px-4 py-2.5 text-end text-slate-500 dark:text-slate-400">{{ $c['shared_keywords'] ? number_format($c['shared_keywords']) : '—' }}</td>
+                                            <td class="px-4 py-2.5 text-end font-medium text-slate-800 dark:text-slate-200">{{ $c['referring_domains'] !== null ? number_format($c['referring_domains']) : '—' }}</td>
+                                            <td class="px-4 py-2.5 text-end text-slate-500 dark:text-slate-400">{{ $c['authority'] ?? '—' }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                             </table>
                         </div>
+                        <p class="mt-2 text-center text-xs text-slate-400">{{ __('A one-time snapshot of your competitive landscape.') }}</p>
+                    @elseif ($generating)
+                        <div wire:poll.5s="refreshCompetitors" class="mt-6 flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                            <svg class="h-5 w-5 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Analyzing your competitive landscape…') }}</p>
+                        </div>
                     @else
                         <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
-                            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('We\'re still gathering your competitive authority data. It appears here as soon as your site analysis finishes, and your content plan is already being built either way.') }}</p>
+                            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Your competitive landscape appears here shortly. Your content plan is already being built either way.') }}</p>
                         </div>
                     @endif
 
