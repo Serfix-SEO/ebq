@@ -89,7 +89,16 @@ class ContentArticleProducer
             $draftInput['model'] = $writeModel['model'];
         }
 
-        $draft = $writer->draft($website, 0, $draftInput);
+        try {
+            $draft = $writer->draft($website, 0, $draftInput);
+        } catch (\App\Exceptions\QuotaExceededException $e) {
+            // The owner's plan ran out of AI tokens — an EXPECTED operational
+            // state, not a crash. The topic parks as failed with an internal
+            // marker; client copy stays neutral ("Needs attention").
+            $topic->fail('llm_quota_exhausted');
+
+            return null;
+        }
         $this->meter->add(ContentLlmSpendMeter::EST_WRITE_USD);
         if (! ($draft['ok'] ?? false)) {
             $topic->fail('draft_failed: '.(string) ($draft['error'] ?? 'unknown'));
@@ -129,7 +138,11 @@ class ContentArticleProducer
             $iteration++;
             $topic->enterStage(ContentTopic::STATUS_REVISING);
 
-            $revised = $this->revise($article, $topic, $plan);
+            try {
+                $revised = $this->revise($article, $topic, $plan);
+            } catch (\App\Exceptions\QuotaExceededException) {
+                $revised = null; // out of tokens mid-loop: ship the best version
+            }
             $this->meter->add(ContentLlmSpendMeter::EST_REVISE_USD);
             if ($revised === null) {
                 break; // revision call failed — keep the best version we have

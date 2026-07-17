@@ -123,6 +123,15 @@ plugin codebase (42 PHP classes + React build) is a **separate git repo** checke
 `/var/www/ebq/ebq-wordpress-plugin/` (gitignored; **never commit it here**), calling the HQ
 API via an `EBQ_Rest_Proxy`; core on-page output works offline.
 
+### Content Autopilot — auto content calendar 🟡 (Phases 0–1 built, staging)
+[content-autopilot/](./content-autopilot/README.md) — evidence-driven topic ideation
+(GSC striking-distance + business profile + cannibalization guard) → AI writing (reuses
+the Writer's `draft()` v25, DeepSeek-preferred) → **deterministic `ContentSeoScorer` +
+`HumanizerService` anti-AI-detection lint** → targeted revision loop → versioned
+articles. `ebq:content-autopilot` heartbeat (reap/top-up/claim), `content` queue on the
+heavy pool, two admin-only spend breakers. Publishing/images/client UI are Phases 2–4.
+Plan: repo-root `AUTO_CONTENT_CALENDAR_PLAN.md`.
+
 ### Guest (public, lead-gen) tools ✅
 [guest-tools/](./guest-tools/README.md) — rank / pagespeed / volume / audit; shared
 request→queued-job→email-link→results pattern, reCAPTCHA + rate limits + lead capture.
@@ -272,6 +281,19 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-17 (Content Autopilot Phases 0–1)** — New subsystem
+  [content-autopilot/](./content-autopilot/README.md): auto content calendar
+  (getautoseo.com competitor; plan at repo-root `AUTO_CONTENT_CALENDAR_PLAN.md`).
+  Six `content_*` tables (versioned articles, encrypted integration creds),
+  `ContentTopicPlanner` (GSC-grounded ideation + cannibalization guard),
+  `ContentArticleProducer` (brief→`AiWriterService::draft`→score→targeted revise
+  loop), pure `ContentSeoScorer` + `HumanizerService` (anti-AI-detection prompt
+  contract + deterministic lint, admin-editable banned-phrase list),
+  `ebq:content-autopilot` 15-min heartbeat, new `content` queue on the heavy pool
+  (redis-long), `IdeogramClient` (v3, expiring URLs) + `Ideogram`/`ContentLlm`
+  spend breakers (shared `MonthlySpendMeter` base), Content Autopilot card on
+  `/admin/settings`, `IDEOGRAM_API_KEY` blanked in phpunit. Also fixed a stale
+  `TrialCleanupTest` expecting pre-redesign onboarding copy.
 - **2026-07-17 (staging environment + cost/spend controls)** — Built the isolated
   **staging box** (`10.0.0.4`, cx33, staging.serfix.io via box-A reverse proxy +
   basic auth; own MariaDB/Redis, log mail, sandbox DataForSEO, no fleet/Stripe
