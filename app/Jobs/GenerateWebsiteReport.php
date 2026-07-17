@@ -8,6 +8,7 @@ use App\Services\DataForSeoBacklinkClient;
 use App\Services\MozLinksClient;
 use App\Services\OpenPageRankClient;
 use App\Services\ReportFreshnessGate;
+use App\Services\Reports\BacklinkSampleAggregator;
 use App\Services\Reports\ClientReportService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -130,16 +131,29 @@ class GenerateWebsiteReport implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
+            // Complete-profile shortcut: the backlinks sample is fetched
+            // `mode=as_is`, top row_limit by rank — when the domain's TOTAL live
+            // links fit inside that cap, the sample IS the complete profile, and
+            // the referring_domains / anchors / domain_pages endpoints are just
+            // paid server-side GROUP BYs over the same rows. Aggregate locally
+            // instead (exact same output, 3 fewer paid calls — ~53% of targets).
+            $backlinks = $dfs->backlinksSample($normalized);
+            $rowLimit = (int) config('services.dataforseo.row_limit', 1000);
+            $sampleComplete = $backlinks !== []
+                && ($total = (int) ($summary['backlinks'] ?? 0)) > 0
+                && $total <= $rowLimit;
+            $agg = $sampleComplete ? new BacklinkSampleAggregator() : null;
+
             $raw = [
                 'summary' => $summary,
                 'history' => $dfs->history($normalized),
-                'referring_domains' => $dfs->referringDomains($normalized),
-                'anchors' => $dfs->anchors($normalized),
-                'domain_pages' => $dfs->domainPages($normalized),
+                'referring_domains' => $agg ? $agg->referringDomains($backlinks) : $dfs->referringDomains($normalized),
+                'anchors' => $agg ? $agg->anchors($backlinks) : $dfs->anchors($normalized),
+                'domain_pages' => $agg ? $agg->domainPages($backlinks) : $dfs->domainPages($normalized),
                 // Organic SERP competitors (shared ranking keywords) — solid;
                 // fall back to backlink-intersection competitors if Labs is empty.
                 'competitors' => $dfs->labsCompetitors($normalized) ?: $dfs->competitors($normalized),
-                'backlinks' => $dfs->backlinksSample($normalized),
+                'backlinks' => $backlinks,
                 // Moz only on the client's own domain (1 free-tier row).
                 'moz' => $moz->isConfigured() ? $moz->urlMetrics($normalized) : null,
             ];

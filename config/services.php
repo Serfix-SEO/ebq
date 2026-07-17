@@ -205,6 +205,15 @@ return [
         // return within a shallow 100-row window.
         'pages_limit' => (int) env('DATAFORSEO_PAGES_LIMIT', 1000),
         'competitors_limit' => (int) env('DATAFORSEO_COMPETITORS_LIMIT', 1000),
+        // Labs rows cost $0.0001 — 10× the Backlinks-API row price — so the
+        // Labs organic-competitors call gets its OWN, tighter cap (the 1000-row
+        // "extra rows are nearly free" rationale above does NOT hold there).
+        // Report value concentrates at the top: rows are sorted by shared
+        // keywords, and past ~row 300 it's 15–40 weak-position stragglers
+        // nobody acts on (verified on live payloads 2026-07-17). 300 keeps
+        // every actionable competitor and cuts the priciest usage line ~60%.
+        // Dial back up here anytime without a code change.
+        'labs_competitors_limit' => (int) env('DATAFORSEO_LABS_COMPETITORS_LIMIT', 300),
         'history_months' => (int) env('DATAFORSEO_HISTORY_MONTHS', 12),
         'timeout' => (int) env('DATAFORSEO_TIMEOUT_S', 60),
     ],

@@ -47,6 +47,10 @@ class SiteExplorerPagesNoRebillTest extends TestCase
             'fetched_at' => now()->subDay(),
             'payload' => [
                 'domain' => $domain,
+                // Current schema — an OLD-schema snapshot deliberately triggers
+                // ONE self-heal regeneration (ReportViewController::resolve);
+                // this test guards the no-rebill path for CURRENT snapshots.
+                'meta' => ['schema' => \App\Services\Reports\ClientReportService::PAYLOAD_SCHEMA],
                 'totals' => ['backlinks' => 100, 'referring_domains' => 10, 'referring_ips' => 8, 'referring_subnets' => 6],
                 'ratios' => ['dofollow_pct' => 70, 'active_pct' => 60],
                 'history' => [], 'anchor_types' => [], 'gauges' => [], 'popularity' => [],

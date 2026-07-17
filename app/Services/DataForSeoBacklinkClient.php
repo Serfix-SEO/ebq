@@ -172,7 +172,9 @@ class DataForSeoBacklinkClient
      */
     public function labsCompetitors(string $domain, ?int $limit = null): array
     {
-        $limit = $limit ?? (int) config('services.dataforseo.competitors_limit', 1000);
+        // Labs-specific cap — Labs rows are 10× the Backlinks row price, and
+        // competitor value concentrates in the top rows (see config comment).
+        $limit = $limit ?? (int) config('services.dataforseo.labs_competitors_limit', 300);
 
         return $this->items('/dataforseo_labs/google/competitors_domain/live', [
             'target' => $this->target($domain),

@@ -286,6 +286,98 @@ class ClientReportTest extends TestCase
         $this->assertEquals(4.7, $snapshot->payload['popularity']['score']);
     }
 
+    public function test_generate_job_derives_aggregates_locally_when_sample_is_complete(): void
+    {
+        config(['services.dataforseo.login' => 'x', 'services.dataforseo.password' => 'y']);
+
+        $dfs = Mockery::mock(DataForSeoBacklinkClient::class);
+        $dfs->shouldReceive('isConfigured')->andReturn(true);
+        $dfs->shouldReceive('useSandbox')->andReturnSelf();
+        // 3 total live links ≤ row_limit → the sample is the COMPLETE profile.
+        $dfs->shouldReceive('summary')->andReturn(['backlinks' => 3, 'referring_domains' => 2, 'rank' => 120]);
+        $dfs->shouldReceive('backlinksSample')->andReturn([
+            ['domain_from' => 'alpha.test', 'domain_from_rank' => 300, 'url_to' => 'https://small.test/', 'anchor' => 'Small Co', 'dofollow' => true, 'first_seen' => '2025-04-01 00:00:00'],
+            ['domain_from' => 'alpha.test', 'domain_from_rank' => 300, 'url_to' => 'https://small.test/about', 'anchor' => 'about', 'dofollow' => true, 'first_seen' => '2025-05-01 00:00:00'],
+            ['domain_from' => 'beta.test', 'domain_from_rank' => 90, 'url_to' => 'https://small.test/', 'anchor' => 'Small Co', 'dofollow' => false, 'first_seen' => '2025-06-01 00:00:00'],
+        ]);
+        $dfs->shouldReceive('history')->andReturn([]);
+        $dfs->shouldReceive('labsCompetitors')->andReturn([]);
+        $dfs->shouldReceive('competitors')->andReturn([]);
+        $dfs->shouldReceive('totalCost')->andReturn(0.11);
+        // The point: the 3 aggregation endpoints are NEVER called.
+        $dfs->shouldReceive('referringDomains')->never();
+        $dfs->shouldReceive('anchors')->never();
+        $dfs->shouldReceive('domainPages')->never();
+
+        $moz = Mockery::mock(MozLinksClient::class);
+        $moz->shouldReceive('isConfigured')->andReturn(false);
+        $opr = Mockery::mock(\App\Services\OpenPageRankClient::class);
+        $opr->shouldReceive('metricsFor')->andReturn([]);
+
+        $this->app->instance(DataForSeoBacklinkClient::class, $dfs);
+        $this->app->instance(MozLinksClient::class, $moz);
+        $this->app->instance(\App\Services\OpenPageRankClient::class, $opr);
+
+        (new GenerateWebsiteReport('small.test'))->handle(
+            $dfs, $moz, $opr, app(ReportFreshnessGate::class), app(\App\Services\Reports\ClientReportService::class),
+            app(\App\Services\ClientActivityLogger::class)
+        );
+
+        $payload = WebsiteReportSnapshot::forDomain('small.test')->payload;
+        // Derived referring domains: rank-desc, exact counts + first_seen months.
+        $this->assertSame('alpha.test', $payload['top_referring_domains'][0]['domain']);
+        $this->assertSame(300, $payload['top_referring_domains'][0]['rank']);
+        $this->assertSame(2, $payload['top_referring_domains'][0]['backlinks']);
+        $this->assertSame('beta.test', $payload['top_referring_domains'][1]['domain']);
+        // Derived anchors: 'Small Co' tops with 2 links / 2 domains / 1 dofollow.
+        $this->assertSame('Small Co', $payload['anchors'][0]['anchor']);
+        $this->assertSame(2, $payload['anchors'][0]['backlinks']);
+        $this->assertSame(2, $payload['anchors'][0]['referring_domains']);
+        $this->assertSame(1, $payload['anchors'][0]['dofollow']);
+        // Derived top pages: homepage first (2 domains), refdoms FILLED (not null).
+        $this->assertSame('https://small.test/', $payload['top_pages'][0]['url']);
+        $this->assertSame(2, $payload['top_pages'][0]['referring_domains']);
+        $this->assertSame(2, $payload['top_pages'][0]['backlinks']);
+    }
+
+    public function test_generate_job_keeps_paid_aggregation_calls_for_big_profiles(): void
+    {
+        config(['services.dataforseo.login' => 'x', 'services.dataforseo.password' => 'y']);
+
+        $dfs = Mockery::mock(DataForSeoBacklinkClient::class);
+        $dfs->shouldReceive('isConfigured')->andReturn(true);
+        $dfs->shouldReceive('useSandbox')->andReturnSelf();
+        // 24k links > row_limit → sample is a top-1000 slice, NOT complete.
+        $dfs->shouldReceive('summary')->andReturn(['backlinks' => 24318, 'rank' => 470]);
+        $dfs->shouldReceive('backlinksSample')->andReturn([
+            ['domain_from' => 'alpha.test', 'url_to' => 'https://big.test/', 'anchor' => 'x', 'dofollow' => true],
+        ]);
+        $dfs->shouldReceive('history')->andReturn([]);
+        $dfs->shouldReceive('labsCompetitors')->andReturn([]);
+        $dfs->shouldReceive('competitors')->andReturn([]);
+        $dfs->shouldReceive('totalCost')->andReturn(0.3);
+        // Aggregations can't be derived from a partial sample → endpoints used.
+        $dfs->shouldReceive('referringDomains')->once()->andReturn([]);
+        $dfs->shouldReceive('anchors')->once()->andReturn([]);
+        $dfs->shouldReceive('domainPages')->once()->andReturn([]);
+
+        $moz = Mockery::mock(MozLinksClient::class);
+        $moz->shouldReceive('isConfigured')->andReturn(false);
+        $opr = Mockery::mock(\App\Services\OpenPageRankClient::class);
+        $opr->shouldReceive('metricsFor')->andReturn([]);
+
+        $this->app->instance(DataForSeoBacklinkClient::class, $dfs);
+        $this->app->instance(MozLinksClient::class, $moz);
+        $this->app->instance(\App\Services\OpenPageRankClient::class, $opr);
+
+        (new GenerateWebsiteReport('big.test'))->handle(
+            $dfs, $moz, $opr, app(ReportFreshnessGate::class), app(\App\Services\Reports\ClientReportService::class),
+            app(\App\Services\ClientActivityLogger::class)
+        );
+
+        $this->assertSame('ready', WebsiteReportSnapshot::forDomain('big.test')->status);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();
