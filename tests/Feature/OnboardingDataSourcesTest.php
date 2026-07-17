@@ -186,6 +186,28 @@ class OnboardingDataSourcesTest extends TestCase
         Queue::assertNotPushed(SyncSearchConsoleData::class);
     }
 
+    public function test_change_domain_goes_back_and_resubmit_updates_same_website(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+
+        $c = Livewire::actingAs($user)
+            ->test(ConnectGoogle::class)
+            ->set('domain', 'first-try.com')
+            ->call('addWebsite')
+            ->assertSet('step', 2)
+            ->call('changeDomain')
+            ->assertSet('step', 1)
+            ->assertSet('domain', 'first-try.com') // pre-filled for editing
+            ->set('domain', 'corrected.com')
+            ->call('addWebsite')
+            ->assertSet('step', 2);
+
+        // Same row updated — no second website created.
+        $this->assertSame(1, Website::where('user_id', $user->id)->count());
+        $this->assertSame('corrected.com', Website::where('user_id', $user->id)->first()->domain);
+    }
+
     public function test_skip_without_a_website_returns_to_step_one(): void
     {
         $user = User::factory()->create();

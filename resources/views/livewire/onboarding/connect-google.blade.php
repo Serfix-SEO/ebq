@@ -16,7 +16,10 @@
 
     {{-- Step indicator --}}
     <div class="mx-auto mt-8 flex max-w-md items-center gap-3">
-        <div class="flex items-center gap-2.5">
+        {{-- Completed step 1 is clickable — standard wizard affordance to go
+             back and change the domain. --}}
+        <button type="button" @if ($step > 1) wire:click="changeDomain" @else disabled @endif
+            class="flex items-center gap-2.5 {{ $step > 1 ? 'cursor-pointer' : '' }}">
             <span @class([
                 'flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold shadow-sm',
                 'bg-orange-600 text-white' => $step === 1,
@@ -28,8 +31,8 @@
                     1
                 @endif
             </span>
-            <span class="whitespace-nowrap text-sm font-semibold {{ $step === 1 ? 'text-slate-900' : 'text-emerald-600' }}">{{ __('Your website') }}</span>
-        </div>
+            <span class="whitespace-nowrap text-sm font-semibold {{ $step === 1 ? 'text-slate-900' : 'text-emerald-600 hover:underline underline-offset-4' }}">{{ __('Your website') }}</span>
+        </button>
         <div class="h-px flex-1 {{ $step > 1 ? 'bg-emerald-400' : 'bg-slate-200' }}"></div>
         <div class="flex items-center gap-2.5">
             <span @class([
@@ -97,7 +100,11 @@
                         <p class="truncate text-sm font-semibold text-slate-900">{{ $domain }}</p>
                         <p class="text-xs text-emerald-700">{{ __('Added — analysis is running') }}</p>
                     </div>
-                    <svg class="ml-auto h-5 w-5 flex-none text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <button type="button" wire:click="changeDomain"
+                        class="ml-auto inline-flex h-8 flex-none items-center gap-1 whitespace-nowrap rounded-lg border border-emerald-200 bg-white px-2.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900">
+                        <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" /></svg>
+                        {{ __('Change') }}
+                    </button>
                 </div>
             @endif
 

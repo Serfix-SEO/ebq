@@ -111,6 +111,17 @@ class ConnectGoogle extends Component
     }
 
     /**
+     * "Change" on the step-2 domain chip → back to step 1 with the domain
+     * pre-filled for editing. Re-submitting updates the SAME website row
+     * (persistWebsite reuses it) and the Website saving hook rebinds the
+     * crawl_site when the normalized domain changes.
+     */
+    public function changeDomain(): void
+    {
+        $this->step = 1;
+    }
+
+    /**
      * Stash the current picks and bounce to Google so the user can add a
      * second account (e.g. GA lives on one login, GSC on another). On
      * return we re-pool with the new account included.
