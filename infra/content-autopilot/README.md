@@ -79,10 +79,16 @@ website has NO ACTIVE plan (`inWizard`):
    user reads the next steps.
 3. **How it works** — 3-step explainer (research → daily article → traffic;
    the reference's backlinks step is deliberately omitted).
-4. **Competitors & authority** — real data via `ContentSetupInsights`
-   (read-only: `WebsiteReportSnapshot::forDomain` + `ClientReportService::
-   withTraffic`, NO paid call): your referring domains, your Citation-Score
-   authority, competitor median + table. Graceful "still analyzing" empty state.
+4. **Competitors & authority** — `ContentSetupInsights`: your referring domains
+   vs competitor **median + gap multiplier** (reference-style "13.6×") + a
+   top-5 competitor table (referring domains + authority). Reads the shared
+   report snapshot (read-only), enriches each competitor's referring-domains
+   count via **OpenPageRank free bulk** (snapshot competitor rows lack it),
+   caches the whole result 30 days. When no usable snapshot exists,
+   `ensureGenerating()` FORCE-dispatches the standard paid report ONCE
+   (spend-metered; sandbox on staging; guarded once/30min) and step 4 polls
+   (`refreshCompetitors`) until it lands. Graceful "analyzing" / "appears
+   shortly" states otherwise.
 5. **First articles** — the background-generated topics (`wire:poll.4s` until
    ready), removable; **Launch** flips the plan to active and article writing
    begins (the dispatcher only claims ACTIVE plans, so nothing bills during the
