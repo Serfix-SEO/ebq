@@ -26,6 +26,11 @@ class TeamPermissions
             'description' => 'Search Console keyword performance.',
             'route' => 'keywords.index',
         ],
+        'content' => [
+            'label' => 'Content',
+            'description' => 'Automatic content calendar: planned, written, and published articles.',
+            'route' => 'content.index',
+        ],
         'rank_tracking' => [
             'label' => 'Rank Tracking',
             'description' => 'Tracked SERP positions and history.',

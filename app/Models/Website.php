@@ -160,6 +160,7 @@ class Website extends Model
     public const FEATURE_KEYS = [
         'chatbot',
         'ai_writer',
+        'content_autopilot',
         'ai_inline',
         'live_audit',
         'hq',
@@ -184,6 +185,10 @@ class Website extends Model
     public const FEATURE_DEFAULTS = [
         'chatbot'          => false,
         'ai_writer'        => false,
+        // Globally ON — the per-plan matrix is the real gate; this map is
+        // also the global kill-switch default (false here would AND the
+        // feature off platform-wide until an admin flips it).
+        'content_autopilot' => true,
         'ai_inline'        => true,
         'live_audit'       => true,
         'hq'               => true,

@@ -33,6 +33,8 @@ class Plan extends Model
     public const FEATURE_KEYS = [
         'chatbot',
         'ai_writer',
+        // Platform feature — Content Autopilot (auto content calendar).
+        'content_autopilot',
         'ai_inline',
         'live_audit',
         'hq',

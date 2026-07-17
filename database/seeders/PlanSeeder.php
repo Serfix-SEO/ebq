@@ -73,6 +73,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => false,
                     'ai_writer'         => true,
+                    'content_autopilot' => true,
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,
@@ -133,6 +134,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => false,
                     'ai_writer'         => true,
+                    'content_autopilot' => true,
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,
@@ -191,6 +193,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
+                    'content_autopilot' => true,
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,
@@ -250,6 +253,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
+                    'content_autopilot' => true,
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,
@@ -308,6 +312,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
+                    'content_autopilot' => true,
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,

@@ -259,6 +259,14 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/websites', 'websites.index')->name('websites.index');
     Route::view('/team', 'team.index')->middleware('feature:team')->name('team.index');
     Route::view('/reports', 'reports.index')->middleware('feature:reports')->name('reports.index');
+
+    // Content Autopilot — automatic content calendar (setup wizard renders on
+    // the same page while no plan exists). Review page shows one topic's
+    // current article + SEO checks.
+    Route::view('/content', 'content.index')->middleware('feature:content')->name('content.index');
+    Route::get('/content/topics/{topic}', fn (string $topic) => view('content.review', ['topicId' => $topic]))
+        ->middleware('feature:content')
+        ->name('content.review');
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
 
     Route::middleware('feature:ai_studio')->group(function (): void {
