@@ -252,6 +252,11 @@ return [
         'llm_monthly_cap_usd' => env('CONTENT_LLM_MONTHLY_CAP_USD') !== null
             ? (float) env('CONTENT_LLM_MONTHLY_CAP_USD')
             : null,
+        // Client-UI kill switch. Box A's working tree IS prod's docroot, so
+        // new code activates on prod before any deploy decision — this env
+        // gate (not code presence) decides where the feature is visible.
+        // Prod keeps false until the operator approves; staging leaves it on.
+        'ui_enabled' => (bool) env('CONTENT_AUTOPILOT_UI', true),
     ],
 
     // Open PageRank (by Keywords Everywhere) — global popularity rank + 0-10

@@ -262,11 +262,15 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
 
     // Content Autopilot — automatic content calendar (setup wizard renders on
     // the same page while no plan exists). Review page shows one topic's
-    // current article + SEO checks.
-    Route::view('/content', 'content.index')->middleware('feature:content')->name('content.index');
-    Route::get('/content/topics/{topic}', fn (string $topic) => view('content.review', ['topicId' => $topic]))
-        ->middleware('feature:content')
-        ->name('content.review');
+    // current article + SEO checks. Env-gated (CONTENT_AUTOPILOT_UI): the
+    // shared box-A docroot means code goes live before deploy decisions — the
+    // env flag, not code presence, decides where the feature is visible.
+    if (config('services.content_autopilot.ui_enabled')) {
+        Route::view('/content', 'content.index')->middleware('feature:content')->name('content.index');
+        Route::get('/content/topics/{topic}', fn (string $topic) => view('content.review', ['topicId' => $topic]))
+            ->middleware('feature:content')
+            ->name('content.review');
+    }
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
 
     Route::middleware('feature:ai_studio')->group(function (): void {

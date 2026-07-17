@@ -56,6 +56,11 @@
         <env name="MISTRAL_API_KEY" value=""/>
         <env name="DEEPSEEK_API_KEY" value=""/>
         <env name="IDEOGRAM_API_KEY" value=""/>
+        <!-- Spend breakers off by default in tests (prod .env now carries real
+             caps; the spend Redis key accumulates across runs in the pinned
+             test db). Tests that exercise a breaker set config() explicitly. -->
+        <env name="CONTENT_LLM_MONTHLY_CAP_USD" value=""/>
+        <env name="IDEOGRAM_MONTHLY_CAP_USD" value=""/>
         <!-- Same rule for the Site Explorer report providers (found again
              2026-07-14: a plain GET /backlinks in a test dispatched a REAL
              billed DataForSEO generation via QUEUE_CONNECTION=sync, because
