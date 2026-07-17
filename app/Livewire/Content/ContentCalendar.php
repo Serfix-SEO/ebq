@@ -411,27 +411,32 @@ class ContentCalendar extends Component
         $rows = $topics->values();
         $total = $rows->count();
 
+        // Light singular stemming so "name"/"names" don't split into two
+        // pillars (strip a trailing plural 's' on tokens > 4 chars).
+        $stem = static fn (string $t): string => (mb_strlen($t) > 4 && str_ends_with($t, 's') && ! str_ends_with($t, 'ss'))
+            ? mb_substr($t, 0, -1) : $t;
+
         // First pass: token frequency across all topics.
         $tokensPerRow = [];
         $freq = [];
         foreach ($rows as $i => $t) {
-            $tokens = array_values(array_unique(array_filter(array_diff(
+            $tokens = array_values(array_unique(array_map($stem, array_filter(array_diff(
                 preg_split('/[^a-z0-9]+/', mb_strtolower((string) $t->target_keyword), -1, PREG_SPLIT_NO_EMPTY) ?: [],
                 $stop
-            ), fn ($tok) => mb_strlen($tok) >= 3)));
+            ), fn ($tok) => mb_strlen($tok) >= 3))));
             $tokensPerRow[$i] = $tokens;
             foreach ($tokens as $token) {
                 $freq[$token] = ($freq[$token] ?? 0) + 1;
             }
         }
 
-        // Ubiquitous tokens (brand terms present in >55% of topics, e.g.
-        // "pubg", "name", "generator") DON'T distinguish pillars — they'd
-        // swallow everything into one cluster. Exclude them as pillar
+        // Ubiquitous tokens (brand terms in ≥45% of topics, e.g. "pubg",
+        // "name", "generator") DON'T distinguish pillars — they'd swallow
+        // everything into near-identical clusters. Exclude them as pillar
         // candidates so the map groups on the meaningful themes.
         $ubiquitous = [];
         foreach ($freq as $token => $count) {
-            if ($count > max(2, (int) ceil($total * 0.55))) {
+            if ($count > max(2, (int) floor($total * 0.45))) {
                 $ubiquitous[$token] = true;
             }
         }

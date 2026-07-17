@@ -276,7 +276,7 @@
                         'writing' => '#F59E0B', 'researching' => '#F59E0B', 'scoring' => '#F59E0B', 'revising' => '#F59E0B',
                         'failed' => '#EF4444', 'approved' => '#0EA5E9', 'suggested' => '#94A3B8'];
                     $siteLabel = \Illuminate\Support\Str::of((string) ($plan->website?->domain ?? 'Site'))
-                        ->before('.')->limit(13, '')->value();
+                        ->before('.')->limit(10, '…')->value();
                 @endphp
                 <div class="mt-3 overflow-x-auto">
                     <svg viewBox="0 0 940 660" class="w-full" style="min-width:660px" role="img" aria-label="{{ __('Content strategy map') }}">
@@ -311,9 +311,9 @@
                             <circle cx="{{ round($px,1) }}" cy="{{ round($py,1) }}" r="9" fill="{{ $color }}"/>
                             <text x="{{ round($px,1) }}" y="{{ round($py - 15,1) }}" font-size="13" font-weight="700" fill="{{ $color }}" text-anchor="middle">{{ $cluster['theme'] }}</text>
                         @endforeach
-                        <circle cx="{{ $cx }}" cy="{{ $cy }}" r="40" fill="#F26419"/>
-                        <text x="{{ $cx }}" y="{{ $cy - 1 }}" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">{{ $siteLabel }}</text>
-                        <text x="{{ $cx }}" y="{{ $cy + 15 }}" font-size="9" fill="#fff" text-anchor="middle" opacity="0.85">{{ __('your content') }}</text>
+                        <circle cx="{{ $cx }}" cy="{{ $cy }}" r="42" fill="#F26419"/>
+                        <text x="{{ $cx }}" y="{{ $cy - 1 }}" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">{{ $siteLabel }}</text>
+                        <text x="{{ $cx }}" y="{{ $cy + 14 }}" font-size="9" fill="#fff" text-anchor="middle" opacity="0.85">{{ __('your content') }}</text>
                     </svg>
                 </div>
             </div>
