@@ -10,6 +10,7 @@ use App\Services\OpenPageRankClient;
 use App\Services\ReportFreshnessGate;
 use App\Services\Reports\BacklinkSampleAggregator;
 use App\Services\Reports\ClientReportService;
+use App\Services\Reports\DataForSeoSpendMeter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -84,6 +85,47 @@ class GenerateWebsiteReport implements ShouldBeUnique, ShouldQueue
             Log::warning('GenerateWebsiteReport: DataForSEO not configured', ['domain' => $normalized]);
 
             return;
+        }
+
+        // Global monthly spend circuit-breaker — the single choke point for
+        // every dispatch site (analyze, resolve, self-heal, TTL refresh,
+        // keyword suggestions). Sandbox is mock/free → exempt. Strictly
+        // admin-only: every degraded path below renders existing, neutral
+        // client UI (cached report / the young-site partial flow) — no
+        // budget or limit copy anywhere. {@see DataForSeoSpendMeter}
+        if (! $sandbox && app(DataForSeoSpendMeter::class)->exhausted()) {
+            $existing = WebsiteReportSnapshot::forDomain($normalized, false);
+            if ($existing !== null && ! empty($existing->payload)) {
+                // TTL refresh / schema self-heal → keep serving the cached
+                // snapshot; it regenerates once the new month resets the meter.
+                return;
+            }
+
+            $attached = \App\Models\Website::query()
+                ->where('normalized_domain', $normalized)
+                ->exists();
+            if (! $attached) {
+                // Arbitrary-domain lookup → free-signal partial report
+                // (OPR/Moz/CC ranks/own link graph — the standard young-site
+                // flow; client sees a normal partial, nothing about budgets).
+                if ((bool) config('services.report.enrichment.enabled')) {
+                    WebsiteReportSnapshot::updateOrCreate(
+                        ['normalized_domain' => $storeKey],
+                        [
+                            'status' => 'enriching',
+                            'payload' => null,
+                            'enrichment_state' => ['stage' => 'bootstrap', 'started_at' => now()->toIso8601String()],
+                            'fetched_at' => now(),
+                        ],
+                    );
+                    EnrichEmptyReportJob::dispatch($normalized);
+                }
+                Log::info('GenerateWebsiteReport: spend cap reached — lookup served as partial', ['domain' => $normalized]);
+
+                return;
+            }
+            // Attached own site with no report yet → fall through and generate
+            // (core product promise; spend drift is bounded by signup rate).
         }
 
         $dfs->useSandbox($sandbox);
@@ -238,6 +280,10 @@ class GenerateWebsiteReport implements ShouldBeUnique, ShouldQueue
                 EnrichTopicalTrustJob::dispatch($normalized);
             }
         } catch (Throwable $e) {
+            // Calls made before the failure were still billed — meter them.
+            if (! $sandbox) {
+                app(DataForSeoSpendMeter::class)->add($dfs->totalCost());
+            }
             Log::warning('GenerateWebsiteReport: failed', [
                 'domain' => $normalized,
                 'message' => $e->getMessage(),
@@ -259,6 +305,9 @@ class GenerateWebsiteReport implements ShouldBeUnique, ShouldQueue
         if ($sandbox) {
             return;
         }
+
+        // Feed the monthly circuit-breaker with the REAL billed amount.
+        app(DataForSeoSpendMeter::class)->add($cost);
 
         $logger->log('site_explorer.generation', meta: [
             'domain' => $domain,

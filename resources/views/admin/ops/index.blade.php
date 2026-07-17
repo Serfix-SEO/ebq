@@ -27,6 +27,20 @@
             <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{ session('error') }}</div>
         @endif
 
+        {{-- DataForSEO monthly spend vs circuit-breaker cap (admin-only concept) --}}
+        @if (($dfsSpend['cap'] ?? null) !== null)
+            <div class="rounded-lg border px-4 py-3 text-sm
+                {{ $dfsSpend['exhausted'] ? 'border-rose-200 bg-rose-50 text-rose-800' : ($dfsSpend['near'] ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-600') }}">
+                <span class="font-semibold">DataForSEO spend this month:</span>
+                ${{ number_format($dfsSpend['spent'], 2) }} / ${{ number_format($dfsSpend['cap'], 2) }}
+                @if ($dfsSpend['exhausted'])
+                    — <span class="font-semibold">cap reached</span>: lookups serve free-signal partials, TTL refreshes paused, own-site first reports still generate. Raise <code class="text-xs">DATAFORSEO_MONTHLY_CAP_USD</code> to resume.
+                @elseif ($dfsSpend['near'])
+                    — approaching the cap (80%+).
+                @endif
+            </div>
+        @endif
+
         {{-- Queue depths --}}
         <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">

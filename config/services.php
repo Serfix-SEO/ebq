@@ -216,6 +216,17 @@ return [
         'labs_competitors_limit' => (int) env('DATAFORSEO_LABS_COMPETITORS_LIMIT', 300),
         'history_months' => (int) env('DATAFORSEO_HISTORY_MONTHS', 12),
         'timeout' => (int) env('DATAFORSEO_TIMEOUT_S', 60),
+        // Global monthly spend circuit-breaker (USD). When the month's real
+        // billed DataForSEO spend reaches this cap: arbitrary-domain lookups
+        // degrade to the free-signal partial-report path, TTL refreshes /
+        // schema self-heals serve the cached snapshot instead of regenerating,
+        // and OWN attached-site first reports still generate (core promise,
+        // bounded by signup rate). Strictly ADMIN-ONLY: clients see the normal
+        // partial report — no budget/limit copy anywhere. Null/0 = disabled.
+        // {@see \App\Services\Reports\DataForSeoSpendMeter}
+        'monthly_cap_usd' => env('DATAFORSEO_MONTHLY_CAP_USD') !== null
+            ? (float) env('DATAFORSEO_MONTHLY_CAP_USD')
+            : null,
     ],
 
     // Open PageRank (by Keywords Everywhere) — global popularity rank + 0-10

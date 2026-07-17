@@ -41,13 +41,36 @@ class SendFailedJobsAlert extends Command
             ->where('created_at', '<', now()->subDay())
             ->get(['id', 'normalized_domain', 'created_at']);
 
-        if ($failures === [] && $stuckPending->isEmpty()) {
+        // DataForSEO spend circuit-breaker warning (80% / 100% of the monthly
+        // cap). Runs every 15 min, so a cache flag limits each threshold to
+        // ONE digest line per day. Admin-only — clients never see spend state.
+        $spendLine = null;
+        $meter = app(\App\Services\Reports\DataForSeoSpendMeter::class);
+        if ($meter->nearCap()) {
+            $threshold = $meter->exhausted() ? '100' : '80';
+            $flag = 'dfs-spend-warned:'.now()->utc()->format('Y-m-d').':'.$threshold;
+            if (\Illuminate\Support\Facades\Cache::add($flag, true, now()->addDay())) {
+                $spendLine = sprintf(
+                    'DataForSEO spend: $%.2f of the $%.2f monthly cap%s',
+                    $meter->spent(), $meter->cap(),
+                    $meter->exhausted()
+                        ? ' — CAP REACHED: lookups now serve free-signal partials, TTL refreshes paused, own-site first reports still generate. Raise DATAFORSEO_MONTHLY_CAP_USD to resume.'
+                        : ' (80%+ warning).'
+                );
+            }
+        }
+
+        if ($failures === [] && $stuckPending->isEmpty() && $spendLine === null) {
             $this->info('Nothing to report.');
 
             return self::SUCCESS;
         }
 
         $lines = [];
+        if ($spendLine !== null) {
+            $lines[] = $spendLine;
+            $lines[] = '';
+        }
         if ($failures !== []) {
             $lines[] = count($failures).' queue job(s) failed permanently since the last digest:';
             $byJob = collect($failures)->groupBy('job');

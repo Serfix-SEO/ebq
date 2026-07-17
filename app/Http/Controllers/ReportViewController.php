@@ -116,6 +116,14 @@ class ReportViewController extends Controller
             now()->addDays(7),
             function () use ($dfs, $domain, $anchor, $sandbox) {
                 $dfs->useSandbox($sandbox);
+                $items = $dfs->backlinksForAnchor($domain, $anchor);
+
+                // Count the real billed cost toward the monthly circuit-breaker.
+                // Drill-downs stay ALLOWED over cap (plan-gated, ~$0.03, only on
+                // already-generated reports) but their spend must be visible.
+                if (! $sandbox) {
+                    app(\App\Services\Reports\DataForSeoSpendMeter::class)->add($dfs->totalCost());
+                }
 
                 return array_map(fn ($r) => [
                     'url_from' => (string) ($r['url_from'] ?? ''),
@@ -123,7 +131,7 @@ class ReportViewController extends Controller
                     'anchor' => (string) ($r['anchor'] ?? ''),
                     'dofollow' => (bool) ($r['dofollow'] ?? false),
                     'rank' => is_numeric($r['domain_from_rank'] ?? null) ? (int) $r['domain_from_rank'] : null,
-                ], array_slice($dfs->backlinksForAnchor($domain, $anchor), 0, 100));
+                ], array_slice($items, 0, 100));
             },
         );
 

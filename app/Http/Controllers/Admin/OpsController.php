@@ -97,12 +97,21 @@ class OpsController extends Controller
             }
         }
 
+        // ─── DataForSEO monthly spend vs circuit-breaker cap ────────────
+        $spendMeter = app(\App\Services\Reports\DataForSeoSpendMeter::class);
+
         return view('admin.ops.index', [
             'failedGroups' => $failedGroups,
             'failedTotal' => $failedRows->count(),
             'stuckSites' => $stuckSites,
             'queues' => $queues,
             'alertBufferSize' => count(FailedJobAlertBuffer::peek()),
+            'dfsSpend' => [
+                'spent' => $spendMeter->spent(),
+                'cap' => $spendMeter->cap(),
+                'near' => $spendMeter->nearCap(),
+                'exhausted' => $spendMeter->exhausted(),
+            ],
         ]);
     }
 
