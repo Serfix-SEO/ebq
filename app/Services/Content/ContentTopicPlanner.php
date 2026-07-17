@@ -65,8 +65,8 @@ class ContentTopicPlanner
             if (count($created) >= $count) {
                 break;
             }
-            $title = trim((string) ($candidate['title'] ?? ''));
-            $keyword = mb_strtolower(trim((string) ($candidate['target_keyword'] ?? '')));
+            $title = self::freshenYears(trim((string) ($candidate['title'] ?? '')));
+            $keyword = self::freshenYears(mb_strtolower(trim((string) ($candidate['target_keyword'] ?? ''))));
             if ($title === '' || $keyword === '') {
                 continue;
             }
@@ -189,6 +189,8 @@ class ContentTopicPlanner
 
         $language = $plan->language ?: 'en';
         $domain = (string) $website->domain;
+        $today = now()->toFormattedDateString();
+        $currentYear = now()->year;
 
         $system = 'You are an SEO content strategist. Respond with valid JSON only.';
         $user = <<<PROMPT
@@ -208,6 +210,7 @@ class ContentTopicPlanner
         Rules:
         - Prefer topics targeting the real queries above (source "gsc_gap"); fill remaining slots with adjacent topics a customer would search (source "llm").
         - One clear target keyword per topic, natural article title (not clickbait, no year numbers unless essential).
+        - TODAY'S DATE is {$today}. If a title genuinely needs a year, it MUST be {$currentYear} — never an earlier year.
         - 3-6 secondary keywords per topic.
         - Write titles in language "{$language}".
         - Never invent topics about things they do not offer.
@@ -270,6 +273,23 @@ class ContentTopicPlanner
         }
 
         return $dates;
+    }
+
+    /**
+     * Replace stale years with the current one. LLMs leak their training
+     * cutoff ("Best X in 2024" generated in 2026 — owner QA find). Only
+     * recent-past years are rewritten; older ones (2019 and earlier) are
+     * treated as deliberate historical references.
+     */
+    public static function freshenYears(string $text): string
+    {
+        $current = now()->year;
+
+        return preg_replace_callback('/\b(20[2-9][0-9])\b/', function ($m) use ($current) {
+            $year = (int) $m[1];
+
+            return ($year >= 2020 && $year < $current) ? (string) $current : $m[1];
+        }, $text) ?? $text;
     }
 
     /** Token-overlap title similarity (same heuristic as the scorer). */

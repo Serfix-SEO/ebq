@@ -31,6 +31,8 @@ class ContentCalendar extends Component
 
     // Wizard state (shown while no plan exists)
     public int $wizardStep = 1;
+    public bool $analyzing = false;
+    public bool $analyzed = false;
     public string $businessDescription = '';
     public string $sellInput = '';
     public string $dontSellInput = '';
@@ -64,27 +66,59 @@ class ContentCalendar extends Component
 
     // ── Wizard ──────────────────────────────────────────────────────────
 
-    /** Pre-fill the business description from data we already hold. */
+    /**
+     * Arm the deferred site analysis (wire:init) — the LLM extraction takes
+     * seconds, so it must not block the first paint.
+     */
     private function prefillWizard(): void
     {
+        $this->analyzing = $this->website() !== null && $this->plan() === null;
+        $this->analyzed = false;
+    }
+
+    /**
+     * Auto-detect the business profile from crawl data (SiteProfileExtractor:
+     * one cached LLM call over the site's own pages). Owner QA 2026-07-17:
+     * offerings + description must be auto-detected, manual entry stays as
+     * the override. Falls back to the homepage meta description.
+     */
+    public function analyzeSite(): void
+    {
+        $this->analyzing = false;
+        $this->analyzed = true;
+
         $website = $this->website();
-        if ($website === null || $this->plan() !== null || $this->businessDescription !== '') {
+        if ($website === null || $this->plan() !== null) {
             return;
         }
 
-        try {
-            if ($website->crawl_site_id) {
-                $home = DB::table('website_pages')
-                    ->where('crawl_site_id', $website->crawl_site_id)
-                    ->whereNotNull('meta_description')
-                    ->where('meta_description', '!=', '')
-                    ->orderBy('url')
-                    ->limit(1)
-                    ->value('meta_description');
-                $this->businessDescription = (string) ($home ?? '');
+        $profile = app(\App\Services\Content\SiteProfileExtractor::class)->extract($website);
+
+        if ($this->businessDescription === '') {
+            $this->businessDescription = (string) ($profile['description'] ?? '');
+        }
+        if ($this->sellInput === '' && $profile['sell'] !== []) {
+            $this->sellInput = implode("\n", $profile['sell']);
+        }
+        if ($this->dontSellInput === '' && $profile['dont_sell'] !== []) {
+            $this->dontSellInput = implode("\n", $profile['dont_sell']);
+        }
+
+        // Fallback: homepage meta description beats an empty box.
+        if ($this->businessDescription === '') {
+            try {
+                if ($website->crawl_site_id) {
+                    $this->businessDescription = (string) (DB::table('website_pages')
+                        ->where('crawl_site_id', $website->crawl_site_id)
+                        ->whereNotNull('meta_description')
+                        ->where('meta_description', '!=', '')
+                        ->orderBy('url')
+                        ->limit(1)
+                        ->value('meta_description') ?? '');
+                }
+            } catch (\Throwable) {
+                // No crawl data yet — the client types it.
             }
-        } catch (\Throwable) {
-            // No crawl data yet — the client types it.
         }
     }
 

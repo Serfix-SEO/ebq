@@ -411,6 +411,8 @@ class ContentArticleProducer
             $rules[] = 'Cite at least one authoritative external source with a link.';
         }
         $rules[] = 'Article length target: about '.$plan->article_length.' words.';
+        $rules[] = "Today's date is ".now()->toFormattedDateString().'. Any year you mention must be '
+            .now()->year.' unless you are referring to a genuinely historical fact.';
         if (trim((string) $plan->custom_instructions) !== '') {
             $rules[] = trim((string) $plan->custom_instructions);
         }

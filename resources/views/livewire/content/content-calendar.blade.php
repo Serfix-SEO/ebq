@@ -27,8 +27,17 @@
             @enderror
 
             @if ($wizardStep === 1)
+                <div @if($analyzing) wire:init="analyzeSite" @endif>
                 <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">{{ __('Tell us about your business') }}</h2>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('We pre-filled what we could from your website. Adjust it so every article fits your business perfectly.') }}</p>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('We analyzed your website and filled this in for you. Adjust anything so every article fits your business perfectly.') }}</p>
+
+                @if ($analyzing)
+                    <div class="mt-5 flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-200">
+                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                        {{ __('Analyzing your website…') }}
+                    </div>
+                @endif
+                </div>
 
                 <label class="mt-5 block text-sm font-medium text-slate-700 dark:text-slate-300" for="ca-desc">{{ __('What does your business do?') }}</label>
                 <textarea id="ca-desc" wire:model="businessDescription" rows="4" maxlength="1000"
