@@ -81,6 +81,23 @@ fixture-exact) + `tests/Feature/Content/ContentAutopilotPipelineTest.php`
 reaper, claim rules, spend-cap gate). Seed `PlanSeeder`; no Serper key in
 tests exercises the brief-less degradation path deliberately.
 
+## Staging QA (2026-07-17, real DeepSeek + real GSC topics)
+
+3 articles end-to-end on pubgnamegenerator.net: two scored **87/100** (1409 and
+1866 words, 0 em-dashes, 1-2 minor style flags, ~60-90s each); one broad-keyword
+topic parks at 67-69 (v4-pro overwrites 3000+ words vs target → word_count check
+fails → below-target score; floor + review-first gating handled it as designed).
+Cost ≈ $0.06–0.10 per article. Landmines encoded in code/comments:
+- **`deepseek-chat` alias resolves to v4-FLASH** which truncates the 16k-token
+  article JSON (`llm_parse_failed`) — write/revise default is hard-pinned to
+  `deepseek-v4-pro` (`ContentAutopilotConfig::modelFor`), admin pin wins.
+- The reviser must be HANDED the real site-URL list or it invents internal
+  links (scorer rejects them) — same "passed-but-dropped" class as writer v25.
+- Length rules must be bidirectional (expand under / tighten over) — a
+  one-sided "never shorten" made v4-pro balloon 1500→3046 words.
+- Open Phase-2 item: length adherence on broad keywords (section budget or
+  band widening for hub topics).
+
 ## Env (staging QA values 2026-07-17)
 
 Staging `.env` gained real `DEEPSEEK_API_KEY`/`MISTRAL_API_KEY` (copied from
