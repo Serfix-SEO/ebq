@@ -106,8 +106,11 @@ class PlanSeeder extends Seeder
                 'trial_days'         => 0,
                 'max_websites'       => 3,
                 'max_seats'          => 1,
+                // 20 per 24h (was 20/1h — an hourly window silently allowed
+                // 480/day, 7× pro's daily cap on the cheapest paid plan; each
+                // fresh-domain lookup is a real DataForSEO bill).
                 'site_explorer_limit'        => 20,
-                'site_explorer_window_hours' => 1,
+                'site_explorer_window_hours' => 24,
                 'extra_seat_price_usd' => 10,
                 'max_crawl_pages'    => 100000,
                 'display_order'      => 2,
