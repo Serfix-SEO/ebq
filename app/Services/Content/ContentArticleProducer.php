@@ -82,7 +82,9 @@ class ContentArticleProducer
             'additional_keywords' => (array) ($topic->secondary_keywords ?? []),
             'language' => strtolower((string) ($plan->language ?: 'en')),
             'country' => strtoupper((string) ($plan->country ?: '')),
-            'custom_prompt' => $this->templateInstructions($plan),
+            'custom_prompt' => $this->templateInstructions($plan)
+                .(($urls = array_slice((array) ($context['site_urls'] ?? []), 0, 15)) === [] ? ''
+                    : "\nInternal pages you may link to (2-3, exact URLs only):\n".implode("\n", $urls)),
             '__user_id' => $website->user_id,
         ];
         if (! empty($writeModel['model'])) {
@@ -176,6 +178,15 @@ class ContentArticleProducer
 
     // ── internals ───────────────────────────────────────────────────────
 
+    /**
+     * Synthetic section titles the writer's strict mode fabricates for
+     * edit/replace ops — never render these as headings.
+     */
+    private const SYNTHETIC_TITLES = [
+        'new section', 'edit existing section', 'replace post content',
+        'full article replacement', 'article', 'content',
+    ];
+
     /** Concatenate draft sections into article HTML (H2 per section). */
     private function assembleHtml(array $draft): string
     {
@@ -190,14 +201,52 @@ class ContentArticleProducer
                 continue;
             }
             // Sections may already open with their own heading; only add one
-            // when missing so we never double-head.
-            if ($title !== '' && ! preg_match('/^\s*<h[23]/i', $sectionHtml)) {
+            // when missing — and never render strict-mode synthetic titles.
+            if ($title !== ''
+                && ! in_array(mb_strtolower($title), self::SYNTHETIC_TITLES, true)
+                && ! preg_match('/^\s*<h[123]/i', $sectionHtml)) {
                 $parts[] = '<h2>'.e($title).'</h2>';
             }
             $parts[] = $sectionHtml;
         }
 
-        return implode("\n", $parts);
+        $html = implode("\n", $parts);
+
+        // The page H1 is rendered by the publish target — strip a leading
+        // in-body <h1>/<h2> that merely repeats the headline.
+        $h1 = mb_strtolower(trim(strip_tags((string) ($draft['h1'] ?? ''))));
+        if ($h1 !== '' && preg_match('/^\s*<h[12]\b[^>]*>(.*?)<\/h[12]>/is', $html, $m)
+            && mb_strtolower(trim(strip_tags($m[1]))) === $h1) {
+            $html = (string) preg_replace('/^\s*<h[12]\b[^>]*>.*?<\/h[12]>/is', '', $html, 1);
+        }
+
+        return $html;
+    }
+
+    /**
+     * Mechanical structure fixes applied to EVERY version (write and revise
+     * paths alike): drop a leading heading that repeats the H1, and promote
+     * pre-first-H2 orphan H3s to H2 so the hierarchy is valid.
+     */
+    private function normalizeStructure(string $html, string $h1): string
+    {
+        $h1Lower = mb_strtolower(trim($h1));
+        if ($h1Lower !== '' && preg_match('/^\s*<h[12]\b[^>]*>(.*?)<\/h[12]>/is', $html, $m)
+            && mb_strtolower(trim(strip_tags($m[1]))) === $h1Lower) {
+            $html = (string) preg_replace('/^\s*<h[12]\b[^>]*>.*?<\/h[12]>/is', '', $html, 1);
+        }
+
+        // Promote every h3 that appears before the first h2.
+        while (true) {
+            $firstH2 = stripos($html, '<h2');
+            $firstH3 = stripos($html, '<h3');
+            if ($firstH3 === false || ($firstH2 !== false && $firstH2 < $firstH3)) {
+                break;
+            }
+            $html = preg_replace('/<h3\b([^>]*)>(.*?)<\/h3>/is', '<h2$1>$2</h2>', $html, 1) ?? $html;
+        }
+
+        return $html;
     }
 
     /** Score + persist as the next version, folding in the style lint. */
@@ -205,7 +254,11 @@ class ContentArticleProducer
     {
         $topic->enterStage(ContentTopic::STATUS_SCORING);
 
-        $html = (string) ($attributes['html'] ?? '');
+        $attributes['html'] = $this->normalizeStructure(
+            (string) ($attributes['html'] ?? ''),
+            (string) ($attributes['h1'] ?? '')
+        );
+        $html = (string) $attributes['html'];
         $styleIssues = $this->humanizer->lint($html);
         $context['style_issues'] = $styleIssues;
 
@@ -246,13 +299,25 @@ class ContentArticleProducer
         $issueList = implode("\n- ", array_filter($issues));
 
         $system = 'You are an expert SEO editor. Fix ONLY the listed problems in the article. '
-            .'Keep everything that is not mentioned unchanged. Respond with valid JSON only: '
+            .'Keep everything that is not mentioned unchanged. NEVER shorten the article: when a '
+            .'problem asks for more length or expanded sections, ADD substantive new paragraphs '
+            .'with concrete detail. Target length: about '.$plan->article_length.' words. '
+            .'Respond with valid JSON only: '
             .'{"html": "<full corrected article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}. '
             ."\n".$this->humanizer->promptRules();
+
+        // Real, existing pages the model may link to — without this list the
+        // reviser cannot satisfy the internal-link checks (it would invent
+        // URLs, which the scorer rejects).
+        $linkTargets = array_slice((array) ($this->scorerContext($topic, $plan, $topic->website)['site_urls'] ?? []), 0, 15);
+        $linkBlock = $linkTargets === [] ? ''
+            : "INTERNAL PAGES YOU MAY LINK TO (use 2-3 naturally, exact URLs only):\n"
+                .implode("\n", $linkTargets)."\n\n";
 
         $user = "TARGET KEYWORD: {$topic->target_keyword}\n"
             .'LANGUAGE: '.($plan->language ?: 'en')."\n"
             ."PROBLEMS TO FIX:\n- {$issueList}\n\n"
+            .$linkBlock
             ."CURRENT META TITLE: {$article->meta_title}\n"
             ."CURRENT META DESCRIPTION: {$article->meta_description}\n"
             ."CURRENT H1: {$article->h1}\n\n"

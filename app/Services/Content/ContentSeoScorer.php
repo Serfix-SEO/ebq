@@ -51,6 +51,24 @@ class ContentSeoScorer
 
         // ── Keyword placement ───────────────────────────────────────────
         $kwIn = fn (string $haystack): bool => $keyword !== '' && str_contains(mb_strtolower($haystack), $keyword);
+        // Token-complete match: every keyword word present regardless of
+        // order ("free pubg name generator" ≈ "pubg name generator free").
+        // Used where natural word order matters more than the exact phrase
+        // (meta description, headings) — title/H1/body stay verbatim-strict.
+        $kwTokens = array_filter(preg_split('/\s+/', $keyword) ?: []);
+        $kwLoose = function (string $haystack) use ($kwTokens): bool {
+            if ($kwTokens === []) {
+                return false;
+            }
+            $lower = mb_strtolower($haystack);
+            foreach ($kwTokens as $token) {
+                if (! str_contains($lower, $token)) {
+                    return false;
+                }
+            }
+
+            return true;
+        };
 
         $add('kw_in_meta_title', 10, $kwIn($metaTitle),
             "Include the exact keyword \"{$keyword}\" in the meta title.");
@@ -60,8 +78,8 @@ class ContentSeoScorer
             "Include the exact keyword \"{$keyword}\" in the H1.");
         $add('h1_length', 2, $h1 !== '' && mb_strlen($h1) <= 70,
             'Shorten the H1 to 70 characters or fewer.');
-        $add('kw_in_meta_description', 6, $kwIn($metaDescription),
-            "Include the exact keyword \"{$keyword}\" in the meta description.");
+        $add('kw_in_meta_description', 6, $kwIn($metaDescription) || $kwLoose($metaDescription),
+            "Include the keyword \"{$keyword}\" (all its words) in the meta description.");
         $add('meta_description_length', 4, mb_strlen($metaDescription) >= 120 && mb_strlen($metaDescription) <= 160,
             'Rewrite the meta description to 120-160 characters (currently '.mb_strlen($metaDescription).').');
         $add('kw_in_first_words', 6, $kwIn(implode(' ', array_slice(explode(' ', $text), 0, 100))),
@@ -79,7 +97,7 @@ class ContentSeoScorer
             "Adjust length to roughly {$targetWords} words (currently {$wordCount}). Expand thin sections rather than padding.");
         $add('h2_count', 6, count($h2s) >= 4,
             'Structure the article with at least 4 H2 sections.');
-        $add('kw_in_a_heading', 4, $keyword !== '' && (bool) array_filter($h2s, $kwIn),
+        $add('kw_in_a_heading', 4, $keyword !== '' && (bool) array_filter($h2s, fn ($h) => $kwIn($h) || $kwLoose($h)),
             "Use the keyword \"{$keyword}\" naturally in at least one H2 heading.");
         $add('no_orphan_h3', 2, ! $h3sOrphaned,
             'Every H3 must sit under an H2 parent; fix the heading hierarchy.');

@@ -43,13 +43,17 @@ class ContentAutopilotConfig
             return ['provider' => (string) $value['provider'], 'model' => (string) $value['model']];
         }
 
-        // Unset => platform default provider + its current model. The write
-        // stage prefers DeepSeek when configured (quality per $; thinking mode).
+        // Unset => the write/revise stages prefer DeepSeek v4-PRO when the
+        // key is configured (operator decision 2026-07-17): the -flash tier
+        // (what the `deepseek-chat` alias resolves to) truncates the 16k-token
+        // article JSON → llm_parse_failed, observed live on staging. Pro also
+        // scored 87 vs flash-era 66-71 on identical topics. An explicit admin
+        // stage pin (checked above) always wins.
         if (in_array($stage, ['write', 'revise'], true)
             && LlmProviderConfig::isConfigured(LlmProviderConfig::PROVIDER_DEEPSEEK)) {
             return [
                 'provider' => LlmProviderConfig::PROVIDER_DEEPSEEK,
-                'model' => AiModelConfig::currentModel(LlmProviderConfig::PROVIDER_DEEPSEEK),
+                'model' => 'deepseek-v4-pro',
             ];
         }
 
