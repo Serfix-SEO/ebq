@@ -158,6 +158,7 @@ complete as of 2026-07-07 — admin panel stays English-only.
 | [reference/configuration.md](./reference/configuration.md) | All **16 `config/*.php`** + consolidated `.env` knobs (secrets marked) |
 | [reference/mail-and-wiring.md](./reference/mail-and-wiring.md) | The 9 mailables + Postal transport, providers, observers/listeners, container bindings |
 | [reference/testing.md](./reference/testing.md) | The test suite + **⛔ safe-test-running** (the sqlite guard / prod-wipe story) |
+| [reference/staging.md](./reference/staging.md) | The **staging box** (10.0.0.4, staging.serfix.io): isolated full-stack QA env, deploy via `scripts/deploy-staging.sh`, isolation guarantees |
 
 > Co-located non-EBQ apps share Box A: **Postal** (mail), **Jitsi/Prosody** (meet.ebq.io
 > video; booking app in `/var/www/marketing` — memory `meet-video-bookings`). Detail in
@@ -267,6 +268,18 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-17 (staging environment + cost/spend controls)** — Built the isolated
+  **staging box** (`10.0.0.4`, cx33, staging.serfix.io via box-A reverse proxy +
+  basic auth; own MariaDB/Redis, log mail, sandbox DataForSEO, no fleet/Stripe
+  keys) — [reference/staging.md](./reference/staging.md), deploy via
+  `scripts/deploy-staging.sh`; Horizon gained a `staging` env. Same day: link
+  crawler made perpetually self-feeding (recrawl requeue + organic expansion +
+  graph-backfill seed — recrawl was silently dead), DataForSEO report cost cut
+  ~30% (`BacklinkSampleAggregator` complete-profile local aggregation + Labs
+  competitors row cap 300), **global monthly spend circuit-breaker**
+  (`DataForSeoSpendMeter`, admin-only degradation), solo explorer window fixed
+  1h→24h, Stripe unknown-price→NULL interval fix + coverage, full test suite
+  de-staled (793 green). Docs: [reports/client-report.md](./reports/client-report.md).
 - **2026-07-16 (Trust Score / Citation Score — own authority metrics)** — New
   0–100 TF/CF-analogue scores computed deterministically from data already in
   the report payload (zero new provider cost). Pure

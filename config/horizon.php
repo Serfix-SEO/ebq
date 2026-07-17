@@ -289,6 +289,14 @@ return [
         'worker-ephemeral' => [
             'worker-crawl' => $crawlPool,
         ],
+        // Staging box (10.0.0.4, APP_ENV=staging): the WHOLE pipeline on one
+        // small box so QA covers every queue — web + crawl + heavy, tiny pools.
+        // Its own Redis/DB; never shares prod queues.
+        'staging' => [
+            'web' => array_replace($webPool, ['maxProcesses' => 2]),
+            'worker-crawl' => array_replace($crawlPool, ['maxProcesses' => 2]),
+            'worker-heavy' => array_replace($heavyPool, ['maxProcesses' => 1]),
+        ],
     ],
 
     /*
