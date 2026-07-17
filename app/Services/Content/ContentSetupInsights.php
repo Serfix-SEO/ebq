@@ -75,10 +75,14 @@ class ContentSetupInsights
         Cache::put($lock, 1, now()->addMinutes(30));
 
         $domain = $website->normalized_domain ?: $website->domain;
+        // FORCE the paid attempt: a "partial" / young-site snapshot may already
+        // exist from the free-feed path, which the freshness gate treats as
+        // fresh and would skip. The wizard explicitly wants the deeper
+        // (backlink/competitor) data, so bypass the gate this one time.
         // sandbox for admins (+ forced on staging via env); non-admins bill
         // real spend, which the report pipeline meters. One-time per site.
         $sandbox = (bool) $website->user?->is_admin;
-        GenerateWebsiteReport::dispatch($domain, false, $sandbox);
+        GenerateWebsiteReport::dispatch($domain, true, $sandbox);
     }
 
     /** Clear the cache so a fresh snapshot is re-read (called after generation). */
