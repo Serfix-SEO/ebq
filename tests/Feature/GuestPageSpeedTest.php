@@ -4,9 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\RunGuestPageSpeedStrategy;
 use App\Models\GuestPageSpeed;
-use App\Models\Lead;
 use App\Support\Audit\SafeHttpGuard;
-use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -34,15 +32,6 @@ class GuestPageSpeedTest extends TestCase
         parent::tearDown();
     }
 
-    private function cookiesFrom($response): array
-    {
-        $out = [];
-        foreach ($response->headers->getCookies() as $cookie) {
-            $out[$cookie->getName()] = $cookie->getValue();
-        }
-
-        return $out;
-    }
 
     public function test_tool_pages_load(): void
     {
@@ -52,11 +41,17 @@ class GuestPageSpeedTest extends TestCase
 
     public function test_url_is_required(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         $this->postJson(route('guest-pagespeed.store'), ['url' => ''])->assertStatus(422);
     }
 
     public function test_first_test_is_free_shown_on_screen_and_queued(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         Queue::fake();
         $guard = Mockery::mock(SafeHttpGuard::class);
         $guard->shouldReceive('check')->andReturn(['ok' => true]);
@@ -73,41 +68,42 @@ class GuestPageSpeedTest extends TestCase
 
     public function test_unconfigured_lighthouse_is_handled(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         config(['services.lighthouse.url' => '', 'services.lighthouse.key' => '']);
         $this->postJson(route('guest-pagespeed.store'), ['url' => 'https://a.com/p'])->assertStatus(503);
     }
 
     /**
-     * Regression test (found + fixed 2026-07-06, infra/guest-tools/README.md
-     * §Gotchas): the 2nd-run (email-gated) lead capture used to call
-     * Lead::capture() with no `source` arg, so it silently fell back to
-     * SOURCE_GUEST_AUDIT — PageSpeed funnel attribution was lost.
+     * The old email-gated 2nd run (and its Lead::capture) was replaced by the
+     * account gate: anonymous submits get the signup teaser (202, no row, no
+     * job); signed-in users run every test frictionless — no email step, no
+     * lead rows.
      */
-    public function test_second_run_lead_is_tagged_with_the_pagespeed_source(): void
+    public function test_account_gate_anonymous_teaser_and_authed_frictionless(): void
     {
         Queue::fake();
-        $this->disableCookieEncryption();
-        $this->withoutMiddleware(EncryptCookies::class);
-        $this->withCredentials();
         $guard = Mockery::mock(SafeHttpGuard::class);
         $guard->shouldReceive('check')->andReturn(['ok' => true]);
         $this->app->instance(SafeHttpGuard::class, $guard);
 
-        // 1st run — free, sets the counter cookie.
-        $r1 = $this->postJson(route('guest-pagespeed.store'), ['url' => 'a.com/p']);
-        $r1->assertStatus(202);
-        $cookies = $this->cookiesFrom($r1);
+        // Anonymous → teaser only: no row, no jobs.
+        $this->postJson(route('guest-pagespeed.store'), ['url' => 'a.com/p'])
+            ->assertStatus(202)
+            ->assertJsonMissingPath('token');
+        $this->assertDatabaseCount('guest_page_speeds', 0);
+        Queue::assertNothingPushed();
 
-        // 2nd run — email-gated, captures the lead.
-        $r2 = $this->withCookies($cookies)->postJson(route('guest-pagespeed.store'), [
-            'url' => 'a.com/p2', 'name' => 'Jane Doe', 'email' => 'pagespeed-lead@example.com',
-        ]);
-        $r2->assertStatus(202)->assertJsonPath('emailed', true);
-
-        $this->assertDatabaseHas('leads', [
-            'email' => 'pagespeed-lead@example.com',
-            'source' => Lead::SOURCE_GUEST_PAGESPEED,
-        ]);
+        // Signed-in → consecutive runs both free + on screen, no email gate.
+        $this->actingAs(\App\Models\User::factory()->create());
+        foreach (['a.com/p', 'a.com/p2'] as $url) {
+            $this->postJson(route('guest-pagespeed.store'), ['url' => $url])
+                ->assertStatus(202)
+                ->assertJsonPath('emailed', false);
+        }
+        Queue::assertPushed(RunGuestPageSpeedStrategy::class, 4); // 2 runs × (mobile+desktop)
+        $this->assertDatabaseCount('leads', 0);
     }
 
     // NOTE: the per-browser progressive gate (1st free → 2nd email → 3rd signup)

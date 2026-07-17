@@ -33,11 +33,17 @@ class GuestRankCheckTest extends TestCase
 
     public function test_keyword_and_domain_are_required(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         $this->postJson(route('guest-rank.store'), ['keyword' => '', 'domain' => ''])->assertStatus(422);
     }
 
     public function test_a_non_domain_is_rejected(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         $this->postJson(route('guest-rank.store'), ['keyword' => 'seo tools', 'domain' => 'notadomain'])
             ->assertStatus(422)
             ->assertJsonValidationErrors('domain');
@@ -45,6 +51,9 @@ class GuestRankCheckTest extends TestCase
 
     public function test_unconfigured_serper_is_handled(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         config(['services.serper.key' => '']);
         $this->postJson(route('guest-rank.store'), ['keyword' => 'seo tools', 'domain' => 'example.com'])
             ->assertStatus(503);
@@ -52,6 +61,9 @@ class GuestRankCheckTest extends TestCase
 
     public function test_first_check_is_free_shown_on_screen_and_queued(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         Queue::fake();
 
         $r = $this->postJson(route('guest-rank.store'), [

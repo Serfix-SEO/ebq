@@ -19,7 +19,7 @@ class FeaturesPageTest extends TestCase
             ->assertSee('Cross-signal insights')
             ->assertSee('Rank tracking')
             ->assertSee('Anomaly alerts')
-            ->assertSee('Page audits')
+            ->assertSee('Site audits')
             ->assertSee('Backlinks')
             ->assertSee('Reporting')
             ->assertSee('Integrations');
@@ -44,7 +44,7 @@ class FeaturesPageTest extends TestCase
     {
         $this->get(route('features'))
             ->assertOk()
-            ->assertSee('Surface insights where editors write.')
+            ->assertSee('A full Serfix HQ inside wp-admin.')
             ->assertDontSee('/wordpress/plugin.zip', escape: false);
     }
 

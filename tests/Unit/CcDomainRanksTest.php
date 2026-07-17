@@ -17,7 +17,9 @@ class CcDomainRanksTest extends TestCase
     {
         parent::setUp();
         $this->db = sys_get_temp_dir().'/cc-ranks-test-'.getmypid().'.sqlite';
-        @unlink($this->db);
+        if (file_exists($this->db)) {
+            unlink($this->db);
+        }
 
         $pdo = new \PDO('sqlite:'.$this->db);
         $pdo->exec('CREATE TABLE ranks(domain TEXT PRIMARY KEY, harmonic INTEGER NOT NULL, pagerank INTEGER NOT NULL) WITHOUT ROWID');
@@ -31,7 +33,9 @@ class CcDomainRanksTest extends TestCase
 
     protected function tearDown(): void
     {
-        @unlink($this->db);
+        if (file_exists($this->db)) {
+            unlink($this->db);
+        }
         parent::tearDown();
     }
 

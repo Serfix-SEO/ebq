@@ -3,13 +3,12 @@
 namespace Tests\Unit;
 
 use App\Models\CrawlSite;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class CrawlSiteNormalizeDomainTest extends TestCase
 {
-    /**
-     * @dataProvider domainCases
-     */
+    #[DataProvider('domainCases')]
     public function test_normalize_domain_collapses_variants(string $input, string $expected): void
     {
         $this->assertSame($expected, CrawlSite::normalizeDomain($input));

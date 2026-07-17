@@ -103,6 +103,7 @@ class BacklinkToxicityTest extends TestCase
 
         $dfs = \Mockery::mock(\App\Services\DataForSeoBacklinkClient::class);
         $dfs->shouldReceive('useSandbox')->andReturnSelf();
+        $dfs->shouldReceive('totalCost')->andReturn(0.03); // metered by the spend circuit-breaker
         $dfs->shouldReceive('backlinksForAnchor')->once()->andReturn([
             ['url_from' => 'https://spam-seller.site/p1', 'url_to' => 'https://victim.test/a', 'anchor' => 'TG @SEO_LINKK_ORDER – SEO BACKLINKS, HOMEPAGE LINKS, CROSSLINKS', 'dofollow' => false, 'domain_from_rank' => 3],
         ]);

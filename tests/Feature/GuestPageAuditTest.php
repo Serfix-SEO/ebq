@@ -135,6 +135,9 @@ class GuestPageAuditTest extends TestCase
 
     public function test_store_endpoint_persists_chosen_country(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         Queue::fake();
 
         $this->postJson(route('guest-audit.store'), [
@@ -148,6 +151,9 @@ class GuestPageAuditTest extends TestCase
 
     public function test_store_endpoint_rejects_invalid_country(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         Queue::fake();
 
         $this->postJson(route('guest-audit.store'), [
@@ -159,55 +165,38 @@ class GuestPageAuditTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    /** Carry response Set-Cookie values into the next request (they're encrypted; the middleware round-trips them). */
-    private function cookiesFrom($response): array
-    {
-        $out = [];
-        foreach ($response->headers->getCookies() as $cookie) {
-            $out[$cookie->getName()] = $cookie->getValue();
-        }
 
-        return $out;
-    }
-
-    public function test_progressive_gate_first_free_second_email_third_signup(): void
+    /**
+     * The old per-browser progressive gate (1st free → 2nd email → 3rd signup)
+     * was replaced by the account gate: anonymous submits short-circuit to the
+     * signup teaser (202, nothing persisted, nothing queued), signed-in users
+     * run every audit frictionless — no email step, results always on screen.
+     */
+    public function test_account_gate_anonymous_teaser_and_authed_frictionless(): void
     {
         Queue::fake();
-        // Plaintext counter cookie end-to-end so the round-trip is deterministic:
-        // disable the harness's outgoing encryption AND the decrypting middleware,
-        // and send credentials so JSON requests actually include cookies.
-        $this->disableCookieEncryption();
-        $this->withoutMiddleware(\Illuminate\Cookie\Middleware\EncryptCookies::class);
-        $this->withCredentials();
         $guard = Mockery::mock(SafeHttpGuard::class);
         $guard->shouldReceive('check')->andReturn(['ok' => true]);
         $this->app->instance(SafeHttpGuard::class, $guard);
 
-        // 1st audit — free, no email, queued. Sets the counter cookie.
-        $r1 = $this->postJson(route('guest-audit.store'), ['url' => 'a.com/p', 'keyword' => 'best seo tools']);
-        $r1->assertStatus(202)->assertJsonMissing(['emailed' => true]);
-        $cookies = $this->cookiesFrom($r1);
-        Queue::assertPushed(RunGuestPageAudit::class, 1);
+        // Anonymous → teaser only: no row, no job, even with a valid payload.
+        $this->postJson(route('guest-audit.store'), ['url' => 'a.com/p', 'keyword' => 'best seo tools'])
+            ->assertStatus(202)
+            ->assertJsonStructure(['results_url'])
+            ->assertJsonMissingPath('token');
+        $this->assertDatabaseCount('guest_page_audits', 0);
+        Queue::assertNothingPushed();
 
-        // 2nd audit without email — gated, asks for email, no audit queued.
-        $r2 = $this->withCookies($cookies)->postJson(route('guest-audit.store'), ['url' => 'a.com/p2', 'keyword' => 'best seo tools']);
-        $r2->assertStatus(200)->assertJsonPath('require', 'email');
-        Queue::assertPushed(RunGuestPageAudit::class, 1); // still only the first
-
-        // 2nd audit with name + email — runs, emailed (no on-screen results), lead captured.
-        $r2b = $this->withCookies($cookies)->postJson(route('guest-audit.store'), ['url' => 'a.com/p2', 'keyword' => 'best seo tools', 'name' => 'Jane Doe', 'email' => 'lead@example.com']);
-        $r2b->assertStatus(202)
-            ->assertJsonPath('emailed', true)
-            ->assertJsonMissing(['results_url' => true]);
-        $this->assertArrayNotHasKey('results_url', $r2b->json()); // 2nd audit must NOT expose on-screen results
-        $this->assertDatabaseHas('guest_page_audits', ['url' => 'https://a.com/p2', 'email' => 'lead@example.com', 'name' => 'Jane Doe']);
-        $this->assertDatabaseHas('leads', ['email' => 'lead@example.com', 'name' => 'Jane Doe', 'converted_at' => null]);
-        $cookies2 = $this->cookiesFrom($r2b);
-
-        // 3rd audit — blocked, signup gate.
-        $r3 = $this->withCookies($cookies2)->postJson(route('guest-audit.store'), ['url' => 'a.com/p3', 'keyword' => 'best seo tools']);
-        $r3->assertStatus(200)->assertJsonPath('require', 'signup')->assertJsonStructure(['register_url']);
-        Queue::assertPushed(RunGuestPageAudit::class, 2); // first + second-with-email only
+        // Signed-in → every run is free, on screen, queued. No email gate.
+        $this->actingAs(\App\Models\User::factory()->create());
+        foreach (['a.com/p', 'a.com/p2'] as $url) {
+            $this->postJson(route('guest-audit.store'), ['url' => $url, 'keyword' => 'best seo tools'])
+                ->assertStatus(202)
+                ->assertJsonPath('emailed', false)
+                ->assertJsonStructure(['token', 'status_url', 'results_url']);
+        }
+        Queue::assertPushed(RunGuestPageAudit::class, 2);
+        $this->assertDatabaseCount('leads', 0); // lead capture gone with the email gate
     }
 
     public function test_lead_is_tagged_converted_when_matching_user_signs_up(): void
@@ -295,6 +284,9 @@ class GuestPageAuditTest extends TestCase
 
     public function test_store_endpoint_queues_an_audit_and_returns_token(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         Queue::fake();
 
         $response = $this->postJson(route('guest-audit.store'), [
@@ -316,6 +308,9 @@ class GuestPageAuditTest extends TestCase
 
     public function test_store_endpoint_validates_url_and_keyword(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         Queue::fake();
 
         $this->postJson(route('guest-audit.store'), ['url' => '', 'keyword' => ''])
@@ -327,6 +322,9 @@ class GuestPageAuditTest extends TestCase
 
     public function test_store_endpoint_rate_limits_per_ip(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         Queue::fake();
         RateLimiter::clear('guest-audit:m:127.0.0.1');
 

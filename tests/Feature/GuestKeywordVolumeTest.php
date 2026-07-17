@@ -37,11 +37,17 @@ class GuestKeywordVolumeTest extends TestCase
 
     public function test_keyword_is_required(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         $this->postJson(route('guest-volume.store'), ['keyword' => ''])->assertStatus(422);
     }
 
     public function test_invalid_country_is_rejected(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         $this->postJson(route('guest-volume.store'), ['keyword' => 'seo tools', 'country' => 'zz'])
             ->assertStatus(422)
             ->assertJsonValidationErrors('country');
@@ -49,12 +55,18 @@ class GuestKeywordVolumeTest extends TestCase
 
     public function test_unconfigured_keywords_everywhere_is_handled(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         config(['services.keywords_everywhere.key' => '']);
         $this->postJson(route('guest-volume.store'), ['keyword' => 'seo tools'])->assertStatus(503);
     }
 
     public function test_first_check_is_free_shown_on_screen_and_queued(): void
     {
+        // Signed-in user — anonymous submits short-circuit to the signup
+        // teaser (202, no validation, no job) before any of this logic runs.
+        $this->actingAs(\App\Models\User::factory()->create());
         Queue::fake();
 
         $r = $this->postJson(route('guest-volume.store'), ['keyword' => 'best seo tools', 'country' => 'us']);
