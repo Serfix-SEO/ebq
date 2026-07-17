@@ -335,8 +335,10 @@ class BillingController extends Controller
 
         // Preserve the subscriber's current billing interval — swapping must not
         // silently move a monthly subscriber onto yearly billing for the new tier.
+        // NULL interval = the current price isn't in `plans` (legacy/renamed) —
+        // fail safe with the picker error instead of guessing an interval.
         $interval = Plan::intervalForStripePrice($subscription->stripe_price);
-        if (! $plan || ! $plan->isCheckoutReady($interval)) {
+        if (! $plan || $interval === null || ! $plan->isCheckoutReady($interval)) {
             return redirect()->route('billing.show')
                 ->with('error', 'That plan is not available right now.');
         }

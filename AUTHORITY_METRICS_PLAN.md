@@ -22,11 +22,31 @@
       crawler toolchain. Activate: env flag on both boxes + Horizon restart.
       Details: infra/reports/client-report.md § Tier-1.5.
 - [ ] **Tier 2 — broad crawler ~1M pages/day.** Needs ONE Hetzner auction box
-      (~64GB/2×1TB NVMe, €35–45/mo) for ClickHouse. **Trigger:** Tier 1.5
-      proves demand.
+      (~64GB/2×1TB NVMe, €35–45/mo) for ClickHouse. Long-run value: fresh
+      new/lost-backlink alerts at scale = the retention (churn) weapon.
 - [ ] **Tier 3 hybrid — quarterly CC WAT page-level extraction** for tracked
       domains (~€10–20/quarter temp instances). Full web-scale parity stays
       rejected. Schema rules that keep this path open are in the plan below.
+      Long-run value: margin (kills per-lookup provider cost), unlimited free
+      site-explorer as acquisition funnel, provider independence, data moat.
+
+## Revisit triggers (decided 2026-07-17 — do NOT build T2/T3 before one fires)
+
+Both tiers are parallel datasets, NOT DataForSEO replacements (CC-based index
+≈ 25% link completeness) — they add fixed burn before revenue. Startup posture:
+variable cost that scales with revenue. Revisit when ANY of:
+
+1. **DataForSEO bill > €250/mo for 2 consecutive months** (check the spend
+   meter / admin usage page) → evaluate Tier 3 hybrid first.
+2. **Unlimited free site-explorer wanted as an acquisition funnel** (per-lookup
+   provider cost becomes the growth bottleneck) → T2/T3 become growth
+   investments, not cost saves.
+3. **~$5k MRR** or sustained link-crawl frontier ceiling (300k) + product
+   demand for fresh-link alerts → Tier 2's ClickHouse box first (cheapest step).
+
+Guards already in place instead: monthly spend circuit-breaker
+(DATAFORSEO_MONTHLY_CAP_USD, 2026-07-17), complete-profile local aggregation
+(~30% report-cost cut), per-plan explorer lookup windows.
 - Quarterly ritual: `ebq:import-cc-webgraph --release=<new> --snapshot-history`
   when Common Crawl announces a release. Partner PDF:
   `/root/serfix-authority-metrics-roadmap.pdf`.

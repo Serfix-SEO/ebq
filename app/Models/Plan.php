@@ -261,8 +261,14 @@ class Plan extends Model
         if (! $priceId) {
             return null;
         }
+        if (static::where('stripe_price_id_monthly', $priceId)->exists()) {
+            return 'monthly';
+        }
 
-        return static::where('stripe_price_id_monthly', $priceId)->exists() ? 'monthly' : 'annual';
+        // Unknown price must be NULL, not 'annual' — a subscriber on a
+        // legacy/renamed price would otherwise be silently swapped from
+        // monthly onto yearly billing (the exact thing swap() must preserve).
+        return static::where('stripe_price_id_yearly', $priceId)->exists() ? 'annual' : null;
     }
 
     /**
