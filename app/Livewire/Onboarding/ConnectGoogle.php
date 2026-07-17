@@ -9,6 +9,20 @@ use App\Support\GoogleSourcePool;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
+/**
+ * Two-step onboarding, domain-first (redesigned 2026-07-17 — the old flow led
+ * with the Google OAuth ask and buried the domain input in skip-text, which
+ * users found confusing):
+ *
+ *   Step 1 "Add your website" — one domain input (pre-filled from the signup
+ *   funnel when available). Creates the Website immediately and subscribes it
+ *   to the shared crawl, so value starts flowing before any OAuth decision.
+ *
+ *   Step 2 "Connect Google (optional)" — value-framed, skippable. Not
+ *   connected: a single Google button + a prominent "go to dashboard" exit.
+ *   Connected: plain-language GSC/GA pickers that UPDATE the step-1 website
+ *   and kick off the 365-day backfills.
+ */
 class ConnectGoogle extends Component
 {
     public int $step = 1;
@@ -36,41 +50,64 @@ class ConnectGoogle extends Component
         $user = Auth::user();
         $this->googleConnected = (bool) $user?->googleAccounts()->exists();
 
-        // Prefill the domain regardless of Google state — it may come from
-        // the OAuth-bounce stash below OR from the Site Explorer signup
-        // funnel (RegisteredUserController stashes the analyzed domain here
-        // on the pay-first path so the user never has to retype it).
+        // Prefill the domain — from the OAuth-bounce stash OR from the Site
+        // Explorer signup funnel (RegisteredUserController stashes the
+        // analyzed domain so the user never has to retype it).
         $this->domain = (string) session()->pull('onboarding.domain', $this->domain);
 
-        if ($this->googleConnected) {
+        // A real website already exists (created in step 1, or the user
+        // bounced out to OAuth and came back) → straight to step 2.
+        $website = $this->currentWebsite();
+        if ($website !== null && $website->domain !== '') {
+            $this->domain = $this->domain !== '' ? $this->domain : $website->domain;
             $this->step = 2;
-            // Restore any in-progress selections that were stashed before
-            // bouncing out to OAuth to connect an extra account.
+        }
+
+        if ($this->googleConnected && $this->step === 2) {
+            // Restore any in-progress selections stashed before bouncing out
+            // to OAuth to connect an extra account.
             $this->gaSelection = (string) session()->pull('onboarding.ga_selection', $this->gaSelection);
             $this->gscSelection = (string) session()->pull('onboarding.gsc_selection', $this->gscSelection);
             $this->fetchGoogleData();
         }
     }
 
-    public function goToStep(int $step): void
+    /**
+     * Step 1 → 2: create (or fill the pay-first placeholder) website from the
+     * domain alone and start its crawl — the user gets value regardless of
+     * what they decide about Google on step 2.
+     */
+    public function addWebsite(): void
     {
-        if ($step === 2 && ! $this->googleConnected) {
-            return;
+        $this->validate([
+            'domain' => ['required', 'string', 'max:255'],
+        ], [], ['domain' => __('website address')]);
+
+        $website = $this->persistWebsite([
+            'domain' => $this->domain,
+            'ga_property_id' => '',
+            'ga_google_account_id' => null,
+            'gsc_site_url' => '',
+            'gsc_google_account_id' => null,
+        ]);
+
+        if ($website === null) {
+            return; // plan-limit redirect already issued
         }
 
-        $this->step = $step;
+        // Free tools + audit start now: subscribe to the shared crawl_site
+        // (charges the cap; reuses the existing shared crawl when covered).
+        app(\App\Services\Crawler\CrawlSiteBootstrapper::class)->subscribeWebsite($website);
+
+        $this->step = 2;
+        if ($this->googleConnected) {
+            $this->fetchGoogleData();
+        }
     }
 
     public function updatedGscSelection(string $value): void
     {
-        if ($value === '' || $this->domain !== '') {
-            return;
-        }
-
-        [, $siteUrl] = $this->splitSelection($value);
-        if ($siteUrl !== '') {
-            $this->domain = $this->extractDomain($siteUrl);
-        }
+        // Domain is fixed in step 1 now — nothing to auto-fill.
     }
 
     /**
@@ -89,84 +126,56 @@ class ConnectGoogle extends Component
         $this->redirect(route('google.redirect', ['return' => 'onboarding']));
     }
 
+    /** Step 2 "Save & finish" — attach the picked sources to the step-1 website. */
     public function saveWebsite(): void
     {
-        $this->validate([
-            'domain' => ['required', 'string', 'max:255'],
-            'gaSelection' => ['nullable', 'string', 'max:512'],
-            'gscSelection' => ['nullable', 'string', 'max:512'],
-        ]);
-
-        [$gaAccountId, $gaPropertyId] = $this->splitSelection($this->gaSelection);
-        [$gscAccountId, $gscSiteUrl] = $this->splitSelection($this->gscSelection);
-
-        // Need at least one real data source — the "connect neither" exit
-        // is the explicit Skip button, not an empty Finish.
-        if ($gaPropertyId === '' && $gscSiteUrl === '') {
-            $this->addError('gaSelection', 'Connect at least one of Google Analytics or Search Console — or use “Skip for now”.');
+        $website = $this->currentWebsite();
+        if ($website === null || $website->domain === '') {
+            $this->step = 1; // step 1 was somehow skipped — send them back
 
             return;
         }
 
-        $website = $this->persistWebsite([
-            'domain' => $this->domain,
+        [$gaAccountId, $gaPropertyId] = $this->splitSelection($this->gaSelection);
+        [$gscAccountId, $gscSiteUrl] = $this->splitSelection($this->gscSelection);
+
+        // Nothing picked → same as "go to dashboard"; no error walls here.
+        if ($gaPropertyId === '' && $gscSiteUrl === '') {
+            $this->finishOnboarding($website);
+
+            return;
+        }
+
+        $website->fill([
             'ga_property_id' => $gaPropertyId,
             'ga_google_account_id' => $gaPropertyId !== '' ? $gaAccountId : null,
             'gsc_site_url' => $gscSiteUrl,
             'gsc_google_account_id' => $gscSiteUrl !== '' ? $gscAccountId : null,
-        ]);
+        ])->save();
 
-        if ($website === null) {
-            return; // plan-limit redirect already issued
-        }
-
-        // Kick off the 365-day backfill for the sources that are actually
-        // connected. The Website model's created hook does the same for
-        // fresh rows, but the pay-first flow updates a pre-existing
-        // placeholder, so we (re)dispatch here once the real IDs are set.
-        // NOTE: requires a running queue worker (QUEUE_CONNECTION=database).
+        // Kick off the 365-day backfill for the sources actually connected.
         if ($website->hasGa()) {
             SyncAnalyticsData::dispatch($website->id, 365);
         }
         if ($website->hasGsc()) {
             SyncSearchConsoleData::dispatch($website->id, 365);
         }
-        // Subscribe to the shared crawl_site: charge the cap, and crawl only if the
-        // domain isn't already covered (otherwise the user instantly reuses the
-        // existing shared crawl). Frontier seeds the homepage, so GSC isn't required.
-        app(\App\Services\Crawler\CrawlSiteBootstrapper::class)->subscribeWebsite($website);
 
         $this->finishOnboarding($website);
     }
 
     /**
-     * "Skip for now" — let users in with no Google data at all. They land
-     * on the dashboard (full of connect prompts) and can still use the
-     * free PageSpeed tool. We create a minimal Website row so the
-     * onboarding gate is satisfied.
+     * "Go to my dashboard" — the explicit no-Google exit from step 2. The
+     * website already exists (step 1), so this just completes onboarding.
      */
     public function skipForNow(): void
     {
-        // Require a domain so the skip yields a real, named website (free
-        // tools, crawl, keyword research) rather than an empty placeholder.
-        $this->validate([
-            'domain' => ['required', 'string', 'max:255'],
-        ]);
+        $website = $this->currentWebsite();
+        if ($website === null || $website->domain === '') {
+            $this->step = 1;
 
-        $website = $this->persistWebsite([
-            'domain' => $this->domain,
-            'ga_property_id' => '',
-            'ga_google_account_id' => null,
-            'gsc_site_url' => '',
-            'gsc_google_account_id' => null,
-        ]);
-
-        if ($website === null) {
             return;
         }
-
-        // A domain-only add of an already-crawled domain still gets the shared data.
-        app(\App\Services\Crawler\CrawlSiteBootstrapper::class)->subscribeWebsite($website);
 
         $this->finishOnboarding($website);
     }
@@ -174,6 +183,15 @@ class ConnectGoogle extends Component
     public function render()
     {
         return view('livewire.onboarding.connect-google');
+    }
+
+    /** The user's website (pay-first placeholder ranks last so real rows win). */
+    private function currentWebsite(): ?Website
+    {
+        return Website::query()
+            ->where('user_id', Auth::id())
+            ->orderByRaw("CASE WHEN domain = '' THEN 1 ELSE 0 END")
+            ->first();
     }
 
     /**
@@ -236,7 +254,7 @@ class ConnectGoogle extends Component
         $this->gscOptions = $pool['gsc'];
 
         if ($pool['ga_error'] || $pool['gsc_error']) {
-            $this->fetchError = 'We couldn’t load some of your Google data. You can still continue with what loaded, or reconnect the affected account.';
+            $this->fetchError = __('We couldn’t load some of your Google data. You can still continue with what loaded, or reconnect the affected account.');
         }
     }
 
@@ -259,13 +277,5 @@ class ConnectGoogle extends Component
         $accountId = substr($selection, 0, $pos);
 
         return [($accountId !== null && $accountId !== '') ? $accountId : null, substr($selection, $pos + 1)];
-    }
-
-    private function extractDomain(string $siteUrl): string
-    {
-        $url = str_replace('sc-domain:', '', $siteUrl);
-        $parsed = parse_url($url, PHP_URL_HOST);
-
-        return $parsed ?: preg_replace('#^https?://#', '', rtrim($url, '/'));
     }
 }
