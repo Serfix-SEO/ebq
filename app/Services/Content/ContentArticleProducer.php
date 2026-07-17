@@ -298,10 +298,12 @@ class ContentArticleProducer
         );
         $issueList = implode("\n- ", array_filter($issues));
 
+        $currentWords = str_word_count(trim(strip_tags((string) $article->html)));
         $system = 'You are an expert SEO editor. Fix ONLY the listed problems in the article. '
-            .'Keep everything that is not mentioned unchanged. NEVER shorten the article: when a '
-            .'problem asks for more length or expanded sections, ADD substantive new paragraphs '
-            .'with concrete detail. Target length: about '.$plan->article_length.' words. '
+            .'Keep everything that is not mentioned unchanged. '
+            .'Length discipline: the target is about '.$plan->article_length.' words and the article '
+            .'is currently '.$currentWords.' words. If it is under target, ADD substantive paragraphs '
+            .'with concrete detail; if it is over target, TIGHTEN by cutting redundancy. Never pad. '
             .'Respond with valid JSON only: '
             .'{"html": "<full corrected article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}. '
             ."\n".$this->humanizer->promptRules();
