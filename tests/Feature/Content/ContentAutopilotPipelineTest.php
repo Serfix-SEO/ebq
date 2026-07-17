@@ -82,6 +82,54 @@ class ContentAutopilotPipelineTest extends TestCase
         $this->assertSame(1, $topic->articles()->where('is_current', true)->count());
     }
 
+    public function test_toc_is_built_with_anchor_links_when_enabled(): void
+    {
+        $plan = ContentPlan::factory()->create([
+            'toggles' => ['toc' => true, 'key_takeaways' => false, 'faq' => false],
+        ]);
+        $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $plan->website_id,
+            'target_keyword' => 'blue widget cleaning',
+        ]);
+
+        $revised = '<h2>Blue widget cleaning basics</h2><p>Real content explaining the basics with concrete detail and enough words to count.</p>'
+            .'<h2>Tools you need for blue widget cleaning</h2><p>A soft brush works well because it lifts grime without scratching the coating.</p>'
+            .'<h2>Step by step blue widget cleaning</h2><p>Start dry, then work each surface slowly, checking the corners where dust builds up.</p>';
+        $this->fakeLlm('Blue widget cleaning intro with enough real words to matter here.', $revised);
+
+        $article = app(ContentArticleProducer::class)->produce($topic->fresh());
+
+        $this->assertNotNull($article);
+        // TOC nav present.
+        $this->assertStringContainsString('class="content-toc"', $article->html);
+        // Every H2 carries an id.
+        preg_match_all('/<h2\b[^>]*\bid="([^"]+)"/i', $article->html, $ids);
+        $this->assertNotEmpty($ids[1]);
+        // Every TOC link targets a real heading id.
+        preg_match_all('/<a href="#([^"]+)"/i', $article->html, $links);
+        $this->assertNotEmpty($links[1]);
+        foreach ($links[1] as $anchor) {
+            $this->assertContains($anchor, $ids[1], "TOC anchor #{$anchor} has no matching heading id");
+        }
+    }
+
+    public function test_toc_absent_when_disabled(): void
+    {
+        $plan = ContentPlan::factory()->create([
+            'toggles' => ['toc' => false, 'key_takeaways' => false, 'faq' => false],
+        ]);
+        $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $plan->website_id,
+            'target_keyword' => 'blue widget cleaning',
+        ]);
+
+        $this->fakeLlm('Blue widget cleaning intro text with real words here to fill.');
+
+        $article = app(ContentArticleProducer::class)->produce($topic->fresh());
+
+        $this->assertStringNotContainsString('class="content-toc"', $article->html);
+    }
+
     public function test_revision_loop_produces_new_versions_when_score_low(): void
     {
         $plan = ContentPlan::factory()->create();

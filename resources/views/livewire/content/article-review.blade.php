@@ -80,11 +80,27 @@
 
             {{-- ── Article preview ──────────────────────────────────── --}}
             <div class="lg:col-span-2">
-                <article class="prose prose-slate max-w-none rounded-xl border border-slate-200 bg-white p-6 sm:p-8 dark:border-slate-800 dark:bg-slate-900 dark:prose-invert">
+                <article class="ca-preview prose prose-slate max-w-none rounded-xl border border-slate-200 bg-white p-6 sm:p-8 dark:border-slate-800 dark:bg-slate-900 dark:prose-invert">
                     <h1>{{ $article->h1 }}</h1>
                     {!! $previewHtml !!}
                 </article>
             </div>
+
+            {{-- Table-of-contents styling (the TOC ships inside the article
+                 HTML as <nav class="content-toc">; scoped so it never bleeds). --}}
+            <style>
+                .ca-preview { scroll-behavior: smooth; }
+                .ca-preview .content-toc { margin: 0 0 1.75rem; padding: 1rem 1.25rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; background: #f8fafc; }
+                .ca-preview .content-toc__title { margin: 0 0 .5rem; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; }
+                .ca-preview .content-toc ul { margin: 0; padding: 0; list-style: none; }
+                .ca-preview .content-toc__item { margin: .25rem 0; }
+                .ca-preview .content-toc__item--sub { margin-inline-start: 1rem; font-size: .9em; }
+                .ca-preview .content-toc a { color: #c2410c; text-decoration: none; }
+                .ca-preview .content-toc a:hover { text-decoration: underline; }
+                .dark .ca-preview .content-toc { border-color: #334155; background: #0f172a; }
+                .dark .ca-preview .content-toc__title { color: #94a3b8; }
+                .dark .ca-preview .content-toc a { color: #fb923c; }
+            </style>
         </div>
     @endif
 </div>

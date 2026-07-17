@@ -225,10 +225,14 @@ class ContentArticleProducer
 
     /**
      * Mechanical structure fixes applied to EVERY version (write and revise
-     * paths alike): drop a leading heading that repeats the H1, and promote
-     * pre-first-H2 orphan H3s to H2 so the hierarchy is valid.
+     * paths alike): drop a leading heading that repeats the H1, promote
+     * pre-first-H2 orphan H3s so the hierarchy is valid, give every H2/H3 a
+     * stable `id` slug, and (when the plan enables it) build a real
+     * anchor-linked table of contents that scrolls to those ids. The TOC is
+     * generated deterministically here — asking the LLM for one produced a
+     * plain list with no working anchors (owner QA 2026-07-17).
      */
-    private function normalizeStructure(string $html, string $h1): string
+    private function normalizeStructure(string $html, string $h1, bool $withToc = false): string
     {
         $h1Lower = mb_strtolower(trim($h1));
         if ($h1Lower !== '' && preg_match('/^\s*<h[12]\b[^>]*>(.*?)<\/h[12]>/is', $html, $m)
@@ -246,7 +250,77 @@ class ContentArticleProducer
             $html = preg_replace('/<h3\b([^>]*)>(.*?)<\/h3>/is', '<h2$1>$2</h2>', $html, 1) ?? $html;
         }
 
+        // Remove any prior model-authored / previously-injected TOC so a
+        // revision pass never stacks duplicates.
+        $html = preg_replace('/<nav\b[^>]*class="[^"]*content-toc[^"]*"[^>]*>.*?<\/nav>/is', '', $html) ?? $html;
+
+        // Slug + id every H2/H3 (idempotent: existing ids are respected).
+        $used = [];
+        $html = preg_replace_callback('/<(h[23])\b([^>]*)>(.*?)<\/\1>/is', function ($m) use (&$used) {
+            [$full, $tag, $attrs, $inner] = $m;
+            if (preg_match('/\bid="([^"]+)"/i', $attrs, $idm)) {
+                $used[$idm[1]] = true;
+
+                return $full;
+            }
+            $slug = $this->headingSlug(strip_tags($inner), $used);
+            $used[$slug] = true;
+
+            return '<'.$tag.$attrs.' id="'.$slug.'">'.$inner.'</'.$tag.'>';
+        }, $html) ?? $html;
+
+        if ($withToc) {
+            $html = $this->buildToc($html).$html;
+        }
+
         return $html;
+    }
+
+    /** A unique kebab-case anchor id for a heading. */
+    private function headingSlug(string $text, array $used): string
+    {
+        $base = Str::slug($text);
+        if ($base === '') {
+            $base = 'section';
+        }
+        $slug = $base;
+        $i = 2;
+        while (isset($used[$slug])) {
+            $slug = $base.'-'.$i++;
+        }
+
+        return $slug;
+    }
+
+    /**
+     * Build the anchor-linked TOC from the article's H2 headings (with their
+     * H3 children nested). Empty string when there are fewer than 2 sections.
+     */
+    private function buildToc(string $html): string
+    {
+        if (! preg_match_all('/<(h[23])\b[^>]*\bid="([^"]+)"[^>]*>(.*?)<\/\1>/is', $html, $matches, PREG_SET_ORDER)) {
+            return '';
+        }
+
+        $h2s = array_filter($matches, fn ($m) => strtolower($m[1]) === 'h2');
+        if (count($h2s) < 2) {
+            return '';
+        }
+
+        $items = [];
+        foreach ($matches as $m) {
+            $label = trim(strip_tags($m[3]));
+            if ($label === '') {
+                continue;
+            }
+            $isH3 = strtolower($m[1]) === 'h3';
+            $items[] = '<li class="content-toc__item'.($isH3 ? ' content-toc__item--sub' : '').'">'
+                .'<a href="#'.e($m[2]).'">'.e($label).'</a></li>';
+        }
+
+        return '<nav class="content-toc" aria-label="Table of contents">'
+            .'<p class="content-toc__title">In this article</p>'
+            .'<ul>'.implode('', $items).'</ul></nav>'."\n";
     }
 
     /** Score + persist as the next version, folding in the style lint. */
@@ -256,7 +330,8 @@ class ContentArticleProducer
 
         $attributes['html'] = $this->normalizeStructure(
             (string) ($attributes['html'] ?? ''),
-            (string) ($attributes['h1'] ?? '')
+            (string) ($attributes['h1'] ?? ''),
+            (bool) (($context['toggles'] ?? [])['toc'] ?? false),
         );
         $html = (string) $attributes['html'];
         $styleIssues = $this->humanizer->lint($html);
