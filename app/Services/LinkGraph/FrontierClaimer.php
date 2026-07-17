@@ -65,6 +65,47 @@ class FrontierClaimer
         return LinkCrawlFrontier::query()->where('lease_id', $leaseId)->get();
     }
 
+    /**
+     * Flip up to $limit `done` rows whose recrawl window has elapsed
+     * (next_at <= now) back to `pending`, so they re-enter the crawl cycle.
+     * The claimer only ever takes `pending`, so without this a crawled domain
+     * would stay `done` forever and the frontier would drain to empty. Ordered
+     * oldest-due first (most-stale recrawled soonest). Returns the count moved.
+     */
+    public function requeueRecrawls(int $limit): int
+    {
+        $limit = max(0, $limit);
+        if ($limit === 0) {
+            return 0;
+        }
+
+        // Portable: pick due ids first (MySQL forbids UPDATE…LIMIT via subquery
+        // on the same table anyway), then flip. Only `done` rows — failed rows
+        // are terminal, blocked rows are re-tried on their own schedule.
+        $ids = DB::table('link_crawl_frontier')
+            ->where('status', 'done')
+            ->whereNotNull('next_at')
+            ->where('next_at', '<=', now())
+            ->orderBy('next_at')
+            ->limit($limit)
+            ->pluck('id');
+
+        if ($ids->isEmpty()) {
+            return 0;
+        }
+
+        return DB::table('link_crawl_frontier')
+            ->whereIn('id', $ids)
+            ->where('status', 'done')
+            ->update([
+                'status' => 'pending',
+                'lease_id' => null,
+                'leased_until' => null,
+                'next_at' => now(),
+                'updated_at' => now(),
+            ]);
+    }
+
     /** True while there is any due, unclaimed work left. */
     public function hasDueWork(): bool
     {

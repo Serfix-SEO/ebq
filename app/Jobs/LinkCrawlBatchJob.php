@@ -9,6 +9,7 @@ use App\Services\Crawler\ProxyPool;
 use App\Services\LinkGraph\EdgeRecorder;
 use App\Services\LinkGraph\FrontierClaimer;
 use App\Services\LinkGraph\LinkCrawlBudget;
+use App\Services\OpenPageRankClient;
 use App\Support\Audit\HtmlAuditor;
 use App\Support\Crawler\BlockDetector;
 use App\Support\Crawler\RobotsTxtParser;
@@ -78,6 +79,15 @@ class LinkCrawlBatchJob implements ShouldQueue
         $recrawlDays = (int) config('crawler.link_crawl.recrawl_days', 30);
         $delayMs = (int) config('crawler.delay_ms', 250);
 
+        // Organic expansion gate: crawl NEW external domains we discover so the
+        // frontier grows itself. One cached count per ~30s (shared across the
+        // ~40 concurrent batches) keeps the frontier-size check cheap; stop
+        // expanding once the frontier hits its hard ceiling.
+        $canExpand = (bool) config('crawler.link_crawl.expand_enabled', true)
+            && Cache::remember('linkcrawl:frontier_count', now()->addSeconds(30),
+                fn () => LinkCrawlFrontier::query()->count())
+                < (int) config('crawler.link_crawl.max_frontier', 300000);
+
         foreach ($rows as $row) {
             if ($budget->exhausted()) {
                 // Release the unfetched claim so it isn't stranded until reaping.
@@ -116,6 +126,9 @@ class LinkCrawlBatchJob implements ShouldQueue
 
                 if ((int) $row->depth === 0) {
                     $this->enqueueInternal($row->host, $links['internal'] ?? []);
+                }
+                if ($canExpand) {
+                    $this->expandFrontier($row->host, $links['external'] ?? []);
                 }
 
                 $this->finish($row, 'done', attempts: $row->attempts + 1, nextAt: now()->addDays($recrawlDays));
@@ -241,6 +254,72 @@ class LinkCrawlBatchJob implements ShouldQueue
                 'url' => mb_substr($u, 0, 2048),
                 'url_hash' => LinkCrawlFrontier::hashFor($u),
                 'depth' => 1,
+                'status' => 'pending',
+                'attempts' => 0,
+                'next_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        if ($insert !== []) {
+            DB::table('link_crawl_frontier')->insertOrIgnore($insert);
+        }
+    }
+
+    /**
+     * Organic frontier growth: queue a handful of NEWLY-seen external domains
+     * (registrable eTLD+1, as depth-0 homepages) discovered on this page. This
+     * is what keeps the crawler continuously busy — it expands through the link
+     * graph from our clients' neighbourhoods instead of only crawling the seeded
+     * set. Bounded per page (`expand_per_page`), skips domains already in the
+     * frontier, and only runs while under the frontier ceiling ($canExpand).
+     *
+     * @param  list<array{href: string, anchor?: string, nofollow?: bool}>  $external
+     */
+    private function expandFrontier(string $fromHost, array $external): void
+    {
+        $per = (int) config('crawler.link_crawl.expand_per_page', 3);
+        if ($per <= 0 || $external === []) {
+            return;
+        }
+
+        $fromReg = OpenPageRankClient::registrable(strtolower($fromHost));
+        $candidates = [];
+        foreach ($external as $link) {
+            $host = strtolower((string) parse_url((string) ($link['href'] ?? ''), PHP_URL_HOST));
+            if ($host === '') {
+                continue;
+            }
+            $reg = OpenPageRankClient::registrable($host);
+            if ($reg === '' || $reg === $fromReg) {
+                continue; // same registrable domain — not an expansion target
+            }
+            $candidates[$reg] = true; // dedupe within the page
+            if (count($candidates) >= $per) {
+                break;
+            }
+        }
+        if ($candidates === []) {
+            return;
+        }
+
+        // Drop domains already sitting in the frontier (any status) — insertOrIgnore
+        // on url_hash is the final backstop against races.
+        $hosts = array_keys($candidates);
+        $existing = LinkCrawlFrontier::query()->whereIn('host', $hosts)->pluck('host')->flip();
+
+        $now = now();
+        $insert = [];
+        foreach ($hosts as $host) {
+            if ($existing->has($host)) {
+                continue;
+            }
+            $url = 'https://'.$host.'/';
+            $insert[] = [
+                'host' => $host,
+                'url' => $url,
+                'url_hash' => LinkCrawlFrontier::hashFor($url),
+                'depth' => 0,
                 'status' => 'pending',
                 'attempts' => 0,
                 'next_at' => $now,

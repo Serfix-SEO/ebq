@@ -127,9 +127,8 @@ Tier-1's passive harvest. **OFF by default** (`LINK_CRAWL_ENABLED`, config
 `crawler.link_crawl.*`); a new outbound web crawler activates deliberately.
 
 Pieces (all reuse the site-audit toolchain — CrawlFetcher, ProxyPool,
-DomainRateLimiter, RobotsTxtParser, EdgeRecorder, the Bus::batch
-self-perpetuating pass pattern; runs on the `crawl` queue / box B + ephemeral
-fleet):
+DomainRateLimiter, RobotsTxtParser, EdgeRecorder; runs on the dedicated
+`link-crawl` queue / box B + ephemeral fleet):
 - `link_crawl_frontier` table + `App\Models\LinkCrawlFrontier` — flat host/URL
   work-list (distinct from `website_pages`, which is crawl_site_id-scoped).
 - `ebq:seed-link-crawl` (scheduled 01:20) — queues homepages of important
@@ -154,6 +153,22 @@ fleet):
   crashed workers' expired leases to `pending` (crash recovery).
 - `App\Services\LinkGraph\LinkCrawlBudget` — Redis daily page cap
   (`daily_budget`, default 150k, fleet-wide).
+- **Keeping the frontier fed (else it drains → backlog 0)** — the claimer only
+  ever takes `pending`, so two mechanisms return work to `pending`:
+  1. **Recrawl requeue.** A crawled row goes `done` with `next_at = +recrawl_days`.
+     `FrontierClaimer::requeueRecrawls(limit)` (called each tick by the
+     dispatcher, capped `recrawl_requeue_limit`, default 1000) flips due `done`
+     rows (`next_at <= now`) back to `pending`. WITHOUT this a domain is `done`
+     forever and the frontier empties (fixed 2026-07-17 — `next_at` on done rows
+     was previously decorative; the seed's `$recrawlBefore` was dead code).
+     `failed` rows are terminal (never resurrected); `blocked` retry on their own.
+  2. **Organic expansion.** `LinkCrawlBatchJob::expandFrontier()` queues up to
+     `expand_per_page` (default 3) NEWLY-seen external registrable domains per
+     crawled page as depth-0 homepages — so the crawler grows the graph through
+     its clients' link neighbourhoods instead of only crawling the seeded set.
+     Gated by `expand_enabled` + a hard `max_frontier` ceiling (default 300k,
+     checked via a 30s-cached frontier count) so it can't grow unbounded. This is
+     the primary "stay continuously busy" lever; the daily budget still caps cost.
 
 **To activate:** `LINK_CRAWL_ENABLED=true` on BOTH boxes + Horizon restart
 (box B runs the crawl queue). ACTIVATED 2026-07-16.

@@ -184,5 +184,20 @@ return [
         'recrawl_days' => (int) env('LINK_CRAWL_RECRAWL_DAYS', 30),
         'retry_after_hours' => (int) env('LINK_CRAWL_RETRY_HOURS', 72),
         'max_attempts' => (int) env('LINK_CRAWL_MAX_ATTEMPTS', 3),
+        // How many `done` rows whose recrawl window (next_at) has elapsed the
+        // dispatcher flips back to `pending` per tick. Without this, a crawled
+        // domain is `done` FOREVER (the claimer only takes `pending`) — the
+        // frontier drains and the crawler idles at backlog 0. Capped per tick so
+        // a huge due-backlog doesn't stampede.
+        'recrawl_requeue_limit' => (int) env('LINK_CRAWL_RECRAWL_REQUEUE', 1000),
+        // Organic expansion: feed NEWLY-discovered external domains back into
+        // the frontier as depth-0 seeds so the crawler grows the link graph on
+        // its own (a real expanding crawler) instead of only ever crawling the
+        // seeded set. Bounded by the daily budget and `max_frontier`.
+        'expand_enabled' => (bool) env('LINK_CRAWL_EXPAND', true),
+        'expand_per_page' => (int) env('LINK_CRAWL_EXPAND_PER_PAGE', 3),
+        // Hard ceiling on total frontier rows — expansion stops adding above it
+        // so the frontier can't grow unbounded (recrawls + retries still flow).
+        'max_frontier' => (int) env('LINK_CRAWL_MAX_FRONTIER', 300000),
     ],
 ];

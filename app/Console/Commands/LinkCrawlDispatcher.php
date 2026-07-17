@@ -32,6 +32,15 @@ class LinkCrawlDispatcher extends Command
         if (! LinkCrawlToggle::enabled() || $budget->exhausted()) {
             return self::SUCCESS;
         }
+
+        // Return recrawl-due `done` rows to `pending` first — this is what keeps
+        // the frontier perpetually fed (a crawled domain re-enters after its
+        // recrawl window) instead of draining to empty. Capped per tick.
+        $requeued = $claimer->requeueRecrawls((int) config('crawler.link_crawl.recrawl_requeue_limit', 1000));
+        if ($requeued > 0) {
+            $this->info("Requeued {$requeued} domains for recrawl.");
+        }
+
         if (! $claimer->hasDueWork()) {
             return self::SUCCESS;
         }

@@ -10,6 +10,7 @@ use App\Services\Crawler\DomainRateLimiter;
 use App\Services\Crawler\ProxyPool;
 use App\Services\LinkGraph\FrontierClaimer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
@@ -45,6 +46,24 @@ class LinkCrawlTest extends TestCase
         $this->assertDatabaseHas('link_crawl_frontier', ['host' => 'active-client.test', 'status' => 'pending', 'depth' => 0]);
         $this->artisan('ebq:seed-link-crawl')->assertSuccessful();
         $this->assertSame(2, LinkCrawlFrontier::count());
+    }
+
+    public function test_seed_backfills_from_discovered_graph_when_metrics_exhausted(): void
+    {
+        // No domain_metrics rows → phase 1 seeds nothing; the discovered graph
+        // (link_domains + link_edges) must fill the frontier instead.
+        $hot = DB::table('link_domains')->insertGetId(['name' => 'hot.test']);
+        $cold = DB::table('link_domains')->insertGetId(['name' => 'cold.test']);
+        $src = DB::table('link_domains')->insertGetId(['name' => 'src.test']);
+        // hot.test has 2 inbound edges, cold.test has 1 → hot ranks first.
+        $edge = fn ($from, $to) => ['from_domain_id' => $from, 'to_domain_id' => $to, 'source' => 'own_crawl',
+            'dofollow' => true, 'first_seen_at' => now(), 'last_seen_at' => now()];
+        DB::table('link_edges')->insert([$edge($src, $hot), $edge($cold, $hot), $edge($src, $cold)]);
+
+        $this->artisan('ebq:seed-link-crawl')->assertSuccessful();
+
+        $this->assertDatabaseHas('link_crawl_frontier', ['host' => 'hot.test', 'depth' => 0, 'status' => 'pending']);
+        $this->assertDatabaseHas('link_crawl_frontier', ['host' => 'cold.test', 'depth' => 0]);
     }
 
     // ── Atomic claiming ─────────────────────────────────────────
@@ -209,5 +228,82 @@ class LinkCrawlTest extends TestCase
         Queue::fake();
         $this->artisan('ebq:link-crawl-dispatch')->assertSuccessful();
         Queue::assertNothingPushed();
+    }
+
+    // ── Recrawl requeue (keeps the frontier perpetually fed) ────
+
+    public function test_requeue_recrawls_returns_due_done_rows_to_pending(): void
+    {
+        $due = $this->pending('due.test');
+        $due->update(['status' => 'done', 'next_at' => now()->subDay()]);
+        $future = $this->pending('future.test');
+        $future->update(['status' => 'done', 'next_at' => now()->addDays(10)]);
+        $failed = $this->pending('failed.test');
+        $failed->update(['status' => 'failed', 'next_at' => now()->subDay()]); // terminal — untouched
+
+        $moved = app(FrontierClaimer::class)->requeueRecrawls(100);
+
+        $this->assertSame(1, $moved);
+        $this->assertSame('pending', $due->fresh()->status);
+        $this->assertSame('done', $future->fresh()->status);   // window not elapsed
+        $this->assertSame('failed', $failed->fresh()->status); // never resurrected
+    }
+
+    public function test_dispatcher_requeues_recrawls_then_tops_up(): void
+    {
+        Queue::fake();
+        config(['crawler.link_crawl.target_in_flight' => 3]);
+        // No pending work, only a recrawl-due done row → dispatcher must revive it
+        // (else hasDueWork() is false and nothing is pushed).
+        $row = $this->pending('recrawl.test');
+        $row->update(['status' => 'done', 'next_at' => now()->subDay()]);
+
+        $this->artisan('ebq:link-crawl-dispatch')->assertSuccessful();
+
+        $this->assertSame('pending', $row->fresh()->status);
+        Queue::assertPushed(LinkCrawlBatchJob::class, 3);
+    }
+
+    // ── Organic expansion (self-growing frontier) ───────────────
+
+    public function test_batch_expands_frontier_with_new_external_domains(): void
+    {
+        Queue::fake();
+        $this->bindNoOpPolitness();
+        config(['crawler.link_crawl.expand_enabled' => true, 'crawler.link_crawl.expand_per_page' => 3]);
+        Cache::forget('linkcrawl:frontier_count');
+        $this->pending('src.test');
+
+        // Two distinct external registrable domains + one already-queued one.
+        // `known.test` is already `done` (future recrawl) so it isn't claimed by
+        // this batch — it exists purely to prove expansion skips known domains.
+        $this->pending('known.test')->update(['status' => 'done', 'next_at' => now()->addDays(10)]);
+        $html = '<a href="https://fresh-one.test/x">1</a><a href="https://fresh-two.test/">2</a>'
+            .'<a href="https://known.test/y">dup</a><a href="https://src.test/about">int</a>';
+        $this->app->instance(CrawlFetcher::class, $this->fakeFetcher('src.test', $html));
+
+        $this->runBatch();
+
+        // New external domains queued as depth-0 homepages…
+        $this->assertDatabaseHas('link_crawl_frontier', ['host' => 'fresh-one.test', 'url' => 'https://fresh-one.test/', 'depth' => 0, 'status' => 'pending']);
+        $this->assertDatabaseHas('link_crawl_frontier', ['host' => 'fresh-two.test', 'depth' => 0]);
+        // …the already-present domain stays a single row (no duplicate).
+        $this->assertSame(1, LinkCrawlFrontier::where('host', 'known.test')->count());
+    }
+
+    public function test_expansion_respects_frontier_ceiling(): void
+    {
+        Queue::fake();
+        $this->bindNoOpPolitness();
+        config(['crawler.link_crawl.expand_enabled' => true, 'crawler.link_crawl.max_frontier' => 1]);
+        Cache::forget('linkcrawl:frontier_count');
+        $this->pending('src.test'); // frontier already at/above the ceiling of 1
+
+        $html = '<a href="https://newdomain.test/x">n</a>';
+        $this->app->instance(CrawlFetcher::class, $this->fakeFetcher('src.test', $html));
+
+        $this->runBatch();
+
+        $this->assertSame(0, LinkCrawlFrontier::where('host', 'newdomain.test')->count());
     }
 }

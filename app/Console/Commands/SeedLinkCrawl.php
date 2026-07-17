@@ -32,7 +32,6 @@ class SeedLinkCrawl extends Command
         }
 
         $limit = (int) ($this->option('limit') ?: config('crawler.link_crawl.seed_domains_per_run', 3000));
-        $recrawlBefore = now()->subDays((int) config('crawler.link_crawl.recrawl_days', 30));
 
         // Hosts already sitting in the frontier (any status) — don't double-queue.
         $queuedHosts = LinkCrawlFrontier::query()->pluck('host')->flip();
@@ -46,40 +45,77 @@ class SeedLinkCrawl extends Command
             ->orderByDesc('times_seen')
             ->orderByRaw('cc_harmonic_rank IS NULL, cc_harmonic_rank ASC')
             ->limit($limit * 3) // over-scan; many will be skipped
-            ->chunk(1000, function ($rows) use (&$seeded, $limit, $queuedHosts, $recrawlBefore) {
-                $insert = [];
-                $now = now();
-                foreach ($rows as $m) {
-                    if ($seeded + count($insert) >= $limit) {
-                        break;
-                    }
-                    $host = strtolower(trim((string) $m->domain));
-                    if ($host === '' || $queuedHosts->has($host)) {
-                        continue;
-                    }
-                    $url = 'https://'.$host.'/';
-                    $insert[] = [
-                        'host' => $host,
-                        'url' => $url,
-                        'url_hash' => LinkCrawlFrontier::hashFor($url),
-                        'depth' => 0,
-                        'status' => 'pending',
-                        'attempts' => 0,
-                        'next_at' => $now,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
-                    $queuedHosts->put($host, true);
-                }
-                if ($insert !== []) {
-                    $seeded += DB::table('link_crawl_frontier')->insertOrIgnore($insert);
-                }
+            ->chunk(1000, function ($rows) use (&$seeded, $limit, $queuedHosts) {
+                $seeded += $this->queueHosts($rows->pluck('domain')->all(), $limit - $seeded, $queuedHosts);
 
                 return $seeded < $limit;
             });
 
+        // Phase 2 — backfill from the DISCOVERED graph. Once every tracked
+        // domain_metrics domain is already queued (the steady state), pull the
+        // most-linked-to domains the crawler has DISCOVERED (link_domains, ranked
+        // by in-degree = how many distinct sites point at them) that we haven't
+        // crawled yet. This makes the daily seed self-feed from the link graph —
+        // the frontier keeps growing toward the domains that matter most, without
+        // any external source. Organic per-page expansion does this gradually;
+        // this bulk-tops it up so the crawler never idles waiting for discovery.
+        if ($seeded < $limit) {
+            $need = $limit - $seeded;
+            $names = DB::table('link_edges')
+                ->select('to_domain_id', DB::raw('COUNT(*) as indeg'))
+                ->groupBy('to_domain_id')
+                ->orderByDesc('indeg')
+                ->limit($need * 4) // over-scan; many already queued
+                ->pluck('to_domain_id')
+                ->chunk(1000)
+                ->flatMap(fn ($ids) => DB::table('link_domains')->whereIn('id', $ids)->pluck('name'))
+                ->all();
+            $seeded += $this->queueHosts($names, $need, $queuedHosts);
+        }
+
         $this->info("Seeded {$seeded} domains into the link-crawl frontier.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Insert up to $max of the given hosts as depth-0 `pending` homepages,
+     * skipping any already in the frontier ($queuedHosts, mutated in place so
+     * later phases/chunks don't re-queue). Returns the number actually inserted.
+     *
+     * @param  iterable<string>  $hosts
+     * @param  \Illuminate\Support\Collection<string, mixed>  $queuedHosts
+     */
+    private function queueHosts(iterable $hosts, int $max, $queuedHosts): int
+    {
+        if ($max <= 0) {
+            return 0;
+        }
+        $now = now();
+        $insert = [];
+        foreach ($hosts as $raw) {
+            if (count($insert) >= $max) {
+                break;
+            }
+            $host = strtolower(trim((string) $raw));
+            if ($host === '' || $queuedHosts->has($host)) {
+                continue;
+            }
+            $url = 'https://'.$host.'/';
+            $insert[] = [
+                'host' => $host,
+                'url' => $url,
+                'url_hash' => LinkCrawlFrontier::hashFor($url),
+                'depth' => 0,
+                'status' => 'pending',
+                'attempts' => 0,
+                'next_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+            $queuedHosts->put($host, true);
+        }
+
+        return $insert === [] ? 0 : DB::table('link_crawl_frontier')->insertOrIgnore($insert);
     }
 }
