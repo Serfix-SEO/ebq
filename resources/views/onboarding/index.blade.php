@@ -1,4 +1,4 @@
-<x-layouts.guest :title="'Get Started — Serfix'">
+<x-layouts.onboarding :title="'Get Started — Serfix'">
     @if (session()->has('impersonator_id'))
         <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             You are impersonating another client account.
@@ -58,4 +58,4 @@
     @else
         <livewire:onboarding.connect-google />
     @endif
-</x-layouts.guest>
+</x-layouts.onboarding>
