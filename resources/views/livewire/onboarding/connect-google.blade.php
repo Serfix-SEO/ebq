@@ -163,7 +163,7 @@
                                 class="h-11 w-full truncate rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-sm shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
                                 <option value="">{{ __('Don’t connect Search Console') }}</option>
                                 @foreach ($gscOptions as $opt)
-                                    <option value="{{ $opt['account_id'] }}|{{ $opt['siteUrl'] }}">{{ $opt['siteUrl'] }} — {{ $opt['account_label'] }}</option>
+                                    <option value="{{ $opt['account_id'] }}|{{ $opt['siteUrl'] }}">{{ $opt['label'] ?? $opt['siteUrl'] }}</option>
                                 @endforeach
                             </select>
                         @else
@@ -180,7 +180,7 @@
                                 class="h-11 w-full truncate rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-sm shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
                                 <option value="">{{ __('Don’t connect Analytics') }}</option>
                                 @foreach ($gaOptions as $opt)
-                                    <option value="{{ $opt['account_id'] }}|{{ $opt['id'] }}">{{ $opt['name'] }} — {{ $opt['account_label'] }}</option>
+                                    <option value="{{ $opt['account_id'] }}|{{ $opt['id'] }}">{{ $opt['label'] ?? $opt['name'] }}</option>
                                 @endforeach
                             </select>
                         @else

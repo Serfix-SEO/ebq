@@ -263,12 +263,45 @@ class ConnectGoogle extends Component
         $pool = app(GoogleSourcePool::class)->forUser($user);
         $this->gaOptions = $pool['ga'];
         $this->gscOptions = $pool['gsc'];
+        $this->labelOptions();
 
         if ($pool['ga_error'] || $pool['gsc_error']) {
             $this->fetchError = __('We couldn’t load some of your Google data. You can still continue with what loaded, or reconnect the affected account.');
         }
 
         $this->autoSelectSources();
+    }
+
+    /**
+     * Human labels for the pickers — raw API identifiers read like dev-speak
+     * ("sc-domain:example.com — user@gmail.com"). Rules:
+     *  - GSC: bare host ("example.com"); URL-prefix properties keep their
+     *    path ("example.com/blog") since that's what scopes them.
+     *  - GA: the property name alone.
+     *  - The account email is appended ONLY when more than one Google
+     *    account feeds that list (it's disambiguation, not decoration).
+     */
+    private function labelOptions(): void
+    {
+        $multiGsc = count(array_unique(array_column($this->gscOptions, 'account_id'))) > 1;
+        foreach ($this->gscOptions as &$opt) {
+            $site = (string) $opt['siteUrl'];
+            if (str_starts_with($site, 'sc-domain:')) {
+                $label = substr($site, 10);
+            } else {
+                $host = (string) parse_url($site, PHP_URL_HOST);
+                $path = rtrim((string) parse_url($site, PHP_URL_PATH), '/');
+                $label = ($host !== '' ? $host : rtrim(preg_replace('#^https?://#', '', $site), '/')).$path;
+            }
+            $opt['label'] = $label.($multiGsc ? ' — '.$opt['account_label'] : '');
+        }
+        unset($opt);
+
+        $multiGa = count(array_unique(array_column($this->gaOptions, 'account_id'))) > 1;
+        foreach ($this->gaOptions as &$opt) {
+            $opt['label'] = (string) $opt['name'].($multiGa ? ' — '.$opt['account_label'] : '');
+        }
+        unset($opt);
     }
 
     /**
