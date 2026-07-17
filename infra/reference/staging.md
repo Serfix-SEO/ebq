@@ -19,8 +19,11 @@ WITHOUT touching production. Prod boxes: web A `10.0.0.2` + worker B `10.0.0.3`.
 
 - **Own DB + own Redis** — different creds, different host; no prod connection
   strings exist in staging's `.env`.
-- **Mail = `log` driver** — every mail lands in `storage/logs/laravel.log`,
-  nothing sends.
+- **Mail = REAL sending via prod Postal relay** (changed 2026-07-17 on operator
+  request — verification emails needed for QA): `POSTAL_SMTP_HOST=10.0.0.2:25`
+  over the private net, sender `"[Staging] Serfix" <noreply@serfix.io>` so every
+  staging mail is visibly prefixed. Risk accepted: staging CAN email real
+  addresses — only register test accounts with your own inboxes there.
 - **DataForSEO forced sandbox** (`DATAFORSEO_FORCE_SANDBOX=true`) + spend cap $1
   — every report call hits the free mock host.
 - **Absent on purpose**: Stripe keys (add TEST keys only if billing QA needed),
