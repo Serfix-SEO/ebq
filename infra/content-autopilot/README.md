@@ -12,7 +12,7 @@
 |---|---|---|
 | 0 | Schema, models, config, spend meters, IdeogramClient, admin settings card | ✅ shipped (staging) |
 | 1 | Pipeline core: ideation → write → score → revise loop + dispatcher | ✅ shipped (staging) |
-| 2 | Client calendar UI + setup wizard + plan gating | ⬜ next |
+| 2 | Client calendar UI + setup wizard + plan gating | ✅ shipped (staging) |
 | 3 | Publish drivers (WP plugin v2.1 / app-password / webhook) + live-URL verify | ⬜ |
 | 4 | Ideogram images end-to-end (client exists; job pending) | ⬜ |
 | 5 | Shopify, RSS/JSON feed, translations | ⬜ |
@@ -39,6 +39,32 @@ revising → ready → scheduled → publishing → published | failed | skipped
 | Humanizer | `app/Services/Content/HumanizerService.php` | promptRules() (hard style contract: dash ban, ~60 banned phrases from `ContentAutopilotConfig::bannedPhrases()`, sentence-variance rules) + clean() (mechanical strip) + lint() (deterministic tells → feeds scorer `style_clean` weight 10). NO external AI-detector APIs by design. |
 | Jobs | `app/Jobs/{PlanContentTopicsJob,ProduceContentArticleJob}.php` | queue `content` on **redis-long** (heavy pool, retry_after 3900); tries=1 (retries re-bill LLM); unique per plan/topic; `failed()` marks the topic. |
 | Dispatcher | `app/Console/Commands/ContentAutopilotDispatcher.php` | `ebq:content-autopilot` every 15 min: reap stuck (>45 min), top-up thin calendars (<7 future topics), claim due topics (48h write-ahead, ONE in-flight per website, 5/tick, ContentLlmSpendMeter gate). |
+
+## Client UI (Phase 2, 2026-07-17)
+
+- `/content` (`Route::view` + `livewire:content.content-calendar`,
+  `feature:content` middleware — new `TeamPermissions::FEATURES['content']`)
+  renders the **2-step setup wizard** while the website has no plan (business
+  description pre-filled from crawl homepage meta; offerings; cadence/length/
+  toggles/CTA; review-first default) and the **calendar** afterwards (month
+  grid + list toggle, approve/skip/retry/reschedule/add-topic, pause/resume).
+- `/content/topics/{topic}` → `livewire:content.article-review`: preview
+  (script/`on*` attributes stripped), quality ring (`reports/charts/ring`),
+  plain-language improvement labels (`ArticleReview::issueLabel` maps scorer
+  codes to client-safe copy), search-result preview, Approve → `scheduled`,
+  Request-new-draft → re-dispatch. Tenancy via `accessibleWebsitesQuery()`.
+- **Gating layers** (landmine, cost 3 test rounds): a new plan feature key
+  must be added in FOUR places — `PlanSeeder plan_features`,
+  `Plan::FEATURE_KEYS` (featureMap whitelist), `Website::FEATURE_KEYS`
+  (effective-flags trim), `Website::FEATURE_DEFAULTS` (which is ALSO the
+  global-kill default — `false` there ANDs the feature off platform-wide;
+  `content_autopilot` is deliberately `true`).
+- Status pills map internal states to neutral copy
+  (`ContentCalendar::statusPresentation`) — writing/scoring/revising all
+  render as "In progress"; failed renders "Needs attention".
+- i18n: 83 en/ar keys. Compiled-CSS audit caveat: grep the bundle with
+  ESCAPED colons (`hover\:border-orange-300`) — plain `-F ".hover:…"` false-
+  negatives; `min-h-*`/`lg:order-last` are NOT compiled (inline styles used).
 
 ## Config & admin
 
