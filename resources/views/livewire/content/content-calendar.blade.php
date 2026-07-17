@@ -269,43 +269,51 @@
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('How your articles group into content pillars around your site.') }}</p>
 
                 @php
-                    $cx = 430; $cy = 300; $rings = 210;
+                    $cx = 470; $cy = 330; $rings = 185;
                     $n = count($clusters);
                     $palette = ['#F26419', '#0EA5E9', '#10B981', '#8B5CF6', '#EF4444', '#F59E0B', '#64748B'];
                     $statusColor = ['ready' => '#10B981', 'scheduled' => '#10B981', 'published' => '#059669',
                         'writing' => '#F59E0B', 'researching' => '#F59E0B', 'scoring' => '#F59E0B', 'revising' => '#F59E0B',
                         'failed' => '#EF4444', 'approved' => '#0EA5E9', 'suggested' => '#94A3B8'];
+                    $siteLabel = \Illuminate\Support\Str::of((string) ($plan->website?->domain ?? 'Site'))
+                        ->before('.')->limit(13, '')->value();
                 @endphp
                 <div class="mt-3 overflow-x-auto">
-                    <svg viewBox="0 0 860 600" class="w-full" style="min-width:640px" role="img" aria-label="{{ __('Content strategy map') }}">
-                        {{-- pillar + leaf edges --}}
+                    <svg viewBox="0 0 940 660" class="w-full" style="min-width:660px" role="img" aria-label="{{ __('Content strategy map') }}">
                         @foreach ($clusters as $ci => $cluster)
                             @php
                                 $ang = $n <= 1 ? -M_PI/2 : (2*M_PI*$ci/$n) - M_PI/2;
                                 $px = $cx + $rings * cos($ang); $py = $cy + $rings * sin($ang);
                                 $color = $palette[$ci % count($palette)];
-                                $m = count($cluster['topics']);
+                                // Point labels outward (away from center) on the correct side.
+                                $rightSide = $px >= $cx;
+                                $shown = array_slice($cluster['topics'], 0, 5);
+                                $m = count($shown);
+                                $extra = count($cluster['topics']) - $m;
                             @endphp
-                            <line x1="{{ round($cx,1) }}" y1="{{ round($cy,1) }}" x2="{{ round($px,1) }}" y2="{{ round($py,1) }}" stroke="{{ $color }}" stroke-width="2" opacity="0.5"/>
-                            @foreach ($cluster['topics'] as $li => $topic)
+                            <line x1="{{ round($cx,1) }}" y1="{{ round($cy,1) }}" x2="{{ round($px,1) }}" y2="{{ round($py,1) }}" stroke="{{ $color }}" stroke-width="2" opacity="0.45"/>
+                            @foreach ($shown as $li => $topic)
                                 @php
-                                    $spread = 1.15;
-                                    $la = $ang + ($m <= 1 ? 0 : ($spread * ($li/($m-1) - 0.5)));
-                                    $lr = 135;
-                                    $lx = $px + $lr * cos($la); $ly = $py + $lr * sin($la);
+                                    // Fan leaves along a vertical-ish comb on the outward side.
+                                    $step = 26; $ly = $py + ($li - ($m-1)/2) * $step;
+                                    $lx = $px + ($rightSide ? 46 : -46);
                                     $sc = $statusColor[$topic['status']] ?? '#94A3B8';
+                                    $anchor = $rightSide ? 'start' : 'end';
+                                    $tx = $lx + ($rightSide ? 9 : -9);
                                 @endphp
-                                <line x1="{{ round($px,1) }}" y1="{{ round($py,1) }}" x2="{{ round($lx,1) }}" y2="{{ round($ly,1) }}" stroke="{{ $color }}" stroke-width="1" opacity="0.3"/>
+                                <path d="M {{ round($px,1) }} {{ round($py,1) }} C {{ round(($px+$lx)/2,1) }} {{ round($py,1) }}, {{ round(($px+$lx)/2,1) }} {{ round($ly,1) }}, {{ round($lx,1) }} {{ round($ly,1) }}" fill="none" stroke="{{ $color }}" stroke-width="1.2" opacity="0.35"/>
                                 <circle cx="{{ round($lx,1) }}" cy="{{ round($ly,1) }}" r="5" fill="{{ $sc }}"/>
-                                <text x="{{ round($lx + ($lx >= $px ? 9 : -9),1) }}" y="{{ round($ly+3,1) }}" font-size="10" fill="currentColor" class="text-slate-600 dark:text-slate-300" text-anchor="{{ $lx >= $px ? 'start' : 'end' }}">{{ \Illuminate\Support\Str::limit($topic['title'], 26) }}</text>
+                                <text x="{{ round($tx,1) }}" y="{{ round($ly+3.5,1) }}" font-size="11" fill="#64748b" text-anchor="{{ $anchor }}">{{ \Illuminate\Support\Str::limit($topic['title'], 30) }}</text>
                             @endforeach
-                            <circle cx="{{ round($px,1) }}" cy="{{ round($py,1) }}" r="8" fill="{{ $color }}"/>
-                            <text x="{{ round($px,1) }}" y="{{ round($py - 14,1) }}" font-size="12" font-weight="700" fill="{{ $color }}" text-anchor="middle">{{ $cluster['theme'] }}</text>
+                            @if ($extra > 0)
+                                <text x="{{ round($px + ($rightSide ? 55 : -55),1) }}" y="{{ round($py + ($m/2)*26 + 12,1) }}" font-size="10" fill="#94a3b8" text-anchor="{{ $rightSide ? 'start' : 'end' }}">+{{ $extra }} {{ __('more') }}</text>
+                            @endif
+                            <circle cx="{{ round($px,1) }}" cy="{{ round($py,1) }}" r="9" fill="{{ $color }}"/>
+                            <text x="{{ round($px,1) }}" y="{{ round($py - 15,1) }}" font-size="13" font-weight="700" fill="{{ $color }}" text-anchor="middle">{{ $cluster['theme'] }}</text>
                         @endforeach
-                        {{-- center brand node --}}
-                        <circle cx="{{ $cx }}" cy="{{ $cy }}" r="34" fill="#F26419"/>
-                        <text x="{{ $cx }}" y="{{ $cy - 2 }}" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">{{ \Illuminate\Support\Str::limit($plan->website?->domain ?? 'Site', 16) }}</text>
-                        <text x="{{ $cx }}" y="{{ $cy + 14 }}" font-size="9" fill="#ffe" text-anchor="middle" opacity="0.85">{{ __('your content') }}</text>
+                        <circle cx="{{ $cx }}" cy="{{ $cy }}" r="40" fill="#F26419"/>
+                        <text x="{{ $cx }}" y="{{ $cy - 1 }}" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">{{ $siteLabel }}</text>
+                        <text x="{{ $cx }}" y="{{ $cy + 15 }}" font-size="9" fill="#fff" text-anchor="middle" opacity="0.85">{{ __('your content') }}</text>
                     </svg>
                 </div>
             </div>
