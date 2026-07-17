@@ -267,6 +267,64 @@ class ConnectGoogle extends Component
         if ($pool['ga_error'] || $pool['gsc_error']) {
             $this->fetchError = __('We couldn’t load some of your Google data. You can still continue with what loaded, or reconnect the affected account.');
         }
+
+        $this->autoSelectSources();
+    }
+
+    /**
+     * Pre-pick the obvious GSC/GA options for the added domain so most users
+     * just review + "Save & finish" instead of hunting through dropdowns.
+     * Only fills EMPTY selections (never overrides a user's/stashed pick).
+     *
+     *  - GSC: exact host match against the site URL (`sc-domain:example.com`
+     *    or `https://www.example.com/`, www-insensitive). sc-domain wins ties.
+     *  - GA: property whose name contains the domain's brand token (name is
+     *    all GA gives us) — or the only property when exactly one exists.
+     */
+    private function autoSelectSources(): void
+    {
+        $host = strtolower(trim($this->domain));
+        $host = preg_replace('#^https?://#', '', rtrim($host, '/'));
+        $host = preg_replace('/^www\./', '', (string) $host);
+        if ($host === '') {
+            return;
+        }
+
+        if ($this->gscSelection === '') {
+            $exact = null;
+            foreach ($this->gscOptions as $opt) {
+                $site = strtolower((string) $opt['siteUrl']);
+                $siteHost = str_starts_with($site, 'sc-domain:')
+                    ? substr($site, 10)
+                    : (string) preg_replace('/^www\./', '', (string) parse_url($site, PHP_URL_HOST));
+                if ($siteHost === $host) {
+                    $exact = $opt['account_id'].'|'.$opt['siteUrl'];
+                    if (str_starts_with($site, 'sc-domain:')) {
+                        break; // domain property beats URL-prefix
+                    }
+                }
+            }
+            if ($exact !== null) {
+                $this->gscSelection = $exact;
+            }
+        }
+
+        if ($this->gaSelection === '') {
+            if (count($this->gaOptions) === 1) {
+                $only = $this->gaOptions[0];
+                $this->gaSelection = $only['account_id'].'|'.$only['id'];
+            } else {
+                $brand = preg_replace('/[^a-z0-9]/', '', explode('.', $host)[0]);
+                if ($brand !== '') {
+                    $matches = array_values(array_filter($this->gaOptions, fn ($opt) => str_contains(
+                        (string) preg_replace('/[^a-z0-9]/', '', strtolower((string) $opt['name'])), $brand
+                    )));
+                    if (count($matches) === 1) {
+                        $this->gaSelection = $matches[0]['account_id'].'|'.$matches[0]['id'];
+                    }
+                }
+            }
+        }
     }
 
     /**

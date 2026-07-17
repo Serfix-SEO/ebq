@@ -208,6 +208,40 @@ class OnboardingDataSourcesTest extends TestCase
         $this->assertSame('corrected.com', Website::where('user_id', $user->id)->first()->domain);
     }
 
+    public function test_sources_auto_selected_for_the_added_domain(): void
+    {
+        $user = User::factory()->create();
+        $account = GoogleAccount::factory()->create(['user_id' => $user->id]);
+        $this->fakePool($account->id); // gsc: sc-domain:example.com, ga: single property
+        Website::factory()->create(['user_id' => $user->id, 'domain' => 'example.com']);
+
+        Livewire::actingAs($user)
+            ->test(ConnectGoogle::class)
+            ->assertSet('step', 2)
+            // GSC matched by host, GA picked as the only property.
+            ->assertSet('gscSelection', $account->id.'|sc-domain:example.com')
+            ->assertSet('gaSelection', $account->id.'|properties/123');
+    }
+
+    public function test_auto_select_never_overrides_a_stashed_pick(): void
+    {
+        $user = User::factory()->create();
+        $account = GoogleAccount::factory()->create(['user_id' => $user->id]);
+        $this->fakePool($account->id);
+        Website::factory()->create(['user_id' => $user->id, 'domain' => 'example.com']);
+
+        // Stash from a "connect another account" bounce — must survive mount.
+        session([
+            'onboarding.gsc_selection' => $account->id.'|sc-domain:other.com',
+            'onboarding.ga_selection' => '',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConnectGoogle::class)
+            ->assertSet('gscSelection', $account->id.'|sc-domain:other.com') // kept
+            ->assertSet('gaSelection', $account->id.'|properties/123');      // empty → filled
+    }
+
     public function test_skip_without_a_website_returns_to_step_one(): void
     {
         $user = User::factory()->create();
