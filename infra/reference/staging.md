@@ -40,7 +40,10 @@ WITHOUT touching production. Prod boxes: web A `10.0.0.2` + worker B `10.0.0.3`.
 explicitly approves.** No exceptions for "trivial" fixes — prod is the
 approval gate, not the test bench.
 
-1. Make changes on box A working tree (or a branch).
+1. Make changes on box A working tree **on the `staging` branch** (created
+   2026-07-17): `git checkout staging`, commit work there. `main` receives a
+   merge only after QA + approval (step 5) — so `main`'s tip is always
+   what production runs.
 2. `sudo bash scripts/deploy-staging.sh` — rsyncs code, migrates, restarts
    staging FPM + Horizon. Never touches staging `.env`.
 3. QA at `https://staging.serfix.io` (basic auth). Site-explorer lookups return

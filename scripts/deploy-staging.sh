@@ -9,6 +9,14 @@
 # prod on purpose).
 set -euo pipefail
 
+# Branch discipline (2026-07-17): day-to-day work commits to the `staging`
+# branch; `main` receives merges only AFTER staging QA + operator approval.
+# Warn (don't block) when deploying from another branch — hotfix flows exist.
+BRANCH=$(git -C /var/www/ebq rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" != "staging" ]; then
+  echo "⚠  deploying working tree from branch '$BRANCH' (expected 'staging')"
+fi
+
 STAGING=10.0.0.4
 KEY=/root/.ssh/id_ed25519_worker
 SSH="ssh -i $KEY -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
