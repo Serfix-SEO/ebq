@@ -138,7 +138,7 @@
                         <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">{{ __('Your site in Search Console') }}</label>
                         @if (count($gscOptions))
                             <select wire:model="gscSelection"
-                                class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
+                                class="h-10 w-full truncate rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                                 <option value="">{{ __('Don’t connect Search Console') }}</option>
                                 @foreach ($gscOptions as $opt)
                                     <option value="{{ $opt['account_id'] }}|{{ $opt['siteUrl'] }}">{{ $opt['siteUrl'] }} — {{ $opt['account_label'] }}</option>
@@ -155,7 +155,7 @@
                         <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">{{ __('Your Google Analytics property') }}</label>
                         @if (count($gaOptions))
                             <select wire:model="gaSelection"
-                                class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
+                                class="h-10 w-full truncate rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800">
                                 <option value="">{{ __('Don’t connect Analytics') }}</option>
                                 @foreach ($gaOptions as $opt)
                                     <option value="{{ $opt['account_id'] }}|{{ $opt['id'] }}">{{ $opt['name'] }} — {{ $opt['account_label'] }}</option>
@@ -174,14 +174,14 @@
                         {{ __('Add another Google account') }}
                     </button>
 
-                    <div class="flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+                    <div class="flex items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                         <button type="button" wire:click="skipForNow"
-                            class="text-sm font-medium text-slate-500 transition hover:text-slate-700 dark:hover:text-slate-300">
-                            {{ __('Skip — take me to my dashboard') }}
+                            class="whitespace-nowrap text-sm font-medium text-slate-500 transition hover:text-slate-700 dark:hover:text-slate-300">
+                            {{ __('Skip for now') }}
                         </button>
                         <button type="submit"
-                            class="inline-flex h-10 items-center gap-2 rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700">
-                            {{ __('Save & open dashboard') }}
+                            class="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700">
+                            {{ __('Save & finish') }}
                             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                         </button>
                     </div>
