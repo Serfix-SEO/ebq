@@ -112,6 +112,12 @@ class LlmProviderSwitchTest extends TestCase
             'default_check_interval_hours' => 24,
             'keyword_volume_provider' => 'keywords_everywhere',
             'banner_type' => 'image',
+            'autopilot_max_inline' => 2,
+            'autopilot_rendering_speed' => 'TURBO',
+            'autopilot_style_type' => 'AUTO',
+            'autopilot_target_score' => 85,
+            'autopilot_max_revisions' => 3,
+            'autopilot_publish_floor' => 60,
         ];
     }
 

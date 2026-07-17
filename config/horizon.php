@@ -49,7 +49,7 @@ $heavyPool = [
     // redis-long: retry_after 3900 > the 3600 finalize timeout below, so a long
     // AnalyzeSiteJob is never re-reserved mid-run (see config/queue.php).
     'connection' => 'redis-long',
-    'queue' => ['sync', 'crawl-finalize'],
+    'queue' => ['sync', 'crawl-finalize', 'content'],
     'balance' => 'auto',
     'autoScalingStrategy' => 'size',
     'maxProcesses' => 4,

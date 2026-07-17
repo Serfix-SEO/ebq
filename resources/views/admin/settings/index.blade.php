@@ -67,6 +67,105 @@
                 </p>
             </section>
 
+            {{-- ── Content Autopilot ────────────────────────────────── --}}
+            <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Content Autopilot</h2>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    The auto content calendar pipeline. Per-stage model pins ("Automatic" follows the platform default, with the write/revise stages preferring DeepSeek when configured), image generation, and the quality loop. Spend caps live in <code>.env</code> (CONTENT_LLM_MONTHLY_CAP_USD / IDEOGRAM_MONTHLY_CAP_USD).
+                </p>
+
+                <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                    @foreach ($autopilot['stages'] as $stage)
+                        <div>
+                            <label for="autopilot_model_{{ $stage }}" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">{{ ucfirst(str_replace('_', ' ', $stage)) }} model</label>
+                            <select id="autopilot_model_{{ $stage }}" name="autopilot_model_{{ $stage }}"
+                                class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                <option value="auto" @selected(old('autopilot_model_'.$stage, $autopilot['stage_models'][$stage]) === 'auto')>Automatic</option>
+                                <optgroup label="Mistral">
+                                    @foreach ($mistralModels as $m)
+                                        <option value="mistral:{{ $m['id'] }}" @selected(old('autopilot_model_'.$stage, $autopilot['stage_models'][$stage]) === 'mistral:'.$m['id'])>{{ $m['label'] ?? $m['id'] }}</option>
+                                    @endforeach
+                                </optgroup>
+                                <optgroup label="DeepSeek">
+                                    @foreach ($deepseekModels as $m)
+                                        <option value="deepseek:{{ $m['id'] }}" @selected(old('autopilot_model_'.$stage, $autopilot['stage_models'][$stage]) === 'deepseek:'.$m['id'])>{{ $m['label'] ?? $m['id'] }}</option>
+                                    @endforeach
+                                </optgroup>
+                            </select>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="mt-5 grid gap-4 sm:grid-cols-3">
+                    <div>
+                        <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            <input type="hidden" name="autopilot_images_enabled" value="0" />
+                            <input type="checkbox" name="autopilot_images_enabled" value="1"
+                                @checked(old('autopilot_images_enabled', $autopilot['images_enabled']))
+                                class="rounded border-slate-300 text-orange-600 focus:ring-orange-500 dark:border-slate-700" />
+                            Generate images
+                        </label>
+                        <label class="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            <input type="hidden" name="autopilot_featured_enabled" value="0" />
+                            <input type="checkbox" name="autopilot_featured_enabled" value="1"
+                                @checked(old('autopilot_featured_enabled', $autopilot['featured_enabled']))
+                                class="rounded border-slate-300 text-orange-600 focus:ring-orange-500 dark:border-slate-700" />
+                            Featured image
+                        </label>
+                    </div>
+                    <div>
+                        <label for="autopilot_max_inline" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Max inline images / article</label>
+                        <input type="number" id="autopilot_max_inline" name="autopilot_max_inline" min="0" max="4" required
+                            value="{{ old('autopilot_max_inline', $autopilot['max_inline']) }}"
+                            class="mt-1 w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                    </div>
+                    <div>
+                        <label for="autopilot_rendering_speed" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Image quality</label>
+                        <select id="autopilot_rendering_speed" name="autopilot_rendering_speed"
+                            class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                            @foreach (['FLASH' => 'Flash ($0.03)', 'TURBO' => 'Turbo ($0.03)', 'DEFAULT' => 'Default ($0.06)', 'QUALITY' => 'Quality ($0.09)'] as $value => $label)
+                                <option value="{{ $value }}" @selected(old('autopilot_rendering_speed', $autopilot['rendering_speed']) === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <label for="autopilot_style_type" class="mt-2 block text-xs font-semibold text-slate-700 dark:text-slate-300">Image style</label>
+                        <select id="autopilot_style_type" name="autopilot_style_type"
+                            class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                            @foreach (['AUTO', 'GENERAL', 'REALISTIC', 'DESIGN'] as $value)
+                                <option value="{{ $value }}" @selected(old('autopilot_style_type', $autopilot['style_type']) === $value)>{{ ucfirst(strtolower($value)) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-5 grid gap-4 sm:grid-cols-3">
+                    <div>
+                        <label for="autopilot_target_score" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Target SEO score</label>
+                        <input type="number" id="autopilot_target_score" name="autopilot_target_score" min="50" max="100" required
+                            value="{{ old('autopilot_target_score', $autopilot['target_score']) }}"
+                            class="mt-1 w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Revisions stop at this score.</p>
+                    </div>
+                    <div>
+                        <label for="autopilot_max_revisions" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Max revisions</label>
+                        <input type="number" id="autopilot_max_revisions" name="autopilot_max_revisions" min="0" max="6" required
+                            value="{{ old('autopilot_max_revisions', $autopilot['max_revisions']) }}"
+                            class="mt-1 w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                    </div>
+                    <div>
+                        <label for="autopilot_publish_floor" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Publish floor</label>
+                        <input type="number" id="autopilot_publish_floor" name="autopilot_publish_floor" min="0" max="100" required
+                            value="{{ old('autopilot_publish_floor', $autopilot['publish_floor']) }}"
+                            class="mt-1 w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Below this the topic fails instead of publishing.</p>
+                    </div>
+                </div>
+
+                <label for="autopilot_banned_phrases" class="mt-5 block text-xs font-semibold text-slate-700 dark:text-slate-300">Banned phrases (one per line)</label>
+                <textarea id="autopilot_banned_phrases" name="autopilot_banned_phrases" rows="5"
+                    class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">{{ old('autopilot_banned_phrases', $autopilot['banned_phrases']) }}</textarea>
+                <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">AI-tell phrases the writer must avoid and the style lint flags. Clearing the box restores the built-in list.</p>
+            </section>
+
             {{-- ── Rank tracker ─────────────────────────────────────── --}}
             <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Rank tracker</h2>

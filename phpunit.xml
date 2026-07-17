@@ -55,6 +55,7 @@
              Http::fake() and set a fake key via config(). -->
         <env name="MISTRAL_API_KEY" value=""/>
         <env name="DEEPSEEK_API_KEY" value=""/>
+        <env name="IDEOGRAM_API_KEY" value=""/>
         <!-- Same rule for the Site Explorer report providers (found again
              2026-07-14: a plain GET /backlinks in a test dispatched a REAL
              billed DataForSEO generation via QUEUE_CONNECTION=sync, because

@@ -38,5 +38,11 @@ final class Queues
 
     public const CRAWL_FINALIZE = 'crawl-finalize';
 
+    /** Content Autopilot production line (brief→write→score→revise, images,
+     *  publish). Long LLM jobs (≤1800s) — served by the heavy pool
+     *  (redis-long, retry_after 3900) so a revise loop is never re-reserved
+     *  mid-run and never starves user-facing queues. */
+    public const CONTENT = 'content';
+
     public const FLEET = 'fleet';
 }

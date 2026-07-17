@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Support\AiModelConfig;
 use App\Support\AuditConfig;
+use App\Support\ContentAutopilotConfig;
 use App\Support\KeywordProviderConfig;
 use App\Support\LlmProviderConfig;
 use App\Support\LocaleConfig;
@@ -43,6 +44,25 @@ class PlatformSettingsController extends Controller
             'keywordProvider'              => KeywordProviderConfig::currentProvider(),
             'keywordProviders'             => KeywordProviderConfig::options(),
             'multilingualEnabled'          => LocaleConfig::multilingualEnabled(),
+            'autopilot' => [
+                'stages' => ContentAutopilotConfig::STAGES,
+                'stage_models' => collect(ContentAutopilotConfig::STAGES)
+                    ->mapWithKeys(function (string $stage) {
+                        $m = Setting::get('content.model.'.$stage);
+
+                        return [$stage => is_array($m) && isset($m['provider'], $m['model'])
+                            ? $m['provider'].':'.$m['model'] : 'auto'];
+                    })->all(),
+                'images_enabled' => ContentAutopilotConfig::imagesEnabled(),
+                'featured_enabled' => ContentAutopilotConfig::featuredImageEnabled(),
+                'max_inline' => ContentAutopilotConfig::maxInlineImages(),
+                'rendering_speed' => ContentAutopilotConfig::renderingSpeed(),
+                'style_type' => ContentAutopilotConfig::styleType(),
+                'target_score' => ContentAutopilotConfig::targetScore(),
+                'max_revisions' => ContentAutopilotConfig::maxRevisions(),
+                'publish_floor' => ContentAutopilotConfig::publishFloor(),
+                'banned_phrases' => implode("\n", ContentAutopilotConfig::bannedPhrases()),
+            ],
             'banner' => [
                 'enabled'     => ((string) Setting::get('plugin.banner.enabled', '0')) === '1',
                 'type'        => (string) Setting::get('plugin.banner.type', 'image'),
@@ -79,6 +99,19 @@ class PlatformSettingsController extends Controller
             'competitor_keywords_everywhere' => ['nullable', 'boolean'],
             'multilingual_enabled' => ['nullable', 'boolean'],
             'keyword_volume_provider' => ['required', 'string', Rule::in(KeywordProviderConfig::PROVIDERS)],
+            'autopilot_model_ideate' => ['nullable', 'string', 'max:120'],
+            'autopilot_model_write' => ['nullable', 'string', 'max:120'],
+            'autopilot_model_revise' => ['nullable', 'string', 'max:120'],
+            'autopilot_model_image_prompts' => ['nullable', 'string', 'max:120'],
+            'autopilot_images_enabled' => ['nullable', 'boolean'],
+            'autopilot_featured_enabled' => ['nullable', 'boolean'],
+            'autopilot_max_inline' => ['required', 'integer', 'min:0', 'max:4'],
+            'autopilot_rendering_speed' => ['required', 'string', Rule::in(['FLASH', 'TURBO', 'DEFAULT', 'QUALITY'])],
+            'autopilot_style_type' => ['required', 'string', Rule::in(['AUTO', 'GENERAL', 'REALISTIC', 'DESIGN'])],
+            'autopilot_target_score' => ['required', 'integer', 'min:50', 'max:100'],
+            'autopilot_max_revisions' => ['required', 'integer', 'min:0', 'max:6'],
+            'autopilot_publish_floor' => ['required', 'integer', 'min:0', 'max:100'],
+            'autopilot_banned_phrases' => ['nullable', 'string', 'max:8000'],
             'banner_enabled' => ['nullable', 'boolean'],
             'banner_type' => ['required', 'string', Rule::in(['image', 'youtube'])],
             'banner_title' => ['nullable', 'string', 'max:120'],
@@ -99,6 +132,35 @@ class PlatformSettingsController extends Controller
         KeywordProviderConfig::setProvider((string) $data['keyword_volume_provider']);
 
         LocaleConfig::setMultilingualEnabled($request->boolean('multilingual_enabled'));
+
+        // Content Autopilot — per-stage model pins ("auto" clears the pin,
+        // otherwise "provider:model" validated against that provider's list).
+        foreach (ContentAutopilotConfig::STAGES as $stage) {
+            $raw = trim((string) ($data['autopilot_model_'.$stage] ?? 'auto'));
+            if ($raw === '' || $raw === 'auto' || ! str_contains($raw, ':')) {
+                ContentAutopilotConfig::setModelFor($stage, null, null);
+
+                continue;
+            }
+            [$provider, $model] = explode(':', $raw, 2);
+            $ids = $provider === LlmProviderConfig::PROVIDER_DEEPSEEK ? $deepseekIds : $mistralIds;
+            if (in_array($provider, LlmProviderConfig::PROVIDERS, true) && in_array($model, $ids, true)) {
+                ContentAutopilotConfig::setModelFor($stage, $provider, $model);
+            }
+        }
+        Setting::set('content.images.enabled', $request->boolean('autopilot_images_enabled'));
+        Setting::set('content.images.featured_enabled', $request->boolean('autopilot_featured_enabled'));
+        Setting::set('content.images.max_inline', (int) $data['autopilot_max_inline']);
+        Setting::set('content.images.rendering_speed', (string) $data['autopilot_rendering_speed']);
+        Setting::set('content.images.style_type', (string) $data['autopilot_style_type']);
+        Setting::set('content.revise.target_score', (int) $data['autopilot_target_score']);
+        Setting::set('content.revise.max_iterations', (int) $data['autopilot_max_revisions']);
+        Setting::set('content.revise.publish_floor', (int) $data['autopilot_publish_floor']);
+        $phrases = array_values(array_filter(array_map(
+            static fn ($line) => mb_strtolower(trim($line)),
+            preg_split('/\r?\n/', (string) ($data['autopilot_banned_phrases'] ?? '')) ?: []
+        )));
+        Setting::set('content.humanizer.banned_phrases', $phrases === [] ? null : $phrases);
 
         Setting::set('plugin.banner.enabled', $request->boolean('banner_enabled') ? '1' : '0');
         Setting::set('plugin.banner.type', (string) $data['banner_type']);

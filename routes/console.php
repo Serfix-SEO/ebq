@@ -44,6 +44,10 @@ Schedule::command('ebq:send-trial-discount-emails')->dailyAt('09:15')->withoutOv
 // shared Redis; this drains + mails admins a digest. Empty buffer = no mail.
 Schedule::command('ebq:failed-jobs-alert')->everyFifteenMinutes()->withoutOverlapping();
 
+// Content Autopilot heartbeat: reap stuck topics, top up thin calendars,
+// dispatch due article productions (writes 48h ahead of each publish slot).
+Schedule::command('ebq:content-autopilot')->everyFifteenMinutes()->withoutOverlapping();
+
 // Content-hash re-audit gate (2026-07-06): independently re-fetches a bounded
 // batch of the oldest completed audits and queues a re-audit only if the
 // page's actual content changed — catches WordPress not bumping `modified`

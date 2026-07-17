@@ -229,6 +229,31 @@ return [
             : null,
     ],
 
+    // Ideogram — AI image generation for Content Autopilot articles
+    // (featured + inline images). v3 generate endpoint; generated URLs EXPIRE
+    // so images are downloaded immediately in the job. Costs per image:
+    // TURBO $0.03 / DEFAULT $0.06 / QUALITY $0.09. Spend is circuit-broken by
+    // {@see \App\Services\Content\IdeogramSpendMeter} — admin-only knowledge,
+    // over-cap articles simply publish without images. Null/0 cap = disabled.
+    'ideogram' => [
+        'key' => env('IDEOGRAM_API_KEY'),
+        'base_url' => env('IDEOGRAM_BASE_URL', 'https://api.ideogram.ai/v1'),
+        'timeout' => (int) env('IDEOGRAM_TIMEOUT_S', 90),
+        'monthly_cap_usd' => env('IDEOGRAM_MONTHLY_CAP_USD') !== null
+            ? (float) env('IDEOGRAM_MONTHLY_CAP_USD')
+            : null,
+    ],
+
+    // Content Autopilot LLM spend breaker — caps AUTOPILOT writing spend
+    // (estimated from token usage × provider $/token config) separately from
+    // interactive AI usage, so a runaway calendar can't drain the LLM budget.
+    // {@see \App\Services\Content\ContentLlmSpendMeter}. Null/0 = disabled.
+    'content_autopilot' => [
+        'llm_monthly_cap_usd' => env('CONTENT_LLM_MONTHLY_CAP_USD') !== null
+            ? (float) env('CONTENT_LLM_MONTHLY_CAP_USD')
+            : null,
+    ],
+
     // Open PageRank (by Keywords Everywhere) — global popularity rank + 0-10
     // score + monthly history per domain. Bulk endpoint accepts up to 100
     // domains/call; free tier 30k domains/mo. Used for the report's Popularity

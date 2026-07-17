@@ -403,8 +403,10 @@ class TrialCleanupTest extends TestCase
     {
         $user = $this->trialUser(5 * 24); // day 5 of 14, no websites yet
 
+        // Domain-first onboarding (2026-07-17 redesign): step 1 asks for the
+        // website; Google connect is step 2.
         $res = $this->actingAs($user)->get(route('onboarding'))->assertOk();
-        $res->assertSee('Connect your Google account');
+        $res->assertSee('Add your website');
         $res->assertDontSee('Your free trial has ended');
     }
 }
