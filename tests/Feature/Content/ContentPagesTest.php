@@ -50,7 +50,7 @@ class ContentPagesTest extends TestCase
             ->assertSee(__('Tell us about your business'));
     }
 
-    public function test_wizard_creates_plan_and_dispatches_topic_planning(): void
+    public function test_wizard_creates_draft_plan_and_dispatches_topic_planning(): void
     {
         Queue::fake();
         [$user, $website] = $this->userWithWebsite();
@@ -59,17 +59,33 @@ class ContentPagesTest extends TestCase
 
         Livewire::test(ContentCalendar::class)
             ->set('businessDescription', 'We sell handmade wooden furniture for small apartments and offer design advice.')
-            ->call('nextStep')
-            ->set('articlesPerWeek', 3)
-            ->set('articleLength', 2000)
-            ->call('createPlan')
+            ->call('toOfferings')
+            ->set('sellItems', ['Wooden tables', 'Chairs'])
+            ->set('dontSellItems', ['Repairs'])
+            ->call('toHowItWorks')
             ->assertHasNoErrors();
 
         $plan = ContentPlan::query()->where('website_id', $website->id)->first();
         $this->assertNotNull($plan);
-        $this->assertSame(3, (int) $plan->articles_per_week);
-        $this->assertFalse((bool) $plan->auto_publish);
+        // Created as a DRAFT so topic ideation runs while the user finishes setup.
+        $this->assertSame(ContentPlan::STATUS_DRAFT, $plan->status);
+        $this->assertSame(7, (int) $plan->articles_per_week);
+        $this->assertSame(['Wooden tables', 'Chairs'], $plan->offerings['sell']);
         Queue::assertPushed(PlanContentTopicsJob::class, 1);
+    }
+
+    public function test_launch_activates_the_draft_plan(): void
+    {
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id, 'status' => ContentPlan::STATUS_DRAFT,
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class)->call('launch');
+
+        $this->assertSame(ContentPlan::STATUS_ACTIVE, $plan->fresh()->status);
     }
 
     public function test_wizard_step_one_validates_description(): void
@@ -80,7 +96,7 @@ class ContentPagesTest extends TestCase
 
         Livewire::test(ContentCalendar::class)
             ->set('businessDescription', 'too short')
-            ->call('nextStep')
+            ->call('toOfferings')
             ->assertHasErrors(['businessDescription']);
     }
 

@@ -7,6 +7,8 @@ use App\Jobs\ProduceContentArticleJob;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\Website;
+use App\Services\Content\ContentSetupInsights;
+use App\Services\Content\SiteProfileExtractor;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -15,36 +17,50 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * Content Autopilot main page: the setup wizard (while the website has no
- * plan) and the monthly calendar (grid + list) once it does.
+ * Content Autopilot main page: a 5-step setup wizard (while the website has
+ * no ACTIVE plan) and the monthly calendar once the plan is live.
+ *
+ * Wizard steps: 1 business profile → 2 offerings (sell / don't-sell lists) →
+ * 3 how-it-works → 4 competitors & authority → 5 first articles. A DRAFT plan
+ * is created at the end of step 2 so topic ideation runs in the BACKGROUND
+ * while the user reads steps 3-4; by step 5 real topics are ready to show.
+ * Finishing the wizard flips the plan to active and article writing begins.
  *
  * Client copy invariant: pipeline internals (scores below floor, spend caps,
- * model names) NEVER surface here — statuses map to neutral labels via
- * statusLabel()/statusColor().
+ * model names) NEVER surface here.
  */
 class ContentCalendar extends Component
 {
+    /** Baked cadence defaults (owner decision 2026-07-17: 1 article/day). */
+    private const DEFAULT_PER_WEEK = 7;
+
+    private const DEFAULT_LENGTH = 2000; // mid of the 1,500-2,500 band
+
     public ?string $websiteId = null;
 
     // Calendar state
-    public string $month = '';        // Y-m
-    public string $view = 'grid';     // grid|list
+    public string $month = '';
+    public string $view = 'grid';
 
-    // Wizard state (shown while no plan exists)
+    // ── Wizard state ──
     public int $wizardStep = 1;
+    public ?string $draftPlanId = null;
     public bool $analyzing = false;
-    public bool $analyzed = false;
-    public string $businessDescription = '';
-    public string $sellInput = '';
-    public string $dontSellInput = '';
-    public int $articlesPerWeek = 3;
-    public int $articleLength = 2000;
-    public bool $autoPublish = false;
-    public bool $includeToc = true;
-    public bool $includeTakeaways = true;
-    public bool $includeFaq = true;
 
-    // Inline add-topic form
+    public string $brandName = '';
+    public string $language = 'en';
+    public string $country = '';
+    public string $businessDescription = '';
+
+    /** @var list<string> */
+    public array $sellItems = [];
+
+    /** @var list<string> */
+    public array $dontSellItems = [];
+    public string $newSell = '';
+    public string $newDont = '';
+
+    // Inline add-topic form (calendar)
     public bool $showAddTopic = false;
     public string $newTitle = '';
     public string $newKeyword = '';
@@ -53,76 +69,92 @@ class ContentCalendar extends Component
     {
         $this->websiteId = session('current_website_id');
         $this->month = now()->format('Y-m');
-        $this->prefillWizard();
+        $this->bootWizard();
     }
 
     #[On('website-changed')]
     public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
+        $this->reset('wizardStep', 'draftPlanId', 'businessDescription', 'sellItems', 'dontSellItems', 'brandName');
         $this->wizardStep = 1;
-        $this->prefillWizard();
+        $this->bootWizard();
     }
 
     // ── Wizard ──────────────────────────────────────────────────────────
 
     /**
-     * Arm the deferred site analysis (wire:init) — the LLM extraction takes
-     * seconds, so it must not block the first paint.
+     * Prepare wizard state: resume a draft plan if one exists, else arm the
+     * deferred site analysis (wire:init) for the fresh flow.
      */
-    private function prefillWizard(): void
+    private function bootWizard(): void
     {
-        $this->analyzing = $this->website() !== null && $this->plan() === null;
-        $this->analyzed = false;
+        $website = $this->website();
+        $this->brandName = $this->brandName ?: $this->guessBrand($website);
+
+        $draft = $this->draftPlan();
+        if ($draft !== null) {
+            // Resume: reload the saved profile and jump past the offerings step.
+            $this->draftPlanId = $draft->id;
+            $this->businessDescription = $this->businessDescription ?: (string) $draft->business_description;
+            $offerings = (array) ($draft->offerings ?? []);
+            $this->sellItems = $this->sellItems ?: array_values((array) ($offerings['sell'] ?? []));
+            $this->dontSellItems = $this->dontSellItems ?: array_values((array) ($offerings['dont_sell'] ?? []));
+            $this->language = $draft->language ?: 'en';
+            $this->country = (string) ($draft->country ?? '');
+            $this->wizardStep = max($this->wizardStep, 3);
+            $this->analyzing = false;
+
+            return;
+        }
+
+        $this->analyzing = $website !== null && $this->activePlan() === null;
     }
 
-    /**
-     * Auto-detect the business profile from crawl data (SiteProfileExtractor:
-     * one cached LLM call over the site's own pages). Owner QA 2026-07-17:
-     * offerings + description must be auto-detected, manual entry stays as
-     * the override. Falls back to the homepage meta description.
-     */
+    /** Auto-detect the business profile from crawl data (cached LLM call). */
     public function analyzeSite(): void
     {
         $this->analyzing = false;
-        $this->analyzed = true;
 
         $website = $this->website();
         if ($website === null || $this->plan() !== null) {
             return;
         }
 
-        $profile = app(\App\Services\Content\SiteProfileExtractor::class)->extract($website);
+        $profile = app(SiteProfileExtractor::class)->extract($website);
 
         if ($this->businessDescription === '') {
             $this->businessDescription = (string) ($profile['description'] ?? '');
         }
-        if ($this->sellInput === '' && $profile['sell'] !== []) {
-            $this->sellInput = implode("\n", $profile['sell']);
+        if ($this->sellItems === [] && ! empty($profile['sell'])) {
+            $this->sellItems = array_values($profile['sell']);
         }
-        if ($this->dontSellInput === '' && $profile['dont_sell'] !== []) {
-            $this->dontSellInput = implode("\n", $profile['dont_sell']);
+        if ($this->dontSellItems === [] && ! empty($profile['dont_sell'])) {
+            $this->dontSellItems = array_values($profile['dont_sell']);
         }
 
-        // Fallback: homepage meta description beats an empty box.
         if ($this->businessDescription === '') {
             try {
                 if ($website->crawl_site_id) {
                     $this->businessDescription = (string) (DB::table('website_pages')
                         ->where('crawl_site_id', $website->crawl_site_id)
-                        ->whereNotNull('meta_description')
-                        ->where('meta_description', '!=', '')
-                        ->orderBy('url')
-                        ->limit(1)
-                        ->value('meta_description') ?? '');
+                        ->whereNotNull('meta_description')->where('meta_description', '!=', '')
+                        ->orderBy('url')->limit(1)->value('meta_description') ?? '');
                 }
             } catch (\Throwable) {
-                // No crawl data yet — the client types it.
             }
         }
     }
 
-    public function nextStep(): void
+    public function goToStep(int $step): void
+    {
+        // Only allow jumping to steps already unlocked (never skip ahead).
+        $max = $this->draftPlanId !== null ? 5 : 2;
+        $this->wizardStep = max(1, min($step, $max));
+    }
+
+    /** Step 1 → 2 */
+    public function toOfferings(): void
     {
         $this->validate([
             'businessDescription' => 'required|string|min:30|max:1000',
@@ -131,12 +163,50 @@ class ContentCalendar extends Component
         $this->wizardStep = 2;
     }
 
-    public function backStep(): void
+    // Offerings list editing.
+    public function addSell(): void
     {
-        $this->wizardStep = 1;
+        $v = trim($this->newSell);
+        if ($v !== '') {
+            $this->sellItems[] = mb_substr($v, 0, 120);
+            $this->newSell = '';
+        }
     }
 
-    public function createPlan(): void
+    public function addDont(): void
+    {
+        $v = trim($this->newDont);
+        if ($v !== '') {
+            $this->dontSellItems[] = mb_substr($v, 0, 120);
+            $this->newDont = '';
+        }
+    }
+
+    public function removeSell(int $i): void
+    {
+        unset($this->sellItems[$i]);
+        $this->sellItems = array_values($this->sellItems);
+    }
+
+    public function removeDont(int $i): void
+    {
+        unset($this->dontSellItems[$i]);
+        $this->dontSellItems = array_values($this->dontSellItems);
+    }
+
+    public function moveSell(int $i, int $dir): void
+    {
+        $j = $i + $dir;
+        if (isset($this->sellItems[$i], $this->sellItems[$j])) {
+            [$this->sellItems[$i], $this->sellItems[$j]] = [$this->sellItems[$j], $this->sellItems[$i]];
+        }
+    }
+
+    /**
+     * Step 2 → 3: persist the DRAFT plan and kick off topic ideation in the
+     * background so the calendar is ready by the "first articles" step.
+     */
+    public function toHowItWorks(): void
     {
         $website = $this->website();
         if ($website === null) {
@@ -148,40 +218,71 @@ class ContentCalendar extends Component
             return;
         }
 
-        $this->validate([
-            'articlesPerWeek' => 'required|integer|min:1|max:7',
-            'articleLength' => 'required|integer|in:1500,2000,2500,3000',
-        ]);
+        $sell = array_values(array_filter(array_map('trim', $this->sellItems)));
+        $dont = array_values(array_filter(array_map('trim', $this->dontSellItems)));
 
-        $split = fn (string $raw) => array_values(array_filter(array_map('trim', preg_split('/[\n,]+/', $raw) ?: [])));
+        $plan = ContentPlan::query()->updateOrCreate(
+            ['website_id' => $website->id],
+            [
+                'status' => ContentPlan::STATUS_DRAFT,
+                'articles_per_week' => self::DEFAULT_PER_WEEK,
+                'article_length' => self::DEFAULT_LENGTH,
+                'auto_publish' => false,
+                'review_hours' => 24,
+                'toggles' => ['toc' => true, 'key_takeaways' => true, 'faq' => true,
+                    'external_links' => true, 'cta_enabled' => false],
+                'business_description' => $this->businessDescription,
+                'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
+                'language' => $this->language ?: 'en',
+                'country' => $this->country ?: null,
+            ]
+        );
+        $this->draftPlanId = $plan->id;
 
-        ContentPlan::query()->create([
-            'website_id' => $website->id,
-            'status' => ContentPlan::STATUS_ACTIVE,
-            'articles_per_week' => $this->articlesPerWeek,
-            'article_length' => $this->articleLength,
-            'auto_publish' => $this->autoPublish,
-            'review_hours' => 24,
-            'toggles' => [
-                'toc' => $this->includeToc,
-                'key_takeaways' => $this->includeTakeaways,
-                'faq' => $this->includeFaq,
-                'external_links' => true,
-                'cta_enabled' => false,
-            ],
-            'cta_url' => null,
-            'business_description' => $this->businessDescription,
-            'offerings' => [
-                'sell' => array_slice($split($this->sellInput), 0, 12),
-                'dont_sell' => array_slice($split($this->dontSellInput), 0, 12),
-            ],
-            'language' => $website->owner_locale ?? 'en',
-            'country' => null,
-        ]);
+        // Generate the calendar in the background (only if empty — resume-safe).
+        if ($plan->topics()->count() === 0) {
+            PlanContentTopicsJob::dispatch($plan->id);
+        }
 
-        PlanContentTopicsJob::dispatch($this->plan()->id);
+        $this->wizardStep = 3;
+    }
 
-        session()->flash('content-status', __('Your content calendar is being prepared. First topics appear within a few minutes.'));
+    public function toCompetitors(): void
+    {
+        $this->wizardStep = 4;
+    }
+
+    public function toFirstArticles(): void
+    {
+        $this->wizardStep = 5;
+    }
+
+    /** Remove a suggested topic from the "first articles" preview. */
+    public function dropTopic(string $topicId): void
+    {
+        $this->draftPlan()?->topics()->whereKey($topicId)->update(['status' => ContentTopic::STATUS_SKIPPED]);
+    }
+
+    /** Finish the wizard: activate the plan → article writing begins. */
+    public function launch(): void
+    {
+        $plan = $this->draftPlan();
+        if ($plan === null) {
+            return;
+        }
+        $plan->update(['status' => ContentPlan::STATUS_ACTIVE]);
+        $this->draftPlanId = null;
+        $this->wizardStep = 1;
+        session()->flash('content-status', __('Your content calendar is live. Articles are being written and will appear for your review.'));
+    }
+
+    private function guessBrand(?Website $website): string
+    {
+        if ($website === null) {
+            return '';
+        }
+
+        return Str::of((string) $website->domain)->before('.')->replace('-', ' ')->title()->value();
     }
 
     // ── Calendar actions ────────────────────────────────────────────────
@@ -215,11 +316,7 @@ class ContentCalendar extends Component
     {
         $topic = $this->topicOrFail($topicId);
         if ($topic !== null && $topic->status === ContentTopic::STATUS_FAILED) {
-            $topic->forceFill([
-                'status' => ContentTopic::STATUS_APPROVED,
-                'last_error' => null,
-                'stage_started_at' => null,
-            ])->save();
+            $topic->forceFill(['status' => ContentTopic::STATUS_APPROVED, 'last_error' => null, 'stage_started_at' => null])->save();
             ProduceContentArticleJob::dispatch($topic->id);
         }
     }
@@ -245,7 +342,7 @@ class ContentCalendar extends Component
 
     public function addTopic(): void
     {
-        $plan = $this->plan();
+        $plan = $this->activePlan();
         if ($plan === null) {
             return;
         }
@@ -268,11 +365,11 @@ class ContentCalendar extends Component
 
     public function pauseOrResume(): void
     {
-        $plan = $this->plan();
+        $plan = $this->activePlan();
         $plan?->update(['status' => $plan->isActive() ? ContentPlan::STATUS_PAUSED : ContentPlan::STATUS_ACTIVE]);
     }
 
-    // ── Presentation helpers (used by the blade) ────────────────────────
+    // ── Presentation helpers ────────────────────────────────────────────
 
     /** @return array{label:string, color:string} */
     public static function statusPresentation(string $status): array
@@ -304,6 +401,7 @@ class ContentCalendar extends Component
         return Auth::user()?->accessibleWebsitesQuery()->whereKey($this->websiteId)->first();
     }
 
+    /** Any plan for this website (draft/active/paused). */
     private function plan(): ?ContentPlan
     {
         return $this->websiteId
@@ -311,57 +409,27 @@ class ContentCalendar extends Component
             : null;
     }
 
-    private function topicOrFail(string $topicId): ?ContentTopic
+    private function activePlan(): ?ContentPlan
     {
         $plan = $this->plan();
 
-        return $plan?->topics()->whereKey($topicId)->first();
+        return ($plan !== null && $plan->status !== ContentPlan::STATUS_DRAFT) ? $plan : null;
     }
 
-    public function render()
+    private function draftPlan(): ?ContentPlan
     {
         $plan = $this->plan();
-        $monthStart = Carbon::createFromFormat('Y-m', $this->month)->startOfMonth();
 
-        $topics = $plan === null ? collect() : $plan->topics()
-            ->with('currentArticle:id,topic_id,seo_score,word_count,version')
-            ->whereBetween('scheduled_for', [
-                $monthStart->copy()->startOfWeek(),
-                $monthStart->copy()->endOfMonth()->endOfWeek(),
-            ])
-            ->orderBy('scheduled_for')->orderBy('position')
-            ->get();
+        return ($plan !== null && $plan->status === ContentPlan::STATUS_DRAFT) ? $plan : null;
+    }
 
-        // Build the week grid (Mon-start) covering the month.
-        $days = [];
-        $cursor = $monthStart->copy()->startOfWeek();
-        $end = $monthStart->copy()->endOfMonth()->endOfWeek();
-        while ($cursor <= $end) {
-            $days[] = $cursor->copy();
-            $cursor->addDay();
-        }
-
-        // All topics (not just this month) power the overview + strategy map.
-        $all = $plan === null ? collect() : $plan->topics()
-            ->whereNotIn('status', [ContentTopic::STATUS_SKIPPED])
-            ->get(['id', 'title', 'target_keyword', 'secondary_keywords', 'keyword_volume', 'source', 'status']);
-
-        return view('livewire.content.content-calendar', [
-            'plan' => $plan,
-            'topics' => $topics,
-            'topicsByDate' => $topics->groupBy(fn ($t) => $t->scheduled_for?->toDateString() ?? ''),
-            'days' => $days,
-            'monthStart' => $monthStart,
-            'hasWebsite' => $this->website() !== null,
-            'stats' => $this->overviewStats($all),
-            'audience' => $this->audienceSearches($all),
-            'clusters' => $this->strategyClusters($all),
-        ]);
+    private function topicOrFail(string $topicId): ?ContentTopic
+    {
+        return $this->activePlan()?->topics()->whereKey($topicId)->first();
     }
 
     // ── Insight builders (real topic/GSC data) ──────────────────────────
 
-    /** @return array<string,int> headline counts for the overview strip */
     private function overviewStats($topics): array
     {
         $inProgress = [ContentTopic::STATUS_RESEARCHING, ContentTopic::STATUS_WRITING,
@@ -377,28 +445,15 @@ class ContentCalendar extends Component
         ];
     }
 
-    /**
-     * The "what your audience is searching" panel — real target keywords
-     * ranked by monthly search volume (from GSC-gap ideation).
-     *
-     * @return list<array{keyword:string, volume:?int}>
-     */
+    /** @return list<array{keyword:string, volume:?int}> */
     private function audienceSearches($topics): array
     {
-        return $topics
-            ->sortByDesc(fn ($t) => (int) $t->keyword_volume)
-            ->take(8)
+        return $topics->sortByDesc(fn ($t) => (int) $t->keyword_volume)->take(8)
             ->map(fn ($t) => ['keyword' => (string) $t->target_keyword, 'volume' => $t->keyword_volume ? (int) $t->keyword_volume : null])
             ->values()->all();
     }
 
-    /**
-     * Content-strategy clusters: group topics into themes by their most
-     * common shared keyword token (greedy), so the strategy map shows how
-     * the calendar's articles connect into content pillars.
-     *
-     * @return list<array{theme:string, topics:list<array{id:string,title:string,status:string}>}>
-     */
+    /** @return list<array{theme:string, topics:list<array{id:string,title:string,status:string}>}> */
     private function strategyClusters($topics): array
     {
         if ($topics->isEmpty()) {
@@ -407,16 +462,11 @@ class ContentCalendar extends Component
 
         $stop = ['the', 'a', 'an', 'for', 'to', 'of', 'and', 'in', 'on', 'your', 'how', 'what',
             'best', 'guide', 'with', 'vs', 'or', 'is', 'are'];
-
-        $rows = $topics->values();
-        $total = $rows->count();
-
-        // Light singular stemming so "name"/"names" don't split into two
-        // pillars (strip a trailing plural 's' on tokens > 4 chars).
         $stem = static fn (string $t): string => (mb_strlen($t) > 4 && str_ends_with($t, 's') && ! str_ends_with($t, 'ss'))
             ? mb_substr($t, 0, -1) : $t;
 
-        // First pass: token frequency across all topics.
+        $rows = $topics->values();
+        $total = $rows->count();
         $tokensPerRow = [];
         $freq = [];
         foreach ($rows as $i => $t) {
@@ -430,10 +480,6 @@ class ContentCalendar extends Component
             }
         }
 
-        // Ubiquitous tokens (brand terms in ≥45% of topics, e.g. "pubg",
-        // "name", "generator") DON'T distinguish pillars — they'd swallow
-        // everything into near-identical clusters. Exclude them as pillar
-        // candidates so the map groups on the meaningful themes.
         $ubiquitous = [];
         foreach ($freq as $token => $count) {
             if ($count > max(2, (int) floor($total * 0.45))) {
@@ -441,7 +487,6 @@ class ContentCalendar extends Component
             }
         }
 
-        // token => [topic indices] using only distinguishing tokens.
         $byToken = [];
         foreach ($tokensPerRow as $i => $tokens) {
             foreach ($tokens as $token) {
@@ -450,7 +495,6 @@ class ContentCalendar extends Component
                 }
             }
         }
-        // Most-covering tokens first.
         uasort($byToken, fn ($a, $b) => count($b) <=> count($a));
 
         $assigned = [];
@@ -458,7 +502,7 @@ class ContentCalendar extends Component
         foreach ($byToken as $token => $idxs) {
             $members = array_values(array_filter($idxs, fn ($i) => ! isset($assigned[$i])));
             if (count($members) < 2) {
-                continue; // a pillar needs at least 2 articles
+                continue;
             }
             foreach ($members as $i) {
                 $assigned[$i] = true;
@@ -466,9 +510,7 @@ class ContentCalendar extends Component
             $clusters[] = [
                 'theme' => Str::title($token),
                 'topics' => array_map(fn ($i) => [
-                    'id' => (string) $rows[$i]->id,
-                    'title' => (string) $rows[$i]->title,
-                    'status' => (string) $rows[$i]->status,
+                    'id' => (string) $rows[$i]->id, 'title' => (string) $rows[$i]->title, 'status' => (string) $rows[$i]->status,
                 ], $members),
             ];
             if (count($clusters) >= 6) {
@@ -476,7 +518,6 @@ class ContentCalendar extends Component
             }
         }
 
-        // Leftovers → an "Other" pillar so nothing is hidden.
         $others = [];
         foreach ($rows as $i => $t) {
             if (! isset($assigned[$i])) {
@@ -488,5 +529,91 @@ class ContentCalendar extends Component
         }
 
         return $clusters;
+    }
+
+    /** Topics generated so far for the draft plan (the "first articles" step). */
+    private function draftTopics()
+    {
+        $plan = $this->draftPlan();
+        if ($plan === null) {
+            return collect();
+        }
+
+        return $plan->topics()
+            ->whereNotIn('status', [ContentTopic::STATUS_SKIPPED])
+            ->orderBy('position')
+            ->limit(12)
+            ->get(['id', 'title', 'target_keyword', 'keyword_volume', 'source']);
+    }
+
+    public function render()
+    {
+        $plan = $this->activePlan();
+        $inWizard = $plan === null; // draft or no-plan → wizard
+
+        // ── Wizard data ──
+        $wizard = [];
+        if ($inWizard) {
+            $wizard = [
+                'draftTopics' => $this->wizardStep >= 5 ? $this->draftTopics() : collect(),
+                'insights' => $this->wizardStep === 4 && $this->website()
+                    ? app(ContentSetupInsights::class)->competitorAuthority($this->website())
+                    : null,
+                'hasWebsite' => $this->website() !== null,
+            ];
+
+            return view('livewire.content.content-calendar', [
+                'inWizard' => true,
+                'wizard' => $wizard,
+            ] + $this->emptyCalendarBindings());
+        }
+
+        // ── Calendar data ──
+        $monthStart = Carbon::createFromFormat('Y-m', $this->month)->startOfMonth();
+        $topics = $plan->topics()
+            ->with('currentArticle:id,topic_id,seo_score,word_count,version')
+            ->whereBetween('scheduled_for', [$monthStart->copy()->startOfWeek(), $monthStart->copy()->endOfMonth()->endOfWeek()])
+            ->orderBy('scheduled_for')->orderBy('position')->get();
+
+        $days = [];
+        $cursor = $monthStart->copy()->startOfWeek();
+        $end = $monthStart->copy()->endOfMonth()->endOfWeek();
+        while ($cursor <= $end) {
+            $days[] = $cursor->copy();
+            $cursor->addDay();
+        }
+
+        $all = $plan->topics()->whereNotIn('status', [ContentTopic::STATUS_SKIPPED])
+            ->get(['id', 'title', 'target_keyword', 'secondary_keywords', 'keyword_volume', 'source', 'status']);
+
+        return view('livewire.content.content-calendar', [
+            'inWizard' => false,
+            'wizard' => [],
+            'plan' => $plan,
+            'topics' => $topics,
+            'topicsByDate' => $topics->groupBy(fn ($t) => $t->scheduled_for?->toDateString() ?? ''),
+            'days' => $days,
+            'monthStart' => $monthStart,
+            'hasWebsite' => true,
+            'stats' => $this->overviewStats($all),
+            'audience' => $this->audienceSearches($all),
+            'clusters' => $this->strategyClusters($all),
+        ]);
+    }
+
+    /** Bindings the calendar branch needs so the wizard branch can omit them. */
+    private function emptyCalendarBindings(): array
+    {
+        return [
+            'plan' => null,
+            'topics' => collect(),
+            'topicsByDate' => collect(),
+            'days' => [],
+            'monthStart' => Carbon::createFromFormat('Y-m', $this->month)->startOfMonth(),
+            'hasWebsite' => $this->website() !== null,
+            'stats' => [],
+            'audience' => [],
+            'clusters' => [],
+        ];
     }
 }

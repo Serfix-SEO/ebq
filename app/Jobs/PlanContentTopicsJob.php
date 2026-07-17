@@ -46,7 +46,10 @@ class PlanContentTopicsJob implements ShouldQueue, ShouldBeUnique
     public function handle(): void
     {
         $plan = ContentPlan::query()->find($this->planId);
-        if ($plan === null || ! $plan->isActive()) {
+        // Runs for active AND draft plans — draft = wizard in progress, we
+        // pre-generate the calendar so the "your first articles" step already
+        // has real topics to show. Paused plans are skipped.
+        if ($plan === null || ! in_array($plan->status, [ContentPlan::STATUS_ACTIVE, ContentPlan::STATUS_DRAFT], true)) {
             return;
         }
 

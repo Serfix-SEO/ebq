@@ -9,106 +9,251 @@
         <div class="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
             {{ __('Add a website first to start planning content.') }}
         </div>
-    @elseif ($plan === null)
-        {{-- ── Setup wizard ─────────────────────────────────────────── --}}
-        <div class="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900">
-            <div class="mb-6 flex items-center gap-3">
-                @foreach ([1 => __('Your business'), 2 => __('Schedule & style')] as $step => $label)
-                    <div class="flex items-center gap-2">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold {{ $wizardStep >= $step ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' }}">{{ $step }}</span>
-                        <span class="text-sm font-medium {{ $wizardStep >= $step ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400' }}">{{ $label }}</span>
-                    </div>
-                    @if ($step === 1)<div class="h-px w-8 bg-slate-200 dark:bg-slate-700"></div>@endif
+    @elseif ($inWizard)
+        {{-- ══ Setup wizard (5 steps) ══════════════════════════════════ --}}
+        @php
+            $steps = [1 => __('Business'), 2 => __('Offerings'), 3 => __('How it works'), 4 => __('Competitors'), 5 => __('First articles')];
+            $maxUnlocked = $draftPlanId !== null ? 5 : 2;
+        @endphp
+        <div class="mx-auto max-w-4xl">
+            {{-- Stepper --}}
+            <div class="mb-6 flex items-center justify-center gap-1.5 sm:gap-3">
+                @foreach ($steps as $s => $label)
+                    <button type="button" @if($s <= $maxUnlocked) wire:click="goToStep({{ $s }})" @endif
+                        class="flex items-center gap-2 {{ $s <= $maxUnlocked ? 'cursor-pointer' : 'cursor-default' }}">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition
+                            {{ $wizardStep === $s ? 'bg-orange-600 text-white ring-2 ring-orange-200'
+                               : ($wizardStep > $s ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-400 dark:bg-slate-800') }}">
+                            @if ($wizardStep > $s) &check; @else {{ $s }} @endif
+                        </span>
+                        <span class="hidden text-sm font-medium sm:inline {{ $wizardStep >= $s ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400' }}">{{ $label }}</span>
+                    </button>
+                    @if (! $loop->last)<span class="h-px w-4 bg-slate-200 sm:w-8 dark:bg-slate-700"></span>@endif
                 @endforeach
             </div>
 
-            @error('plan')
-                <p class="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950 dark:text-rose-300">{{ $message }}</p>
-            @enderror
+            <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900">
+                @error('plan')
+                    <p class="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950 dark:text-rose-300">{{ $message }}</p>
+                @enderror
 
-            @if ($wizardStep === 1)
-                <div @if($analyzing) wire:init="analyzeSite" @endif>
-                <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">{{ __('Tell us about your business') }}</h2>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('We analyzed your website and filled this in for you. Adjust anything so every article fits your business perfectly.') }}</p>
+                {{-- ── Step 1: business ─────────────────────────────── --}}
+                @if ($wizardStep === 1)
+                    <div @if($analyzing) wire:init="analyzeSite" @endif>
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">{{ __('Tell us about your business') }}</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('We analyzed your website and filled this in. Adjust anything so every article fits perfectly.') }}</p>
 
-                @if ($analyzing)
-                    <div class="mt-5 flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-200">
-                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                        {{ __('Analyzing your website…') }}
+                        @if ($analyzing)
+                            <div class="mt-5 flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-200">
+                                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                {{ __('Analyzing your website…') }}
+                            </div>
+                        @endif
+
+                        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300" for="w-brand">{{ __('Brand name') }}</label>
+                                <input id="w-brand" wire:model="brandName" type="text"
+                                    class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300" for="w-lang">{{ __('Article language') }}</label>
+                                <select id="w-lang" wire:model="language"
+                                    class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                    <option value="en">English</option>
+                                    <option value="ar">العربية</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <label class="mt-5 block text-sm font-medium text-slate-700 dark:text-slate-300" for="w-desc">{{ __('What does your business do?') }}</label>
+                        <textarea id="w-desc" wire:model="businessDescription" rows="4" maxlength="1000"
+                            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            placeholder="{{ __('Describe your products, services, and who they are for…') }}"></textarea>
+                        @error('businessDescription') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+
+                        <div class="mt-6 flex justify-end">
+                            <button wire:click="toOfferings" class="rounded-lg bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">{{ __('Continue') }} &rarr;</button>
+                        </div>
+                    </div>
+
+                {{-- ── Step 2: offerings ────────────────────────────── --}}
+                @elseif ($wizardStep === 2)
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">{{ __('What you offer') }}</h2>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('So we write about what you actually sell, and avoid what you don\'t. Order the top list by importance.') }}</p>
+
+                    {{-- Sell --}}
+                    <div class="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-emerald-800 dark:text-emerald-300">&uarr; {{ __('What you sell') }}</h3>
+                            <span class="text-xs text-emerald-700/70 dark:text-emerald-400/70">{{ __('Most important first') }}</span>
+                        </div>
+                        <div class="mt-3 space-y-2">
+                            @forelse ($sellItems as $i => $item)
+                                <div class="flex items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800" wire:key="sell-{{ $i }}">
+                                    <div class="flex flex-col">
+                                        <button type="button" wire:click="moveSell({{ $i }}, -1)" class="text-slate-300 hover:text-slate-500 disabled:opacity-30" @disabled($i === 0)>&uarr;</button>
+                                        <button type="button" wire:click="moveSell({{ $i }}, 1)" class="text-slate-300 hover:text-slate-500 disabled:opacity-30" @disabled($loop->last)>&darr;</button>
+                                    </div>
+                                    <input wire:model="sellItems.{{ $i }}" type="text" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-800 focus:ring-0 dark:text-slate-100" />
+                                    <button type="button" wire:click="removeSell({{ $i }})" class="text-slate-300 hover:text-rose-500" aria-label="{{ __('Remove') }}">&times;</button>
+                                </div>
+                            @empty
+                                <p class="text-sm text-emerald-700/60 dark:text-emerald-400/60">{{ __('Add the products, tools, or services you offer.') }}</p>
+                            @endforelse
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <input wire:model="newSell" wire:keydown.enter.prevent="addSell" type="text" placeholder="{{ __('Add an offering…') }}"
+                                class="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                            <button type="button" wire:click="addSell" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">+ {{ __('Add') }}</button>
+                        </div>
+                    </div>
+
+                    {{-- Don't sell --}}
+                    <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50/60 p-4 dark:border-rose-900 dark:bg-rose-950/30">
+                        <h3 class="text-sm font-bold text-rose-800 dark:text-rose-300">{{ __("What you don't sell") }}</h3>
+                        <p class="text-xs text-rose-700/70 dark:text-rose-400/70">{{ __("Related things you don't offer, so we never write about the wrong products.") }}</p>
+                        <div class="mt-3 space-y-2">
+                            @foreach ($dontSellItems as $i => $item)
+                                <div class="flex items-center gap-2 rounded-lg border border-rose-100 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800" wire:key="dont-{{ $i }}">
+                                    <input wire:model="dontSellItems.{{ $i }}" type="text" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-800 focus:ring-0 dark:text-slate-100" />
+                                    <button type="button" wire:click="removeDont({{ $i }})" class="text-slate-300 hover:text-rose-500" aria-label="{{ __('Remove') }}">&times;</button>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <input wire:model="newDont" wire:keydown.enter.prevent="addDont" type="text" placeholder="{{ __('Add something you don\'t offer…') }}"
+                                class="min-w-0 flex-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                            <button type="button" wire:click="addDont" class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">+ {{ __('Add') }}</button>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex items-center justify-between">
+                        <button wire:click="goToStep(1)" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">&larr; {{ __('Back') }}</button>
+                        <button wire:click="toHowItWorks" class="rounded-lg bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">
+                            <span wire:loading.remove wire:target="toHowItWorks">{{ __('Continue') }} &rarr;</span>
+                            <span wire:loading wire:target="toHowItWorks">{{ __('Saving…') }}</span>
+                        </button>
+                    </div>
+
+                {{-- ── Step 3: how it works ─────────────────────────── --}}
+                @elseif ($wizardStep === 3)
+                    <div class="text-center">
+                        <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">{{ __('How this grows your traffic') }}</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Fully automatic. You just review and approve.') }}</p>
+                    </div>
+                    <div class="mx-auto mt-6 max-w-2xl space-y-1">
+                        @foreach ([
+                            ['n' => 1, 'title' => __('Deep research on your business'), 'body' => __('We study your site, your competitors, and real Google searches to find what your customers actually look for.'), 'tag' => __('Grounded in your real data')],
+                            ['n' => 2, 'title' => __('One expert article, every day'), 'body' => __('A genuinely useful article that answers a real customer question, checked against technical SEO before it reaches you.'), 'tag' => __('1,500–2,500 words each')],
+                            ['n' => 3, 'title' => __('Watch your traffic grow'), 'body' => __('Search engines and AI assistants surface your articles. New customers find you, on autopilot.'), 'tag' => __('You review and approve everything')],
+                        ] as $step)
+                            <div class="flex gap-4 rounded-xl p-3">
+                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-600 text-sm font-bold text-white">{{ $step['n'] }}</div>
+                                <div>
+                                    <h3 class="text-base font-bold text-slate-900 dark:text-slate-100">{{ $step['title'] }}</h3>
+                                    <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ $step['body'] }}</p>
+                                    <span class="mt-2 inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">&check; {{ $step['tag'] }}</span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="mt-6 flex items-center justify-between">
+                        <button wire:click="goToStep(2)" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">&larr; {{ __('Back') }}</button>
+                        <button wire:click="toCompetitors" class="rounded-lg bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">{{ __('Continue') }} &rarr;</button>
+                    </div>
+
+                {{-- ── Step 4: competitors ──────────────────────────── --}}
+                @elseif ($wizardStep === 4)
+                    <div class="text-center">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">{{ __('Your competitors and their authority') }}</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('How your site\'s authority compares to others in your space.') }}</p>
+                    </div>
+
+                    @php $ins = $wizard['insights'] ?? null; @endphp
+                    @if ($ins && ! empty($ins['competitors']))
+                        @if ($ins['behind'])
+                            <div class="mx-auto mt-3 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">{{ __('Room to grow') }}</div>
+                        @endif
+                        <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Your referring domains') }}</div>
+                                <div class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ number_format($ins['my_referring_domains']) }}</div>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Your authority score') }}</div>
+                                <div class="mt-1 text-2xl font-bold text-orange-600">{{ $ins['my_authority'] ?? '—' }}<span class="text-base text-slate-400">/100</span></div>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Competitor median') }}</div>
+                                <div class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $ins['median'] ?? '—' }}<span class="text-base text-slate-400">/100</span></div>
+                            </div>
+                        </div>
+                        <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                                    <tr><th class="px-4 py-2 text-start font-semibold">{{ __('Competitor') }}</th><th class="px-4 py-2 text-end font-semibold">{{ __('Authority') }}</th><th class="px-4 py-2 text-end font-semibold">{{ __('Shared keywords') }}</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                    @foreach ($ins['competitors'] as $c)
+                                        <tr class="bg-white dark:bg-slate-900">
+                                            <td class="px-4 py-2.5 text-slate-800 dark:text-slate-200">{{ $c['domain'] }}</td>
+                                            <td class="px-4 py-2.5 text-end font-medium text-slate-800 dark:text-slate-200">{{ $c['authority'] ?? '—' }}</td>
+                                            <td class="px-4 py-2.5 text-end text-slate-500 dark:text-slate-400">{{ $c['shared_keywords'] ? number_format($c['shared_keywords']) : '—' }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('We\'re still gathering your competitive authority data. It appears here as soon as your site analysis finishes, and your content plan is already being built either way.') }}</p>
+                        </div>
+                    @endif
+
+                    <div class="mt-6 flex items-center justify-between">
+                        <button wire:click="goToStep(3)" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">&larr; {{ __('Back') }}</button>
+                        <button wire:click="toFirstArticles" class="rounded-lg bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">{{ __('Continue') }} &rarr;</button>
+                    </div>
+
+                {{-- ── Step 5: first articles ───────────────────────── --}}
+                @else
+                    @php $dts = $wizard['draftTopics'] ?? collect(); @endphp
+                    <div class="text-center">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">{{ __('Your first articles are ready') }}</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Built from what your audience is really searching for. Remove any that don\'t fit, then launch.') }}</p>
+                    </div>
+
+                    @if ($dts->isEmpty())
+                        <div wire:poll.4s class="mt-6 flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                            <svg class="h-5 w-5 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Researching the best topics for your site…') }}</p>
+                        </div>
+                    @else
+                        <div class="mt-5 space-y-2">
+                            @foreach ($dts as $t)
+                                <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800" wire:key="dt-{{ $t->id }}">
+                                    <svg class="h-5 w-5 shrink-0 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $t->title }}</div>
+                                        <div class="text-xs text-slate-500 dark:text-slate-400">{{ $t->target_keyword }}@if($t->keyword_volume) · {{ number_format($t->keyword_volume) }} {{ __('searches/mo') }}@endif</div>
+                                    </div>
+                                    <button wire:click="dropTopic('{{ $t->id }}')" class="text-slate-300 hover:text-rose-500" aria-label="{{ __('Remove') }}">&times;</button>
+                                </div>
+                            @endforeach
+                        </div>
+                        <p class="mt-3 text-center text-xs text-slate-400">{{ __('More topics keep generating in the background. Publishing: 1 article/day — change anytime.') }}</p>
+                    @endif
+
+                    <div class="mt-6 flex items-center justify-between">
+                        <button wire:click="goToStep(4)" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">&larr; {{ __('Back') }}</button>
+                        <button wire:click="launch" @disabled($dts->isEmpty())
+                            class="rounded-lg bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
+                            {{ __('Looks good — launch') }} &rarr;
+                        </button>
                     </div>
                 @endif
-                </div>
-
-                <label class="mt-5 block text-sm font-medium text-slate-700 dark:text-slate-300" for="ca-desc">{{ __('What does your business do?') }}</label>
-                <textarea id="ca-desc" wire:model="businessDescription" rows="4" maxlength="1000"
-                    class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    placeholder="{{ __('Describe your products, services, and who they are for…') }}"></textarea>
-                @error('businessDescription') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
-
-                <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300" for="ca-sell">{{ __('What you offer') }}</label>
-                        <textarea id="ca-sell" wire:model="sellInput" rows="3"
-                            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            placeholder="{{ __('One per line, most important first') }}"></textarea>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300" for="ca-dontsell">{{ __("What you don't offer") }}</label>
-                        <textarea id="ca-dontsell" wire:model="dontSellInput" rows="3"
-                            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            placeholder="{{ __('So we never write about the wrong things') }}"></textarea>
-                    </div>
-                </div>
-
-                <div class="mt-6 flex justify-end">
-                    <button wire:click="nextStep" class="rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">{{ __('Continue') }}</button>
-                </div>
-            @else
-                <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">{{ __('Set your publishing rhythm') }}</h2>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('You can change all of this later. New articles always wait for your approval first.') }}</p>
-
-                <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300" for="ca-perweek">{{ __('Articles per week') }}</label>
-                        <select id="ca-perweek" wire:model="articlesPerWeek"
-                            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                            @foreach ([1, 2, 3, 5, 7] as $n)
-                                <option value="{{ $n }}">{{ $n }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300" for="ca-length">{{ __('Article length') }}</label>
-                        <select id="ca-length" wire:model="articleLength"
-                            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                            <option value="1500">{{ __(':n words (concise)', ['n' => '1,500']) }}</option>
-                            <option value="2000">{{ __(':n words (recommended)', ['n' => '2,000']) }}</option>
-                            <option value="2500">{{ __(':n words (detailed)', ['n' => '2,500']) }}</option>
-                            <option value="3000">{{ __(':n words (in-depth)', ['n' => '3,000']) }}</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="mt-4 grid gap-2 sm:grid-cols-3">
-                    <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                        <input type="checkbox" wire:model="includeTakeaways" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500 dark:border-slate-700" /> {{ __('Key takeaways box') }}
-                    </label>
-                    <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                        <input type="checkbox" wire:model="includeFaq" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500 dark:border-slate-700" /> {{ __('FAQ section') }}
-                    </label>
-                    <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                        <input type="checkbox" wire:model="includeToc" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500 dark:border-slate-700" /> {{ __('Table of contents') }}
-                    </label>
-                </div>
-
-                <div class="mt-6 flex items-center justify-between">
-                    <button wire:click="backStep" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">{{ __('Back') }}</button>
-                    <button wire:click="createPlan" class="rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">
-                        <span wire:loading.remove wire:target="createPlan">{{ __('Build my content calendar') }}</span>
-                        <span wire:loading wire:target="createPlan">{{ __('Building…') }}</span>
-                    </button>
-                </div>
-            @endif
+            </div>
         </div>
     @else
         {{-- ── Calendar ─────────────────────────────────────────────── --}}

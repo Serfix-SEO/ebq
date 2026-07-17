@@ -21,6 +21,11 @@ class ContentPlan extends Model
 
     public const STATUS_PAUSED = 'paused';
 
+    // Wizard in progress: the plan exists so topic ideation can run in the
+    // background while the user finishes setup, but no articles are written
+    // until the user finishes the wizard and the plan flips to active.
+    public const STATUS_DRAFT = 'draft';
+
     protected $guarded = [];
 
     protected function casts(): array
