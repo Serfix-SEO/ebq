@@ -66,6 +66,32 @@ revising → ready → scheduled → publishing → published | failed | skipped
   ESCAPED colons (`hover\:border-orange-300`) — plain `-F ".hover:…"` false-
   negatives; `min-h-*`/`lg:order-last` are NOT compiled (inline styles used).
 
+## Setup wizard v2 (5 steps, 2026-07-17)
+
+`ContentCalendar` Livewire component drives a 5-step wizard shown whenever the
+website has NO ACTIVE plan (`inWizard`):
+1. **Business** — brand (guessed from domain), article language, auto-detected
+   description (`SiteProfileExtractor`, wire:init spinner).
+2. **Offerings** — multi-item sell / don't-sell lists (add/remove/reorder/
+   inline-edit), auto-filled from the site profile. On Continue creates a
+   **DRAFT `ContentPlan`** (`ContentPlan::STATUS_DRAFT`) and dispatches
+   `PlanContentTopicsJob` — topic ideation runs in the BACKGROUND while the
+   user reads the next steps.
+3. **How it works** — 3-step explainer (research → daily article → traffic;
+   the reference's backlinks step is deliberately omitted).
+4. **Competitors & authority** — real data via `ContentSetupInsights`
+   (read-only: `WebsiteReportSnapshot::forDomain` + `ClientReportService::
+   withTraffic`, NO paid call): your referring domains, your Citation-Score
+   authority, competitor median + table. Graceful "still analyzing" empty state.
+5. **First articles** — the background-generated topics (`wire:poll.4s` until
+   ready), removable; **Launch** flips the plan to active and article writing
+   begins (the dispatcher only claims ACTIVE plans, so nothing bills during the
+   draft window). Baked defaults: 1 article/day, ~2,000 words (cadence step +
+   CTA field removed on owner request).
+
+Resume: `bootWizard()` reloads a draft plan on mount and jumps past the
+offerings step. `STATUS_DRAFT` plans render the wizard, not the calendar.
+
 ## Config & admin
 
 - **Admin settings card** (`/admin/settings`, `PlatformSettingsController`):
