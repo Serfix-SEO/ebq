@@ -61,6 +61,13 @@ web box never crawls.
 
 ## Deploying a code change
 
+> ⛔ **STAGING-FIRST POLICY (2026-07-17, operator decision).** Every change goes
+> to the **staging box first** (`sudo bash scripts/deploy-staging.sh`, QA at
+> https://staging.serfix.io — see [reference/staging.md](./reference/staging.md)),
+> and reaches production **only after explicit operator approval**. No direct
+> prod deploys, no "small fix" exceptions. The prod steps below run only
+> post-approval.
+
 1. **Both boxes** get the new code (the web box checkout *and* the worker box's
    docker checkout — they are independent).
 2. **Run migrations once** (shared DB): `php artisan migrate --force`.

@@ -34,15 +34,22 @@ WITHOUT touching production. Prod boxes: web A `10.0.0.2` + worker B `10.0.0.3`.
 - CC sidecar (`cc-domain-ranks.sqlite`, ~7 GB) not copied — `CcDomainRanks`
   returns null and score weights renormalize.
 
-## Workflow
+## Workflow — STAGING-FIRST IS MANDATORY (operator decision 2026-07-17)
+
+**Every change ships to staging first; production only after the operator
+explicitly approves.** No exceptions for "trivial" fixes — prod is the
+approval gate, not the test bench.
 
 1. Make changes on box A working tree (or a branch).
 2. `sudo bash scripts/deploy-staging.sh` — rsyncs code, migrates, restarts
    staging FPM + Horizon. Never touches staging `.env`.
 3. QA at `https://staging.serfix.io` (basic auth). Site-explorer lookups return
-   DataForSEO sandbox mock data instantly — good test fixtures.
-4. When green: commit → push → deploy prod (box A restart + box B rsync per
-   `infra/main.md`).
+   DataForSEO sandbox mock data instantly — good test fixtures. Mail sends for
+   real (Postal relay, "[Staging] Serfix" sender).
+4. **Present the result to the operator and WAIT for approval.**
+5. Only after approval: commit → push → prod deploy (box A FPM/Horizon restart
+   + box B rsync + Horizon restart per
+   [deployment-and-queues.md](../deployment-and-queues.md)).
 
 ## Gotchas
 

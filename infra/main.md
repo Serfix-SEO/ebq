@@ -178,6 +178,10 @@ complete as of 2026-07-07 — admin panel stays English-only.
    Changing a queued job's identity (`uniqueId`/constructor) requires both boxes to match or
    locks leak. [deployment-and-queues.md](./deployment-and-queues.md) · live state in
    [server-deployment.md](./server-deployment.md).
+2b. **STAGING-FIRST (2026-07-17).** Every change deploys to the staging box first
+   (`scripts/deploy-staging.sh` → QA at staging.serfix.io) and goes to production
+   **only after explicit operator approval** — no direct prod deploys, no trivial-fix
+   exceptions. [reference/staging.md](./reference/staging.md).
 3. **FPM opcache `validate_timestamps=0`** → a code change needs a *full* `php8.3-fpm`
    restart, not a reload; long-running `queue:work` needs `queue:restart` / container restart.
 4. **Crawler per-user scoping** — shared crawl data is exposed only through `CrawlReportService`
