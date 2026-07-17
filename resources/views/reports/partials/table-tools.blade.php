@@ -100,20 +100,19 @@ if (!window.__rptTables) { window.__rptTables = true;
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (d) {
                 var out = wrap.querySelector('[data-anchor-results]');
-                if (!d || !out) { btn.textContent = btn.getAttribute('data-failed') || 'Nothing found in the index either'; return; }
-                btn.classList.add('hidden');
+                if (!d) { btn.textContent = btn.getAttribute('data-failed') || 'Nothing found in the index either'; return; }
                 if (!d.rows.length) {
-                    out.innerHTML = '<p class="mt-3 text-xs">' + (wrap.getAttribute('data-none-text') || 'The index has no live links for this exact anchor anymore.') + '</p>';
+                    btn.classList.add('hidden');
+                    if (out) out.innerHTML = '<p class="mt-3 text-xs text-slate-400">' + (wrap.getAttribute('data-none-text') || 'The index has no live links for this exact anchor anymore.') + '</p>';
                     return;
                 }
-                var esc = function (s) { var el = document.createElement('div'); el.textContent = s; return el.innerHTML; };
-                out.innerHTML = '<div class="mt-4 space-y-2 text-left">' + d.rows.map(function (r) {
-                    return '<div class="rounded-lg bg-white px-3 py-2 text-xs shadow-sm ring-1 ring-slate-200">'
-                        + '<a href="' + esc(r.url_from) + '" target="_blank" rel="nofollow noopener" class="break-all font-medium text-orange-600 hover:underline">' + esc(r.url_from) + '</a>'
-                        + '<span class="ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-medium ' + (r.dofollow ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500') + '">' + (r.dofollow ? 'dofollow' : 'nofollow') + '</span>'
-                        + (r.url_to ? '<div class="mt-0.5 truncate text-slate-400">→ ' + esc(r.url_to) + '</div>' : '')
-                        + '</div>';
-                }).join('') + '</div>';
+                // The fetched rows were persisted into the snapshot server-side —
+                // reload so they render as NORMAL table rows (matching styling,
+                // Trust/Citation pills, toxicity badges), then re-apply this
+                // anchor filter automatically so they're front-and-centre.
+                btn.textContent = d.rows.length + ' found — loading…';
+                try { sessionStorage.setItem('rpt-refilter:' + btn.getAttribute('data-anchor-fetch'), q); } catch (e) {}
+                location.reload();
             })
             .catch(function () { btn.disabled = false; btn.textContent = btn.getAttribute('data-retry') || 'Try again'; });
     });
@@ -165,6 +164,19 @@ if (!window.__rptTables) { window.__rptTables = true;
             return dir === 'asc' ? r : -r;
         });
         rows.forEach(function (r) { tbody.appendChild(r); });
+    });
+    // After an anchor drill-down reloads the page, re-apply the anchor filter
+    // so the freshly-persisted rows (now normal table rows) are shown filtered.
+    document.querySelectorAll('[data-rpt-filter]').forEach(function (input) {
+        var key = 'rpt-refilter:' + input.getAttribute('data-rpt-filter');
+        var val;
+        try { val = sessionStorage.getItem(key); sessionStorage.removeItem(key); } catch (e) {}
+        if (val) {
+            input.value = val;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            var box = document.getElementById(input.getAttribute('data-rpt-filter'));
+            if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     });
 }
 </script>
