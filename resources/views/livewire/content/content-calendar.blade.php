@@ -101,8 +101,9 @@
                     </label>
                 </div>
 
-                <label class="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300" for="ca-cta">{{ __('Call-to-action link (optional)') }}</label>
-                <input id="ca-cta" wire:model="ctaUrl" type="url" placeholder="https://example.com/get-started"
+                <label class="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300" for="ca-cta">{{ __('Where should readers go next?') }} <span class="font-normal text-slate-400">{{ __('(optional)') }}</span></label>
+                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Each article ends with a natural link to this page, such as your signup, product, or contact page. Leave blank to skip.') }}</p>
+                <input id="ca-cta" wire:model="ctaUrl" type="url" placeholder="https://yoursite.com/get-started"
                     class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
                 @error('ctaUrl') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
 
