@@ -101,12 +101,6 @@
                     </label>
                 </div>
 
-                <label class="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300" for="ca-cta">{{ __('Where should readers go next?') }} <span class="font-normal text-slate-400">{{ __('(optional)') }}</span></label>
-                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Each article ends with a natural link to this page, such as your signup, product, or contact page. Leave blank to skip.') }}</p>
-                <input id="ca-cta" wire:model="ctaUrl" type="url" placeholder="https://yoursite.com/get-started"
-                    class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                @error('ctaUrl') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
-
                 <div class="mt-6 flex items-center justify-between">
                     <button wire:click="backStep" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">{{ __('Back') }}</button>
                     <button wire:click="createPlan" class="rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">
@@ -136,6 +130,27 @@
                 </button>
             </div>
         </div>
+
+        {{-- ── Overview KPIs ────────────────────────────────────────── --}}
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            @foreach ([
+                ['label' => __('Planned'), 'value' => $stats['planned'], 'color' => 'sky'],
+                ['label' => __('In progress'), 'value' => $stats['in_progress'], 'color' => 'amber'],
+                ['label' => __('Ready for review'), 'value' => $stats['ready'], 'color' => 'emerald'],
+                ['label' => __('Published'), 'value' => $stats['published'], 'color' => 'orange'],
+            ] as $kpi)
+                <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <div class="text-2xl font-bold text-{{ $kpi['color'] }}-600">{{ number_format($kpi['value']) }}</div>
+                    <div class="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">{{ $kpi['label'] }}</div>
+                </div>
+            @endforeach
+        </div>
+
+        @if ($stats['from_search'] > 0 || $stats['monthly_searches'] > 0)
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+                {{ __(':n topics come straight from what your audience already searches for', ['n' => $stats['from_search']]) }}@if ($stats['monthly_searches'] > 0), {{ __('targeting about :v searches every month', ['v' => number_format($stats['monthly_searches'])]) }}@endif.
+            </p>
+        @endif
 
         @unless ($plan->isActive())
             <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
@@ -224,6 +239,74 @@
                             {{ __('No articles planned this month yet.') }}
                         </div>
                     @endforelse
+                </div>
+            </div>
+        @endif
+
+        {{-- ── Insight: what your audience searches ─────────────────── --}}
+        @if (! empty($audience))
+            <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('What your audience is searching for') }}</h3>
+                </div>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Real search demand behind your planned articles.') }}</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @foreach ($audience as $row)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                            {{ $row['keyword'] }}
+                            @if ($row['volume'])<span class="text-xs font-semibold text-orange-600">{{ number_format($row['volume']) }}/mo</span>@endif
+                        </span>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        {{-- ── Content strategy map (topic clusters) ────────────────── --}}
+        @if (! empty($clusters))
+            <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Content strategy map') }}</h3>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('How your articles group into content pillars around your site.') }}</p>
+
+                @php
+                    $cx = 430; $cy = 300; $rings = 210;
+                    $n = count($clusters);
+                    $palette = ['#F26419', '#0EA5E9', '#10B981', '#8B5CF6', '#EF4444', '#F59E0B', '#64748B'];
+                    $statusColor = ['ready' => '#10B981', 'scheduled' => '#10B981', 'published' => '#059669',
+                        'writing' => '#F59E0B', 'researching' => '#F59E0B', 'scoring' => '#F59E0B', 'revising' => '#F59E0B',
+                        'failed' => '#EF4444', 'approved' => '#0EA5E9', 'suggested' => '#94A3B8'];
+                @endphp
+                <div class="mt-3 overflow-x-auto">
+                    <svg viewBox="0 0 860 600" class="w-full" style="min-width:640px" role="img" aria-label="{{ __('Content strategy map') }}">
+                        {{-- pillar + leaf edges --}}
+                        @foreach ($clusters as $ci => $cluster)
+                            @php
+                                $ang = $n <= 1 ? -M_PI/2 : (2*M_PI*$ci/$n) - M_PI/2;
+                                $px = $cx + $rings * cos($ang); $py = $cy + $rings * sin($ang);
+                                $color = $palette[$ci % count($palette)];
+                                $m = count($cluster['topics']);
+                            @endphp
+                            <line x1="{{ round($cx,1) }}" y1="{{ round($cy,1) }}" x2="{{ round($px,1) }}" y2="{{ round($py,1) }}" stroke="{{ $color }}" stroke-width="2" opacity="0.5"/>
+                            @foreach ($cluster['topics'] as $li => $topic)
+                                @php
+                                    $spread = 1.15;
+                                    $la = $ang + ($m <= 1 ? 0 : ($spread * ($li/($m-1) - 0.5)));
+                                    $lr = 135;
+                                    $lx = $px + $lr * cos($la); $ly = $py + $lr * sin($la);
+                                    $sc = $statusColor[$topic['status']] ?? '#94A3B8';
+                                @endphp
+                                <line x1="{{ round($px,1) }}" y1="{{ round($py,1) }}" x2="{{ round($lx,1) }}" y2="{{ round($ly,1) }}" stroke="{{ $color }}" stroke-width="1" opacity="0.3"/>
+                                <circle cx="{{ round($lx,1) }}" cy="{{ round($ly,1) }}" r="5" fill="{{ $sc }}"/>
+                                <text x="{{ round($lx + ($lx >= $px ? 9 : -9),1) }}" y="{{ round($ly+3,1) }}" font-size="10" fill="currentColor" class="text-slate-600 dark:text-slate-300" text-anchor="{{ $lx >= $px ? 'start' : 'end' }}">{{ \Illuminate\Support\Str::limit($topic['title'], 26) }}</text>
+                            @endforeach
+                            <circle cx="{{ round($px,1) }}" cy="{{ round($py,1) }}" r="8" fill="{{ $color }}"/>
+                            <text x="{{ round($px,1) }}" y="{{ round($py - 14,1) }}" font-size="12" font-weight="700" fill="{{ $color }}" text-anchor="middle">{{ $cluster['theme'] }}</text>
+                        @endforeach
+                        {{-- center brand node --}}
+                        <circle cx="{{ $cx }}" cy="{{ $cy }}" r="34" fill="#F26419"/>
+                        <text x="{{ $cx }}" y="{{ $cy - 2 }}" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">{{ \Illuminate\Support\Str::limit($plan->website?->domain ?? 'Site', 16) }}</text>
+                        <text x="{{ $cx }}" y="{{ $cy + 14 }}" font-size="9" fill="#ffe" text-anchor="middle" opacity="0.85">{{ __('your content') }}</text>
+                    </svg>
                 </div>
             </div>
         @endif

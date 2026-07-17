@@ -10,6 +10,7 @@ use App\Models\Website;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -42,7 +43,6 @@ class ContentCalendar extends Component
     public bool $includeToc = true;
     public bool $includeTakeaways = true;
     public bool $includeFaq = true;
-    public string $ctaUrl = '';
 
     // Inline add-topic form
     public bool $showAddTopic = false;
@@ -151,7 +151,6 @@ class ContentCalendar extends Component
         $this->validate([
             'articlesPerWeek' => 'required|integer|min:1|max:7',
             'articleLength' => 'required|integer|in:1500,2000,2500,3000',
-            'ctaUrl' => 'nullable|url|max:500',
         ]);
 
         $split = fn (string $raw) => array_values(array_filter(array_map('trim', preg_split('/[\n,]+/', $raw) ?: [])));
@@ -168,9 +167,9 @@ class ContentCalendar extends Component
                 'key_takeaways' => $this->includeTakeaways,
                 'faq' => $this->includeFaq,
                 'external_links' => true,
-                'cta_enabled' => $this->ctaUrl !== '',
+                'cta_enabled' => false,
             ],
-            'cta_url' => $this->ctaUrl ?: null,
+            'cta_url' => null,
             'business_description' => $this->businessDescription,
             'offerings' => [
                 'sell' => array_slice($split($this->sellInput), 0, 12),
@@ -342,6 +341,11 @@ class ContentCalendar extends Component
             $cursor->addDay();
         }
 
+        // All topics (not just this month) power the overview + strategy map.
+        $all = $plan === null ? collect() : $plan->topics()
+            ->whereNotIn('status', [ContentTopic::STATUS_SKIPPED])
+            ->get(['id', 'title', 'target_keyword', 'secondary_keywords', 'keyword_volume', 'source', 'status']);
+
         return view('livewire.content.content-calendar', [
             'plan' => $plan,
             'topics' => $topics,
@@ -349,6 +353,112 @@ class ContentCalendar extends Component
             'days' => $days,
             'monthStart' => $monthStart,
             'hasWebsite' => $this->website() !== null,
+            'stats' => $this->overviewStats($all),
+            'audience' => $this->audienceSearches($all),
+            'clusters' => $this->strategyClusters($all),
         ]);
+    }
+
+    // ── Insight builders (real topic/GSC data) ──────────────────────────
+
+    /** @return array<string,int> headline counts for the overview strip */
+    private function overviewStats($topics): array
+    {
+        $inProgress = [ContentTopic::STATUS_RESEARCHING, ContentTopic::STATUS_WRITING,
+            ContentTopic::STATUS_SCORING, ContentTopic::STATUS_REVISING, ContentTopic::STATUS_PUBLISHING];
+
+        return [
+            'planned' => $topics->whereIn('status', [ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED])->count(),
+            'in_progress' => $topics->whereIn('status', $inProgress)->count(),
+            'ready' => $topics->where('status', ContentTopic::STATUS_READY)->count(),
+            'published' => $topics->where('status', ContentTopic::STATUS_PUBLISHED)->count(),
+            'from_search' => $topics->where('source', 'gsc_gap')->count(),
+            'monthly_searches' => (int) $topics->sum('keyword_volume'),
+        ];
+    }
+
+    /**
+     * The "what your audience is searching" panel — real target keywords
+     * ranked by monthly search volume (from GSC-gap ideation).
+     *
+     * @return list<array{keyword:string, volume:?int}>
+     */
+    private function audienceSearches($topics): array
+    {
+        return $topics
+            ->sortByDesc(fn ($t) => (int) $t->keyword_volume)
+            ->take(8)
+            ->map(fn ($t) => ['keyword' => (string) $t->target_keyword, 'volume' => $t->keyword_volume ? (int) $t->keyword_volume : null])
+            ->values()->all();
+    }
+
+    /**
+     * Content-strategy clusters: group topics into themes by their most
+     * common shared keyword token (greedy), so the strategy map shows how
+     * the calendar's articles connect into content pillars.
+     *
+     * @return list<array{theme:string, topics:list<array{id:string,title:string,status:string}>}>
+     */
+    private function strategyClusters($topics): array
+    {
+        if ($topics->isEmpty()) {
+            return [];
+        }
+
+        $stop = ['the', 'a', 'an', 'for', 'to', 'of', 'and', 'in', 'on', 'your', 'how', 'what',
+            'best', 'guide', 'with', 'vs', 'or', 'is', 'are', 'name', 'names'];
+
+        // token => [topic indices]
+        $byToken = [];
+        $rows = $topics->values();
+        foreach ($rows as $i => $t) {
+            $tokens = array_unique(array_diff(
+                preg_split('/[^a-z0-9]+/', mb_strtolower((string) $t->target_keyword), -1, PREG_SPLIT_NO_EMPTY) ?: [],
+                $stop
+            ));
+            foreach ($tokens as $token) {
+                if (mb_strlen($token) >= 3) {
+                    $byToken[$token][] = $i;
+                }
+            }
+        }
+        // Most-covering tokens first.
+        uasort($byToken, fn ($a, $b) => count($b) <=> count($a));
+
+        $assigned = [];
+        $clusters = [];
+        foreach ($byToken as $token => $idxs) {
+            $members = array_values(array_filter($idxs, fn ($i) => ! isset($assigned[$i])));
+            if (count($members) < 2) {
+                continue; // a pillar needs at least 2 articles
+            }
+            foreach ($members as $i) {
+                $assigned[$i] = true;
+            }
+            $clusters[] = [
+                'theme' => Str::title($token),
+                'topics' => array_map(fn ($i) => [
+                    'id' => (string) $rows[$i]->id,
+                    'title' => (string) $rows[$i]->title,
+                    'status' => (string) $rows[$i]->status,
+                ], $members),
+            ];
+            if (count($clusters) >= 6) {
+                break;
+            }
+        }
+
+        // Leftovers → an "Other" pillar so nothing is hidden.
+        $others = [];
+        foreach ($rows as $i => $t) {
+            if (! isset($assigned[$i])) {
+                $others[] = ['id' => (string) $t->id, 'title' => (string) $t->title, 'status' => (string) $t->status];
+            }
+        }
+        if ($others !== []) {
+            $clusters[] = ['theme' => __('More topics'), 'topics' => array_slice($others, 0, 10)];
+        }
+
+        return $clusters;
     }
 }
