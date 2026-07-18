@@ -653,7 +653,16 @@
                                 </div>
                             @endforeach
                         </div>
-                        <p class="mt-4 text-center text-xs text-slate-400">{{ __('More topics keep generating in the background. Publishing: 1 article/day — change anytime.') }}</p>
+                        {{-- "This list keeps growing" callout (mirrors the step-5 research-engine callout) --}}
+                        <div class="mt-4 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('This is just the beginning — your calendar keeps filling itself') }}</p>
+                                <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __('New topics keep generating in the background, so you always have articles lined up. Publishing starts at 1 article per day — you can change the pace anytime.') }}</p>
+                            </div>
+                        </div>
                     @endif
 
                     <div class="mt-7 flex items-center justify-between">
