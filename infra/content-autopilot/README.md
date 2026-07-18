@@ -78,10 +78,9 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   ESCAPED colons (`hover\:border-orange-300`) — plain `-F ".hover:…"` false-
   negatives; `min-h-*`/`lg:order-last` are NOT compiled (inline styles used).
 
-## Setup wizard v2 (5 steps, 2026-07-17)
+## Setup wizard v2 (6 steps, 2026-07-17; keyword-research step added 2026-07-18)
 
-`ContentCalendar` Livewire component drives a 5-step wizard shown whenever the
-website has NO ACTIVE plan (`inWizard`):
+`ContentCalendar` Livewire component drives a 6-step wizard:
 1. **Business** — brand (guessed from domain), article language, auto-detected
    description (`SiteProfileExtractor`, wire:init spinner).
 2. **Offerings** — multi-item sell / don't-sell lists (add/remove/reorder/
@@ -168,7 +167,25 @@ website has NO ACTIVE plan (`inWizard`):
      month. Owner's call: intentional — QA (non-admin) accounts should see
      real data on staging; only admin accounts need sandboxing, which is
      exactly what this app-level fix implements (no staging env change made).
-5. **First articles** — the background-generated topics (`wire:poll.4s` until
+5. **Keyword research** (2026-07-18) — `ContentKeywordInsights`: the client-
+   facing digest of the research behind their plan. Background flow:
+   `PrepareContentKeywordInsightsJob` fires at the end of step 2 (alongside
+   topic ideation) and dispatches an UNMETERED ideas request to the
+   self-hosted keyword server (`KeywordFinderPool::dispatchIdeas`, seeds =
+   short heads of the confirmed sell-offerings + GSC striking-distance
+   queries, capped 20). Minutes-long turnaround at concurrency 1 — hence the
+   early dispatch; step 5 polls (`wire:poll.5s`). Once complete: topic
+   clusters (LLM labels via `AiKeywordClusterService`, monthly-cached;
+   `KeywordTermGrouper` fallback), intent mix (deterministic
+   `KeywordIntentClassifier`, plain-language labels), audience questions,
+   volume×competition opportunity picks with "In your calendar" badges,
+   30-day cached per plan (`content:kw-insights:v1:{planId}`). Completed
+   research also backfills `ContentTopic.keyword_volume`. **Degradation:**
+   failed/absent/overdue (12-min grace) server → insights built from the
+   plan's own topics + cached `keyword_metrics` volumes, marked `partial`
+   (7-day cache) — never dead-ends. Staging exercises exactly this path
+   (no `keyword_api_servers` row there; fleet webhooks point at prod).
+6. **First articles** — the background-generated topics (`wire:poll.4s` until
    ready), removable; **Launch** flips the plan to active and article writing
    begins (the dispatcher only claims ACTIVE plans, so nothing bills during the
    draft window). Baked defaults: 1 article/day, ~2,000 words (cadence step +
