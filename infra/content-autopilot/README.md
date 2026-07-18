@@ -14,7 +14,7 @@
 | 1 | Pipeline core: ideation → write → score → revise loop + dispatcher | ✅ shipped (staging) |
 | 2 | Client calendar UI + setup wizard + plan gating | ✅ shipped (staging) |
 | 3 | Publish drivers (app-password + webhook) + live-URL verify | ✅ shipped 2026-07-18 (staging; WP-plugin v2.1 driver deferred) |
-| 4 | Ideogram images end-to-end (client exists; job pending) | ⬜ |
+| 4 | Ideogram images end-to-end (featured + inline, WP sideload) | ✅ shipped 2026-07-18 (staging) |
 | 5 | Shopify, RSS/JSON feed, translations | ⬜ |
 
 ## Data model (migration `2026_07_17_120000`)
@@ -251,6 +251,43 @@ Deferred from the original Phase-3 spec: the WP-plugin v2.1
 `POST /wp-json/ebq/v1/content` receive endpoint + publish-secret minting in
 `WordPressConnectController` (separate plugin release cycle), and
 featured-image sideload (no `content_images` rows exist until Phase 4).
+
+## Images (Phase 4, 2026-07-18)
+
+`GenerateContentImagesJob` (queue `content`, tries=1 — images bill real
+money, retries would double-charge): chained from `ProduceContentArticleJob`
+right after the READY transition (gated on `ContentAutopilotConfig::
+imagesEnabled()`). ASYNC — never blocks publish; every failure mode (images
+off, Ideogram unconfigured, `IdeogramSpendMeter` cap hit, generate/download
+error) degrades to "article without images".
+
+Flow per article: build a featured prompt (from the H1) + up to
+`maxInlineImages` inline prompts (one per non-boilerplate H2 — FAQ/takeaways
+skipped), all deterministic (no LLM call) with the plan's
+`image_style_prompt` appended. For each: `IdeogramClient::generate`
+(num_images=1) → `download()` the short-lived URL → `Storage::disk('public')
+->put('content/images/{ulid}.png')` → `ContentImage` row (status generated)
+→ `IdeogramSpendMeter::add(cost)`. Then inject `<figure class="content-image">`
+into `$article->html`: featured after any leading TOC nav, each inline right
+after its section's `<h2 id>` (the anchor the scorer already stamps).
+
+**Alt text is keyphrase-driven, not decorative:** featured alt = the focus
+keyphrase, each inline alt = one of the additional keyphrases — so images
+also raise the WP plugin's on-page topical-coverage signal (its image-alt
+bonus), lifting the coverage cap that text alone couldn't clear.
+
+**WordPress sideload** (`WordPressAppPasswordDriver::sideloadImages`): on
+publish, every generated image is uploaded to `/wp/v2/media` (raw bytes +
+Content-Disposition), the featured one sets `featured_media`, and inline
+`<img src>` are rewritten from our storage URL to the WP-hosted one so
+published posts never hotlink our disk. Best-effort — a media failure leaves
+the post text intact. Alt text is set on each media entry too.
+
+Config (`ContentAutopilotConfig`, live-flippable via `settings`):
+`content.images.enabled` / `.featured_enabled` / `.max_inline` (0-4, def 2) /
+`.rendering_speed` (TURBO) / `.style_type` (AUTO); cap
+`services.ideogram.monthly_cap_usd`. Review preview renders the figures
+(`.ca-preview figure.content-image` styling in article-review.blade).
 
 ## Config & admin
 

@@ -65,6 +65,14 @@ class ProduceContentArticleJob implements ShouldQueue, ShouldBeUnique
             'score' => $article?->seo_score,
             'version' => $article?->version,
         ]);
+
+        // Article is ready → generate images asynchronously (never blocks
+        // publish; the job self-gates on the images toggle + Ideogram config
+        // + spend cap). Only when production actually succeeded.
+        if ($article !== null && $topic->fresh()->status === ContentTopic::STATUS_READY
+            && \App\Support\ContentAutopilotConfig::imagesEnabled()) {
+            GenerateContentImagesJob::dispatch($article->id);
+        }
     }
 
     public function failed(\Throwable $e): void

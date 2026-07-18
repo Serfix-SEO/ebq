@@ -85,15 +85,25 @@ class WordPressAppPasswordDriver implements PublishDriver
             return PublishResult::failure($err);
         }
 
+        // Sideload generated images into the WP media library first: uploads
+        // the featured image (→ featured_media) and every inline image,
+        // rewriting inline <img src> from our storage URL to the WP-hosted
+        // one so published posts never hotlink our disk. Best-effort — a
+        // media failure leaves the post text intact.
+        [$html, $featuredMediaId] = $this->sideloadImages($article, $base, $auth);
+
         $config = (array) ($integration->config ?? []);
         $payload = [
             'title' => (string) ($article->meta_title ?: $article->h1),
-            'content' => (string) $article->html,
+            'content' => $html,
             'slug' => (string) $article->slug,
             'status' => in_array($config['post_status'] ?? 'publish', ['publish', 'draft'], true)
                 ? ($config['post_status'] ?? 'publish') : 'publish',
             'excerpt' => (string) ($article->meta_description ?? ''),
         ];
+        if ($featuredMediaId !== null) {
+            $payload['featured_media'] = $featuredMediaId;
+        }
 
         // Populate the Serfix plugin's on-page SEO / self-check fields — but
         // ONLY when the plugin is present. WP rejects unregistered protected
@@ -185,6 +195,83 @@ class WordPressAppPasswordDriver implements PublishDriver
             return in_array('ebq/v1', (array) ($response->json('namespaces') ?? []), true);
         } catch (\Throwable) {
             return false;
+        }
+    }
+
+    /**
+     * Upload generated images to the WP media library. Returns the article
+     * HTML with inline <img src> rewritten to WP-hosted URLs, plus the
+     * featured attachment id (or null). Fully best-effort — any failure
+     * leaves that image as-is and never blocks the post.
+     *
+     * @param  array{username: string, app_password: string}  $auth
+     * @return array{0: string, 1: ?int}
+     */
+    private function sideloadImages(ContentArticle $article, string $base, array $auth): array
+    {
+        $html = (string) $article->html;
+        $featuredId = null;
+
+        $images = $article->images()->where('status', \App\Models\ContentImage::STATUS_GENERATED)->get();
+        foreach ($images as $image) {
+            $localUrl = $image->url();
+            $bytes = $image->disk_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($image->disk_path)
+                ? \Illuminate\Support\Facades\Storage::disk('public')->get($image->disk_path)
+                : null;
+            if ($bytes === null) {
+                continue;
+            }
+
+            $media = $this->uploadMedia($base, $auth, $bytes, (string) ($image->filename ?: 'image.png'), (string) ($image->alt_text ?? ''));
+            if ($media === null) {
+                continue;
+            }
+
+            if ($image->role === \App\Models\ContentImage::ROLE_FEATURED) {
+                $featuredId = $media['id'];
+            }
+            // Rewrite the inline (and featured, harmlessly) src to the WP URL.
+            if ($localUrl !== null && ! empty($media['url'])) {
+                $html = str_replace($localUrl, $media['url'], $html);
+            }
+        }
+
+        return [$html, $featuredId];
+    }
+
+    /**
+     * POST raw bytes to /wp/v2/media; set alt text; return {id, url}.
+     *
+     * @param  array{username: string, app_password: string}  $auth
+     * @return array{id:int, url:string}|null
+     */
+    private function uploadMedia(string $base, array $auth, string $bytes, string $filename, string $alt): ?array
+    {
+        try {
+            $response = Http::timeout(60)->connectTimeout(8)
+                ->withBasicAuth($auth['username'], $auth['app_password'])
+                ->withHeaders([
+                    'Content-Type' => 'image/png',
+                    'Content-Disposition' => 'attachment; filename="'.str_replace('"', '', $filename).'"',
+                ])
+                ->withBody($bytes, 'image/png')
+                ->post($base.'/wp-json/wp/v2/media');
+
+            if ($response->failed() || ! $response->json('id')) {
+                return null;
+            }
+            $id = (int) $response->json('id');
+            $url = (string) ($response->json('source_url') ?? '');
+
+            if ($alt !== '') {
+                // Best-effort alt for the media library entry.
+                Http::timeout(20)->withBasicAuth($auth['username'], $auth['app_password'])
+                    ->acceptJson()->post($base.'/wp-json/wp/v2/media/'.$id, ['alt_text' => $alt]);
+            }
+
+            return ['id' => $id, 'url' => $url];
+        } catch (\Throwable) {
+            return null;
         }
     }
 

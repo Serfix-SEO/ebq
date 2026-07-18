@@ -100,6 +100,9 @@
                 .dark .ca-preview .content-toc { border-color: #334155; background: #0f172a; }
                 .dark .ca-preview .content-toc__title { color: #94a3b8; }
                 .dark .ca-preview .content-toc a { color: #fb923c; }
+                .ca-preview figure.content-image { margin: 1.25rem 0; }
+                .ca-preview figure.content-image img { width: 100%; height: auto; border-radius: .75rem; display: block; }
+                .ca-preview figure.content-image figcaption { margin-top: .4rem; font-size: .8rem; color: #64748b; text-align: center; }
             </style>
         </div>
     @endif

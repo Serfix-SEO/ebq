@@ -16,7 +16,21 @@ class ContentImage extends Model
 
     public const ROLE_INLINE = 'inline';
 
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_GENERATED = 'generated';
+
+    public const STATUS_FAILED = 'failed';
+
+    public const STATUS_REJECTED = 'rejected';
+
     protected $guarded = [];
+
+    /** Public-disk URL for the stored image, or null. */
+    public function url(): ?string
+    {
+        return $this->disk_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->disk_path) : null;
+    }
 
     protected function casts(): array
     {
