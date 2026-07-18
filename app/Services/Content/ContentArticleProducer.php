@@ -169,6 +169,35 @@ class ContentArticleProducer
             }
         }
 
+        // ── Final de-AI cleanup ─────────────────────────────────────────
+        // The SEO revise optimizes for on-page checks, not for sounding human,
+        // so fabrication/filler tells often survive it. Run ONE focused editor
+        // pass whose only job is to strip those tells (invented reports/dates/
+        // stats, teaching loops, over-repeated exact keyword, sweeping claims,
+        // dramatic closers) without touching SEO. Keep the result only if it
+        // still clears the publish floor.
+        if ($this->hasIntegrityTell($article)) {
+            $topic->enterStage(ContentTopic::STATUS_REVISING);
+            try {
+                $cleaned = $this->deAiCleanup($article, $topic, $plan);
+            } catch (\App\Exceptions\QuotaExceededException) {
+                $cleaned = null;
+            }
+            if ($cleaned !== null) {
+                $this->meter->add(ContentLlmSpendMeter::EST_REVISE_USD);
+                $candidate = $this->storeScoredVersion($topic, $context, $cleaned + [
+                    'generation_meta' => [
+                        'provider' => $writeModel['provider'],
+                        'model' => ContentAutopilotConfig::modelFor('revise')['model'],
+                        'stage' => 'de_ai_cleanup',
+                    ],
+                ]);
+                if ($candidate->seo_score >= ContentAutopilotConfig::publishFloor()) {
+                    $article = $candidate;
+                }
+            }
+        }
+
         // ── Verdict ─────────────────────────────────────────────────────
         if ($article->seo_score < ContentAutopilotConfig::publishFloor()) {
             $topic->fail('below_publish_floor: score '.$article->seo_score);
@@ -299,6 +328,87 @@ class ContentArticleProducer
     private function hasStyleIssue(ContentArticle $article): bool
     {
         return ! empty((array) ($article->style_issues ?? []));
+    }
+
+    /**
+     * The subset of style tells that are integrity/credibility problems (as
+     * opposed to rhythm nits) — worth a dedicated cleanup pass because the SEO
+     * revise won't fix them.
+     */
+    private function hasIntegrityTell(ContentArticle $article): bool
+    {
+        $codes = array_column((array) ($article->style_issues ?? []), 'code');
+
+        return array_intersect($codes, [
+            'fabricated_consensus', 'fabricated_citation', 'banned_phrases',
+            'hype_contrast', 'formal_tone',
+        ]) !== [];
+    }
+
+    /**
+     * One focused editor pass that ONLY removes AI tells — no SEO changes.
+     * Different brief from revise(): here the job is to make the prose read as
+     * a knowledgeable human wrote it, deleting anything invented or padded.
+     *
+     * @return array{h1:string, meta_title:string, meta_description:string, slug:string, html:string, outline:mixed}|null
+     */
+    private function deAiCleanup(ContentArticle $article, ContentTopic $topic, ContentPlan $plan): ?array
+    {
+        $reviseModel = ContentAutopilotConfig::modelFor('revise');
+        $llm = LlmClientFactory::make($reviseModel['provider']);
+        if (! $llm->isAvailable()) {
+            return null;
+        }
+
+        $tells = implode("\n- ", array_filter(array_map(
+            static fn ($i) => (string) ($i['message'] ?? ''),
+            (array) ($article->style_issues ?? [])
+        )));
+
+        $system = 'You are a senior editor whose ONLY job is to make an article read like a knowledgeable human wrote it, not an AI. '
+            .'Do NOT restructure, do not change headings, do not add or remove sections, do not touch links, images, tables, or the FAQ. '
+            .'Keep the meaning, the useful specifics, and roughly the same length. Edit sentence by sentence to fix these problems:'
+            ."\n- {$tells}\n"
+            .'Hard rules: DELETE every invented claim outright — no "players reported", no "the community found", no dated events ("in mid-2025..."), no fabricated studies/percentages, no "works on all regions/versions", no "most reliable" unless it is plainly true. When you delete an unsupported claim, do NOT replace it with another guess; either state only what is certain or drop the point. '
+            .'Compress teaching loops so each idea is explained ONCE. Cut exact-keyword over-repetition (keep at most 3-4 exact uses; vary the rest). Remove dramatic sign-offs. Keep contractions and natural rhythm. '
+            .'Respond with valid JSON only: {"html": "<full edited article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}. '
+            ."\n".$this->humanizer->promptRules();
+
+        $user = "FOCUS KEYWORD (use at most 3-4 exact times): {$topic->target_keyword}\n"
+            .'LANGUAGE: '.($plan->language ?: 'en')."\n\n"
+            ."CURRENT META TITLE: {$article->meta_title}\n"
+            ."CURRENT META DESCRIPTION: {$article->meta_description}\n"
+            ."CURRENT H1: {$article->h1}\n\n"
+            ."ARTICLE HTML TO CLEAN:\n{$article->html}";
+
+        $options = [
+            'temperature' => 0.4,
+            'max_tokens' => 16000,
+            'timeout' => 240,
+            '__user_id' => $topic->website?->user_id,
+            '__source' => 'content_autopilot.de_ai',
+        ];
+        if (! empty($reviseModel['model'])) {
+            $options['model'] = $reviseModel['model'];
+        }
+
+        $result = $llm->completeJson([
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $user],
+        ], $options);
+
+        if (! is_array($result) || trim((string) ($result['html'] ?? '')) === '') {
+            return null;
+        }
+
+        return [
+            'h1' => trim((string) ($result['h1'] ?? $article->h1)) ?: (string) $article->h1,
+            'meta_title' => mb_substr(trim((string) ($result['meta_title'] ?? $article->meta_title)), 0, 300),
+            'meta_description' => mb_substr(trim((string) ($result['meta_description'] ?? $article->meta_description)), 0, 500),
+            'slug' => (string) $article->slug,
+            'html' => (string) $result['html'],
+            'outline' => $article->outline,
+        ];
     }
 
     /** A unique kebab-case anchor id for a heading. */
