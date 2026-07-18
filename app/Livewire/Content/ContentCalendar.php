@@ -84,6 +84,12 @@ class ContentCalendar extends Component
     /** Article-structure toggles surfaced in the wizard (step 3). */
     public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true];
 
+    /** Publishing cadence — editable from the post-onboarding Settings view. */
+    public int $articlesPerWeek = self::DEFAULT_PER_WEEK;
+    public int $articleLength = self::DEFAULT_LENGTH;
+    public bool $autoPublish = false;
+    public int $reviewHours = 24;
+
     public function mount(string $mode = 'calendar'): void
     {
         $this->mode = in_array($mode, ['calendar', 'settings'], true) ? $mode : 'calendar';
@@ -130,6 +136,10 @@ class ContentCalendar extends Component
                 'toc' => $existing->toggle('toc'),
                 'faq' => $existing->toggle('faq'),
             ];
+            $this->articlesPerWeek = (int) ($existing->articles_per_week ?: self::DEFAULT_PER_WEEK);
+            $this->articleLength = (int) ($existing->article_length ?: self::DEFAULT_LENGTH);
+            $this->autoPublish = (bool) $existing->auto_publish;
+            $this->reviewHours = (int) ($existing->review_hours ?? 24);
             if ($existing->status === ContentPlan::STATUS_DRAFT) {
                 $this->wizardStep = max($this->wizardStep, 3);
             }
@@ -492,6 +502,46 @@ class ContentCalendar extends Component
         $this->redirect(route('content.index'), navigate: true);
     }
 
+    /**
+     * Post-onboarding Settings save: persist ONLY the settings-relevant fields
+     * (profile, offerings, structure, cadence) on an already-onboarded plan.
+     * Never touches status and never re-triggers the onboarding jobs
+     * (competitor discovery, keyword research, topic ideation) — those belong
+     * to the first-run wizard, not to routine settings edits.
+     */
+    public function saveSettings(): void
+    {
+        $plan = $this->plan();
+        if ($plan === null) {
+            return;
+        }
+        $this->validate([
+            'businessDescription' => 'required|string|min:30|max:1000',
+        ]);
+
+        $sell = array_values(array_filter(array_map('trim', $this->sellItems)));
+        $dont = array_values(array_filter(array_map('trim', $this->dontSellItems)));
+        $toggles = array_merge((array) ($plan->toggles ?? []), [
+            'key_takeaways' => (bool) ($this->structureToggles['key_takeaways'] ?? true),
+            'toc' => (bool) ($this->structureToggles['toc'] ?? true),
+            'faq' => (bool) ($this->structureToggles['faq'] ?? true),
+        ]);
+
+        $plan->update([
+            'business_description' => $this->businessDescription,
+            'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
+            'language' => $this->language ?: 'en',
+            'country' => $this->country ?: null,
+            'articles_per_week' => max(1, min(7, $this->articlesPerWeek)),
+            'article_length' => max(800, min(4000, $this->articleLength)),
+            'auto_publish' => $this->autoPublish,
+            'review_hours' => max(0, min(168, $this->reviewHours)),
+            'toggles' => $toggles,
+        ]);
+
+        session()->flash('content-status', __('Your content settings have been saved.'));
+    }
+
     private function guessBrand(?Website $website): string
     {
         if ($website === null) {
@@ -768,11 +818,24 @@ class ContentCalendar extends Component
     public function render()
     {
         $plan = $this->activePlan();
-        // Settings always shows the wizard. Calendar shows the wizard ONLY
-        // implicitly never — a plan-less Calendar page gets a lightweight
-        // "set it up in Settings" prompt instead (see $needsSetup below).
-        $inWizard = $this->mode === 'settings';
+        // Post-onboarding (plan is no longer a draft) the Settings page becomes
+        // a real SETTINGS layout — profile/offerings/structure/cadence only —
+        // skipping the onboarding-only steps (how-it-works, competitors,
+        // keyword research, first articles). The full 6-step wizard is reserved
+        // for first-run setup (draft or no plan yet).
+        $settingsView = $this->mode === 'settings' && $plan !== null;
+        $inWizard = $this->mode === 'settings' && ! $settingsView;
         $needsSetup = $this->mode === 'calendar' && $plan === null;
+
+        if ($settingsView) {
+            return view('livewire.content.content-calendar', [
+                'inWizard' => false,
+                'needsSetup' => false,
+                'settingsView' => true,
+                'wizard' => [],
+                'plan' => $plan,
+            ] + $this->emptyCalendarBindings());
+        }
 
         // ── Wizard data ──
         $wizard = [];
@@ -841,6 +904,7 @@ class ContentCalendar extends Component
         return view('livewire.content.content-calendar', [
             'inWizard' => false,
             'needsSetup' => false,
+            'settingsView' => false,
             'wizard' => [],
             'plan' => $plan,
             'topics' => $topics,
@@ -858,6 +922,7 @@ class ContentCalendar extends Component
     private function emptyCalendarBindings(): array
     {
         return [
+            'settingsView' => false,
             'plan' => null,
             'topics' => collect(),
             'topicsByDate' => collect(),

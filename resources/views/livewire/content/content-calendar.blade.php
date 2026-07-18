@@ -22,6 +22,150 @@
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
             </a>
         </div>
+    @elseif ($settingsView)
+        {{-- ══ Post-onboarding SETTINGS layout (no stepper) ════════════ --}}
+        <div class="mx-auto w-full max-w-4xl space-y-5">
+            <div class="flex justify-end">
+                <a href="{{ route('content.index') }}" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                    {{ __('View calendar') }}
+                </a>
+            </div>
+
+            {{-- Business profile --}}
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Business profile') }}</h2>
+                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('What your business does — used to research and write every article.') }}</p>
+                <textarea wire:model="businessDescription" rows="4"
+                    class="mt-3 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"></textarea>
+                @error('businessDescription') <p class="mt-1.5 text-xs text-error">{{ $message }}</p> @enderror
+                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Language') }}</label>
+                        <input wire:model="language" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Country (optional)') }}</label>
+                        <input wire:model="country" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                    </div>
+                </div>
+            </div>
+
+            {{-- Offerings --}}
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('What you sell') }}</h2>
+                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Guides article topics toward what you actually offer.') }}</p>
+                <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wide text-success">{{ __('We sell') }}</div>
+                        <div class="mt-2 space-y-2">
+                            @foreach ($sellItems as $i => $item)
+                                <div class="flex items-center gap-2" wire:key="set-sell-{{ $i }}">
+                                    <input wire:model="sellItems.{{ $i }}" type="text" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                                    <button type="button" wire:click="removeSell({{ $i }})" class="text-slate-300 hover:text-error" aria-label="{{ __('Remove') }}">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="mt-2 flex gap-2">
+                            <input wire:model="newSell" wire:keydown.enter.prevent="addSell" type="text" placeholder="{{ __('Add an offering') }}" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                            <button type="button" wire:click="addSell" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-600 text-white hover:brightness-110" aria-label="{{ __('Add') }}">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ __("We don't sell") }}</div>
+                        <div class="mt-2 space-y-2">
+                            @foreach ($dontSellItems as $i => $item)
+                                <div class="flex items-center gap-2" wire:key="set-dont-{{ $i }}">
+                                    <input wire:model="dontSellItems.{{ $i }}" type="text" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                                    <button type="button" wire:click="removeDont({{ $i }})" class="text-slate-300 hover:text-error" aria-label="{{ __('Remove') }}">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="mt-2 flex gap-2">
+                            <input wire:model="newDont" wire:keydown.enter.prevent="addDont" type="text" placeholder="{{ __('Add an exclusion') }}" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                            <button type="button" wire:click="addDont" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-600 text-white hover:brightness-110" aria-label="{{ __('Add') }}">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Article structure --}}
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('What goes into every article') }}</h2>
+                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Turn these sections on or off. Applies to future articles.') }}</p>
+                <div class="mt-4 space-y-2.5">
+                    @php
+                        $structOpts = [
+                            ['key' => 'key_takeaways', 'title' => __('Key takeaways'), 'desc' => __('A quick bullet summary near the top.')],
+                            ['key' => 'toc', 'title' => __('“In this article” list'), 'desc' => __('A clickable table of contents after the intro.')],
+                            ['key' => 'faq', 'title' => __('FAQ section'), 'desc' => __('Common questions answered at the end.')],
+                        ];
+                    @endphp
+                    @foreach ($structOpts as $opt)
+                        @php $on = (bool) ($structureToggles[$opt['key']] ?? true); @endphp
+                        <div class="flex items-center justify-between gap-4 rounded-xl border border-slate-100 p-3 dark:border-slate-800" wire:key="set-struct-{{ $opt['key'] }}">
+                            <div class="min-w-0">
+                                <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $opt['title'] }}</div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">{{ $opt['desc'] }}</div>
+                            </div>
+                            <button type="button" wire:click="toggleStructure('{{ $opt['key'] }}')" role="switch" aria-checked="{{ $on ? 'true' : 'false' }}"
+                                class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition {{ $on ? 'bg-orange-600' : 'bg-slate-300 dark:bg-slate-700' }}">
+                                <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition {{ $on ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                            </button>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Publishing cadence --}}
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Publishing') }}</h2>
+                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('How often we publish and how long each article runs.') }}</p>
+                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Articles per week') }}</label>
+                        <select wire:model="articlesPerWeek" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                            @foreach ([1,2,3,4,5,6,7] as $n)
+                                <option value="{{ $n }}">{{ trans_choice('{1} :count article/week|[2,*] :count articles/week', $n, ['count' => $n]) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Article length') }}</label>
+                        <select wire:model="articleLength" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                            <option value="1500">{{ __('Concise (~1,500 words)') }}</option>
+                            <option value="2000">{{ __('Standard (~2,000 words)') }}</option>
+                            <option value="2500">{{ __('In-depth (~2,500 words)') }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center justify-between gap-4 rounded-xl border border-slate-100 p-3 dark:border-slate-800">
+                    <div class="min-w-0">
+                        <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ __('Auto-publish') }}</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">{{ __('Publish approved articles automatically instead of waiting for manual approval.') }}</div>
+                    </div>
+                    <button type="button" wire:click="$toggle('autoPublish')" role="switch" aria-checked="{{ $autoPublish ? 'true' : 'false' }}"
+                        class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition {{ $autoPublish ? 'bg-orange-600' : 'bg-slate-300 dark:bg-slate-700' }}">
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition {{ $autoPublish ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="button" wire:click="saveSettings" class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                    {{ __('Save settings') }}
+                </button>
+            </div>
+        </div>
+
     @elseif ($inWizard)
         {{-- ══ Setup wizard (5 steps) ══════════════════════════════════ --}}
         @php

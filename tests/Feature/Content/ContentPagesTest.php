@@ -62,32 +62,58 @@ class ContentPagesTest extends TestCase
             ->assertSee(__('Tell us about your business'));
     }
 
-    public function test_settings_page_reopens_wizard_for_active_plan_without_demoting_it(): void
+    public function test_settings_page_shows_settings_layout_for_onboarded_plan(): void
     {
         [$user, $website] = $this->userWithWebsite();
         $plan = ContentPlan::factory()->create([
             'website_id' => $website->id,
             'status' => ContentPlan::STATUS_ACTIVE,
             'business_description' => 'We sell handmade wooden furniture for small apartments.',
+            'articles_per_week' => 7,
         ]);
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
+        // Onboarded plan → settings layout, NOT the onboarding stepper.
         $this->get('/content/settings')
             ->assertOk()
-            ->assertSee(__('Tell us about your business'));
+            ->assertSee(__('Articles per week'))          // settings-only control
+            ->assertSee(__('Auto-publish'))
+            ->assertDontSee(__('Step 3 of 6'))            // no stepper
+            ->assertDontSee(__('How this grows your traffic')) // onboarding-only step skipped
+            ->assertDontSee(__('Keyword research'));
 
+        // saveSettings persists settings fields without demoting the plan or
+        // re-running onboarding jobs.
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
             ->set('businessDescription', 'We sell handmade wooden furniture for small apartments, updated.')
-            ->call('toOfferings')
-            ->call('toHowItWorks')
+            ->set('articlesPerWeek', 3)
+            ->set('autoPublish', true)
+            ->call('saveSettings')
             ->assertHasNoErrors();
 
-        $this->assertSame(ContentPlan::STATUS_ACTIVE, $plan->fresh()->status);
-        $this->assertSame(
-            'We sell handmade wooden furniture for small apartments, updated.',
-            $plan->fresh()->business_description
-        );
+        $fresh = $plan->fresh();
+        $this->assertSame(ContentPlan::STATUS_ACTIVE, $fresh->status);
+        $this->assertSame('We sell handmade wooden furniture for small apartments, updated.', $fresh->business_description);
+        $this->assertSame(3, (int) $fresh->articles_per_week);
+        $this->assertTrue((bool) $fresh->auto_publish);
+    }
+
+    public function test_settings_page_shows_wizard_for_draft_plan(): void
+    {
+        [$user, $website] = $this->userWithWebsite();
+        ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'status' => ContentPlan::STATUS_DRAFT,
+            'business_description' => 'A not-yet-launched draft plan awaiting first setup.',
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_website_id' => $website->id])
+            ->get('/content/settings')
+            ->assertOk()
+            ->assertSee(__('How this grows your traffic')) // still the onboarding wizard (draft lands on step 3)
+            ->assertDontSee(__('Articles per week'));       // settings-only control absent
     }
 
     public function test_structure_toggle_persists_to_plan(): void
