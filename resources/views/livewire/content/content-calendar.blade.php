@@ -447,8 +447,19 @@
                             <p class="text-xs text-slate-400">{{ __('This runs in the background — feel free to continue and check back.') }}</p>
                         </div>
                     @else
+                        {{-- "This is a live sample, not the whole picture" callout --}}
+                        <div class="mt-6 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __("A live glimpse of your research engine — not the whole picture") }}</p>
+                                <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __("What you see here is a real-time sample of how we research your market. The deeper analysis never stops: every single article gets its own fresh round of research — search trends, competing pages, and related questions — the moment it's written.") }}</p>
+                            </div>
+                        </div>
+
                         {{-- Headline stats --}}
-                        <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                             <div class="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-center dark:border-orange-900 dark:bg-orange-950">
                                 <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['keywords']) }}</div>
                                 <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Keywords analyzed') }}</div>
