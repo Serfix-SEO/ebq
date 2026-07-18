@@ -29,13 +29,20 @@
             $maxUnlocked = $draftPlanId !== null ? 5 : 2;
             $stepCount = count($steps);
             $fillPct = $stepCount > 1 ? (($wizardStep - 1) / ($stepCount - 1)) * 100 : 0;
+            // Each step circle sits centered in its own 100/stepCount-wide slot,
+            // so its center is half a slot in from each edge — the connector
+            // line must start/end there too, or it overshoots past the first
+            // and last circles (visibly sticking out either side).
+            $halfSlot = 100 / $stepCount / 2;
+            $trackWidth = 100 - (2 * $halfSlot);
+            $fillWidth = $trackWidth * $fillPct / 100;
         @endphp
-        <div class="mx-auto max-w-4xl">
+        <div class="w-full">
             {{-- Progress rail --}}
             <div class="mb-8 px-2 sm:px-6">
                 <div class="relative">
-                    <div class="absolute inset-x-0 h-1 rounded-full bg-slate-200 dark:bg-slate-800" style="top:0.875rem"></div>
-                    <div class="absolute start-0 h-1 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-200" style="top:0.875rem; width: {{ $fillPct }}%"></div>
+                    <div class="absolute h-1 rounded-full bg-slate-200 dark:bg-slate-800" style="top:0.875rem; inset-inline-start: {{ $halfSlot }}%; inset-inline-end: {{ $halfSlot }}%"></div>
+                    <div class="absolute h-1 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-200" style="top:0.875rem; inset-inline-start: {{ $halfSlot }}%; width: {{ $fillWidth }}%"></div>
                     <div class="relative flex items-start justify-between">
                         @foreach ($steps as $s => $label)
                             <button type="button" @if($s <= $maxUnlocked) wire:click="goToStep({{ $s }})" @endif
@@ -141,18 +148,25 @@
                                 </h3>
                                 <span class="rounded-full bg-success/15 px-2.5 py-1 text-xs font-bold text-success">{{ count($sellItems) }}</span>
                             </div>
-                            <p class="mt-1.5 text-xs font-medium text-success/80">{{ __('Most important first') }}</p>
-                            <div class="mt-4 space-y-2">
+                            <p class="mt-1.5 text-xs font-medium text-success/80">{{ __('Most important first — drag to reorder') }}</p>
+                            <div class="mt-4 space-y-2" x-data="{ dragIndex: null }">
                                 @forelse ($sellItems as $i => $item)
-                                    <div class="group flex items-center gap-2 rounded-xl border border-success/15 bg-white px-3 py-2.5 shadow-sm transition hover:border-success/40 hover:shadow-md dark:border-slate-700 dark:bg-slate-800" wire:key="sell-{{ $i }}">
-                                        <div class="flex flex-col text-slate-300 dark:text-slate-600">
-                                            <button type="button" wire:click="moveSell({{ $i }}, -1)" class="hover:text-success disabled:opacity-30" @disabled($i === 0)>
-                                                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 6l6 6H6z"/></svg>
-                                            </button>
-                                            <button type="button" wire:click="moveSell({{ $i }}, 1)" class="hover:text-success disabled:opacity-30" @disabled($loop->last)>
-                                                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 18l-6-6h12z"/></svg>
-                                            </button>
-                                        </div>
+                                    <div
+                                        draggable="true"
+                                        x-on:dragstart="dragIndex = {{ $i }}"
+                                        x-on:dragover.prevent
+                                        x-on:drop="if (dragIndex !== null && dragIndex !== {{ $i }}) { $wire.reorderSell(dragIndex, {{ $i }}) }; dragIndex = null"
+                                        x-on:dragend="dragIndex = null"
+                                        :class="dragIndex === {{ $i }} ? 'opacity-40' : ''"
+                                        class="group flex items-center gap-2 rounded-xl border border-success/15 bg-white px-3 py-2.5 shadow-sm transition hover:border-success/40 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                                        wire:key="sell-{{ $i }}">
+                                        <span class="cursor-grab text-slate-300 hover:text-success active:cursor-grabbing dark:text-slate-600" title="{{ __('Drag to reorder') }}">
+                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                                <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+                                                <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                                                <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+                                            </svg>
+                                        </span>
                                         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/15 text-xs font-extrabold text-success">{{ $i + 1 }}</span>
                                         <input wire:model="sellItems.{{ $i }}" type="text" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-slate-800 focus:ring-0 dark:text-slate-100" />
                                         <button type="button" wire:click="removeSell({{ $i }})" class="shrink-0 text-slate-300 opacity-0 transition hover:text-error group-hover:opacity-100" aria-label="{{ __('Remove') }}">

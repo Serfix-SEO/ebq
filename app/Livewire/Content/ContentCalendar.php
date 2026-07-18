@@ -212,12 +212,15 @@ class ContentCalendar extends Component
         $this->dontSellItems = array_values($this->dontSellItems);
     }
 
-    public function moveSell(int $i, int $dir): void
+    /** Drag-and-drop reorder: move the item at $from to sit at $to. */
+    public function reorderSell(int $from, int $to): void
     {
-        $j = $i + $dir;
-        if (isset($this->sellItems[$i], $this->sellItems[$j])) {
-            [$this->sellItems[$i], $this->sellItems[$j]] = [$this->sellItems[$j], $this->sellItems[$i]];
+        if (! isset($this->sellItems[$from]) || $from === $to || $to < 0 || $to >= count($this->sellItems)) {
+            return;
         }
+        $item = $this->sellItems[$from];
+        array_splice($this->sellItems, $from, 1);
+        array_splice($this->sellItems, $to, 0, [$item]);
     }
 
     /**

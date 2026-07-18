@@ -128,6 +128,35 @@ class ContentPagesTest extends TestCase
         $this->assertSame(ContentPlan::STATUS_ACTIVE, $plan->fresh()->status);
     }
 
+    public function test_reorder_sell_moves_item_to_target_position(): void
+    {
+        [$user, $website] = $this->userWithWebsite();
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class)
+            ->set('sellItems', ['A', 'B', 'C', 'D'])
+            ->call('reorderSell', 3, 0)
+            ->assertSet('sellItems', ['D', 'A', 'B', 'C']);
+
+        Livewire::test(ContentCalendar::class)
+            ->set('sellItems', ['A', 'B', 'C', 'D'])
+            ->call('reorderSell', 0, 2)
+            ->assertSet('sellItems', ['B', 'C', 'A', 'D']);
+    }
+
+    public function test_reorder_sell_ignores_out_of_range_indexes(): void
+    {
+        [$user, $website] = $this->userWithWebsite();
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class)
+            ->set('sellItems', ['A', 'B'])
+            ->call('reorderSell', 5, 0)
+            ->assertSet('sellItems', ['A', 'B'])
+            ->call('reorderSell', 0, 99)
+            ->assertSet('sellItems', ['A', 'B']);
+    }
+
     public function test_wizard_step_one_validates_description(): void
     {
         [$user, $website] = $this->userWithWebsite();
