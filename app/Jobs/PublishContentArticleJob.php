@@ -174,7 +174,7 @@ class PublishContentArticleJob implements ShouldQueue
             ->first()?->fail('Publishing error: '.$e->getMessage());
     }
 
-    /** Best-effort live check: 200 + H1 present + not noindexed → verified_at. */
+    /** Best-effort live check: 200 + title present + not noindexed → verified_at. */
     private function verifyLiveUrl(ContentTopic $topic, $article, ?string $liveUrl, SafeHttpGuard $guard): void
     {
         if (! $liveUrl || ! ($guard->check($liveUrl)['ok'] ?? false)) {
@@ -183,9 +183,12 @@ class PublishContentArticleJob implements ShouldQueue
         try {
             $response = Http::timeout(20)->connectTimeout(8)->get($liveUrl);
             $html = (string) $response->body();
-            $h1 = trim((string) $article->h1);
+            // Match the title we actually published — drivers post
+            // meta_title (falling back to h1), which the CMS renders as the
+            // page heading. Checking the raw h1 would miss when the two differ.
+            $needle = trim((string) ($article->meta_title ?: $article->h1));
             $ok = $response->ok()
-                && ($h1 === '' || str_contains($html, e($h1)) || str_contains($html, $h1))
+                && ($needle === '' || str_contains($html, e($needle)) || str_contains($html, $needle))
                 && ! preg_match('/<meta[^>]+noindex/i', $html);
             if ($ok) {
                 ContentPublication::query()
