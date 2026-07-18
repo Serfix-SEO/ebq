@@ -25,8 +25,8 @@
     @elseif ($inWizard)
         {{-- ══ Setup wizard (5 steps) ══════════════════════════════════ --}}
         @php
-            $steps = [1 => __('Business'), 2 => __('Offerings'), 3 => __('How it works'), 4 => __('Competitors'), 5 => __('First articles')];
-            $maxUnlocked = $draftPlanId !== null ? 5 : 2;
+            $steps = [1 => __('Business'), 2 => __('Offerings'), 3 => __('How it works'), 4 => __('Competitors'), 5 => __('Keyword research'), 6 => __('First articles')];
+            $maxUnlocked = $draftPlanId !== null ? 6 : 2;
             $stepCount = count($steps);
             $fillPct = $stepCount > 1 ? (($wizardStep - 1) / ($stepCount - 1)) * 100 : 0;
             // Each step circle sits centered in its own 100/stepCount-wide slot,
@@ -80,7 +80,7 @@
                                 <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15l-.75 18h-13.5L4.5 3zM9 3v18M15 3v18"/></svg>
                             </span>
                             <div>
-                                <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 1 of 5') }}</p>
+                                <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 1 of 6') }}</p>
                                 <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Tell us about your business') }}</h2>
                             </div>
                         </div>
@@ -130,7 +130,7 @@
                             <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.1-.9 2-2 2H5.75c-1.1 0-2-.9-2-2V9.85c0-1.1.9-2 2-2h4.25M20.25 14.15L15 14.15M20.25 14.15l-4.5-4.5M15 4.5h5.25v5.25"/></svg>
                         </span>
                         <div>
-                            <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 2 of 5') }}</p>
+                            <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 2 of 6') }}</p>
                             <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('What you offer') }}</h2>
                         </div>
                     </div>
@@ -242,7 +242,7 @@
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                         </span>
-                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 3 of 5') }}</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 3 of 6') }}</p>
                         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('How this grows your traffic') }}</h2>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Fully automatic. You just review and approve.') }}</p>
                     </div>
@@ -317,7 +317,7 @@
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </span>
-                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 4 of 5') }}</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 4 of 6') }}</p>
                         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Your competitors and their authority') }}</h2>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('How your backlink profile compares to others in your space.') }}</p>
                     </div>
@@ -422,20 +422,197 @@
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                             {{ __('Back') }}
                         </button>
+                        <button wire:click="toKeywordResearch" class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                            {{ __('Continue') }}
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                        </button>
+                    </div>
+
+                {{-- ── Step 5: keyword research ─────────────────────── --}}
+                @elseif ($wizardStep === 5)
+                    @php $kw = $wizard['keywords'] ?? null; @endphp
+                    <div class="text-center">
+                        <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                            <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg>
+                        </span>
+                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 5 of 6') }}</p>
+                        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('The keyword research behind your plan') }}</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('What your audience searches for, grouped and prioritized — this is what your articles are built on.') }}</p>
+                    </div>
+
+                    @if ($kw === null)
+                        <div wire:poll.5s="refreshKeywordInsights" class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                            <svg class="h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('Researching live search data for your market…') }}</p>
+                            <p class="text-xs text-slate-400">{{ __('This runs in the background — feel free to continue and check back.') }}</p>
+                        </div>
+                    @else
+                        {{-- Headline stats --}}
+                        <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            <div class="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-center dark:border-orange-900 dark:bg-orange-950">
+                                <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['keywords']) }}</div>
+                                <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Keywords analyzed') }}</div>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                                <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $kw['stats']['volume'] > 0 ? number_format($kw['stats']['volume']) : '—' }}</div>
+                                <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Monthly searches') }}</div>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                                <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['clusters']) }}</div>
+                                <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Topic groups') }}</div>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                                <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['questions']) }}</div>
+                                <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Questions asked') }}</div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                            {{-- Topic clusters --}}
+                            @if (! empty($kw['clusters']))
+                                <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                                    <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                                        <span class="flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400">
+                                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
+                                        </span>
+                                        {{ __('Your content pillars') }}
+                                    </h3>
+                                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Related searches grouped into the themes your articles will own.') }}</p>
+                                    <div class="mt-3 space-y-2.5">
+                                        @foreach ($kw['clusters'] as $cluster)
+                                            <div class="rounded-xl border border-slate-100 bg-slate-50/60 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-800/40" wire:key="kwc-{{ $loop->index }}">
+                                                <div class="flex items-center justify-between gap-2">
+                                                    <span class="truncate text-sm font-bold text-slate-800 dark:text-slate-100">{{ $cluster['label'] }}</span>
+                                                    <span class="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ $cluster['count'] }} {{ __('keywords') }}@if($cluster['volume'] > 0) · {{ number_format($cluster['volume']) }}/mo @endif</span>
+                                                </div>
+                                                @if (! empty($cluster['top']))
+                                                    <div class="mt-1.5 flex flex-wrap gap-1.5">
+                                                        @foreach ($cluster['top'] as $topKw)
+                                                            <span class="rounded-full bg-white px-2 py-0.5 text-xs text-slate-600 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">{{ $topKw }}</span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+
+                            <div class="space-y-4">
+                                {{-- Intent mix --}}
+                                @if (! empty($kw['intents']))
+                                    @php
+                                        $intentTotal = max(1, array_sum($kw['intents']));
+                                        $intentMeta = [
+                                            'informational' => ['label' => __('Learning'), 'hint' => __('how-to & answers'), 'bar' => 'bg-orange-500'],
+                                            'transactional' => ['label' => __('Ready to act'), 'hint' => __('tools, buying, doing'), 'bar' => 'bg-success'],
+                                            'commercial' => ['label' => __('Comparing options'), 'hint' => __('best-of & reviews'), 'bar' => 'bg-amber-500'],
+                                            'navigational' => ['label' => __('Finding a site'), 'hint' => __('brand lookups'), 'bar' => 'bg-slate-400'],
+                                            'other' => ['label' => __('Broad interest'), 'hint' => __('everything else'), 'bar' => 'bg-slate-300'],
+                                        ];
+                                    @endphp
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Why people search these') }}</h3>
+                                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Your calendar balances teaching content with content that converts.') }}</p>
+                                        <div class="mt-3 space-y-2">
+                                            @foreach ($kw['intents'] as $intent => $count)
+                                                @php $meta = $intentMeta[$intent] ?? $intentMeta['other']; $pct = (int) round($count / $intentTotal * 100); @endphp
+                                                <div wire:key="kwi-{{ $intent }}">
+                                                    <div class="flex items-center justify-between text-xs">
+                                                        <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $meta['label'] }} <span class="font-normal text-slate-400">· {{ $meta['hint'] }}</span></span>
+                                                        <span class="font-bold text-slate-600 dark:text-slate-400">{{ $pct }}%</span>
+                                                    </div>
+                                                    <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                                                        <div class="h-1.5 rounded-full {{ $meta['bar'] }}" style="width: {{ max(3, $pct) }}%"></div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                {{-- Questions --}}
+                                @if (! empty($kw['questions']))
+                                    <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Questions your audience is asking') }}</h3>
+                                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Your articles will answer these directly — the fastest way to earn trust and rankings.') }}</p>
+                                        <ul class="mt-3 space-y-1.5">
+                                            @foreach ($kw['questions'] as $q)
+                                                <li class="flex items-center justify-between gap-2 text-sm" wire:key="kwq-{{ $loop->index }}">
+                                                    <span class="truncate text-slate-700 dark:text-slate-300">{{ $q['keyword'] }}</span>
+                                                    @if ($q['volume'])
+                                                        <span class="shrink-0 text-xs font-semibold text-orange-600 dark:text-orange-400">{{ number_format($q['volume']) }}/mo</span>
+                                                    @endif
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- Opportunities --}}
+                        @if (! empty($kw['opportunities']))
+                            <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                                        <tr>
+                                            <th class="px-4 py-2.5 text-start font-bold">{{ __('Biggest opportunities') }}</th>
+                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Monthly searches') }}</th>
+                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Competition') }}</th>
+                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Status') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                        @foreach ($kw['opportunities'] as $opp)
+                                            <tr class="bg-white dark:bg-slate-900" wire:key="kwo-{{ $loop->index }}">
+                                                <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{{ $opp['keyword'] }}</td>
+                                                <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $opp['volume'] !== null ? number_format($opp['volume']) : '—' }}</td>
+                                                <td class="px-4 py-3 text-end">
+                                                    @php $compClass = ['low' => 'bg-success/10 text-success', 'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300', 'high' => 'bg-error/10 text-error', 'unknown' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'][$opp['competition']] ?? 'bg-slate-100 text-slate-500'; @endphp
+                                                    <span class="rounded-full px-2 py-0.5 text-xs font-bold {{ $compClass }}">{{ ['low' => __('Low'), 'medium' => __('Medium'), 'high' => __('High'), 'unknown' => '—'][$opp['competition']] ?? '—' }}</span>
+                                                </td>
+                                                <td class="px-4 py-3 text-end">
+                                                    @if ($opp['planned'])
+                                                        <span class="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-bold text-success">
+                                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                                            {{ __('In your calendar') }}
+                                                        </span>
+                                                    @else
+                                                        <span class="text-xs text-slate-400">{{ __('Tracked') }}</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+
+                        @if ($kw['partial'])
+                            <p class="mt-2 text-center text-xs text-slate-400">{{ __('Research keeps deepening in the background — this view refreshes as more data lands.') }}</p>
+                        @endif
+                    @endif
+
+                    <div class="mt-7 flex items-center justify-between">
+                        <button wire:click="goToStep(4)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+                            {{ __('Back') }}
+                        </button>
                         <button wire:click="toFirstArticles" class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
                             {{ __('Continue') }}
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                         </button>
                     </div>
 
-                {{-- ── Step 5: first articles ───────────────────────── --}}
+                {{-- ── Step 6: first articles ───────────────────────── --}}
                 @else
                     @php $dts = $wizard['draftTopics'] ?? collect(); @endphp
                     <div class="text-center">
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a5.25 5.25 0 016.775-5.025.75.75 0 01.313 1.248l-3.32 3.319c.063.475.276.934.641 1.299.365.365.824.578 1.3.64l3.318-3.319a.75.75 0 011.248.313 5.25 5.25 0 01-5.472 6.756c-1.018-.086-1.87.1-2.309.634L7.344 21.3A3.298 3.298 0 112.7 16.657l8.684-7.151c.533-.44.72-1.291.634-2.309a5.342 5.342 0 01-.068-.447z"/></svg>
                         </span>
-                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 5 of 5') }}</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 6 of 6') }}</p>
                         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Your first articles are ready') }}</h2>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Built from what your audience is really searching for. Remove any that don\'t fit, then launch.') }}</p>
                     </div>
@@ -466,7 +643,7 @@
                     @endif
 
                     <div class="mt-7 flex items-center justify-between">
-                        <button wire:click="goToStep(4)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                        <button wire:click="goToStep(5)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                             {{ __('Back') }}
                         </button>

@@ -3,10 +3,12 @@
 namespace App\Livewire\Content;
 
 use App\Jobs\PlanContentTopicsJob;
+use App\Jobs\PrepareContentKeywordInsightsJob;
 use App\Jobs\ProduceContentArticleJob;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\Website;
+use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentSetupInsights;
 use App\Services\Content\SiteProfileExtractor;
 use Illuminate\Support\Carbon;
@@ -28,11 +30,13 @@ use Livewire\Component;
  *    active plan back to draft — see toHowItWorks()).
  *
  * Wizard steps: 1 business profile → 2 offerings (sell / don't-sell lists) →
- * 3 how-it-works → 4 competitors & authority → 5 first articles. A DRAFT plan
- * is created at the end of step 2 (first time only) so topic ideation runs in
- * the BACKGROUND while the user reads steps 3-4; by step 5 real topics are
- * ready to show. Finishing the wizard activates the plan (article writing
- * begins) and returns to the Calendar page.
+ * 3 how-it-works → 4 competitors & authority → 5 keyword research →
+ * 6 first articles. A DRAFT plan is created at the end of step 2 (first time
+ * only) so topic ideation AND keyword research (self-hosted keyword server,
+ * minutes-long — see ContentKeywordInsights) run in the BACKGROUND while the
+ * user reads steps 3-4; by steps 5-6 real data is ready to show. Finishing
+ * the wizard activates the plan (article writing begins) and returns to the
+ * Calendar page.
  *
  * Client copy invariant: pipeline internals (scores below floor, spend caps,
  * model names) NEVER surface here.
@@ -167,7 +171,7 @@ class ContentCalendar extends Component
     public function goToStep(int $step): void
     {
         // Only allow jumping to steps already unlocked (never skip ahead).
-        $max = $this->draftPlanId !== null ? 5 : 2;
+        $max = $this->draftPlanId !== null ? 6 : 2;
         $this->wizardStep = max(1, min($step, $max));
     }
 
@@ -269,6 +273,9 @@ class ContentCalendar extends Component
         if ($plan->topics()->count() === 0) {
             PlanContentTopicsJob::dispatch($plan->id);
         }
+        // Keyword research runs in parallel (minutes-long, self-hosted server)
+        // so step 5 has data by the time the user reads steps 3-4. Idempotent.
+        PrepareContentKeywordInsightsJob::dispatch($plan->id);
 
         $this->wizardStep = 3;
     }
@@ -394,9 +401,24 @@ class ContentCalendar extends Component
         return $host;
     }
 
-    public function toFirstArticles(): void
+    public function toKeywordResearch(): void
     {
         $this->wizardStep = 5;
+        // Belt-and-braces: a resumed old draft may predate the research job.
+        if (($plan = $this->plan()) !== null) {
+            PrepareContentKeywordInsightsJob::dispatch($plan->id);
+        }
+    }
+
+    /** Poll target on step 5 — re-rendering re-reads the insights. */
+    public function refreshKeywordInsights(): void
+    {
+        // no-op: render() re-evaluates ContentKeywordInsights::get()
+    }
+
+    public function toFirstArticles(): void
+    {
+        $this->wizardStep = 6;
     }
 
     /**
@@ -730,12 +752,17 @@ class ContentCalendar extends Component
                 $overrides = (array) ($plan4?->competitor_overrides ?? []);
                 $hasOverrides = ! empty($overrides['added']) || ! empty($overrides['removed']);
             }
+            $keywords = null;
+            if ($this->wizardStep === 5 && ($plan5 = $this->plan()) !== null) {
+                $keywords = app(ContentKeywordInsights::class)->get($plan5);
+            }
             $wizard = [
-                'draftTopics' => $this->wizardStep >= 5 ? $this->draftTopics() : collect(),
+                'draftTopics' => $this->wizardStep >= 6 ? $this->draftTopics() : collect(),
                 'insights' => $insights,
                 'generating' => $generating,
                 'needsReportGen' => $needsReportGen,
                 'hasOverrides' => $hasOverrides,
+                'keywords' => $keywords,
                 'hasWebsite' => $this->website() !== null,
             ];
 

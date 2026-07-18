@@ -1,0 +1,187 @@
+<?php
+
+namespace Tests\Feature\Content;
+
+use App\Jobs\PrepareContentKeywordInsightsJob;
+use App\Livewire\Content\ContentCalendar;
+use App\Models\ContentPlan;
+use App\Models\ContentTopic;
+use App\Models\KeywordApiRequest;
+use App\Models\User;
+use App\Models\Website;
+use App\Services\Content\ContentKeywordInsights;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class ContentKeywordInsightsTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(\Database\Seeders\PlanSeeder::class);
+    }
+
+    private function userWithPlan(array $planAttrs = []): array
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+        $plan = ContentPlan::factory()->create(array_merge([
+            'website_id' => $website->id, 'status' => ContentPlan::STATUS_DRAFT,
+        ], $planAttrs));
+
+        return [$user, $website, $plan];
+    }
+
+    private function storeCompletedRequest(ContentPlan $plan, array $results): KeywordApiRequest
+    {
+        $request = KeywordApiRequest::query()->create([
+            'request_id' => (string) \Illuminate\Support\Str::uuid(),
+            'type' => KeywordApiRequest::TYPE_IDEAS,
+            'mode' => 'keywords',
+            'payload' => ['seeds' => ['test']],
+            'status' => KeywordApiRequest::STATUS_COMPLETED,
+            'result' => ['results' => $results],
+            'website_id' => $plan->website_id,
+        ]);
+        Cache::put('content:kw-insights:req:'.$plan->id, $request->id, now()->addHours(2));
+
+        return $request;
+    }
+
+    public function test_step_two_dispatches_keyword_research_job(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithPlan();
+        // No plan yet — the wizard's step 2 will create it.
+        ContentPlan::query()->where('website_id', $website->id)->delete();
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('businessDescription', 'We sell handmade wooden furniture for small apartments and offices.')
+            ->call('toOfferings')
+            ->set('sellItems', ['Wooden tables'])
+            ->call('toHowItWorks')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(PrepareContentKeywordInsightsJob::class, 1);
+    }
+
+    public function test_completed_request_renders_rich_insights(): void
+    {
+        [$user, $website, $plan] = $this->userWithPlan();
+        ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id,
+            'target_keyword' => 'pubg name generator',
+            'status' => ContentTopic::STATUS_SUGGESTED,
+        ]);
+        $this->storeCompletedRequest($plan, [
+            ['keyword' => 'pubg name generator', 'avgMonthlySearches' => 50000, 'competitionIndex' => 20],
+            ['keyword' => 'how to change pubg name', 'avgMonthlySearches' => 8000, 'competitionIndex' => 10],
+            ['keyword' => 'best pubg names', 'avgMonthlySearches' => 12000, 'competitionIndex' => 70],
+            ['keyword' => 'stylish name maker', 'avgMonthlySearches' => 6000, 'competitionIndex' => 40],
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 5)
+            ->assertSee(__('Keywords analyzed'))
+            ->assertSee('pubg name generator')
+            ->assertSee('50,000')
+            ->assertSee(__('In your calendar'))
+            ->assertSee(__('Questions your audience is asking'))
+            ->assertSee('how to change pubg name');
+    }
+
+    public function test_insights_classify_intent_questions_and_opportunities(): void
+    {
+        [, , $plan] = $this->userWithPlan();
+        $this->storeCompletedRequest($plan, [
+            ['keyword' => 'name generator tool', 'avgMonthlySearches' => 1000, 'competitionIndex' => 10],
+            ['keyword' => 'how to pick a username', 'avgMonthlySearches' => 500, 'competitionIndex' => 5],
+            ['keyword' => 'best username ideas', 'avgMonthlySearches' => 700, 'competitionIndex' => 90],
+        ]);
+
+        $insights = app(ContentKeywordInsights::class)->get($plan);
+
+        $this->assertNotNull($insights);
+        $this->assertFalse($insights['partial']);
+        $this->assertSame(3, $insights['stats']['keywords']);
+        $this->assertSame(2200, $insights['stats']['volume']);
+        $this->assertSame(1, $insights['stats']['questions']);
+        $this->assertArrayHasKey('transactional', $insights['intents']); // "tool"
+        $this->assertArrayHasKey('informational', $insights['intents']); // "how to"
+        $this->assertArrayHasKey('commercial', $insights['intents']); // "best"
+        $this->assertSame('how to pick a username', $insights['questions'][0]['keyword']);
+        // Low-competition 1000-vol beats high-competition 700-vol.
+        $this->assertSame('name generator tool', $insights['opportunities'][0]['keyword']);
+    }
+
+    public function test_failed_request_falls_back_to_topic_derived_insights(): void
+    {
+        [$user, $website, $plan] = $this->userWithPlan();
+        ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id,
+            'target_keyword' => 'how to change pubg name',
+            'secondary_keywords' => ['pubg username ideas'],
+            'keyword_volume' => 8000,
+            'status' => ContentTopic::STATUS_SUGGESTED,
+        ]);
+
+        $request = $this->storeCompletedRequest($plan, []);
+        $request->forceFill(['status' => KeywordApiRequest::STATUS_FAILED, 'result' => null])->save();
+
+        $insights = app(ContentKeywordInsights::class)->get($plan);
+
+        $this->assertNotNull($insights);
+        $this->assertTrue($insights['partial']);
+        $this->assertSame(2, $insights['stats']['keywords']);
+        $this->assertSame(1, $insights['stats']['questions']);
+    }
+
+    public function test_pending_request_within_grace_returns_null(): void
+    {
+        [, , $plan] = $this->userWithPlan();
+        $request = $this->storeCompletedRequest($plan, []);
+        $request->forceFill(['status' => KeywordApiRequest::STATUS_RUNNING, 'result' => null])->save();
+
+        $this->assertNull(app(ContentKeywordInsights::class)->get($plan));
+    }
+
+    public function test_completed_results_backfill_topic_volumes(): void
+    {
+        [, $website, $plan] = $this->userWithPlan();
+        $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id,
+            'target_keyword' => 'pubg name generator',
+            'keyword_volume' => null,
+            'status' => ContentTopic::STATUS_SUGGESTED,
+        ]);
+        $this->storeCompletedRequest($plan, [
+            ['keyword' => 'PUBG Name Generator', 'avgMonthlySearches' => 50000, 'competitionIndex' => 20],
+        ]);
+
+        app(ContentKeywordInsights::class)->get($plan);
+
+        $this->assertSame(50000, $topic->fresh()->keyword_volume);
+    }
+
+    public function test_step_five_shows_researching_state_while_pending(): void
+    {
+        [$user, $website, $plan] = $this->userWithPlan();
+        $request = $this->storeCompletedRequest($plan, []);
+        $request->forceFill(['status' => KeywordApiRequest::STATUS_QUEUED, 'result' => null])->save();
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 5)
+            ->assertSee(__('Researching live search data for your market…'));
+    }
+}
