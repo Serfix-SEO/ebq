@@ -43,10 +43,11 @@ class HumanizerService
         - DO NOT make every section a rule or command. Vary the shape: some sections explain, some tell a short real scenario, some weigh a trade-off, some answer a question. Not every H2 should be an imperative.
         - DO NOT stack parallel example patterns ("X plus Y works: A. Y plus Z: B."). Real writers don't template their examples.
         - Drop the over-signposting and the checklist voice. Write in flowing prose, not a sequence of terse directives.
-        - Take a clear stance. Say what you'd actually do and why, including trade-offs and the occasional "it depends". Mild, honest imperfection reads as human; relentless polish reads as a machine.
-        - Write in the first person where it fits ("I", "in my experience", "the way I do it"). Include at least one short, specific first-hand observation or opinion somewhere in the article.
+        - Take a clear stance. Say what actually works and why, including trade-offs and the occasional "it depends". Mild, honest imperfection reads as human; relentless polish reads as a machine.
+        - NEVER fabricate personal experience or a backstory. Do NOT write "I've been playing since the early days", "I've tested dozens of combinations", "in my years of doing this", or any invented anecdote/credential. You are writing for a brand, not pretending to be an individual with a fake history. Establish authority through genuinely useful, concrete, correct information — not a made-up personal story. (A first-hand-sounding but unverifiable anecdote is a top AI tell.) You may use a light second-person "you" voice; avoid first-person "I did X" claims you cannot back up.
+        - NO unevidenced hype or dramatic contrasts. Ban the "It doesn't just X. It Y." construction and cousins ("This isn't just about X, it's about Y"). Ban vague persuasion with no basis ("that psychological edge is real", "this changes everything"). If you can't support a claim, cut it or state it plainly.
         - BREAK PARALLELISM inside sentences. Avoid tidy triples like "short enough to remember, easy to spell, and it says something about you." Real writers list two things, or four uneven ones, or bury the point mid-sentence.
-        - Open the piece and most sections with something specific (a scenario, an opinion, a concrete case), NOT a dictionary-style definition ("A good X is...").
+        - Open the piece and most sections with something specific (a scenario, a concrete case, a direct answer), NOT a dictionary-style definition ("A good X is...").
         - A deliberate sentence fragment for emphasis is fine. So is starting a sentence with "And" or "But".
 
         - Prefer concrete specifics (numbers, examples, named things FROM THE BRIEF) over generic claims — but never invent them.

@@ -552,10 +552,10 @@ class ContentArticleProducer
         // distribution, and matches the EXACT phrase). Getting these right in
         // the draft avoids revise rounds.
         $rules = [
-            "ON-PAGE SEO — focus keyphrase is \"{$kw}\". Follow these precisely:",
-            "- Put the EXACT phrase \"{$kw}\" in the very first sentence of the opening paragraph (before anything else).",
-            "- Repeat the EXACT phrase \"{$kw}\" in the MIDDLE third and again in the CLOSING third of the article — it must appear in the beginning, middle, AND end, not clustered in one place.",
-            "- Overall, use the EXACT phrase \"{$kw}\" about once every 150-200 words (aim for ~0.6-1% of the text), worded naturally — never stuffed.",
+            "ON-PAGE SEO — focus keyphrase is \"{$kw}\". Hit these placements, but readability wins: only ever place the phrase where it reads like a sentence a real writer would have written anyway. Never force it as a standalone label or where a pronoun (\"it\", \"these\", \"them\") is the natural choice.",
+            "- Work the EXACT phrase \"{$kw}\" into the FIRST sentence of the opening paragraph, as part of a real sentence (not a bare restatement of the title).",
+            "- Use the EXACT phrase \"{$kw}\" once more somewhere in the MIDDLE and once near the END, so it's spread across the article — but woven into natural sentences, not dropped in.",
+            "- Keep total exact repetitions LOW: aim for the exact phrase only about 3-5 times in the whole article. Everywhere else, refer to the topic naturally with variants, partials, or pronouns (e.g. \"names with symbols\", \"a symbol name\", \"these\"). Do NOT repeat the full phrase every couple of paragraphs — that reads as stuffing and is a spam signal.",
             "- Use the EXACT phrase \"{$kw}\" (or a very close variant) in at least one H2 or H3 subheading.",
             "- SEO/meta title: 50-60 characters, LEAD with \"{$kw}\", and include one CTR power word (e.g. Ultimate, Complete, Essential, Proven, Best, Easy, Guide) — a number (e.g. a year or count) helps too.",
             '- Meta description: 120-158 characters and it must contain the focus keyphrase.',

@@ -143,11 +143,17 @@ class ContentSeoScorer
         // thirds and wants the phrase in each.
         if ($keyword !== '' && $wordCount >= 100) {
             $occurrences = substr_count($lowerText, $keyword);
-            $density = $occurrences / $wordCount * 100;
+            // Weight by phrase length: one mention of a 5-word phrase covers 5
+            // words. Counting raw occurrences/words forces long-tail phrases to
+            // be repeated ~15× in a 3k-word article — that reads as keyword
+            // stuffing (a spam + AI-content signal). Phrase-weighted density
+            // lets 3-5 natural mentions clear the floor.
+            $phraseWords = max(1, str_word_count($keyword));
+            $density = $occurrences * $phraseWords / $wordCount * 100;
             $add('kw_density', 6, $density >= 0.5 && $density <= 3.0,
                 $density < 0.5
-                    ? "Use the exact phrase \"{$keyword}\" more often — aim for ~0.5-1% density (about once per 150-200 words)."
-                    : "The keyword \"{$keyword}\" is over-used (density ".round($density, 1)."%); remove repetitions.");
+                    ? "Mention the phrase \"{$keyword}\" (or a close variant) a little more — a few natural placements across the article."
+                    : "The keyword \"{$keyword}\" is over-used (density ".round($density, 1)."%); remove repetitions and use pronouns or variants instead.");
 
             if ($wordCount >= 300 && $occurrences >= 2) {
                 $words = preg_split('/\s+/', trim($lowerText)) ?: [];
