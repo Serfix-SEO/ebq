@@ -93,14 +93,31 @@ website has NO ACTIVE plan (`inWizard`):
    the reference's backlinks step is deliberately omitted).
 4. **Competitors & authority** — `ContentSetupInsights`: your referring domains
    vs competitor **median + gap multiplier** (reference-style "13.6×") + a
-   top-5 competitor table (referring domains + authority). Reads the shared
-   report snapshot (read-only), enriches each competitor's referring-domains
-   count via **OpenPageRank free bulk** (snapshot competitor rows lack it),
-   caches the whole result 30 days. When no usable snapshot exists,
-   `ensureGenerating()` FORCE-dispatches the standard paid report ONCE
+   top-5 competitor table (favicon, referring domains, **Moz DA/PA**). Reads
+   the shared report snapshot (read-only), enriches each competitor's
+   referring-domains count via **OpenPageRank free bulk** (snapshot competitor
+   rows lack it), caches the whole result 30 days. When no usable snapshot
+   exists, `ensureGenerating()` FORCE-dispatches the standard paid report ONCE
    (spend-metered; sandbox on staging; guarded once/30min) and step 4 polls
    (`refreshCompetitors`) until it lands. Graceful "analyzing" / "appears
    shortly" states otherwise.
+   - **Moz DA/PA** (2026-07-18, owner request): every competitor row (auto AND
+     manual) is enriched via `MozLinksClient::urlMetrics()`, 30-day cached
+     **per domain** (`content:moz:{host}`, independent of the insights cache
+     so add/remove doesn't cost extra calls) and guarded by a new
+     `MozSpendMeter` (mirrors `ContentLlmSpendMeter`, `services.moz.
+     monthly_row_cap` default 40) — Moz's account is free-tier (50 rows/month
+     total, shared with the client report's own-domain gauge call), so this
+     must stay small. Not configured / cap exhausted → renders "—", zero
+     HTTP calls (never blocks the page).
+   - **Manual add/remove** (2026-07-18): `ContentPlan.competitor_overrides`
+     (`{added:[], removed:[]}`) is merged on top of the cached snapshot by
+     `ContentSetupInsights::withOverrides()` at render time — never written
+     into the 30-day cache itself. Works even before a report snapshot exists,
+     so a manually-added competitor shows immediately. `ContentCalendar::
+     addCompetitor()/removeCompetitor()` persist directly (same
+     immediate-write pattern as `dropTopic()`); domain input validated
+     host-shaped + rejects the user's own site, capped at 8 manual entries.
 5. **First articles** — the background-generated topics (`wire:poll.4s` until
    ready), removable; **Launch** flips the plan to active and article writing
    begins (the dispatcher only claims ACTIVE plans, so nothing bills during the
