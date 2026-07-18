@@ -281,8 +281,12 @@
 
                 {{-- ── Step 4: competitors ──────────────────────────── --}}
                 @elseif ($wizardStep === 4)
-                    @php $ins = $wizard['insights'] ?? null; $generating = $wizard['generating'] ?? false; @endphp
-                    <div class="text-center" @if($ins === null) wire:init="loadCompetitors" @endif>
+                    @php
+                        $ins = $wizard['insights'] ?? null;
+                        $generating = $wizard['generating'] ?? false;
+                        $needsReportGen = $wizard['needsReportGen'] ?? false;
+                    @endphp
+                    <div class="text-center" @if($needsReportGen) wire:init="loadCompetitors" @endif>
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </span>
@@ -315,20 +319,41 @@
                         <div class="mt-5 overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
                             <table class="w-full text-sm">
                                 <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                                    <tr><th class="px-4 py-2.5 text-start font-bold">{{ __('Competitor') }}</th><th class="px-4 py-2.5 text-end font-bold">{{ __('Referring domains') }}</th><th class="px-4 py-2.5 text-end font-bold">{{ __('Authority') }}</th></tr>
+                                    <tr>
+                                        <th class="px-4 py-2.5 text-start font-bold">{{ __('Competitor') }}</th>
+                                        <th class="px-4 py-2.5 text-end font-bold">{{ __('Referring domains') }}</th>
+                                        <th class="px-4 py-2.5 text-end font-bold">{{ __('DA') }}</th>
+                                        <th class="px-4 py-2.5 text-end font-bold">{{ __('PA') }}</th>
+                                        <th class="w-10 px-2 py-2.5"></th>
+                                    </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                     @foreach ($ins['competitors'] as $c)
-                                        <tr class="bg-white dark:bg-slate-900">
-                                            <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{{ $c['domain'] }}</td>
+                                        <tr class="group bg-white dark:bg-slate-900" wire:key="comp-{{ $c['domain'] }}">
+                                            <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
+                                                <div class="flex items-center gap-2">
+                                                    <img src="https://www.google.com/s2/favicons?domain={{ urlencode($c['domain']) }}&sz=32"
+                                                         alt="" width="16" height="16" loading="lazy"
+                                                         class="h-4 w-4 flex-none rounded-sm bg-slate-100 dark:bg-slate-800"
+                                                         onerror="this.style.visibility='hidden'">
+                                                    {{ $c['domain'] }}
+                                                </div>
+                                            </td>
                                             <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $c['referring_domains'] !== null ? number_format($c['referring_domains']) : '—' }}</td>
-                                            <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['authority'] ?? '—' }}</td>
+                                            <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] ?? '—' }}</td>
+                                            <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['pa'] ?? '—' }}</td>
+                                            <td class="px-2 py-3 text-end">
+                                                <button type="button" wire:click="removeCompetitor('{{ $c['domain'] }}')" wire:key="comp-rm-{{ $c['domain'] }}"
+                                                        class="text-slate-300 opacity-0 transition hover:text-error group-hover:opacity-100" aria-label="{{ __('Remove') }}">
+                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                </button>
+                                            </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                             </table>
                         </div>
-                        <p class="mt-2 text-center text-xs text-slate-400">{{ __('A one-time snapshot of your competitive landscape.') }}</p>
+                        <p class="mt-2 text-center text-xs text-slate-400">{{ __('DA/PA from Moz, where available.') }}</p>
                     @elseif ($generating)
                         <div wire:poll.5s="refreshCompetitors" class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
                             <svg class="h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
@@ -339,6 +364,20 @@
                             <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Your competitive landscape appears here shortly. Your content plan is already being built either way.') }}</p>
                         </div>
                     @endif
+
+                    {{-- Manually add a competitor — always available regardless of report state --}}
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Add a competitor') }}</h3>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __("Know a competitor we missed? Add their domain and we'll look up their authority.") }}</p>
+                        <div class="mt-3 flex gap-2">
+                            <input wire:model="newCompetitorDomain" wire:keydown.enter.prevent="addCompetitor" type="text" placeholder="{{ __('competitor-domain.com') }}"
+                                class="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                            <button type="button" wire:click="addCompetitor" aria-label="{{ __('Add') }}" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                            </button>
+                        </div>
+                        @error('newCompetitorDomain') <p class="mt-1.5 text-xs text-error">{{ $message }}</p> @enderror
+                    </div>
 
                     <div class="mt-7 flex items-center justify-between">
                         <button wire:click="goToStep(3)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">

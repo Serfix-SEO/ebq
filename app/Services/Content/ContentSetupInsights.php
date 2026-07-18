@@ -3,8 +3,10 @@
 namespace App\Services\Content;
 
 use App\Jobs\GenerateWebsiteReport;
+use App\Models\ContentPlan;
 use App\Models\Website;
 use App\Models\WebsiteReportSnapshot;
+use App\Services\MozLinksClient;
 use App\Services\OpenPageRankClient;
 use App\Services\Reports\ClientReportService;
 use Illuminate\Support\Facades\Cache;
@@ -21,9 +23,17 @@ use Illuminate\Support\Facades\Cache;
  *  2. Enrich each competitor's referring-domains count via OpenPageRank
  *     (FREE bulk endpoint, 100 domains/call) — the snapshot's competitor rows
  *     don't carry referring_domains.
- *  3. If no usable snapshot exists yet, {@see ensureGenerating()} dispatches
+ *  3. Enrich each competitor's Moz DA/PA ({@see MozLinksClient}), 30-day
+ *     cached per domain and guarded by {@see MozSpendMeter} — the account is
+ *     free-tier (50 rows/month total), so this must stay small and cached.
+ *  4. If no usable snapshot exists yet, {@see ensureGenerating()} dispatches
  *     the standard paid report generation ONCE (spend-metered; sandbox on
  *     staging) and the wizard polls until it lands.
+ *
+ * The user can also manually add/remove competitor domains from the wizard;
+ * those are stored on `ContentPlan::competitor_overrides` and merged on top
+ * of this class's output by {@see withOverrides()} — never written into the
+ * cached snapshot above.
  */
 class ContentSetupInsights
 {
@@ -34,12 +44,14 @@ class ContentSetupInsights
     public function __construct(
         private readonly ClientReportService $reports,
         private readonly OpenPageRankClient $opr,
+        private readonly MozLinksClient $moz,
+        private readonly MozSpendMeter $mozSpend,
     ) {}
 
     /**
      * @return array{
      *   my_referring_domains:int, my_authority:?int,
-     *   competitors:list<array{domain:string, referring_domains:?int, authority:?int}>,
+     *   competitors:list<array{domain:string, referring_domains:?int, authority:?int, da:?int, pa:?int}>,
      *   median:?int, gap:?float, behind:bool
      * }|null  null when no usable snapshot exists yet (caller should generate)
      */
@@ -91,7 +103,122 @@ class ContentSetupInsights
         Cache::forget('content:setup-insights:v1:'.$website->id);
     }
 
+    /**
+     * A single manually-added competitor's row (referring domains + Moz
+     * DA/PA), fetched live — the manual list is small and user-controlled,
+     * so it isn't worth folding into the 30-day cached snapshot build.
+     *
+     * @return array{domain:string, referring_domains:?int, authority:?int, da:?int, pa:?int, manual:true}
+     */
+    public function metricsForDomain(string $domain): array
+    {
+        $domain = trim($domain);
+        $referring = null;
+        try {
+            $opr = $domain !== '' ? $this->opr->metricsFor([$domain]) : [];
+            $host = ltrim(strtolower($domain), 'www.');
+            $referring = $opr[$domain]['referring_domains'] ?? $opr[$host]['referring_domains'] ?? null;
+        } catch (\Throwable) {
+            // leave null — rendered as "—"
+        }
+        $moz = $this->mozMetrics($domain);
+
+        return [
+            'domain' => $domain,
+            'referring_domains' => $referring !== null ? (int) $referring : null,
+            'authority' => null,
+            'da' => $moz['domain_authority'],
+            'pa' => $moz['page_authority'],
+            'manual' => true,
+        ];
+    }
+
+    /**
+     * Apply the plan's manual competitor add/remove overrides on top of the
+     * derived/cached insights. Never mutates the 30-day insights cache
+     * itself — adds are fetched live and removes just filter, each call.
+     * Works even when the base insights are still null (no report snapshot
+     * yet) so a manually-added competitor shows immediately.
+     */
+    public function withOverrides(?array $insights, ContentPlan $plan): ?array
+    {
+        $overrides = (array) ($plan->competitor_overrides ?? []);
+        $removed = array_values(array_unique(array_map(
+            static fn ($d) => strtolower(trim((string) $d)), (array) ($overrides['removed'] ?? [])
+        )));
+        $added = array_values(array_diff(array_unique(array_map(
+            static fn ($d) => strtolower(trim((string) $d)), (array) ($overrides['added'] ?? [])
+        )), $removed));
+
+        if ($insights === null && $added === []) {
+            return $insights;
+        }
+        $insights ??= [
+            'my_referring_domains' => 0, 'my_authority' => null,
+            'competitors' => [], 'median' => null, 'gap' => null, 'behind' => false,
+        ];
+
+        if ($removed !== []) {
+            $insights['competitors'] = array_values(array_filter(
+                $insights['competitors'],
+                static fn ($c) => ! in_array(strtolower($c['domain']), $removed, true)
+            ));
+        }
+
+        $existing = array_map(static fn ($c) => strtolower($c['domain']), $insights['competitors']);
+        foreach ($added as $domain) {
+            if ($domain === '' || in_array($domain, $existing, true)) {
+                continue;
+            }
+            $insights['competitors'][] = $this->metricsForDomain($domain);
+            $existing[] = $domain;
+        }
+
+        return $insights;
+    }
+
     // ── internals ───────────────────────────────────────────────────────
+
+    /**
+     * DA/PA for one domain, 30-day cached per-domain (independent of the
+     * insights cache so manual adds/removes don't cost extra Moz calls).
+     * Guarded by the free-tier row cap; never throws, never blocks the page.
+     *
+     * @return array{domain_authority:?int, page_authority:?int}
+     */
+    private function mozMetrics(string $domain): array
+    {
+        $empty = ['domain_authority' => null, 'page_authority' => null];
+        if (! $this->moz->isConfigured()) {
+            return $empty;
+        }
+
+        $host = strtolower(preg_replace('/^www\./', '', (string) (
+            parse_url(str_contains($domain, '://') ? $domain : 'https://'.$domain, PHP_URL_HOST) ?: $domain
+        )));
+        if ($host === '') {
+            return $empty;
+        }
+
+        $key = 'content:moz:'.$host;
+        $cached = Cache::get($key);
+        if ($cached !== null) {
+            return $cached;
+        }
+        if ($this->mozSpend->exhausted()) {
+            return $empty; // don't cache — retry once the monthly cap resets
+        }
+
+        $metrics = $this->moz->urlMetrics($domain) ?? [];
+        $this->mozSpend->add(1);
+        $result = [
+            'domain_authority' => $metrics['domain_authority'] ?? null,
+            'page_authority' => $metrics['page_authority'] ?? null,
+        ];
+        Cache::put($key, $result, now()->addDays(self::CACHE_TTL_DAYS));
+
+        return $result;
+    }
 
     private function build(Website $website): ?array
     {
@@ -150,10 +277,13 @@ class ContentSetupInsights
             }
             $host = ltrim(strtolower($cd), 'www.');
             $referring = $oprMetrics[$cd]['referring_domains'] ?? $oprMetrics[$host]['referring_domains'] ?? null;
+            $moz = $this->mozMetrics($cd);
             $competitors[] = [
                 'domain' => $cd,
                 'referring_domains' => $referring !== null ? (int) $referring : null,
                 'authority' => isset($c['cs']) ? (int) $c['cs'] : null,
+                'da' => $moz['domain_authority'],
+                'pa' => $moz['page_authority'],
             ];
         }
 

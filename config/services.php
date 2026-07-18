@@ -335,6 +335,10 @@ return [
         'secret_key' => env('MOZ_SECRET_KEY'),
         'base_url' => env('MOZ_BASE_URL', 'https://lsapi.seomoz.com/v2'),
         'timeout' => (int) env('MOZ_TIMEOUT_S', 30),
+        // Free tier is 50 rows/month total, shared with the client-report
+        // gauges' own-domain call. Leaves headroom for those; content wizard
+        // DA/PA lookups are capped and 30-day cached (MozSpendMeter).
+        'monthly_row_cap' => (int) env('MOZ_MONTHLY_ROW_CAP', 40),
     ],
 
     // Competitive Keyword Intelligence module (gap analysis, competitor

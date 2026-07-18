@@ -70,6 +70,7 @@ class ContentCalendar extends Component
     public array $dontSellItems = [];
     public string $newSell = '';
     public string $newDont = '';
+    public string $newCompetitorDomain = '';
 
     // Inline add-topic form (calendar)
     public bool $showAddTopic = false;
@@ -300,6 +301,81 @@ class ContentCalendar extends Component
         if ($website !== null) {
             app(ContentSetupInsights::class)->forget($website);
         }
+    }
+
+    /** Add a manually-typed competitor domain to the step-4 table. */
+    public function addCompetitor(): void
+    {
+        $this->resetErrorBag('newCompetitorDomain');
+        $domain = $this->normalizeCompetitorDomain($this->newCompetitorDomain);
+        $this->newCompetitorDomain = '';
+
+        if ($domain === null) {
+            $this->addError('newCompetitorDomain', __('Enter a valid competitor domain.'));
+
+            return;
+        }
+
+        $plan = $this->plan();
+        if ($plan === null) {
+            return;
+        }
+
+        $overrides = (array) ($plan->competitor_overrides ?? []);
+        $added = array_map('strtolower', (array) ($overrides['added'] ?? []));
+        $removed = array_values(array_diff((array) ($overrides['removed'] ?? []), [$domain]));
+
+        if (count($added) >= 8) {
+            $this->addError('newCompetitorDomain', __('You can add up to 8 competitors.'));
+
+            return;
+        }
+        if (! in_array($domain, $added, true)) {
+            $added[] = $domain;
+        }
+
+        $plan->update(['competitor_overrides' => ['added' => array_values($added), 'removed' => $removed]]);
+    }
+
+    /** Remove a competitor (auto-discovered or manually added) from the step-4 table. */
+    public function removeCompetitor(string $domain): void
+    {
+        $domain = strtolower(trim($domain));
+        $plan = $this->plan();
+        if ($plan === null || $domain === '') {
+            return;
+        }
+
+        $overrides = (array) ($plan->competitor_overrides ?? []);
+        $added = array_values(array_diff((array) ($overrides['added'] ?? []), [$domain]));
+        $removed = (array) ($overrides['removed'] ?? []);
+        if (! in_array($domain, $removed, true)) {
+            $removed[] = $domain;
+        }
+
+        $plan->update(['competitor_overrides' => ['added' => $added, 'removed' => array_values($removed)]]);
+    }
+
+    /** Bare lowercase host, or null if not a plausible domain / is the user's own site. */
+    private function normalizeCompetitorDomain(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        $host = parse_url(str_contains($raw, '://') ? $raw : 'https://'.$raw, PHP_URL_HOST) ?: $raw;
+        $host = strtolower(preg_replace('/^www\./', '', $host));
+
+        if (! preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/', $host)) {
+            return null;
+        }
+
+        $mine = $this->website()?->normalized_domain ?: $this->website()?->domain;
+        if ($mine && strtolower(preg_replace('/^www\./', '', $mine)) === $host) {
+            return null; // can't add yourself as a competitor
+        }
+
+        return $host;
     }
 
     public function toFirstArticles(): void
@@ -626,15 +702,19 @@ class ContentCalendar extends Component
         if ($inWizard) {
             $insights = null;
             $generating = false;
+            $needsReportGen = false;
             if ($this->wizardStep === 4 && ($w = $this->website()) !== null) {
                 $svc = app(ContentSetupInsights::class);
-                $insights = $svc->competitorAuthority($w);
-                $generating = $insights === null && $svc->isGenerating($w);
+                $rawInsights = $svc->competitorAuthority($w);
+                $needsReportGen = $rawInsights === null;
+                $insights = ($plan4 = $this->plan()) !== null ? $svc->withOverrides($rawInsights, $plan4) : $rawInsights;
+                $generating = $needsReportGen && $insights === null && $svc->isGenerating($w);
             }
             $wizard = [
                 'draftTopics' => $this->wizardStep >= 5 ? $this->draftTopics() : collect(),
                 'insights' => $insights,
                 'generating' => $generating,
+                'needsReportGen' => $needsReportGen,
                 'hasWebsite' => $this->website() !== null,
             ];
 
