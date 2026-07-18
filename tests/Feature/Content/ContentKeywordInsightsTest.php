@@ -212,4 +212,35 @@ class ContentKeywordInsightsTest extends TestCase
             ->set('wizardStep', 5)
             ->assertSee(__('Researching live search data for your market…'));
     }
+
+    public function test_research_is_geo_targeted_to_the_plan_country(): void
+    {
+        [, $website, $plan] = $this->userWithPlan([
+            'country' => 'de',
+            'language' => 'German',
+            'business_description' => 'A Berlin bakery selling sourdough and pastries.',
+            'offerings' => ['sell' => ['sourdough bread', 'croissants'], 'dont_sell' => []],
+        ]);
+
+        $captured = [];
+        $mock = \Mockery::mock(\App\Services\KeywordFinder\KeywordFinderPool::class);
+        $mock->shouldReceive('dispatchIdeas')
+            ->once()
+            ->andReturnUsing(function ($opts, $userId, $websiteId, $only = null, $countryKey = null, $meter = true) use (&$captured) {
+                $captured = compact('opts', 'countryKey', 'meter');
+
+                return KeywordApiRequest::query()->create([
+                    'request_id' => (string) \Illuminate\Support\Str::uuid(),
+                    'type' => KeywordApiRequest::TYPE_IDEAS, 'mode' => 'keywords',
+                    'status' => KeywordApiRequest::STATUS_QUEUED, 'payload' => [], 'website_id' => $websiteId,
+                ]);
+            });
+
+        $this->app->instance(\App\Services\KeywordFinder\KeywordFinderPool::class, $mock);
+        app(ContentKeywordInsights::class)->ensureStarted($plan);
+
+        $this->assertSame('de', $captured['countryKey'], 'research must geo-target the plan country');
+        $this->assertSame('German', $captured['opts']['language']);
+        $this->assertFalse($captured['meter'], 'platform prefill is unmetered');
+    }
 }

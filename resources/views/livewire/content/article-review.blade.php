@@ -112,10 +112,6 @@
                         @elseif ($topic->status === \App\Models\ContentTopic::STATUS_SCHEDULED)
                             <p class="rounded-lg bg-success/10 px-3 py-2 text-center text-sm text-success">{{ __('Approved and ready to go.') }}</p>
                         @endif
-                        <button wire:click="requestNewDraft" wire:confirm="{{ __('Write a completely new draft for this topic?') }}"
-                            class="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                            {{ __('Request a new draft') }}
-                        </button>
                     @endif
                 </div>
             </div>

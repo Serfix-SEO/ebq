@@ -129,8 +129,16 @@ class ContentCalendar extends Component
             $offerings = (array) ($existing->offerings ?? []);
             $this->sellItems = $this->sellItems ?: array_values((array) ($offerings['sell'] ?? []));
             $this->dontSellItems = $this->dontSellItems ?: array_values((array) ($offerings['dont_sell'] ?? []));
-            $this->language = $existing->language ?: 'en';
-            $this->country = (string) ($existing->country ?? '');
+            // Language is stored as a full name (dropdown value); legacy plans
+            // hold a code — map en→English, ar→Arabic so the select preselects.
+            $lang = (string) ($existing->language ?? '');
+            $this->language = match (mb_strtolower(trim($lang))) {
+                '', 'en' => 'English',
+                'ar' => 'Arabic',
+                default => $lang,
+            };
+            // Country is a KeywordFinderLocations key ('us', 'global', …).
+            $this->country = (string) ($existing->country ?: 'global');
             $this->structureToggles = [
                 'key_takeaways' => $existing->toggle('key_takeaways'),
                 'toc' => $existing->toggle('toc'),

@@ -84,10 +84,20 @@ class ContentKeywordInsights
         }
 
         try {
+            // Geo-target the research to the plan's country when set, so the
+            // SERP/volume data reflects the audience the client actually sells
+            // to (falls back to worldwide). Language is stored as a full name
+            // (e.g. "English"); legacy code plans map en→English/ar→Arabic.
+            $language = match (mb_strtolower(trim((string) $plan->language))) {
+                '', 'en' => null, // null → keyword server's English default
+                'ar' => 'Arabic',
+                default => (string) $plan->language,
+            };
             $request = $this->pool->dispatchIdeas(
-                ['seeds' => $seeds, 'language' => $plan->language === 'ar' ? 'Arabic' : null],
+                ['seeds' => $seeds, 'language' => $language],
                 $website?->user_id,
                 $website?->id,
+                countryKey: $plan->country ?: null,
                 meter: false, // platform-driven prefill, not the user's quota
             );
             Cache::put($this->requestKey($plan), $request->id, now()->addHours(2));

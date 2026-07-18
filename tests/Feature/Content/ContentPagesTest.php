@@ -81,7 +81,7 @@ class ContentPagesTest extends TestCase
             ->assertSee(__('Auto-publish'))
             ->assertDontSee(__('Step 3 of 6'))            // no stepper
             ->assertDontSee(__('How this grows your traffic')) // onboarding-only step skipped
-            ->assertDontSee(__('Keyword research'));
+            ->assertDontSee(__('Your competitors and their authority'));
 
         // saveSettings persists settings fields without demoting the plan or
         // re-running onboarding jobs.
@@ -89,6 +89,8 @@ class ContentPagesTest extends TestCase
             ->set('businessDescription', 'We sell handmade wooden furniture for small apartments, updated.')
             ->set('articlesPerWeek', 3)
             ->set('autoPublish', true)
+            ->set('language', 'German')
+            ->set('country', 'de')
             ->call('saveSettings')
             ->assertHasNoErrors();
 
@@ -97,6 +99,8 @@ class ContentPagesTest extends TestCase
         $this->assertSame('We sell handmade wooden furniture for small apartments, updated.', $fresh->business_description);
         $this->assertSame(3, (int) $fresh->articles_per_week);
         $this->assertTrue((bool) $fresh->auto_publish);
+        $this->assertSame('German', $fresh->language);
+        $this->assertSame('de', $fresh->country);
     }
 
     public function test_settings_page_shows_wizard_for_draft_plan(): void

@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Content;
 
-use App\Jobs\ProduceContentArticleJob;
 use App\Models\ContentArticle;
 use App\Models\ContentTopic;
 use App\Services\AiToolRunner;
@@ -186,19 +185,6 @@ class ArticleReview extends Component
         }
     }
 
-    public function requestNewDraft(): void
-    {
-        $topic = $this->topic();
-        if ($topic === null || in_array($topic->status, ContentTopic::IN_FLIGHT, true)) {
-            return;
-        }
-        $topic->forceFill([
-            'status' => ContentTopic::STATUS_APPROVED,
-            'last_error' => null,
-            'stage_started_at' => null,
-        ])->save();
-        ProduceContentArticleJob::dispatch($topic->id);
-    }
 
     // ── live scoring ────────────────────────────────────────────────────
 
