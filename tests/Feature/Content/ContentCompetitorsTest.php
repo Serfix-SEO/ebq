@@ -4,6 +4,7 @@ namespace Tests\Feature\Content;
 
 use App\Livewire\Content\ContentCalendar;
 use App\Models\ContentPlan;
+use App\Models\DomainMetric;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\ContentSetupInsights;
@@ -163,5 +164,75 @@ class ContentCompetitorsTest extends TestCase
         $this->assertNotContains('auto-gone.com', $domains);
         $this->assertContains('auto-stays.com', $domains);
         $this->assertContains('manual-rival.com', $domains);
+    }
+
+    public function test_reset_competitors_clears_overrides(): void
+    {
+        [$user, $website, $plan] = $this->userWithPlan();
+        $plan->update(['competitor_overrides' => ['added' => ['a.com'], 'removed' => ['b.com']]]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 4)
+            ->call('resetCompetitors');
+
+        $this->assertNull($plan->fresh()->competitor_overrides);
+    }
+
+    public function test_removing_every_competitor_shows_reset_prompt_and_reset_restores_them(): void
+    {
+        [$user, $website, $plan] = $this->userWithPlan();
+        Cache::put('content:setup-insights:v1:'.$website->id, [
+            'my_referring_domains' => 10, 'my_authority' => 40,
+            'competitors' => [
+                ['domain' => 'only-a.com', 'referring_domains' => 5, 'authority' => 5, 'da' => null, 'pa' => null],
+            ],
+            'median' => null, 'gap' => null, 'behind' => false,
+        ], now()->addDay());
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        $component = Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 4)
+            ->call('removeCompetitor', 'only-a.com')
+            ->assertSee("You've removed every competitor")
+            ->assertSee('Reset to auto-discovered');
+
+        $component->call('resetCompetitors')
+            ->assertSee('only-a.com')
+            ->assertDontSee("You've removed every competitor");
+    }
+
+    public function test_moz_da_pa_persisted_to_domain_metrics_and_reused_without_a_second_call(): void
+    {
+        config(['services.moz.token' => 'fake-token']);
+        Http::fake([
+            'lsapi.seomoz.com/*' => Http::response([
+                'results' => [['domain_authority' => 70, 'page_authority' => 60]],
+            ], 200),
+        ]);
+
+        [$user, $website, $plan] = $this->userWithPlan();
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 4)
+            ->set('newCompetitorDomain', 'shared-rival.com')
+            ->call('addCompetitor')
+            ->assertSee('70')
+            ->assertSee('60');
+
+        $metric = DomainMetric::query()->where('domain', 'shared-rival.com')->first();
+        $this->assertNotNull($metric, 'Moz DA/PA should be stored on the shared domain_metrics table.');
+        $this->assertSame(70, $metric->moz_da);
+        $this->assertSame(60, $metric->moz_pa);
+        $this->assertNotNull($metric->moz_refreshed_at);
+
+        // A second, unrelated website looking up the SAME domain must reuse
+        // the stored value rather than calling Moz again.
+        Http::fake(['lsapi.seomoz.com/*' => Http::response(['results' => []], 500)]);
+        $svc = app(ContentSetupInsights::class);
+        $row = $svc->metricsForDomain('shared-rival.com');
+        $this->assertSame(70, $row['da']);
+        $this->assertSame(60, $row['pa']);
     }
 }

@@ -295,15 +295,28 @@ class ContentCalendar extends Component
         }
     }
 
-    /** Poll target on step 4 while generation is in flight. */
+    /**
+     * Poll target on step 4 while generation is in flight, and also the
+     * manual "Refetch" button — both just clear the memoized insights so the
+     * next render recomputes from the current report snapshot (+ fresh Moz
+     * lookups for anything past its 30-day freshness window).
+     */
     public function refreshCompetitors(): void
     {
-        // A no-op action: re-rendering re-reads the (now possibly ready) cache.
-        // Clear the memoized null so a freshly-landed snapshot is picked up.
         $website = $this->website();
         if ($website !== null) {
             app(ContentSetupInsights::class)->forget($website);
         }
+    }
+
+    /**
+     * Undo manual competitor add/remove edits — restores the plain
+     * auto-discovered list. The only way back once "remove" has cleared
+     * every competitor from the table.
+     */
+    public function resetCompetitors(): void
+    {
+        $this->plan()?->update(['competitor_overrides' => null]);
     }
 
     /** Add a manually-typed competitor domain to the step-4 table. */
@@ -706,18 +719,23 @@ class ContentCalendar extends Component
             $insights = null;
             $generating = false;
             $needsReportGen = false;
+            $hasOverrides = false;
             if ($this->wizardStep === 4 && ($w = $this->website()) !== null) {
                 $svc = app(ContentSetupInsights::class);
                 $rawInsights = $svc->competitorAuthority($w);
                 $needsReportGen = $rawInsights === null;
-                $insights = ($plan4 = $this->plan()) !== null ? $svc->withOverrides($rawInsights, $plan4) : $rawInsights;
+                $plan4 = $this->plan();
+                $insights = $plan4 !== null ? $svc->withOverrides($rawInsights, $plan4) : $rawInsights;
                 $generating = $needsReportGen && $insights === null && $svc->isGenerating($w);
+                $overrides = (array) ($plan4?->competitor_overrides ?? []);
+                $hasOverrides = ! empty($overrides['added']) || ! empty($overrides['removed']);
             }
             $wizard = [
                 'draftTopics' => $this->wizardStep >= 5 ? $this->draftTopics() : collect(),
                 'insights' => $insights,
                 'generating' => $generating,
                 'needsReportGen' => $needsReportGen,
+                'hasOverrides' => $hasOverrides,
                 'hasWebsite' => $this->website() !== null,
             ];
 

@@ -299,8 +299,21 @@
                         $ins = $wizard['insights'] ?? null;
                         $generating = $wizard['generating'] ?? false;
                         $needsReportGen = $wizard['needsReportGen'] ?? false;
+                        $hasOverrides = $wizard['hasOverrides'] ?? false;
                     @endphp
-                    <div class="text-center" @if($needsReportGen) wire:init="loadCompetitors" @endif>
+                    <div class="relative text-center" @if($needsReportGen) wire:init="loadCompetitors" @endif>
+                        <div class="absolute end-0 top-0 flex items-center gap-3 text-xs font-semibold">
+                            <button type="button" wire:click="refreshCompetitors" class="inline-flex items-center gap-1 text-slate-400 hover:text-orange-600 dark:text-slate-500">
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                                {{ __('Refetch') }}
+                            </button>
+                            @if ($hasOverrides)
+                                <button type="button" wire:click="resetCompetitors" wire:confirm="{{ __('Reset to the auto-discovered list? Your manual adds and removals will be lost.') }}" class="inline-flex items-center gap-1 text-slate-400 hover:text-error dark:text-slate-500">
+                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/></svg>
+                                    {{ __('Reset') }}
+                                </button>
+                            @endif
+                        </div>
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </span>
@@ -368,6 +381,15 @@
                             </table>
                         </div>
                         <p class="mt-2 text-center text-xs text-slate-400">{{ __('DA/PA from Moz, where available.') }}</p>
+                    @elseif ($ins !== null && $hasOverrides)
+                        {{-- Data exists, but the user's own edits emptied the table — distinct from "still loading". --}}
+                        <div class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-800/40">
+                            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __("You've removed every competitor. Reset to bring back the auto-discovered list, or add your own below.") }}</p>
+                            <button type="button" wire:click="resetCompetitors" class="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white dark:border-slate-700 dark:text-slate-300">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/></svg>
+                                {{ __('Reset to auto-discovered') }}
+                            </button>
+                        </div>
                     @elseif ($generating)
                         <div wire:poll.5s="refreshCompetitors" class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
                             <svg class="h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>

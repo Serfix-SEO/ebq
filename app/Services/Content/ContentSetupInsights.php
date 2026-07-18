@@ -4,6 +4,7 @@ namespace App\Services\Content;
 
 use App\Jobs\GenerateWebsiteReport;
 use App\Models\ContentPlan;
+use App\Models\DomainMetric;
 use App\Models\Website;
 use App\Models\WebsiteReportSnapshot;
 use App\Services\MozLinksClient;
@@ -23,9 +24,13 @@ use Illuminate\Support\Facades\Cache;
  *  2. Enrich each competitor's referring-domains count via OpenPageRank
  *     (FREE bulk endpoint, 100 domains/call) — the snapshot's competitor rows
  *     don't carry referring_domains.
- *  3. Enrich each competitor's Moz DA/PA ({@see MozLinksClient}), 30-day
- *     cached per domain and guarded by {@see MozSpendMeter} — the account is
- *     free-tier (50 rows/month total), so this must stay small and cached.
+ *  3. Enrich each competitor's Moz DA/PA ({@see MozLinksClient}), stored on
+ *     the shared `domain_metrics` asset (`moz_da`/`moz_pa`/`moz_refreshed_at`)
+ *     — the SAME global per-domain table other subsystems read (backlinks,
+ *     prospecting, etc.), not a feature-local cache, so a domain touched
+ *     once anywhere is never re-fetched from Moz elsewhere within 30 days.
+ *     Guarded by {@see MozSpendMeter} — the account is free-tier (50
+ *     rows/month total), so this must stay small.
  *  4. If no usable snapshot exists yet, {@see ensureGenerating()} dispatches
  *     the standard paid report generation ONCE (spend-metered; sandbox on
  *     staging) and the wizard polls until it lands.
@@ -189,9 +194,6 @@ class ContentSetupInsights
     private function mozMetrics(string $domain): array
     {
         $empty = ['domain_authority' => null, 'page_authority' => null];
-        if (! $this->moz->isConfigured()) {
-            return $empty;
-        }
 
         $host = strtolower(preg_replace('/^www\./', '', (string) (
             parse_url(str_contains($domain, '://') ? $domain : 'https://'.$domain, PHP_URL_HOST) ?: $domain
@@ -200,24 +202,40 @@ class ContentSetupInsights
             return $empty;
         }
 
-        $key = 'content:moz:'.$host;
-        $cached = Cache::get($key);
-        if ($cached !== null) {
-            return $cached;
+        $existing = DomainMetric::query()->where('domain', $host)->first();
+        $fresh = $existing?->moz_refreshed_at !== null
+            && $existing->moz_refreshed_at->gt(now()->subDays(self::CACHE_TTL_DAYS));
+        if ($fresh) {
+            return ['domain_authority' => $existing->moz_da, 'page_authority' => $existing->moz_pa];
         }
-        if ($this->mozSpend->exhausted()) {
-            return $empty; // don't cache — retry once the monthly cap resets
+
+        $stale = $existing !== null
+            ? ['domain_authority' => $existing->moz_da, 'page_authority' => $existing->moz_pa]
+            : $empty;
+
+        if (! $this->moz->isConfigured() || $this->mozSpend->exhausted()) {
+            return $stale; // better than nothing; don't record — retry later
         }
 
         $metrics = $this->moz->urlMetrics($domain) ?? [];
         $this->mozSpend->add(1);
-        $result = [
-            'domain_authority' => $metrics['domain_authority'] ?? null,
-            'page_authority' => $metrics['page_authority'] ?? null,
-        ];
-        Cache::put($key, $result, now()->addDays(self::CACHE_TTL_DAYS));
+        $da = $metrics['domain_authority'] ?? null;
+        $pa = $metrics['page_authority'] ?? null;
 
-        return $result;
+        // Global asset (like domain_metrics' CC/OPR columns) — any subsystem
+        // touching this domain reads the same fresh Moz value for 30 days.
+        DomainMetric::query()->updateOrCreate(
+            ['domain' => $host],
+            [
+                'moz_da' => $da,
+                'moz_pa' => $pa,
+                'moz_refreshed_at' => now(),
+                'last_seen_at' => now(),
+                'first_seen_at' => $existing?->first_seen_at ?? now(),
+            ]
+        );
+
+        return ['domain_authority' => $da, 'page_authority' => $pa];
     }
 
     private function build(Website $website): ?array
