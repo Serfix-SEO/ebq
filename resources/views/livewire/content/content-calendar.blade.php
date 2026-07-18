@@ -37,7 +37,7 @@
             $trackWidth = 100 - (2 * $halfSlot);
             $fillWidth = $trackWidth * $fillPct / 100;
         @endphp
-        <div class="w-full">
+        <div class="mx-auto w-full max-w-6xl">
             {{-- Progress rail --}}
             <div class="mb-8 px-2 sm:px-6">
                 <div class="relative">
@@ -168,7 +168,7 @@
                                             </svg>
                                         </span>
                                         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/15 text-xs font-extrabold text-success">{{ $i + 1 }}</span>
-                                        <input wire:model="sellItems.{{ $i }}" type="text" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-slate-800 focus:ring-0 dark:text-slate-100" />
+                                        <input wire:model="sellItems.{{ $i }}" type="text" title="{{ $item }}" class="min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-sm font-medium text-slate-800 focus:ring-0 dark:text-slate-100" />
                                         <button type="button" wire:click="removeSell({{ $i }})" class="shrink-0 text-slate-300 opacity-0 transition hover:text-error group-hover:opacity-100" aria-label="{{ __('Remove') }}">
                                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
@@ -204,7 +204,7 @@
                                         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-error/15 text-error">
                                             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </span>
-                                        <input wire:model="dontSellItems.{{ $i }}" type="text" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-slate-800 focus:ring-0 dark:text-slate-100" />
+                                        <input wire:model="dontSellItems.{{ $i }}" type="text" title="{{ $item }}" class="min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-sm font-medium text-slate-800 focus:ring-0 dark:text-slate-100" />
                                         <button type="button" wire:click="removeDont({{ $i }})" class="shrink-0 text-slate-300 opacity-0 transition hover:text-error group-hover:opacity-100" aria-label="{{ __('Remove') }}">
                                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
