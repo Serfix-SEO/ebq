@@ -26,6 +26,12 @@ class ContentIntegration extends Model
 
     public const PLATFORM_WEBHOOK = 'webhook';
 
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_CONNECTED = 'connected';
+
+    public const STATUS_ERROR = 'error';
+
     protected $guarded = [];
 
     protected function casts(): array
@@ -44,6 +50,6 @@ class ContentIntegration extends Model
 
     public function isConnected(): bool
     {
-        return $this->status === 'connected';
+        return $this->status === self::STATUS_CONNECTED;
     }
 }

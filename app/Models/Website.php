@@ -616,6 +616,11 @@ class Website extends Model
         return $this->hasMany(WebsiteInvitation::class);
     }
 
+    public function contentIntegrations(): HasMany
+    {
+        return $this->hasMany(ContentIntegration::class);
+    }
+
     public function analyticsData(): HasMany
     {
         return $this->hasMany(AnalyticsData::class);

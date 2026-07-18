@@ -12,6 +12,14 @@ class ContentPublication extends Model
     use HasFactory;
     use HasUlids;
 
+    public const STATUS_QUEUED = 'queued';
+
+    public const STATUS_SENT = 'sent';
+
+    public const STATUS_CONFIRMED = 'confirmed';
+
+    public const STATUS_FAILED = 'failed';
+
     protected $guarded = [];
 
     protected function casts(): array

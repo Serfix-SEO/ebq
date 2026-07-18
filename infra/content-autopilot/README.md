@@ -13,7 +13,7 @@
 | 0 | Schema, models, config, spend meters, IdeogramClient, admin settings card | ✅ shipped (staging) |
 | 1 | Pipeline core: ideation → write → score → revise loop + dispatcher | ✅ shipped (staging) |
 | 2 | Client calendar UI + setup wizard + plan gating | ✅ shipped (staging) |
-| 3 | Publish drivers (WP plugin v2.1 / app-password / webhook) + live-URL verify | ⬜ |
+| 3 | Publish drivers (app-password + webhook) + live-URL verify | ✅ shipped 2026-07-18 (staging; WP-plugin v2.1 driver deferred) |
 | 4 | Ideogram images end-to-end (client exists; job pending) | ⬜ |
 | 5 | Shopify, RSS/JSON feed, translations | ⬜ |
 
@@ -194,6 +194,56 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
 Resume: `bootWizard()` reloads an existing plan (draft OR active) on mount
 and jumps past the offerings step for drafts. Whether the wizard renders is
 now driven by `mode`, not plan status — see the Calendar/Settings split above.
+
+## Publishing (Phase 3, 2026-07-18)
+
+`app/Services/Content/Publishing/`:
+- **`PublishDriver`** interface (`verify`/`publish`/`update`) + `PublishResult`
+  DTO (`ok`, `externalId`, `externalUrl`, `error`, `transient`) +
+  `PublishDriverFactory` (platform → driver; plugin/shopify return null =
+  deferred).
+- **`WordPressAppPasswordDriver`** — WP core REST (`/wp/v2/users/me` verify
+  incl. `edit_posts` capability check, `/wp/v2/posts` create, `/posts/{id}`
+  idempotent update). Credentials `{site_url, username, app_password}`;
+  config `{post_status}`. SSRF-guarded via `SafeHttpGuard`.
+- **`WebhookDriver`** — POSTs full article JSON signed
+  `X-Serfix-Signature: sha256=<hmac(raw body, secret)>` (same convention our
+  keyword-finder INBOUND webhook verifies); expects 2xx, honors optional
+  `{url}` response for the live link; retries live in the job, not the driver.
+  Credentials `{endpoint_url, secret}`.
+
+**`PublishContentArticleJob`** (queue `content`, tries=3 backoff 60/300 —
+publishing is idempotent so retrying is safe, unlike the tries=1 LLM jobs):
+claims the unique `content_publications` (article, integration) row BEFORE
+any HTTP; a row carrying `external_id` routes retries through `update()`
+(never double-posts); topic transitions SCHEDULED → PUBLISHING → PUBLISHED
+when ≥1 integration confirms, FAILED only when all hard-fail, released back
+to SCHEDULED on transient-only failures. **No connected integration = topic
+WAITS in SCHEDULED** (not a failure) and flushes automatically after
+connect. Post-publish verify: SSRF-guarded GET of the live URL, 200 + H1 +
+no noindex → `verified_at` (best-effort).
+
+**Dispatcher block 4** (`ContentAutopilotDispatcher::claimPublishable()`):
+active plans with ≥1 CONNECTED integration, inside the plan's publish window
+(`publish_days` ISO weekdays + `publish_hour_start..end` band, wrapping
+supported, in `plan.timezone`): auto_publish plans first promote READY
+topics whose `review_hours` veto window (anchored `stage_started_at`)
+elapsed → SCHEDULED; then ONE due SCHEDULED topic per plan per tick is
+dispatched (steady 15-min drip matches the 1/day cadence).
+
+**Connect UI** — `App\Livewire\Content\PublishingSettings` ("Where your
+articles publish" card under the wizard on /content/settings): WordPress
+app-password form (with in-WP how-to copy) or webhook form (endpoint +
+min-16-char secret, integration contract described inline), live
+`verify()` before flipping to `connected`, re-check/disconnect actions,
+hands-off (auto_publish) toggle. Secrets go through the encrypted cast,
+are never echoed back, and never appear in plaintext in the DB (test-
+asserted). Status constants now on ContentIntegration/ContentPublication.
+
+Deferred from the original Phase-3 spec: the WP-plugin v2.1
+`POST /wp-json/ebq/v1/content` receive endpoint + publish-secret minting in
+`WordPressConnectController` (separate plugin release cycle), and
+featured-image sideload (no `content_images` rows exist until Phase 4).
 
 ## Config & admin
 

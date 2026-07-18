@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Jobs\PlanContentTopicsJob;
 use App\Jobs\ProduceContentArticleJob;
+use App\Jobs\PublishContentArticleJob;
+use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Services\Content\ContentLlmSpendMeter;
@@ -22,9 +24,17 @@ use Illuminate\Support\Facades\Log;
  *               one per website per tick, bounded per tick, and gated by the
  *               ContentLlmSpendMeter (exhausted => stop claiming; dates shift,
  *               clients just see "Scheduled" — admin-only knowledge).
- *
- * Publishing (ready → platform) is the Phase-3 stage and gets its own claim
- * block when the publish drivers land.
+ *  4. PUBLISH — (Phase 3) topics ready to go live are dispatched to
+ *               PublishContentArticleJob:
+ *                 - SCHEDULED (client-approved) topics whose date arrived, and
+ *                 - READY topics on auto_publish plans whose review window
+ *                   (plan.review_hours, anchored on stage_started_at) elapsed
+ *                   with no client veto — promoted to SCHEDULED here.
+ *               Both honor the plan's publish window: allowed weekday
+ *               (publish_days) + hour band (publish_hour_start..end) in the
+ *               plan's timezone. Only fires for websites with at least one
+ *               CONNECTED integration — nothing connected means articles wait
+ *               in SCHEDULED and flush automatically after connect.
  */
 class ContentAutopilotDispatcher extends Command
 {
@@ -44,12 +54,13 @@ class ContentAutopilotDispatcher extends Command
         $reaped = $this->reapStuck();
         $topped = $this->topUpThinCalendars();
         $claimed = $meter->exhausted() ? 0 : $this->claimDueTopics((int) $this->option('claim-limit'));
+        $published = $this->claimPublishable();
 
         if ($meter->exhausted()) {
             Log::warning('content_autopilot.llm_cap_exhausted', ['spent' => $meter->spent(), 'cap' => $meter->cap()]);
         }
 
-        $this->info("reaped={$reaped} topup_plans={$topped} claimed={$claimed}");
+        $this->info("reaped={$reaped} topup_plans={$topped} claimed={$claimed} published={$published}");
 
         return self::SUCCESS;
     }
@@ -114,5 +125,66 @@ class ContentAutopilotDispatcher extends Command
         }
 
         return $due->count();
+    }
+
+    /** Phase 3: dispatch publish jobs for topics whose moment has come. */
+    private function claimPublishable(): int
+    {
+        $dispatched = 0;
+
+        $plans = ContentPlan::query()
+            ->where('status', ContentPlan::STATUS_ACTIVE)
+            ->whereHas('website.contentIntegrations', fn ($q) => $q->where('status', ContentIntegration::STATUS_CONNECTED))
+            ->get();
+
+        foreach ($plans as $plan) {
+            if (! $this->withinPublishWindow($plan)) {
+                continue;
+            }
+
+            // Auto-publish: promote READY topics whose veto window elapsed.
+            if ($plan->auto_publish) {
+                $plan->topics()
+                    ->where('status', ContentTopic::STATUS_READY)
+                    ->where('stage_started_at', '<=', now()->subHours(max(0, (int) $plan->review_hours)))
+                    ->get()
+                    ->each(fn (ContentTopic $t) => $t->enterStage(ContentTopic::STATUS_SCHEDULED));
+            }
+
+            // Publish everything scheduled and due (one per plan per tick —
+            // steady drip, matches the 1/day cadence).
+            $topic = $plan->topics()
+                ->where('status', ContentTopic::STATUS_SCHEDULED)
+                ->where(fn ($q) => $q->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', now($plan->timezone ?: 'UTC')->toDateString()))
+                ->orderBy('scheduled_for')
+                ->first();
+            if ($topic !== null) {
+                PublishContentArticleJob::dispatch($topic->id);
+                $dispatched++;
+            }
+        }
+
+        return $dispatched;
+    }
+
+    /** Allowed weekday + hour band in the plan's timezone. */
+    private function withinPublishWindow(ContentPlan $plan): bool
+    {
+        $now = now($plan->timezone ?: 'UTC');
+
+        $days = array_map('intval', (array) ($plan->publish_days ?? []));
+        if ($days !== [] && ! in_array($now->isoWeekday(), $days, true)) {
+            return false;
+        }
+
+        $start = (int) ($plan->publish_hour_start ?? 0);
+        $end = (int) ($plan->publish_hour_end ?? 23);
+        if ($start === $end) {
+            return $now->hour === $start;
+        }
+        // Wrapping bands (22..2) supported.
+        return $start < $end
+            ? ($now->hour >= $start && $now->hour <= $end)
+            : ($now->hour >= $start || $now->hour <= $end);
     }
 }
