@@ -409,6 +409,13 @@ class ContentArticleProducer
             .'Length discipline: the target is about '.$plan->article_length.' words and the article '
             .'is currently '.$currentWords.' words. If it is under target, ADD substantive paragraphs '
             .'with concrete detail; if it is over target, TIGHTEN by cutting redundancy. Never pad. '
+            // Style must survive the edit — the revise pass is where the human
+            // voice usually degrades (contractions expanded, keyword re-stuffed,
+            // tone turned formal). Lock those down explicitly.
+            .'PRESERVE THE HUMAN VOICE while you fix things: '
+            .'Keep every contraction (it\'s, you\'re, don\'t) — never expand them, and add them where a stiff phrase like "you are" slipped in. '
+            .'When you fix a keyword or density issue, DO NOT paste the exact phrase into extra or awkward spots; weave it into a sentence that would exist anyway, and prefer variants or pronouns. Never repeat the exact focus phrase more than a handful of times total. '
+            .'Do not make the writing more formal, more corporate, or more "complete" than it was. Do not add hype, dramatic contrasts ("it doesn\'t just X, it Y"), or invented personal experience. Keep sentence-length variety and any deliberate fragments. '
             .'Respond with valid JSON only: '
             .'{"html": "<full corrected article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}. '
             ."\n".$this->humanizer->promptRules();

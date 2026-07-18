@@ -174,6 +174,26 @@ class HumanizerService
                 'message' => 'Too many rhetorical questions; keep at most one in the whole article.'];
         }
 
+        // 8. Formal tone — expanded auxiliaries where a human would contract.
+        //    The revise loop tends to un-contract ("you're" -> "you are");
+        //    that stiffness is a strong AI/robotic tell.
+        $expanded = preg_match_all('/\b(you are|it is|do not|does not|did not|that is|there is|cannot|can not|will not|would not|is not|are not|we are|they are|you will|you have|i am)\b/i', $lower);
+        $contractions = preg_match_all("/\b\w+(?:'|\x{2019})(?:s|t|re|ll|ve|d|m)\b/u", $text);
+        if ($expanded >= 6 && $contractions < $expanded) {
+            $issues[] = ['code' => 'formal_tone', 'count' => (int) $expanded,
+                'message' => 'The tone is too stiff: contract naturally (it\'s, you\'re, don\'t, that\'s). Replace expanded forms like "you are"/"do not"/"it is" with contractions wherever a person would.'];
+        }
+
+        // 9. Hype "X doesn't just A. It Bs." / "not just X but Y" contrast —
+        //    a classic AI marketing tell, including the two-sentence variant
+        //    ("They don't just label you. They announce you.").
+        $hype = preg_match_all("/\\b(?:do|does|is|are|it|they|you)(?:n'|n\x{2019})?t?\\s*(?:not\\s+)?just\\b[^.?!]{0,60}[.?!]\\s+(?:it|they|this|that|you)\\b/iu", $text);
+        $hype += preg_match_all('/\bnot just\b[^.?!]{0,50}?\bbut\b/i', $text);
+        if ($hype > 0) {
+            $issues[] = ['code' => 'hype_contrast', 'count' => (int) $hype,
+                'message' => 'Remove dramatic "it doesn\'t just X, it Y" / "not just X but Y" constructions and any unevidenced hype; state the point plainly.'];
+        }
+
         return $issues;
     }
 
