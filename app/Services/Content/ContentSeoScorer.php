@@ -25,6 +25,16 @@ class ContentSeoScorer
 {
     public const VERSION = 1;
 
+    /** CTR power words — same set the WP plugin's title check uses. */
+    private const POWER_WORDS = [
+        'ultimate', 'definitive', 'complete', 'comprehensive', 'proven', 'essential', 'authoritative',
+        'secret', 'surprising', 'shocking', 'hidden', 'untold', 'unseen',
+        'easy', 'simple', 'quick', 'effortless', 'fast',
+        'best', 'top', 'powerful', 'incredible', 'amazing', 'must-have',
+        'guide', 'tutorial', 'tips', 'checklist', 'framework', 'blueprint', 'review', 'comparison',
+        'free', 'save', 'cheap', 'affordable',
+    ];
+
     /** @return array{score:int, issues:list<array{code:string,weight:int,message:string}>, checks:list<array{code:string,passed:bool,weight:int}>} */
     public function score(
         string $html,
@@ -74,6 +84,9 @@ class ContentSeoScorer
             "Include the exact keyword \"{$keyword}\" in the meta title.");
         $add('meta_title_length', 4, mb_strlen($metaTitle) >= 50 && mb_strlen($metaTitle) <= 60,
             'Rewrite the meta title to the 50-60 character sweet spot (currently '.mb_strlen($metaTitle).').');
+        $titleTokens = preg_split('/[^\p{L}\'-]+/u', mb_strtolower($metaTitle)) ?: [];
+        $add('title_power_word', 2, (bool) array_intersect($titleTokens, self::POWER_WORDS),
+            'Add one CTR power word to the meta title (e.g. Ultimate, Complete, Essential, Proven, Best, Easy, Guide).');
         $add('kw_in_h1', 8, $kwIn($h1),
             "Include the exact keyword \"{$keyword}\" in the H1.");
         $add('h1_length', 2, $h1 !== '' && mb_strlen($h1) <= 70,
