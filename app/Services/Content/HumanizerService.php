@@ -167,11 +167,15 @@ class HumanizerService
             }
         }
 
-        // 7. Rhetorical-question budget (max 1).
-        $questions = mb_substr_count($text, '?');
-        if ($questions > 2) {
+        // 7. Rhetorical-question budget in PROSE (max 1). FAQ Q&A and
+        //    question-style headings are legitimate, so strip the FAQ section
+        //    and all heading text before counting — otherwise every
+        //    FAQ-enabled article trips this falsely.
+        $prose = $this->proseOnly($html);
+        $questions = mb_substr_count($prose, '?');
+        if ($questions > 1) {
             $issues[] = ['code' => 'question_overuse', 'count' => $questions,
-                'message' => 'Too many rhetorical questions; keep at most one in the whole article.'];
+                'message' => 'Too many rhetorical questions in the body. Keep at most one; rewrite the rest as statements. (FAQ questions are fine and do not count.)'];
         }
 
         // 8. Formal tone — expanded auxiliaries where a human would contract.
@@ -204,6 +208,26 @@ class HumanizerService
         $text = html_entity_decode(strip_tags(preg_replace('/<(script|style)\b[^>]*>.*?<\/\1>/is', ' ', $html) ?? $html));
 
         return trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+    }
+
+    /**
+     * Body prose only: drops the FAQ section (its Q&A questions are wanted,
+     * not a tell) and all heading text (a question-form H2/H3 is fine). Used
+     * for the rhetorical-question budget so FAQ articles aren't false-flagged.
+     */
+    private function proseOnly(string $html): string
+    {
+        // Remove the FAQ section: an <h2> whose text marks FAQ, through the
+        // next <h2> or end of document.
+        $html = preg_replace(
+            '/<h2\b[^>]*>\s*(?:frequently asked|faqs?|common questions)[^<]*<\/h2>.*?(?=<h2\b|$)/is',
+            ' ',
+            $html
+        ) ?? $html;
+        // Drop all heading inner text.
+        $html = preg_replace('/<h[1-6]\b[^>]*>.*?<\/h[1-6]>/is', ' ', $html) ?? $html;
+
+        return $this->toText($html);
     }
 
     /** @return list<int> */
