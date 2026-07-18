@@ -205,7 +205,14 @@ now driven by `mode`, not plan status — see the Calendar/Settings split above.
 - **`WordPressAppPasswordDriver`** — WP core REST (`/wp/v2/users/me` verify
   incl. `edit_posts` capability check, `/wp/v2/posts` create, `/posts/{id}`
   idempotent update). Credentials `{site_url, username, app_password}`;
-  config `{post_status}`. SSRF-guarded via `SafeHttpGuard`.
+  config `{post_status, seo_plugin}`. SSRF-guarded via `SafeHttpGuard`.
+  When the **Serfix WP plugin** is present (detected by probing `/wp-json/`
+  for the `ebq/v1` namespace at verify time; cached as `config.seo_plugin`),
+  publish also fills the plugin's on-page self-check meta via the REST `meta`
+  field — `_ebq_title` (meta_title), `_ebq_description`, `_ebq_focus_keyword`
+  (topic target keyword), `_ebq_additional_keywords` (≤5 secondary, JSON),
+  all registered `show_in_rest`. Plugin-ABSENT sites get NO `_ebq_*` meta —
+  WP rejects unregistered protected meta and it would fail the whole publish.
 - **`WebhookDriver`** — POSTs full article JSON signed
   `X-Serfix-Signature: sha256=<hmac(raw body, secret)>` (same convention our
   keyword-finder INBOUND webhook verifies); expects 2xx, honors optional
