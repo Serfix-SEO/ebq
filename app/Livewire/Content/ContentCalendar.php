@@ -548,6 +548,8 @@ class ContentCalendar extends Component
         ]);
 
         session()->flash('content-status', __('Your content settings have been saved.'));
+        // Nudge the browser back to the top so the success banner is seen.
+        $this->dispatch('content-settings-saved');
     }
 
     private function guessBrand(?Website $website): string

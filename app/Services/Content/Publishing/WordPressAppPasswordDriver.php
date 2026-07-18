@@ -180,6 +180,15 @@ class WordPressAppPasswordDriver implements PublishDriver
             );
         }
 
+        // Structured data (FAQPage) the plugin renders as its own JSON-LD
+        // node. The plugin already auto-emits Article/WebPage/Breadcrumb; we
+        // add what it can't derive from plain HTML. Empty string when the
+        // article has no parseable FAQ (schema left untouched on WP).
+        $schema = app(\App\Services\Content\ContentArticleSchema::class)->json($article);
+        if ($schema !== '') {
+            $meta['_ebq_schemas'] = $schema;
+        }
+
         return $meta;
     }
 

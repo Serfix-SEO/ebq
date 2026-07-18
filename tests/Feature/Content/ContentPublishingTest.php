@@ -131,6 +131,44 @@ class ContentPublishingTest extends TestCase
         });
     }
 
+    public function test_publish_sends_faq_schema_meta_when_plugin_present(): void
+    {
+        Http::fake([
+            'client-blog.com/wp-json/' => Http::response(['namespaces' => ['wp/v2', 'ebq/v1']], 200),
+            'client-blog.com/wp-json/wp/v2/posts' => Http::response(['id' => 77, 'link' => 'https://client-blog.com/f/', 'status' => 'publish'], 201),
+            'client-blog.com/f*' => Http::response('<h1>x</h1>', 200),
+        ]);
+
+        [, $website, , $topic, $article] = $this->scheduledArticle();
+        $article->update(['html' => '<h2 id="intro">Intro</h2><p>Hi.</p>'
+            .'<h2 id="faq-frequently-asked">Frequently Asked Questions</h2>'
+            .'<h3>Can I use spaces in my name?</h3><p>Yes, spaces are allowed.</p>'
+            .'<h3>How often can I change it?</h3><p>Once every two weeks.</p>']);
+        $this->wordpressIntegration($website);
+
+        (new PublishContentArticleJob($topic->id))->handle(
+            app(\App\Services\Content\Publishing\PublishDriverFactory::class),
+            app(\App\Support\Audit\SafeHttpGuard::class),
+        );
+
+        Http::assertSent(function ($req) {
+            if (! str_ends_with($req->url(), '/wp/v2/posts')) {
+                return false;
+            }
+            $raw = $req->data()['meta']['_ebq_schemas'] ?? null;
+            if (! is_string($raw) || $raw === '') {
+                return false;
+            }
+            $decoded = json_decode($raw, true);
+            $entry = $decoded[0] ?? [];
+
+            return ($entry['type'] ?? null) === 'FAQPage'
+                && ($entry['template'] ?? null) === 'faq'
+                && count($entry['data']['questions'] ?? []) === 2
+                && ($entry['data']['questions'][0]['question'] ?? null) === 'Can I use spaces in my name?';
+        });
+    }
+
     public function test_publish_omits_plugin_meta_when_plugin_absent(): void
     {
         Http::fake([
