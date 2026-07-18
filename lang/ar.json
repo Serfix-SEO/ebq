@@ -716,6 +716,7 @@
     "Connect one or more Google accounts for Analytics and Search Console data.": "قم بتوصيل حساب واحد أو أكثر من حسابات Google لبيانات Analytics وSearch Console.",
     "Connect or disconnect your site to Serfix with a guided step—no secrets to paste—clear cached responses, adjust title separators, run optional migrations from prior SEO setups, and view diagnostics. Once connected, Head Quarter, the dashboard widget, posts list column, and editor panel all draw from your workspace.": "قم بتوصيل موقعك أو قطع اتصاله بـ Serfix بخطوة إرشادية - لا توجد أسرار للصقها - امسح الاستجابات المخزنة مؤقتًا، واضبط فواصل العناوين، وقم بتشغيل عمليات الترحيل الاختيارية من إعدادات تحسين محركات البحث السابقة، وعرض التشخيصات. بمجرد الاتصال، يتم سحب Head Quarter وأداة لوحة المعلومات وعمود قائمة المنشورات ولوحة المحرر من مساحة العمل الخاصة بك.",
     "Connect search and analytics": "ربط البحث والتحليلات",
+    "Connect the platforms your articles publish to.": "اربط المنصات التي تُنشر مقالاتك عليها.",
     "Connect to Serfix": "الاتصال بسيرفيكس",
     "Connect to any SMTP server (Mailgun, Postmark, your own MX).": "اتصل بأي خادم SMTP (Mailgun، Postmark، MX الخاص بك).",
     "Connect with Google": "الربط عبر Google",

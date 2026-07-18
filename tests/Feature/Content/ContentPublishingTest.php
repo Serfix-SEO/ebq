@@ -245,6 +245,19 @@ class ContentPublishingTest extends TestCase
         Queue::assertNotPushed(PublishContentArticleJob::class);
     }
 
+    public function test_integrations_page_renders(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+        ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
+
+        $this->actingAs($user)
+            ->withSession(['current_website_id' => $website->id])
+            ->get('/content/integrations')
+            ->assertOk()
+            ->assertSee(__('Where your articles publish'));
+    }
+
     public function test_connect_wordpress_verifies_and_stores_encrypted_credentials(): void
     {
         Http::fake([

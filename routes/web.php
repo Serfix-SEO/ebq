@@ -268,6 +268,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     if (config('services.content_autopilot.ui_enabled')) {
         Route::view('/content', 'content.index')->middleware('feature:content')->name('content.index');
         Route::view('/content/settings', 'content.settings')->middleware('feature:content')->name('content.settings');
+        Route::view('/content/integrations', 'content.integrations')->middleware('feature:content')->name('content.integrations');
         Route::get('/content/topics/{topic}', fn (string $topic) => view('content.review', ['topicId' => $topic]))
             ->middleware('feature:content')
             ->name('content.review');
