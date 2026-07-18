@@ -30,15 +30,25 @@ class HumanizerService
         - NEVER use em dashes (—), en dashes (–) or double hyphens (--). Use commas, periods, or parentheses instead.
         - Use straight quotes only, never curly/smart quotes.
         - NEVER use any of these words/phrases (or close variants): "{$banned}".
+        - Output raw HTML only. Never wrap the response in markdown code fences (```), and never emit backticks.
         - Use contractions naturally (it's, don't, you'll).
         - Vary sentence length hard: mix short sentences (under 8 words) with longer ones (over 20 words). Never write three consecutive sentences of similar length.
         - Vary paragraph length: some 1-2 sentences, some 4-5. Never uniform.
-        - Do not open more than one section with the same sentence pattern.
         - At most ONE rhetorical question in the whole article.
-        - Prefer concrete specifics (numbers, examples, named things from the brief) over generic claims.
+
+        SOUND LIKE A REAL PERSON, NOT AN LLM. These are the tells AI writing leaves — avoid every one:
+        - NO cute or forced metaphors and analogies (e.g. "names that stick like sticky grenades", "letter soup"). Say the plain thing plainly. A metaphor is allowed only if a normal person would actually use it.
+        - DO NOT INVENT fake-specific examples to sound authoritative. Never fabricate product names, brand names, made-up username/word mash-ups, statistics, studies, or quotes. Use examples that are real and verifiable, examples taken from the brief, or examples flagged as hypothetical in plain words. Synthetic-sounding invented specifics (e.g. "Mossback Whisperfin", "1993Leaf", "GullRust") are the #1 AI giveaway.
+        - DO NOT coin jargon and present it as established (e.g. "evergreen words", "the X-plus-Y method"). Use language your reader already knows.
+        - DO NOT make every section a rule or command. Vary the shape: some sections explain, some tell a short real scenario, some weigh a trade-off, some answer a question. Not every H2 should be an imperative.
+        - DO NOT stack parallel example patterns ("X plus Y works: A. Y plus Z: B."). Real writers don't template their examples.
+        - Drop the over-signposting and the checklist voice. Write in flowing prose, not a sequence of terse directives.
+        - Take a clear stance. Say what you'd actually do and why, including trade-offs and the occasional "it depends". Mild, honest imperfection reads as human; relentless polish reads as a machine.
+
+        - Prefer concrete specifics (numbers, examples, named things FROM THE BRIEF) over generic claims — but never invent them.
         - Use bullet lists ONLY where content is genuinely list-shaped; most sections should be prose.
         - No formulaic intro ("In this article we will...") and no formulaic closing ("In conclusion...").
-        - Write like an experienced practitioner sharing what they know, not like a brochure.
+        - Write like an experienced practitioner sharing what they actually know, not like a brochure or a how-to robot.
         RULES;
     }
 
@@ -57,6 +67,11 @@ class HumanizerService
             "\u{2026}" => '...',
         ];
         $out = strtr($html, $replacements);
+
+        // Strip markdown code fences the model sometimes wraps HTML in
+        // (```html … ```), plus any stray backticks — a visible AI tell.
+        $out = preg_replace('/```[a-z]*\n?/i', '', $out) ?? $out;
+        $out = str_replace('`', '', $out);
 
         // Collapse ", ," artifacts and doubled spaces introduced above.
         $out = preg_replace('/\s*,\s*,/', ',', $out) ?? $out;
