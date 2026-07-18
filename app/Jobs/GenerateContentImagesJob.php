@@ -4,8 +4,10 @@ namespace App\Jobs;
 
 use App\Models\ContentArticle;
 use App\Models\ContentImage;
+use App\Services\Content\ContentLlmSpendMeter;
 use App\Services\Content\IdeogramClient;
 use App\Services\Content\IdeogramSpendMeter;
+use App\Services\Llm\LlmClientFactory;
 use App\Support\ContentAutopilotConfig;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
@@ -78,13 +80,18 @@ class GenerateContentImagesJob implements ShouldQueue
         $html = (string) $article->html;
         $anchors = $this->sectionAnchors($html, ContentAutopilotConfig::maxInlineImages());
 
+        // Ask an LLM to write art-directed, content-aware prompts (works for
+        // any niche). Falls back to a deterministic prompt per item if the
+        // LLM is unavailable or omits one.
+        $llmPrompts = $this->llmPrompts($article, $topic, $anchors, $stylePrompt);
+
         // Build the work list: featured first, then one per section anchor.
         $jobs = [];
         if (ContentAutopilotConfig::featuredImageEnabled()) {
             $jobs[] = [
                 'role' => ContentImage::ROLE_FEATURED,
                 'anchor' => null,
-                'prompt' => $this->prompt((string) $article->h1, $stylePrompt),
+                'prompt' => $llmPrompts['featured'] ?? $this->prompt((string) $article->h1, $stylePrompt),
                 'alt' => $focus !== '' ? Str::ucfirst($focus) : (string) $article->h1,
                 'aspect' => '16x9',
             ];
@@ -93,7 +100,7 @@ class GenerateContentImagesJob implements ShouldQueue
             $jobs[] = [
                 'role' => ContentImage::ROLE_INLINE,
                 'anchor' => $anchor['id'],
-                'prompt' => $this->prompt($anchor['text'].' — '.$article->h1, $stylePrompt),
+                'prompt' => $llmPrompts['inline'][$anchor['id']] ?? $this->prompt($anchor['text'].' — '.$article->h1, $stylePrompt),
                 // Weave an additional keyphrase into the alt for topical coverage.
                 'alt' => ($additional[$i] ?? $anchor['text']),
                 'aspect' => '16x9',
@@ -192,6 +199,83 @@ class GenerateContentImagesJob implements ShouldQueue
         }
 
         return $out;
+    }
+
+    /**
+     * One LLM call to art-direct the images: a description of the ideal photo
+     * for the article as a whole (featured) and for each illustrated section,
+     * tailored to the actual topic + business — niche-agnostic (works for a
+     * law firm, recipe blog, SaaS, or a gaming site). Returns null-safe maps;
+     * missing keys fall back to the deterministic prompt. Never throws.
+     *
+     * @param  list<array{id:string, text:string}>  $anchors
+     * @return array{featured?:string, inline?:array<string,string>}
+     */
+    private function llmPrompts(ContentArticle $article, $topic, array $anchors, string $stylePrompt): array
+    {
+        try {
+            $model = ContentAutopilotConfig::modelFor('image_prompts');
+            $llm = LlmClientFactory::make($model['provider']);
+            if (! $llm->isAvailable()) {
+                return [];
+            }
+
+            $plan = $topic?->plan;
+            $business = trim((string) ($plan?->business_description ?? ''));
+            $sections = array_map(static fn ($a) => ['id' => $a['id'], 'heading' => $a['text']], $anchors);
+
+            $system = 'You are an art director writing image-generation prompts for a blog article. '
+                .'Return ONLY JSON. For each prompt, describe a single, specific, editorial-quality image that '
+                .'visually represents the actual content — concrete scene, subject, mood, lighting, composition, and style. '
+                .'Adapt to the business/topic (photoreal for real-world businesses, illustration/graphic for digital/gaming/abstract topics). '
+                .'The FEATURED (hero) prompt may include the article title as a bold, correctly-spelled text overlay if it suits the theme. '
+                .'Inline prompts must NOT contain text overlays. Never include logos, watermarks, real brand marks, celebrities, or anything offensive. '
+                .'Keep each prompt 1-3 sentences.'
+                .($stylePrompt !== '' ? ' Preferred visual style: '.$stylePrompt.'.' : '');
+
+            $user = json_encode([
+                'article_title' => (string) $article->h1,
+                'summary' => (string) ($article->meta_description ?? ''),
+                'business' => $business !== '' ? mb_substr($business, 0, 400) : null,
+                'sections_needing_images' => $sections,
+                'output_shape' => ['featured' => 'string prompt', 'inline' => ['<section id>' => 'string prompt']],
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+            $options = ['temperature' => 0.7, '__user_id' => $topic?->website?->user_id, '__source' => 'content_autopilot.image_prompts'];
+            if (! empty($model['model'])) {
+                $options['model'] = $model['model'];
+            }
+
+            $resp = $llm->completeJson([
+                ['role' => 'system', 'content' => $system],
+                ['role' => 'user', 'content' => $user],
+            ], $options);
+            app(ContentLlmSpendMeter::class)->add(ContentLlmSpendMeter::EST_IDEATE_USD);
+
+            if (! is_array($resp)) {
+                return [];
+            }
+
+            $out = [];
+            if (is_string($resp['featured'] ?? null) && trim($resp['featured']) !== '') {
+                $out['featured'] = trim($resp['featured']);
+            }
+            $inline = [];
+            foreach ((array) ($resp['inline'] ?? []) as $id => $prompt) {
+                if (is_string($prompt) && trim($prompt) !== '') {
+                    $inline[(string) $id] = trim($prompt);
+                }
+            }
+            if ($inline !== []) {
+                $out['inline'] = $inline;
+            }
+
+            return $out;
+        } catch (\Throwable $e) {
+            Log::warning('content_autopilot.image_prompts_failed', ['error' => $e->getMessage()]);
+
+            return [];
+        }
     }
 
     private function prompt(string $subject, string $stylePrompt): string
