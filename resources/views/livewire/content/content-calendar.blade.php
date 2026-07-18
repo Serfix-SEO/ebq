@@ -9,6 +9,19 @@
         <div class="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
             {{ __('Add a website first to start planning content.') }}
         </div>
+    @elseif ($needsSetup)
+        {{-- ── No plan yet on the Calendar page: point to Settings ──── --}}
+        <div class="mx-auto max-w-lg rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <span class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+            </span>
+            <h2 class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('No content plan yet') }}</h2>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ __('Set up your business profile and offerings in Settings, and articles will start appearing here automatically.') }}</p>
+            <a href="{{ route('content.settings') }}" class="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                {{ __('Go to Settings') }}
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </a>
+        </div>
     @elseif ($inWizard)
         {{-- ══ Setup wizard (5 steps) ══════════════════════════════════ --}}
         @php

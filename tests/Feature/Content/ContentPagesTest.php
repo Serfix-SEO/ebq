@@ -39,7 +39,7 @@ class ContentPagesTest extends TestCase
         $this->get('/content')->assertRedirect();
     }
 
-    public function test_content_page_renders_wizard_without_plan(): void
+    public function test_content_page_shows_empty_state_without_plan(): void
     {
         [$user, $website] = $this->userWithWebsite();
 
@@ -47,7 +47,47 @@ class ContentPagesTest extends TestCase
             ->withSession(['current_website_id' => $website->id])
             ->get('/content')
             ->assertOk()
+            ->assertSee(__('No content plan yet'))
+            ->assertDontSee(__('Tell us about your business'));
+    }
+
+    public function test_settings_page_renders_wizard_without_plan(): void
+    {
+        [$user, $website] = $this->userWithWebsite();
+
+        $this->actingAs($user)
+            ->withSession(['current_website_id' => $website->id])
+            ->get('/content/settings')
+            ->assertOk()
             ->assertSee(__('Tell us about your business'));
+    }
+
+    public function test_settings_page_reopens_wizard_for_active_plan_without_demoting_it(): void
+    {
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'status' => ContentPlan::STATUS_ACTIVE,
+            'business_description' => 'We sell handmade wooden furniture for small apartments.',
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        $this->get('/content/settings')
+            ->assertOk()
+            ->assertSee(__('Tell us about your business'));
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('businessDescription', 'We sell handmade wooden furniture for small apartments, updated.')
+            ->call('toOfferings')
+            ->call('toHowItWorks')
+            ->assertHasNoErrors();
+
+        $this->assertSame(ContentPlan::STATUS_ACTIVE, $plan->fresh()->status);
+        $this->assertSame(
+            'We sell handmade wooden furniture for small apartments, updated.',
+            $plan->fresh()->business_description
+        );
     }
 
     public function test_wizard_creates_draft_plan_and_dispatches_topic_planning(): void

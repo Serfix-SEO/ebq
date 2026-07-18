@@ -17,14 +17,22 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * Content Autopilot main page: a 5-step setup wizard (while the website has
- * no ACTIVE plan) and the monthly calendar once the plan is live.
+ * Content Autopilot: two separate sidebar pages share this one component,
+ * distinguished by `$mode`:
+ *
+ *  - "calendar" (/content) — the monthly calendar once a plan is ACTIVE;
+ *    a lightweight empty state pointing to Settings when no plan exists yet.
+ *  - "settings" (/content/settings) — the 5-step wizard, ALWAYS. First use
+ *    creates the plan; revisiting later re-opens the SAME wizard to edit an
+ *    already-active plan's business profile / offerings (never demotes an
+ *    active plan back to draft — see toHowItWorks()).
  *
  * Wizard steps: 1 business profile → 2 offerings (sell / don't-sell lists) →
  * 3 how-it-works → 4 competitors & authority → 5 first articles. A DRAFT plan
- * is created at the end of step 2 so topic ideation runs in the BACKGROUND
- * while the user reads steps 3-4; by step 5 real topics are ready to show.
- * Finishing the wizard flips the plan to active and article writing begins.
+ * is created at the end of step 2 (first time only) so topic ideation runs in
+ * the BACKGROUND while the user reads steps 3-4; by step 5 real topics are
+ * ready to show. Finishing the wizard activates the plan (article writing
+ * begins) and returns to the Calendar page.
  *
  * Client copy invariant: pipeline internals (scores below floor, spend caps,
  * model names) NEVER surface here.
@@ -37,6 +45,9 @@ class ContentCalendar extends Component
     private const DEFAULT_LENGTH = 2000; // mid of the 1,500-2,500 band
 
     public ?string $websiteId = null;
+
+    /** 'calendar' | 'settings' — which sidebar page mounted this component. */
+    public string $mode = 'calendar';
 
     // Calendar state
     public string $month = '';
@@ -65,8 +76,9 @@ class ContentCalendar extends Component
     public string $newTitle = '';
     public string $newKeyword = '';
 
-    public function mount(): void
+    public function mount(string $mode = 'calendar'): void
     {
+        $this->mode = in_array($mode, ['calendar', 'settings'], true) ? $mode : 'calendar';
         $this->websiteId = session('current_website_id');
         $this->month = now()->format('Y-m');
         $this->bootWizard();
@@ -84,31 +96,36 @@ class ContentCalendar extends Component
     // ── Wizard ──────────────────────────────────────────────────────────
 
     /**
-     * Prepare wizard state: resume a draft plan if one exists, else arm the
-     * deferred site analysis (wire:init) for the fresh flow.
+     * Prepare wizard state: resume/edit an existing plan (any status) if one
+     * exists, else arm the deferred site analysis (wire:init) for the fresh
+     * flow. Only a true in-progress DRAFT auto-jumps past the offerings step
+     * (background ideation is already running); an already-ACTIVE plan
+     * opened via Settings starts at step 1 so the profile is reviewable from
+     * the top, with every step unlocked immediately.
      */
     private function bootWizard(): void
     {
         $website = $this->website();
         $this->brandName = $this->brandName ?: $this->guessBrand($website);
 
-        $draft = $this->draftPlan();
-        if ($draft !== null) {
-            // Resume: reload the saved profile and jump past the offerings step.
-            $this->draftPlanId = $draft->id;
-            $this->businessDescription = $this->businessDescription ?: (string) $draft->business_description;
-            $offerings = (array) ($draft->offerings ?? []);
+        $existing = $this->plan();
+        if ($existing !== null) {
+            $this->draftPlanId = $existing->id;
+            $this->businessDescription = $this->businessDescription ?: (string) $existing->business_description;
+            $offerings = (array) ($existing->offerings ?? []);
             $this->sellItems = $this->sellItems ?: array_values((array) ($offerings['sell'] ?? []));
             $this->dontSellItems = $this->dontSellItems ?: array_values((array) ($offerings['dont_sell'] ?? []));
-            $this->language = $draft->language ?: 'en';
-            $this->country = (string) ($draft->country ?? '');
-            $this->wizardStep = max($this->wizardStep, 3);
+            $this->language = $existing->language ?: 'en';
+            $this->country = (string) ($existing->country ?? '');
+            if ($existing->status === ContentPlan::STATUS_DRAFT) {
+                $this->wizardStep = max($this->wizardStep, 3);
+            }
             $this->analyzing = false;
 
             return;
         }
 
-        $this->analyzing = $website !== null && $this->activePlan() === null;
+        $this->analyzing = $website !== null;
     }
 
     /** Auto-detect the business profile from crawl data (cached LLM call). */
@@ -221,15 +238,20 @@ class ContentCalendar extends Component
         $sell = array_values(array_filter(array_map('trim', $this->sellItems)));
         $dont = array_values(array_filter(array_map('trim', $this->dontSellItems)));
 
+        // Opened via Settings on an already-active plan: preserve its status
+        // and cadence fields. This step must never silently demote a live
+        // plan back to draft or reset settings it doesn't manage.
+        $existing = ContentPlan::query()->where('website_id', $website->id)->first();
+
         $plan = ContentPlan::query()->updateOrCreate(
             ['website_id' => $website->id],
             [
-                'status' => ContentPlan::STATUS_DRAFT,
-                'articles_per_week' => self::DEFAULT_PER_WEEK,
-                'article_length' => self::DEFAULT_LENGTH,
-                'auto_publish' => false,
-                'review_hours' => 24,
-                'toggles' => ['toc' => true, 'key_takeaways' => true, 'faq' => true,
+                'status' => $existing?->status ?? ContentPlan::STATUS_DRAFT,
+                'articles_per_week' => $existing?->articles_per_week ?? self::DEFAULT_PER_WEEK,
+                'article_length' => $existing?->article_length ?? self::DEFAULT_LENGTH,
+                'auto_publish' => $existing?->auto_publish ?? false,
+                'review_hours' => $existing?->review_hours ?? 24,
+                'toggles' => $existing?->toggles ?? ['toc' => true, 'key_takeaways' => true, 'faq' => true,
                     'external_links' => true, 'cta_enabled' => false],
                 'business_description' => $this->businessDescription,
                 'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
@@ -285,23 +307,36 @@ class ContentCalendar extends Component
         $this->wizardStep = 5;
     }
 
-    /** Remove a suggested topic from the "first articles" preview. */
+    /**
+     * Remove a topic from the "first articles" preview. Only touches topics
+     * still in a pre-publish state — Settings can revisit this step on an
+     * already-active plan, and must never let a stray click skip a
+     * ready/scheduled/published article.
+     */
     public function dropTopic(string $topicId): void
     {
-        $this->draftPlan()?->topics()->whereKey($topicId)->update(['status' => ContentTopic::STATUS_SKIPPED]);
+        $this->plan()?->topics()->whereKey($topicId)
+            ->whereIn('status', [ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED, ContentTopic::STATUS_FAILED])
+            ->update(['status' => ContentTopic::STATUS_SKIPPED]);
     }
 
-    /** Finish the wizard: activate the plan → article writing begins. */
+    /**
+     * Finish the wizard: activate the plan (first time → article writing
+     * begins; already active → just a settings save) and return to the
+     * Calendar page.
+     */
     public function launch(): void
     {
-        $plan = $this->draftPlan();
+        $plan = $this->plan();
         if ($plan === null) {
             return;
         }
+        $wasActive = $plan->isActive();
         $plan->update(['status' => ContentPlan::STATUS_ACTIVE]);
-        $this->draftPlanId = null;
-        $this->wizardStep = 1;
-        session()->flash('content-status', __('Your content calendar is live. Articles are being written and will appear for your review.'));
+        session()->flash('content-status', $wasActive
+            ? __('Your content settings have been saved.')
+            : __('Your content calendar is live. Articles are being written and will appear for your review.'));
+        $this->redirect(route('content.index'), navigate: true);
     }
 
     private function guessBrand(?Website $website): string
@@ -444,13 +479,6 @@ class ContentCalendar extends Component
         return ($plan !== null && $plan->status !== ContentPlan::STATUS_DRAFT) ? $plan : null;
     }
 
-    private function draftPlan(): ?ContentPlan
-    {
-        $plan = $this->plan();
-
-        return ($plan !== null && $plan->status === ContentPlan::STATUS_DRAFT) ? $plan : null;
-    }
-
     private function topicOrFail(string $topicId): ?ContentTopic
     {
         return $this->activePlan()?->topics()->whereKey($topicId)->first();
@@ -559,16 +587,26 @@ class ContentCalendar extends Component
         return $clusters;
     }
 
-    /** Topics generated so far for the draft plan (the "first articles" step). */
+    /**
+     * Topics generated so far for the "first articles" step. Scoped to the
+     * pre-publish pipeline (never scheduled/publishing/published) — Settings
+     * can revisit this step on an already-active plan, and a topic already
+     * live on the Calendar shouldn't appear here with a removable checkmark.
+     */
     private function draftTopics()
     {
-        $plan = $this->draftPlan();
+        $plan = $this->plan();
         if ($plan === null) {
             return collect();
         }
 
         return $plan->topics()
-            ->whereNotIn('status', [ContentTopic::STATUS_SKIPPED])
+            ->whereIn('status', [
+                ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED,
+                ContentTopic::STATUS_RESEARCHING, ContentTopic::STATUS_WRITING,
+                ContentTopic::STATUS_SCORING, ContentTopic::STATUS_REVISING,
+                ContentTopic::STATUS_READY, ContentTopic::STATUS_FAILED,
+            ])
             ->orderBy('position')
             ->limit(12)
             ->get(['id', 'title', 'target_keyword', 'keyword_volume', 'source']);
@@ -577,7 +615,11 @@ class ContentCalendar extends Component
     public function render()
     {
         $plan = $this->activePlan();
-        $inWizard = $plan === null; // draft or no-plan → wizard
+        // Settings always shows the wizard. Calendar shows the wizard ONLY
+        // implicitly never — a plan-less Calendar page gets a lightweight
+        // "set it up in Settings" prompt instead (see $needsSetup below).
+        $inWizard = $this->mode === 'settings';
+        $needsSetup = $this->mode === 'calendar' && $plan === null;
 
         // ── Wizard data ──
         $wizard = [];
@@ -598,7 +640,16 @@ class ContentCalendar extends Component
 
             return view('livewire.content.content-calendar', [
                 'inWizard' => true,
+                'needsSetup' => false,
                 'wizard' => $wizard,
+            ] + $this->emptyCalendarBindings());
+        }
+
+        if ($needsSetup) {
+            return view('livewire.content.content-calendar', [
+                'inWizard' => false,
+                'needsSetup' => true,
+                'wizard' => [],
             ] + $this->emptyCalendarBindings());
         }
 
@@ -622,6 +673,7 @@ class ContentCalendar extends Component
 
         return view('livewire.content.content-calendar', [
             'inWizard' => false,
+            'needsSetup' => false,
             'wizard' => [],
             'plan' => $plan,
             'topics' => $topics,

@@ -40,14 +40,26 @@ revising → ready → scheduled → publishing → published | failed | skipped
 | Jobs | `app/Jobs/{PlanContentTopicsJob,ProduceContentArticleJob}.php` | queue `content` on **redis-long** (heavy pool, retry_after 3900); tries=1 (retries re-bill LLM); unique per plan/topic; `failed()` marks the topic. |
 | Dispatcher | `app/Console/Commands/ContentAutopilotDispatcher.php` | `ebq:content-autopilot` every 15 min: reap stuck (>45 min), top-up thin calendars (<7 future topics), claim due topics (48h write-ahead, ONE in-flight per website, 5/tick, ContentLlmSpendMeter gate). |
 
-## Client UI (Phase 2, 2026-07-17)
+## Client UI (Phase 2, 2026-07-17; Calendar/Settings split 2026-07-18)
 
-- `/content` (`Route::view` + `livewire:content.content-calendar`,
-  `feature:content` middleware — new `TeamPermissions::FEATURES['content']`)
-  renders the **2-step setup wizard** while the website has no plan (business
-  description pre-filled from crawl homepage meta; offerings; cadence/length/
-  toggles/CTA; review-first default) and the **calendar** afterwards (month
-  grid + list toggle, approve/skip/retry/reschedule/add-topic, pause/resume).
+Sidebar has a "Content" group with two pages, both backed by the SAME
+`app/Livewire/Content/ContentCalendar.php` component distinguished by a
+`mode` prop (`'calendar' | 'settings'`, passed via `<livewire:... mode="…">`):
+
+- **Content Calendar** — `/content` (`Route::view` + `mode="calendar"`,
+  `feature:content` middleware). Shows the **calendar only** (month grid +
+  list toggle, approve/skip/retry/reschedule/add-topic, pause/resume). If no
+  plan exists yet, shows a lightweight empty state ("No content plan yet")
+  linking to Settings instead of rendering the wizard inline.
+- **Settings** — `/content/settings` (new route, `content.settings`,
+  `mode="settings"`). **Always** renders the 5-step wizard: first use creates
+  the plan (unchanged flow below); revisiting later re-opens the SAME wizard
+  to edit an already-**active** plan's business profile / offerings.
+  `toHowItWorks()` preserves the existing plan's `status`, cadence, and
+  toggle fields on save (`ContentCalendar::toHowItWorks`) — Settings must
+  NEVER silently demote a live plan back to draft. `dropTopic()` also gained
+  a status guard so reopening the wizard's "first articles" step can't
+  accidentally skip an already-published topic.
 - `/content/topics/{topic}` → `livewire:content.article-review`: preview
   (script/`on*` attributes stripped), quality ring (`reports/charts/ring`),
   plain-language improvement labels (`ArticleReview::issueLabel` maps scorer
@@ -95,8 +107,9 @@ website has NO ACTIVE plan (`inWizard`):
    draft window). Baked defaults: 1 article/day, ~2,000 words (cadence step +
    CTA field removed on owner request).
 
-Resume: `bootWizard()` reloads a draft plan on mount and jumps past the
-offerings step. `STATUS_DRAFT` plans render the wizard, not the calendar.
+Resume: `bootWizard()` reloads an existing plan (draft OR active) on mount
+and jumps past the offerings step for drafts. Whether the wizard renders is
+now driven by `mode`, not plan status — see the Calendar/Settings split above.
 
 ## Config & admin
 

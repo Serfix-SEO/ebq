@@ -267,6 +267,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     // env flag, not code presence, decides where the feature is visible.
     if (config('services.content_autopilot.ui_enabled')) {
         Route::view('/content', 'content.index')->middleware('feature:content')->name('content.index');
+        Route::view('/content/settings', 'content.settings')->middleware('feature:content')->name('content.settings');
         Route::get('/content/topics/{topic}', fn (string $topic) => view('content.review', ['topicId' => $topic]))
             ->middleware('feature:content')
             ->name('content.review');
