@@ -93,7 +93,7 @@ website has NO ACTIVE plan (`inWizard`):
    the reference's backlinks step is deliberately omitted).
 4. **Competitors & authority** — `ContentSetupInsights`: your referring domains
    vs competitor **median + gap multiplier** (reference-style "13.6×") + a
-   top-5 competitor table (favicon, referring domains, **Moz DA/PA**). Reads
+   top-3 competitor table (favicon, referring domains, **Moz DA/PA**). Reads
    the shared report snapshot (read-only), enriches each competitor's
    referring-domains count via **OpenPageRank free bulk** (snapshot competitor
    rows lack it), caches the whole result 30 days. When no usable snapshot

@@ -52,7 +52,7 @@ class ContentSetupInsights
 {
     private const CACHE_TTL_DAYS = 30;
 
-    private const MAX_COMPETITORS = 5;
+    private const MAX_COMPETITORS = 3;
 
     public function __construct(
         private readonly ClientReportService $reports,
