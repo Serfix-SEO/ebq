@@ -93,8 +93,8 @@ class ContentSeoScorer
             'Shorten the H1 to 70 characters or fewer.');
         $add('kw_in_meta_description', 6, $kwIn($metaDescription) || $kwLoose($metaDescription),
             "Include the keyword \"{$keyword}\" (all its words) in the meta description.");
-        $add('meta_description_length', 4, mb_strlen($metaDescription) >= 120 && mb_strlen($metaDescription) <= 158,
-            'Rewrite the meta description to the 120-158 character sweet spot (currently '.mb_strlen($metaDescription).').');
+        $add('meta_description_length', 4, mb_strlen($metaDescription) >= 130 && mb_strlen($metaDescription) <= 155,
+            'Rewrite the meta description to 130-155 characters (currently '.mb_strlen($metaDescription).').');
         $add('kw_in_first_words', 6, $kwIn(implode(' ', array_slice(explode(' ', $text), 0, 100))),
             "Use the exact keyword \"{$keyword}\" within the first 100 words.");
         $add('kw_in_slug', 3, $slug !== '' && str_contains($slug, $this->slugify($keyword)),
@@ -142,18 +142,16 @@ class ContentSeoScorer
         // length), healthy band 0.5-3%; distribution splits the body into
         // thirds and wants the phrase in each.
         if ($keyword !== '' && $wordCount >= 100) {
+            // Density matches the WP plugin's on-page analyzer EXACTLY:
+            // exact-phrase occurrences ÷ total words, healthy band 0.5-2.5%.
+            // (Keeping our score aligned with the plugin the client sees is
+            // the priority; SEO strictness wins over minimizing repetition.)
             $occurrences = substr_count($lowerText, $keyword);
-            // Weight by phrase length: one mention of a 5-word phrase covers 5
-            // words. Counting raw occurrences/words forces long-tail phrases to
-            // be repeated ~15× in a 3k-word article — that reads as keyword
-            // stuffing (a spam + AI-content signal). Phrase-weighted density
-            // lets 3-5 natural mentions clear the floor.
-            $phraseWords = max(1, str_word_count($keyword));
-            $density = $occurrences * $phraseWords / $wordCount * 100;
-            $add('kw_density', 6, $density >= 0.5 && $density <= 3.0,
+            $density = $occurrences / $wordCount * 100;
+            $add('kw_density', 6, $density >= 0.5 && $density <= 2.5,
                 $density < 0.5
-                    ? "Mention the phrase \"{$keyword}\" (or a close variant) a little more — a few natural placements across the article."
-                    : "The keyword \"{$keyword}\" is over-used (density ".round($density, 1)."%); remove repetitions and use pronouns or variants instead.");
+                    ? "Use the exact phrase \"{$keyword}\" more often — aim for 0.5-2.5% density (about once every 120-160 words)."
+                    : "The keyword \"{$keyword}\" is over-used (density ".round($density, 1)."%); trim to at most 2.5%.");
 
             if ($wordCount >= 300) {
                 $words = preg_split('/\s+/', trim($lowerText)) ?: [];
@@ -163,14 +161,11 @@ class ContentSeoScorer
                     implode(' ', array_slice($words, $third, $third)),
                     implode(' ', array_slice($words, 2 * $third)),
                 ];
-                // Variant-tolerant: a section "covers" the topic if it has the
-                // exact phrase OR all the keyword's words (any order). This
-                // spreads the TOPIC across the article without forcing the
-                // exact multi-word phrase to be repeated verbatim in each third
-                // (verbatim repetition is a keyword-stuffing / AI tell).
-                $hits = count(array_filter($sections, fn ($s) => str_contains($s, $keyword) || $kwLoose($s)));
+                // Strict (matches the WP plugin): the EXACT phrase must appear
+                // in each third — intro, middle, and conclusion.
+                $hits = count(array_filter($sections, fn ($s) => str_contains($s, $keyword)));
                 $add('kw_distribution', 8, $hits >= 3,
-                    "Make sure the topic \"{$keyword}\" is present in the intro, the middle, AND the closing third (currently {$hits} of 3). Use the words naturally — you do NOT need the exact phrase in each part.");
+                    "Spread the EXACT phrase \"{$keyword}\" across the whole article — it must appear in the intro, the middle, AND the conclusion (currently in {$hits} of 3 sections).");
             }
         }
 

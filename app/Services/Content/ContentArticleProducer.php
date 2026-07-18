@@ -324,6 +324,22 @@ class ContentArticleProducer
         return $html;
     }
 
+    /** Trim to <= max chars at a word boundary, dropping trailing punctuation. */
+    private function clampLength(string $s, int $max): string
+    {
+        $s = trim($s);
+        if (mb_strlen($s) <= $max) {
+            return $s;
+        }
+        $cut = mb_substr($s, 0, $max);
+        $sp = mb_strrpos($cut, ' ');
+        if ($sp !== false && $sp >= $max - 20) {
+            $cut = mb_substr($cut, 0, $sp);
+        }
+
+        return rtrim($cut, " ,.;:-\u{2013}\u{2014}");
+    }
+
     /** True when the article's persisted style lint found tells. */
     private function hasStyleIssue(ContentArticle $article): bool
     {
@@ -370,11 +386,11 @@ class ContentArticleProducer
             .'Keep the meaning, the useful specifics, and roughly the same length. Edit sentence by sentence to fix these problems:'
             ."\n- {$tells}\n"
             .'Hard rules: DELETE every invented claim outright — no "players reported", no "the community found", no dated events ("in mid-2025..."), no fabricated studies/percentages, no "works on all regions/versions", no "most reliable" unless it is plainly true. When you delete an unsupported claim, do NOT replace it with another guess; either state only what is certain or drop the point. '
-            .'Compress teaching loops so each idea is explained ONCE. Cut exact-keyword over-repetition (keep at most 3-4 exact uses; vary the rest). Remove dramatic sign-offs. Keep contractions and natural rhythm. '
+            .'Compress teaching loops so each idea is explained ONCE. Remove dramatic sign-offs. Keep contractions and natural rhythm. DO NOT reduce how often the focus keyphrase appears — the article needs it at the current SEO density, so preserve those mentions. '
             .'Respond with valid JSON only: {"html": "<full edited article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}. '
             ."\n".$this->humanizer->promptRules();
 
-        $user = "FOCUS KEYWORD (use at most 3-4 exact times): {$topic->target_keyword}\n"
+        $user = "FOCUS KEYWORD (keep its existing density, do not remove mentions): {$topic->target_keyword}\n"
             .'LANGUAGE: '.($plan->language ?: 'en')."\n\n"
             ."CURRENT META TITLE: {$article->meta_title}\n"
             ."CURRENT META DESCRIPTION: {$article->meta_description}\n"
@@ -467,6 +483,12 @@ class ContentArticleProducer
     private function storeScoredVersion(ContentTopic $topic, array $context, array $attributes): ContentArticle
     {
         $topic->enterStage(ContentTopic::STATUS_SCORING);
+
+        // Hard length caps so the WP plugin's on-page checks never flag an
+        // over-length title/description (LLMs routinely land at 61/156). Trim
+        // to a word boundary so nothing is cut mid-word.
+        $attributes['meta_title'] = $this->clampLength((string) ($attributes['meta_title'] ?? ''), 60);
+        $attributes['meta_description'] = $this->clampLength((string) ($attributes['meta_description'] ?? ''), 155);
 
         $attributes['html'] = $this->normalizeStructure(
             (string) ($attributes['html'] ?? ''),
@@ -669,13 +691,13 @@ class ContentArticleProducer
         // distribution, and matches the EXACT phrase). Getting these right in
         // the draft avoids revise rounds.
         $rules = [
-            "ON-PAGE SEO — focus keyphrase is \"{$kw}\". Hit these placements, but readability wins: only ever place the phrase where it reads like a sentence a real writer would have written anyway. Never force it as a standalone label or where a pronoun (\"it\", \"these\", \"them\") is the natural choice.",
-            "- Work the EXACT phrase \"{$kw}\" into the FIRST sentence of the opening paragraph, as part of a real sentence (not a bare restatement of the title).",
-            "- Use the EXACT phrase \"{$kw}\" once more somewhere in the MIDDLE and once near the END, so it's spread across the article — but woven into natural sentences, not dropped in.",
-            "- Keep total exact repetitions LOW: aim for the exact phrase only about 3-5 times in the whole article. Everywhere else, refer to the topic naturally with variants, partials, or pronouns (e.g. \"names with symbols\", \"a symbol name\", \"these\"). Do NOT repeat the full phrase every couple of paragraphs — that reads as stuffing and is a spam signal.",
+            "ON-PAGE SEO — focus keyphrase is \"{$kw}\". These are STRICT requirements; hit every one:",
+            "- Put the EXACT phrase \"{$kw}\" in the FIRST sentence of the opening paragraph.",
+            "- Use the EXACT phrase \"{$kw}\" again in the MIDDLE third and again in the CLOSING third — it must appear in the intro, the middle, AND the end (all three).",
+            "- Keyphrase DENSITY: the exact phrase must be 0.5%-2.5% of the total words — roughly once every 120-160 words (about 8-12 times in a 1,800-word article). Weave each mention into a natural sentence; spread them evenly, never cluster. This density is required for the on-page score.",
             "- Use the EXACT phrase \"{$kw}\" (or a very close variant) in at least one H2 or H3 subheading.",
-            "- SEO/meta title: 50-60 characters, LEAD with \"{$kw}\", and include one CTR power word (e.g. Ultimate, Complete, Essential, Proven, Best, Easy, Guide) — a number (e.g. a year or count) helps too.",
-            '- Meta description: 120-158 characters and it must contain the focus keyphrase.',
+            "- SEO/meta title: 50-60 characters MAX (never exceed 60), LEAD with \"{$kw}\", and include one CTR power word (e.g. Ultimate, Complete, Essential, Proven, Best, Easy, Guide).",
+            '- Meta description: 130-155 characters (never exceed 155) and it must contain the exact focus keyphrase.',
         ];
 
         $additional = array_values(array_filter(array_map(
