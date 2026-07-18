@@ -309,7 +309,9 @@ class ContentArticleProducer
 
         $items = [];
         foreach ($matches as $m) {
-            $label = trim(strip_tags($m[3]));
+            // Decode first: heading text arrives entity-encoded ("&amp;"),
+            // and e() would double-escape it into a visible "&amp;" in the TOC.
+            $label = trim(html_entity_decode(strip_tags($m[3]), ENT_QUOTES | ENT_HTML5));
             if ($label === '') {
                 continue;
             }
