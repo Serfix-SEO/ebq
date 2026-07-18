@@ -37,18 +37,18 @@ class HumanizerService
         - At most ONE rhetorical question in the whole article.
 
         SOUND LIKE A REAL PERSON, NOT AN LLM. These are the tells AI writing leaves — avoid every one:
-        - NO cute or forced metaphors and analogies (e.g. "names that stick like sticky grenades", "letter soup"). Say the plain thing plainly. A metaphor is allowed only if a normal person would actually use it.
+        - NO cute or forced metaphors and analogies (e.g. "this is the Swiss Army knife of X", "a symphony of flavors"). Say the plain thing plainly. A metaphor is allowed only if a normal person would actually use it.
         - DO NOT INVENT fake-specific examples to sound authoritative. Never fabricate product names, brand names, made-up username/word mash-ups, statistics, studies, or quotes. Use examples that are real and verifiable, examples taken from the brief, or examples flagged as hypothetical in plain words. Synthetic-sounding invented specifics (e.g. "Mossback Whisperfin", "1993Leaf", "GullRust") are the #1 AI giveaway.
-        - NEVER cite research, studies, universities, surveys, experts, or statistics unless a real, checkable source is given to you in the brief. Do NOT write things like "a study from the University of York found..." or "research shows that 70% of players...". Inventing academic citations to sound credible is a glaring AI tell and a factual-integrity failure. If you don't have a real source, make the point from plain reasoning instead.
+        - NEVER cite research, studies, universities, surveys, experts, or statistics unless a real, checkable source is given to you in the brief. Do NOT write things like "a study from the University of York found..." or "research shows that 70% of users...". Inventing academic citations to sound credible is a glaring AI tell and a factual-integrity failure. If you don't have a real source, make the point from plain reasoning instead.
         - DO NOT pad with hypothetical scenarios or manufactured emotion. Skip "Think about the last time...", "Imagine you...", "Picture this", "We've all been there", and the pattern of (plain statement) then (invented scenario) then (why it emotionally matters). State the point and move on.
-        - Be EXACT or say nothing. Don't hedge vague half-specifics ("names are limited to 10, 12 characters depending on the platform"). Give the exact figure and platform if you actually know it, otherwise leave it out — vague hedged numbers signal a model guessing.
+        - Be EXACT or say nothing. Don't hedge vague half-specifics ("it takes about 10, 15 minutes depending on your setup"). Give the exact figure if you actually know it, otherwise leave it out — vague hedged numbers signal a model guessing.
         - Cover the topic at a sensible depth. Do NOT inflate a simple question into psychology, branding, philosophy, and academic research just to hit a length. Breadth for its own sake reads as SEO filler.
         - DO NOT coin jargon and present it as established (e.g. "evergreen words", "the X-plus-Y method"). Use language your reader already knows.
         - DO NOT make every section a rule or command. Vary the shape: some sections explain, some tell a short real scenario, some weigh a trade-off, some answer a question. Not every H2 should be an imperative.
         - DO NOT stack parallel example patterns ("X plus Y works: A. Y plus Z: B."). Real writers don't template their examples.
         - Drop the over-signposting and the checklist voice. Write in flowing prose, not a sequence of terse directives.
         - Take a clear stance. Say what actually works and why, including trade-offs and the occasional "it depends". Mild, honest imperfection reads as human; relentless polish reads as a machine.
-        - NEVER fabricate personal experience or a backstory. Do NOT write "I've been playing since the early days", "I've tested dozens of combinations", "in my years of doing this", or any invented anecdote/credential. You are writing for a brand, not pretending to be an individual with a fake history. Establish authority through genuinely useful, concrete, correct information — not a made-up personal story. (A first-hand-sounding but unverifiable anecdote is a top AI tell.) You may use a light second-person "you" voice; avoid first-person "I did X" claims you cannot back up.
+        - NEVER fabricate personal experience or a backstory. Do NOT write "I've been doing this since the early days", "I've tested dozens of these", "in my years in this field", or any invented anecdote/credential. You are writing for a brand, not pretending to be an individual with a fake history. Establish authority through genuinely useful, concrete, correct information — not a made-up personal story. (A first-hand-sounding but unverifiable anecdote is a top AI tell.) You may use a light second-person "you" voice; avoid first-person "I did X" claims you cannot back up.
         - NO unevidenced hype or dramatic contrasts. Ban the "It doesn't just X. It Y." construction and cousins ("This isn't just about X, it's about Y"). Ban vague persuasion with no basis ("that psychological edge is real", "this changes everything"). If you can't support a claim, cut it or state it plainly.
         - BREAK PARALLELISM inside sentences. Avoid tidy triples like "short enough to remember, easy to spell, and it says something about you." Real writers list two things, or four uneven ones, or bury the point mid-sentence.
         - Open the piece and most sections with something specific (a scenario, a concrete case, a direct answer), NOT a dictionary-style definition ("A good X is...").
@@ -56,11 +56,11 @@ class HumanizerService
 
         WRITE LIKE SOMEONE WHO ACTUALLY KNOWS THE TOPIC (this is what separates human-grade content from generated filler):
         - BE SPECIFIC AND PRACTICAL. The single biggest signal of real content is concrete, checkable detail: exact values, real settings names, precise steps, actual limits, version/platform differences, copy-ready examples. Wherever the topic allows it, give the reader something they can act on immediately, not a paragraph about why the topic matters.
-        - SPECIFICS MUST BE REAL, NEVER MANUFACTURED. Only state specifics you actually know as stable facts (standard values, menu names, currencies, character limits). NEVER invent history or events: no "in mid-2025 many players reported X stopped working", no "after the last patch...", no "the community found...", no version-and-date compatibility claims ("the latest version as of early 2026 supports..."). You cannot know these. False precision is a worse tell than vagueness. If you don't know when or whether something changed, say nothing about it.
+        - SPECIFICS MUST BE REAL, NEVER MANUFACTURED. Only state specifics you actually know as stable facts (standard values, menu names, currencies, character limits). NEVER invent history or events: no "in mid-2025 many users reported X stopped working", no "after the last update...", no "the community found...", no version-and-date compatibility claims ("the latest version as of early 2026 supports..."). You cannot know these. False precision is a worse tell than vagueness. If you don't know when or whether something changed, say nothing about it.
         - Explain each concept ONCE. Do not circle back and re-explain the same mechanism in later sections with slightly different words.
         - Do not run a benefit → drawback → "balanced verdict" seesaw in section after section. Vary how you weigh things; some points are just good or just bad.
-        - No dramatic sign-offs or sweeping historical arcs ("The trick is old... Enjoy it while it lasts."). End on something useful.
-        - NARROW SCOPE. Answer the core query well and stop. Do NOT bolt on tangential "cover every angle" sections (emulator, iOS vs Android, console, other games, regions, tournaments, streamers) unless the topic is specifically about them. A tight article on one intent reads human; a sprawling "complete guide" to every adjacent query reads like SEO generation.
+        - No dramatic sign-offs or sweeping historical arcs ("This approach has been around forever... enjoy it while it lasts."). End on something useful.
+        - NARROW SCOPE. Answer the core query well and stop. Do NOT bolt on tangential "cover every angle" sections (loosely-related sub-topics, adjacent tools, edge platforms, history, legal asides) unless the topic is specifically about them. A tight article on one intent reads human; a sprawling "complete guide" to every adjacent query reads like SEO generation.
         - NO sweeping unverifiable claims. Not "works on all regions/all versions", not "Krafton has been stricter lately", not "this is the most reliable" unless it is a plainly known fact. Scope every claim to what is actually true and stable.
         - KEYWORD DISCIPLINE (hard cap): use the EXACT focus phrase at most 3-4 times in the entire article, headings included. Everywhere else vary it or use a pronoun. Seeing the same exact multi-word phrase opening several sentences is a dead SEO-AI giveaway.
         - STRUCTURE AROUND THE SEARCHER'S REAL QUESTIONS. Someone searching this phrase wants specific answers (does it work? which one? how exactly? why did it fail? is it allowed?). Lead with those. Do not open with a copywriting hook or a "why X matters" preamble — open with the direct answer or the concrete problem.
@@ -224,10 +224,13 @@ class HumanizerService
         $citation += preg_match_all('/\bresearch(?:ers)?\s+(?:at|from|found|shows?|suggests?|discovered|have found)\b/i', $text);
         $citation += preg_match_all('/\baccording to (?:a|one|recent|the)\s+(?:study|survey|report|research)\b/i', $text);
         $citation += preg_match_all('/\bstudies (?:show|have shown|found|suggest)\b/i', $text);
-        $citation += preg_match_all('/\b\d{1,3}%\s+of\s+(?:players|gamers|users|people|respondents)\b/i', $text);
+        // "<number>% of <plural group>" — niche-agnostic (people, users,
+        // customers, players, chefs, marketers, patients, …). Any bare stat
+        // about a group with no source is almost always invented.
+        $citation += preg_match_all('/\b\d{1,3}%\s+of\s+(?:all\s+|the\s+)?[a-z]{3,}(?:s|people)\b/i', $text);
         if ($citation > 0) {
             $issues[] = ['code' => 'fabricated_citation', 'count' => (int) $citation,
-                'message' => 'Remove invented research/statistics ("a study from...", "research shows", "70% of players..."). Do not cite studies, surveys, or percentages without a real source; make the point from plain reasoning instead.'];
+                'message' => 'Remove invented research/statistics ("a study from...", "research shows", "70% of users..."). Do not cite studies, surveys, or percentages without a real source; make the point from plain reasoning instead.'];
         }
 
         // 11. Fabricated consensus / false-precision history — "many players
@@ -235,12 +238,15 @@ class HumanizerService
         //     working". The writer has no sources, so any claimed community
         //     event or dated change is invented. ("As of ..." present-state
         //     hedging is allowed and not matched here.)
-        $consensus = preg_match_all('/\b(?:many|most|some|several)?\s*(?:players|users|gamers|people)\s+(?:have\s+|had\s+)?report(?:ed)?\b/i', $text);
-        $consensus += preg_match_all('/\bthe community\s+(?:found|reported|discovered|agrees|noticed)\b/i', $text);
+        // Niche-agnostic: "<many/most/some/several> <any group> <report/say/
+        // claim/found/agree>" catches invented consensus in ANY vertical
+        // (players, customers, chefs, developers, marketers, patients...).
+        $consensus = preg_match_all('/\b(?:many|most|some|several|countless|plenty of)\s+(?:\w+\s+){0,2}(?:report(?:ed)?|say|said|claim(?:ed)?|note[d]?|found|agree[d]?|complain(?:ed)?)\b/i', $text);
+        $consensus += preg_match_all('/\bthe\s+(?:community|industry|consensus|internet|experts?)\s+(?:found|reported|discovered|agrees?|noticed|says?)\b/i', $text);
         $consensus += preg_match_all('/\b(?:in|since|after|until)\s+(?:early|mid|late)[- ]?20\d\d\b/i', $text);
         if ($consensus > 0) {
             $issues[] = ['code' => 'fabricated_consensus', 'count' => (int) $consensus,
-                'message' => 'Remove invented community reports and dated event claims ("many players reported...", "in mid-2025 X stopped working", "since the last patch..."). You have no source for these; state only stable facts, and drop timeline claims entirely.'];
+                'message' => 'Remove invented consensus and dated event claims ("many users reported...", "the community found...", "in mid-2025 X changed", "since the last update..."). You have no source for these; state only stable facts, and drop timeline claims entirely.'];
         }
 
         return $issues;
