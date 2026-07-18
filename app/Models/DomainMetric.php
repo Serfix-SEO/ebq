@@ -23,6 +23,7 @@ class DomainMetric extends Model
             'cc_refreshed_at' => 'datetime',
             'topic_classified_at' => 'datetime',
             'moz_refreshed_at' => 'datetime',
+            'dfs_refreshed_at' => 'datetime',
             'opr_score' => 'float',
         ];
     }

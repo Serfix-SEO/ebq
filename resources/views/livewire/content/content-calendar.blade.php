@@ -349,6 +349,7 @@
                                     <tr>
                                         <th class="px-4 py-2.5 text-start font-bold">{{ __('Competitor') }}</th>
                                         <th class="px-4 py-2.5 text-end font-bold">{{ __('Referring domains') }}</th>
+                                        <th class="px-4 py-2.5 text-end font-bold">{{ __('Backlinks') }}</th>
                                         <th class="px-4 py-2.5 text-end font-bold">{{ __('DA') }}</th>
                                         <th class="px-4 py-2.5 text-end font-bold">{{ __('PA') }}</th>
                                         <th class="w-10 px-2 py-2.5"></th>
@@ -367,6 +368,7 @@
                                                 </div>
                                             </td>
                                             <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $c['referring_domains'] !== null ? number_format($c['referring_domains']) : '—' }}</td>
+                                            <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ isset($c['backlinks']) && $c['backlinks'] !== null ? number_format($c['backlinks']) : '—' }}</td>
                                             <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] ?? '—' }}</td>
                                             <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['pa'] ?? '—' }}</td>
                                             <td class="px-2 py-3 text-end">
@@ -380,7 +382,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        <p class="mt-2 text-center text-xs text-slate-400">{{ __('DA/PA from Moz, where available.') }}</p>
+                        <p class="mt-2 text-center text-xs text-slate-400">{{ __('DA/PA from Moz; referring domains and backlinks from DataForSEO, where available.') }}</p>
                     @elseif ($ins !== null && $hasOverrides)
                         {{-- Data exists, but the user's own edits emptied the table — distinct from "still loading". --}}
                         <div class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-800/40">

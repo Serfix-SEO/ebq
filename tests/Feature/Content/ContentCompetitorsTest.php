@@ -61,6 +61,56 @@ class ContentCompetitorsTest extends TestCase
         );
     }
 
+    public function test_dfs_referring_domains_and_backlinks_stored_and_reused_without_a_second_call(): void
+    {
+        config(['services.dataforseo.login' => 'x', 'services.dataforseo.password' => 'y']);
+        Http::fake([
+            'api.dataforseo.com/*' => Http::response([
+                'tasks' => [[
+                    'cost' => 0.024,
+                    'result' => [['referring_domains' => 5792, 'backlinks' => 44211]],
+                ]],
+            ], 200),
+        ]);
+
+        [$user, $website, $plan] = $this->userWithPlan();
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 4)
+            ->set('newCompetitorDomain', 'dfs-rival.com')
+            ->call('addCompetitor')
+            ->assertSee('5,792')
+            ->assertSee('44,211');
+
+        $metric = DomainMetric::query()->where('domain', 'dfs-rival.com')->first();
+        $this->assertSame(5792, $metric->dfs_referring_domains);
+        $this->assertSame(44211, $metric->dfs_backlinks);
+        $this->assertNotNull($metric->dfs_refreshed_at);
+
+        Http::fake(['api.dataforseo.com/*' => Http::response(['tasks' => [['result' => []]]], 500)]);
+        $row = app(ContentSetupInsights::class)->metricsForDomain('dfs-rival.com');
+        $this->assertSame(5792, $row['referring_domains']);
+        $this->assertSame(44211, $row['backlinks']);
+    }
+
+    public function test_dfs_not_configured_renders_dash_without_http_call(): void
+    {
+        config(['services.dataforseo.login' => null, 'services.dataforseo.password' => null]);
+        Http::fake();
+
+        [$user, $website, $plan] = $this->userWithPlan();
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 4)
+            ->set('newCompetitorDomain', 'no-dfs-example.com')
+            ->call('addCompetitor')
+            ->assertSee('no-dfs-example.com');
+
+        Http::assertNothingSent();
+    }
+
     public function test_rejects_own_domain_and_invalid_domain(): void
     {
         [$user, $website, $plan] = $this->userWithPlan();

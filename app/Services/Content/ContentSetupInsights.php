@@ -7,9 +7,10 @@ use App\Models\ContentPlan;
 use App\Models\DomainMetric;
 use App\Models\Website;
 use App\Models\WebsiteReportSnapshot;
+use App\Services\DataForSeoBacklinkClient;
 use App\Services\MozLinksClient;
-use App\Services\OpenPageRankClient;
 use App\Services\Reports\ClientReportService;
+use App\Services\Reports\DataForSeoSpendMeter;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -21,16 +22,23 @@ use Illuminate\Support\Facades\Cache;
  *  1. Read the shared report snapshot (WebsiteReportSnapshot::forDomain) — the
  *     site's OWN referring domains + Trust/Citation + the discovered competitor
  *     list. Read-only, no paid call.
- *  2. Enrich each competitor's referring-domains count via OpenPageRank
- *     (FREE bulk endpoint, 100 domains/call) — the snapshot's competitor rows
- *     don't carry referring_domains.
- *  3. Enrich each competitor's Moz DA/PA ({@see MozLinksClient}), stored on
- *     the shared `domain_metrics` asset (`moz_da`/`moz_pa`/`moz_refreshed_at`)
- *     — the SAME global per-domain table other subsystems read (backlinks,
- *     prospecting, etc.), not a feature-local cache, so a domain touched
- *     once anywhere is never re-fetched from Moz elsewhere within 30 days.
- *     Guarded by {@see MozSpendMeter} — the account is free-tier (50
- *     rows/month total), so this must stay small.
+ *  2. Enrich each competitor's referring-domains + backlinks total via the
+ *     SAME DataForSEO `/backlinks/summary/live` call used for the site's own
+ *     domain ({@see DataForSeoBacklinkClient::summary()}) — matters because
+ *     the site's own referring-domains number already comes from DataForSEO;
+ *     an earlier version enriched competitors via free OpenPageRank instead,
+ *     which undercounted referring domains 10-100x vs this real index (e.g.
+ *     nickfinder.com: OPR said 90, DataForSEO says ~5,800) and made the
+ *     median/gap comparison badly wrong — sometimes showing the client AHEAD
+ *     when they were actually far behind. Stored on the shared `domain_metrics`
+ *     asset (`dfs_referring_domains`/`dfs_backlinks`/`dfs_refreshed_at`, 30-day
+ *     freshness), guarded by the app-wide {@see DataForSeoSpendMeter}.
+ *  3. Enrich each competitor's Moz DA/PA ({@see MozLinksClient}), also stored
+ *     on `domain_metrics` (`moz_da`/`moz_pa`/`moz_refreshed_at`) — the SAME
+ *     global per-domain table other subsystems read (backlinks, prospecting,
+ *     etc.), so a domain touched once anywhere is never re-fetched elsewhere
+ *     within 30 days. Guarded by {@see MozSpendMeter} — the account is
+ *     free-tier (50 rows/month total), so this must stay small.
  *  4. If no usable snapshot exists yet, {@see ensureGenerating()} dispatches
  *     the standard paid report generation ONCE (spend-metered; sandbox on
  *     staging) and the wizard polls until it lands.
@@ -48,7 +56,8 @@ class ContentSetupInsights
 
     public function __construct(
         private readonly ClientReportService $reports,
-        private readonly OpenPageRankClient $opr,
+        private readonly DataForSeoBacklinkClient $dfs,
+        private readonly DataForSeoSpendMeter $dfsSpend,
         private readonly MozLinksClient $moz,
         private readonly MozSpendMeter $mozSpend,
     ) {}
@@ -56,7 +65,7 @@ class ContentSetupInsights
     /**
      * @return array{
      *   my_referring_domains:int, my_authority:?int,
-     *   competitors:list<array{domain:string, referring_domains:?int, authority:?int, da:?int, pa:?int}>,
+     *   competitors:list<array{domain:string, referring_domains:?int, backlinks:?int, authority:?int, da:?int, pa:?int}>,
      *   median:?int, gap:?float, behind:bool
      * }|null  null when no usable snapshot exists yet (caller should generate)
      */
@@ -109,28 +118,23 @@ class ContentSetupInsights
     }
 
     /**
-     * A single manually-added competitor's row (referring domains + Moz
-     * DA/PA), fetched live — the manual list is small and user-controlled,
-     * so it isn't worth folding into the 30-day cached snapshot build.
+     * A single manually-added competitor's row (DataForSEO referring domains
+     * + backlinks, Moz DA/PA), fetched live — the manual list is small and
+     * user-controlled, so it isn't worth folding into the 30-day cached
+     * snapshot build.
      *
-     * @return array{domain:string, referring_domains:?int, authority:?int, da:?int, pa:?int, manual:true}
+     * @return array{domain:string, referring_domains:?int, backlinks:?int, authority:?int, da:?int, pa:?int, manual:true}
      */
     public function metricsForDomain(string $domain): array
     {
         $domain = trim($domain);
-        $referring = null;
-        try {
-            $opr = $domain !== '' ? $this->opr->metricsFor([$domain]) : [];
-            $host = ltrim(strtolower($domain), 'www.');
-            $referring = $opr[$domain]['referring_domains'] ?? $opr[$host]['referring_domains'] ?? null;
-        } catch (\Throwable) {
-            // leave null — rendered as "—"
-        }
+        $dfs = $this->dfsMetrics($domain);
         $moz = $this->mozMetrics($domain);
 
         return [
             'domain' => $domain,
-            'referring_domains' => $referring !== null ? (int) $referring : null,
+            'referring_domains' => $dfs['referring_domains'],
+            'backlinks' => $dfs['backlinks'],
             'authority' => null,
             'da' => $moz['domain_authority'],
             'pa' => $moz['page_authority'],
@@ -184,6 +188,75 @@ class ContentSetupInsights
 
     // ── internals ───────────────────────────────────────────────────────
 
+    private function normalizeHost(string $domain): string
+    {
+        return strtolower(preg_replace('/^www\./', '', (string) (
+            parse_url(str_contains($domain, '://') ? $domain : 'https://'.$domain, PHP_URL_HOST) ?: $domain
+        )));
+    }
+
+    /**
+     * Referring domains + backlinks total for one domain, from the SAME
+     * DataForSEO endpoint (`/backlinks/summary/live`, $0.024/request) used
+     * for the site's own numbers elsewhere in the app — deliberately NOT a
+     * free proxy (OpenPageRank), because mixing an accurate paid figure for
+     * "your referring domains" against an undercounted free figure for
+     * competitors made the median/gap comparison misleading. 30-day cached
+     * on the shared `domain_metrics` asset; guarded by the app-wide
+     * {@see DataForSeoSpendMeter} (same breaker every other paid DFS call
+     * respects). A domain DataForSEO has no data for (very small/obscure
+     * sites) legitimately returns null — shown as "—", not backfilled from
+     * a weaker source.
+     *
+     * @return array{referring_domains:?int, backlinks:?int}
+     */
+    private function dfsMetrics(string $domain): array
+    {
+        $empty = ['referring_domains' => null, 'backlinks' => null];
+
+        $host = $this->normalizeHost($domain);
+        if ($host === '') {
+            return $empty;
+        }
+
+        $existing = DomainMetric::query()->where('domain', $host)->first();
+        $fresh = $existing?->dfs_refreshed_at !== null
+            && $existing->dfs_refreshed_at->gt(now()->subDays(self::CACHE_TTL_DAYS));
+        if ($fresh) {
+            return ['referring_domains' => $existing->dfs_referring_domains, 'backlinks' => $existing->dfs_backlinks];
+        }
+
+        $stale = $existing !== null
+            ? ['referring_domains' => $existing->dfs_referring_domains, 'backlinks' => $existing->dfs_backlinks]
+            : $empty;
+
+        if (! $this->dfs->isConfigured() || $this->dfsSpend->exhausted()) {
+            return $stale;
+        }
+
+        $this->dfs->resetCost();
+        $summary = $this->dfs->summary($domain);
+        $this->dfsSpend->add($this->dfs->totalCost());
+
+        $referring = isset($summary['referring_domains']) ? (int) $summary['referring_domains'] : null;
+        $backlinks = isset($summary['backlinks']) ? (int) $summary['backlinks'] : null;
+
+        // Global asset — any subsystem touching this domain reads the same
+        // fresh DataForSEO value for 30 days instead of re-billing.
+        DomainMetric::query()->updateOrCreate(
+            ['domain' => $host],
+            [
+                'dfs_referring_domains' => $referring,
+                'dfs_backlinks' => $backlinks,
+                'dfs_refreshed_at' => now(),
+                'last_seen_at' => now(),
+                'first_seen_at' => $existing?->first_seen_at ?? now(),
+            ]
+        );
+
+        return ['referring_domains' => $referring, 'backlinks' => $backlinks];
+    }
+
     /**
      * DA/PA for one domain, 30-day cached per-domain (independent of the
      * insights cache so manual adds/removes don't cost extra Moz calls).
@@ -195,9 +268,7 @@ class ContentSetupInsights
     {
         $empty = ['domain_authority' => null, 'page_authority' => null];
 
-        $host = strtolower(preg_replace('/^www\./', '', (string) (
-            parse_url(str_contains($domain, '://') ? $domain : 'https://'.$domain, PHP_URL_HOST) ?: $domain
-        )));
+        $host = $this->normalizeHost($domain);
         if ($host === '') {
             return $empty;
         }
@@ -275,30 +346,18 @@ class ContentSetupInsights
         usort($competitorRows, fn ($a, $b) => (int) ($b['shared_keywords'] ?? 0) <=> (int) ($a['shared_keywords'] ?? 0));
         $competitorRows = array_slice($competitorRows, 0, self::MAX_COMPETITORS);
 
-        // Enrich referring domains via OpenPageRank (free bulk).
-        $domains = array_values(array_filter(array_map(
-            static fn ($c) => trim((string) ($c['domain'] ?? '')),
-            $competitorRows
-        )));
-        $oprMetrics = [];
-        try {
-            $oprMetrics = $domains !== [] ? $this->opr->metricsFor($domains) : [];
-        } catch (\Throwable) {
-            $oprMetrics = [];
-        }
-
         $competitors = [];
         foreach ($competitorRows as $c) {
             $cd = trim((string) ($c['domain'] ?? ''));
             if ($cd === '' || $cd === $domain) {
                 continue;
             }
-            $host = ltrim(strtolower($cd), 'www.');
-            $referring = $oprMetrics[$cd]['referring_domains'] ?? $oprMetrics[$host]['referring_domains'] ?? null;
+            $dfs = $this->dfsMetrics($cd);
             $moz = $this->mozMetrics($cd);
             $competitors[] = [
                 'domain' => $cd,
-                'referring_domains' => $referring !== null ? (int) $referring : null,
+                'referring_domains' => $dfs['referring_domains'],
+                'backlinks' => $dfs['backlinks'],
                 'authority' => isset($c['cs']) ? (int) $c['cs'] : null,
                 'da' => $moz['domain_authority'],
                 'pa' => $moz['page_authority'],
