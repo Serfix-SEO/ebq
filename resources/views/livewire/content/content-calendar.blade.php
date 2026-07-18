@@ -282,6 +282,34 @@
                             @endforeach
                         </div>
                     </div>
+                    {{-- Article structure — what goes into every article --}}
+                    <div class="mx-auto mt-8 max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('What goes into every article') }}</h3>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Turn these sections on or off. Applies to future articles.') }}</p>
+                        <div class="mt-4 space-y-2.5">
+                            @php
+                                $structOpts = [
+                                    ['key' => 'key_takeaways', 'title' => __('Key takeaways'), 'desc' => __('A quick bullet summary near the top.')],
+                                    ['key' => 'toc', 'title' => __('“In this article” list'), 'desc' => __('A clickable table of contents after the intro.')],
+                                    ['key' => 'faq', 'title' => __('FAQ section'), 'desc' => __('Common questions answered at the end.')],
+                                ];
+                            @endphp
+                            @foreach ($structOpts as $opt)
+                                @php $on = (bool) ($structureToggles[$opt['key']] ?? true); @endphp
+                                <div class="flex items-center justify-between gap-4 rounded-xl border border-slate-100 p-3 dark:border-slate-800" wire:key="struct-{{ $opt['key'] }}">
+                                    <div class="min-w-0">
+                                        <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $opt['title'] }}</div>
+                                        <div class="text-xs text-slate-500 dark:text-slate-400">{{ $opt['desc'] }}</div>
+                                    </div>
+                                    <button type="button" wire:click="toggleStructure('{{ $opt['key'] }}')" role="switch" aria-checked="{{ $on ? 'true' : 'false' }}"
+                                        class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition {{ $on ? 'bg-orange-600' : 'bg-slate-300 dark:bg-slate-700' }}">
+                                        <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition {{ $on ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
                     <div class="mt-8 flex items-center justify-between">
                         <button wire:click="goToStep(2)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>

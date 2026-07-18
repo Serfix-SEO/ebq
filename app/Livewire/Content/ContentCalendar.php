@@ -81,6 +81,9 @@ class ContentCalendar extends Component
     public string $newTitle = '';
     public string $newKeyword = '';
 
+    /** Article-structure toggles surfaced in the wizard (step 3). */
+    public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true];
+
     public function mount(string $mode = 'calendar'): void
     {
         $this->mode = in_array($mode, ['calendar', 'settings'], true) ? $mode : 'calendar';
@@ -122,6 +125,11 @@ class ContentCalendar extends Component
             $this->dontSellItems = $this->dontSellItems ?: array_values((array) ($offerings['dont_sell'] ?? []));
             $this->language = $existing->language ?: 'en';
             $this->country = (string) ($existing->country ?? '');
+            $this->structureToggles = [
+                'key_takeaways' => $existing->toggle('key_takeaways'),
+                'toc' => $existing->toggle('toc'),
+                'faq' => $existing->toggle('faq'),
+            ];
             if ($existing->status === ContentPlan::STATUS_DRAFT) {
                 $this->wizardStep = max($this->wizardStep, 3);
             }
@@ -259,8 +267,18 @@ class ContentCalendar extends Component
                 'article_length' => $existing?->article_length ?? self::DEFAULT_LENGTH,
                 'auto_publish' => $existing?->auto_publish ?? false,
                 'review_hours' => $existing?->review_hours ?? 24,
-                'toggles' => $existing?->toggles ?? ['toc' => true, 'key_takeaways' => true, 'faq' => true,
-                    'external_links' => true, 'cta_enabled' => false],
+                // Merge the wizard's structure switches over the plan's stored
+                // toggles (or first-run defaults), preserving toggles the
+                // wizard doesn't surface (external_links, cta_enabled, author_box).
+                'toggles' => array_merge(
+                    $existing?->toggles ?? ['toc' => true, 'key_takeaways' => true, 'faq' => true,
+                        'external_links' => true, 'cta_enabled' => false],
+                    [
+                        'key_takeaways' => (bool) ($this->structureToggles['key_takeaways'] ?? true),
+                        'toc' => (bool) ($this->structureToggles['toc'] ?? true),
+                        'faq' => (bool) ($this->structureToggles['faq'] ?? true),
+                    ]
+                ),
                 'business_description' => $this->businessDescription,
                 'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
                 'language' => $this->language ?: 'en',
@@ -283,6 +301,27 @@ class ContentCalendar extends Component
     public function toCompetitors(): void
     {
         $this->wizardStep = 4;
+    }
+
+    /**
+     * Flip an article-structure toggle (Key takeaways / In this article /
+     * FAQ) and persist it to the draft plan right away — the plan already
+     * exists by step 3, so the change survives without waiting for a later
+     * step. Future articles pick it up; already-written ones are unchanged.
+     */
+    public function toggleStructure(string $key): void
+    {
+        if (! array_key_exists($key, $this->structureToggles)) {
+            return;
+        }
+        $this->structureToggles[$key] = ! $this->structureToggles[$key];
+
+        $plan = $this->plan();
+        if ($plan !== null) {
+            $toggles = (array) ($plan->toggles ?? []);
+            $toggles[$key] = $this->structureToggles[$key];
+            $plan->update(['toggles' => $toggles]);
+        }
     }
 
     /**

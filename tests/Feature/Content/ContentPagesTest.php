@@ -90,6 +90,29 @@ class ContentPagesTest extends TestCase
         );
     }
 
+    public function test_structure_toggle_persists_to_plan(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'status' => ContentPlan::STATUS_ACTIVE,
+            'toggles' => ['toc' => true, 'key_takeaways' => true, 'faq' => true, 'external_links' => true, 'cta_enabled' => false],
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->call('toggleStructure', 'key_takeaways')
+            ->assertHasNoErrors();
+
+        $toggles = $plan->fresh()->toggles;
+        $this->assertFalse($toggles['key_takeaways'], 'toggle flips + persists');
+        // Untouched toggles the wizard does not surface are preserved.
+        $this->assertTrue($toggles['external_links']);
+        $this->assertTrue($toggles['toc']);
+    }
+
     public function test_wizard_creates_draft_plan_and_dispatches_topic_planning(): void
     {
         Queue::fake();

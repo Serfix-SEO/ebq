@@ -136,7 +136,10 @@ class ContentArticleProducer
         $maxRevisions = ContentAutopilotConfig::maxRevisions();
         $iteration = 0;
 
-        while ($article->seo_score < $target && $iteration < $maxRevisions) {
+        // Natural writing style is a hard requirement (owner 2026-07-18): a
+        // draft whose style lint is dirty gets revised even when its numeric
+        // score already clears the target — we never ship robotic prose.
+        while (($article->seo_score < $target || $this->hasStyleIssue($article)) && $iteration < $maxRevisions) {
             $iteration++;
             $topic->enterStage(ContentTopic::STATUS_REVISING);
 
@@ -159,8 +162,10 @@ class ContentArticleProducer
                 ],
             ]);
 
-            if ($article->seo_score <= $previousScore + 2) {
-                break; // diminishing returns
+            // Diminishing returns — but never abandon a dirty style lint
+            // while revisions remain: style is a must, not a nice-to-have.
+            if ($article->seo_score <= $previousScore + 2 && ! $this->hasStyleIssue($article)) {
+                break;
             }
         }
 
@@ -270,10 +275,30 @@ class ContentArticleProducer
         }, $html) ?? $html;
 
         if ($withToc) {
-            $html = $this->buildToc($html).$html;
+            $toc = $this->buildToc($html);
+            if ($toc !== '') {
+                // The "In this article" TOC sits AFTER the opening paragraph,
+                // never before it (owner 2026-07-18): the opener carries the
+                // focus keyphrase and the on-page analyzer reads the first
+                // <p> as the intro — a leading TOC would bury both. Insert
+                // right after the first closing </p>; if the draft opens with
+                // no paragraph, fall back to prepending.
+                if (preg_match('/<\/p>/i', $html, $m, PREG_OFFSET_CAPTURE)) {
+                    $at = $m[0][1] + strlen($m[0][0]);
+                    $html = substr($html, 0, $at)."\n".$toc.substr($html, $at);
+                } else {
+                    $html = $toc.$html;
+                }
+            }
         }
 
         return $html;
+    }
+
+    /** True when the article's persisted style lint found tells. */
+    private function hasStyleIssue(ContentArticle $article): bool
+    {
+        return ! empty((array) ($article->style_issues ?? []));
     }
 
     /** A unique kebab-case anchor id for a heading. */
@@ -478,8 +503,13 @@ class ContentArticleProducer
     private function templateInstructions(ContentPlan $plan, ContentTopic $topic): string
     {
         $rules = [];
+        // Ordering is load-bearing: the FIRST element must be a short opening
+        // paragraph carrying the focus keyphrase (on-page analyzer reads the
+        // first <p> as the intro). Anything else — Key takeaways box, TOC —
+        // comes after it.
+        $rules[] = 'Begin with a short opening paragraph (1-3 sentences) that includes the focus keyphrase. This paragraph must be the very first thing in the article — nothing (no box, no list, no heading) before it.';
         if ($plan->toggle('key_takeaways')) {
-            $rules[] = 'Open with a "Key takeaways" box: 3-5 short bullet points summarizing the article.';
+            $rules[] = 'Immediately AFTER that opening paragraph, add a "Key takeaways" box: 3-5 short bullet points summarizing the article.';
         }
         if ($plan->toggle('faq')) {
             $rules[] = 'End with an FAQ section (H2) answering 3-5 real questions searchers ask.';
