@@ -53,7 +53,17 @@ class WordPressAppPasswordDriver implements PublishDriver
             return PublishResult::failure('This WordPress user cannot create posts. Use an Author, Editor or Administrator account.');
         }
 
-        return PublishResult::success((string) $response->json('id'), $base, ['user' => $response->json('name')]);
+        // Detect the Serfix plugin so publish can fill its on-page SEO fields,
+        // and cache the result on the integration (re-checked on every verify).
+        $hasPlugin = $this->detectSeoPlugin($base);
+        $integration->forceFill([
+            'config' => ((array) ($integration->config ?? [])) + ['seo_plugin' => $hasPlugin],
+        ])->save();
+
+        return PublishResult::success((string) $response->json('id'), $base, [
+            'user' => $response->json('name'),
+            'seo_plugin' => $hasPlugin,
+        ]);
     }
 
     public function publish(ContentArticle $article, ContentIntegration $integration): PublishResult
@@ -85,6 +95,15 @@ class WordPressAppPasswordDriver implements PublishDriver
             'excerpt' => (string) ($article->meta_description ?? ''),
         ];
 
+        // Populate the Serfix plugin's on-page SEO / self-check fields — but
+        // ONLY when the plugin is present. WP rejects unregistered protected
+        // (`_`-prefixed) meta, which would fail the whole publish on
+        // plugin-less sites the app-password driver must still serve.
+        $meta = $this->seoMeta($article, $integration, $base);
+        if ($meta !== []) {
+            $payload['meta'] = $meta;
+        }
+
         $url = $base.'/wp-json/wp/v2/posts'.($externalId !== null ? '/'.rawurlencode($externalId) : '');
 
         try {
@@ -112,6 +131,61 @@ class WordPressAppPasswordDriver implements PublishDriver
             (string) ($response->json('link') ?? ''),
             ['status' => $response->json('status')],
         );
+    }
+
+    /**
+     * The Serfix plugin's on-page SEO / self-check meta fields (registered
+     * show_in_rest), keyed off the article + its topic. Empty when the plugin
+     * isn't detected on the target site.
+     *
+     * @return array<string, string>
+     */
+    private function seoMeta(ContentArticle $article, ContentIntegration $integration, ?string $base): array
+    {
+        $cfg = (array) ($integration->config ?? []);
+        // Detect+cache lazily for integrations connected before this existed.
+        if (! array_key_exists('seo_plugin', $cfg)) {
+            $cfg['seo_plugin'] = $base !== null && $this->detectSeoPlugin($base);
+            $integration->forceFill(['config' => $cfg])->save();
+        }
+        if (empty($cfg['seo_plugin'])) {
+            return [];
+        }
+
+        $topic = $article->topic;
+        $meta = array_filter([
+            '_ebq_title' => (string) ($article->meta_title ?? ''),
+            '_ebq_description' => (string) ($article->meta_description ?? ''),
+            '_ebq_focus_keyword' => (string) ($topic?->target_keyword ?? ''),
+        ], static fn (string $v): bool => $v !== '');
+
+        $secondary = array_values(array_filter(array_map(
+            static fn ($k): string => trim((string) $k),
+            (array) ($topic?->secondary_keywords ?? [])
+        )));
+        if ($secondary !== []) {
+            $meta['_ebq_additional_keywords'] = (string) json_encode(
+                array_slice($secondary, 0, 5),
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+            );
+        }
+
+        return $meta;
+    }
+
+    /** True when the Serfix WP plugin's REST namespace (ebq/v1) is present. */
+    private function detectSeoPlugin(string $base): bool
+    {
+        try {
+            $response = Http::timeout(10)->connectTimeout(6)->acceptJson()->get($base.'/wp-json/');
+            if (! $response->ok()) {
+                return false;
+            }
+
+            return in_array('ebq/v1', (array) ($response->json('namespaces') ?? []), true);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

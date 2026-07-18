@@ -102,6 +102,56 @@ class ContentPublishingTest extends TestCase
         $this->assertNotNull($publication->verified_at, 'live-URL verification should set verified_at');
     }
 
+    public function test_publish_fills_serfix_plugin_seo_meta_when_plugin_present(): void
+    {
+        Http::fake([
+            'client-blog.com/wp-json/' => Http::response(['namespaces' => ['wp/v2', 'ebq/v1']], 200),
+            'client-blog.com/wp-json/wp/v2/posts' => Http::response(['id' => 55, 'link' => 'https://client-blog.com/p/', 'status' => 'publish'], 201),
+            'client-blog.com/p*' => Http::response('<h1>x</h1>', 200),
+        ]);
+
+        [, $website, , $topic, $article] = $this->scheduledArticle();
+        $topic->update(['target_keyword' => 'change pubg name', 'secondary_keywords' => ['pubg rename', 'bgmi name']]);
+        $this->wordpressIntegration($website);
+
+        (new PublishContentArticleJob($topic->id))->handle(
+            app(\App\Services\Content\Publishing\PublishDriverFactory::class),
+            app(\App\Support\Audit\SafeHttpGuard::class),
+        );
+
+        Http::assertSent(function ($req) {
+            if (! str_ends_with($req->url(), '/wp/v2/posts')) {
+                return false;
+            }
+            $meta = $req->data()['meta'] ?? [];
+
+            return ($meta['_ebq_focus_keyword'] ?? null) === 'change pubg name'
+                && ($meta['_ebq_title'] ?? null) === 'A Publishable Article'
+                && str_contains($meta['_ebq_additional_keywords'] ?? '', 'pubg rename');
+        });
+    }
+
+    public function test_publish_omits_plugin_meta_when_plugin_absent(): void
+    {
+        Http::fake([
+            'client-blog.com/wp-json/' => Http::response(['namespaces' => ['wp/v2', 'oembed/1.0']], 200),
+            'client-blog.com/wp-json/wp/v2/posts' => Http::response(['id' => 56, 'link' => 'https://client-blog.com/q/', 'status' => 'publish'], 201),
+            'client-blog.com/q*' => Http::response('<h1>x</h1>', 200),
+        ]);
+
+        [, $website, , $topic] = $this->scheduledArticle();
+        $this->wordpressIntegration($website);
+
+        (new PublishContentArticleJob($topic->id))->handle(
+            app(\App\Services\Content\Publishing\PublishDriverFactory::class),
+            app(\App\Support\Audit\SafeHttpGuard::class),
+        );
+
+        Http::assertSent(fn ($req) => str_ends_with($req->url(), '/wp/v2/posts')
+            && ! array_key_exists('meta', $req->data()));
+        $this->assertSame(ContentTopic::STATUS_PUBLISHED, $topic->fresh()->status);
+    }
+
     public function test_publish_is_idempotent_and_routes_retries_through_update(): void
     {
         Http::fake([
