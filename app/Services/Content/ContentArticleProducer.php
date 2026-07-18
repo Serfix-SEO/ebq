@@ -82,7 +82,7 @@ class ContentArticleProducer
             'additional_keywords' => (array) ($topic->secondary_keywords ?? []),
             'language' => strtolower((string) ($plan->language ?: 'en')),
             'country' => strtoupper((string) ($plan->country ?: '')),
-            'custom_prompt' => $this->templateInstructions($plan)
+            'custom_prompt' => $this->templateInstructions($plan, $topic)
                 .(($urls = array_slice((array) ($context['site_urls'] ?? []), 0, 15)) === [] ? ''
                     : "\nInternal pages you may link to (2-3, exact URLs only):\n".implode("\n", $urls)),
             '__user_id' => $website->user_id,
@@ -470,7 +470,7 @@ class ContentArticleProducer
     }
 
     /** Template requirements injected via the writer's custom_prompt slot. */
-    private function templateInstructions(ContentPlan $plan): string
+    private function templateInstructions(ContentPlan $plan, ContentTopic $topic): string
     {
         $rules = [];
         if ($plan->toggle('key_takeaways')) {
@@ -492,6 +492,43 @@ class ContentArticleProducer
             $rules[] = trim((string) $plan->custom_instructions);
         }
 
-        return implode("\n", $rules)."\n".$this->humanizer->promptRules();
+        return implode("\n", array_merge($rules, $this->onPageSeoRules($topic)))
+            ."\n".$this->humanizer->promptRules();
+    }
+
+    /**
+     * On-page SEO rules mirroring the Serfix WP plugin's on-page self-check,
+     * so drafts pass it without a revise round: focus keyphrase in the intro
+     * + a subheading + spread through the body at a healthy density, every
+     * additional keyphrase present in the body (never crammed into title/H1),
+     * and a 50-60 char SEO title. Keep it natural — these are targets, not a
+     * license to keyword-stuff.
+     *
+     * @return list<string>
+     */
+    private function onPageSeoRules(ContentTopic $topic): array
+    {
+        $kw = trim((string) $topic->target_keyword);
+        if ($kw === '') {
+            return [];
+        }
+        $rules = [
+            "SEO / on-page rules for the focus keyphrase \"{$kw}\":",
+            "- Use the exact phrase \"{$kw}\" in the FIRST paragraph (the intro).",
+            "- Use the exact phrase \"{$kw}\" in at least one H2 or H3 subheading.",
+            "- Mention \"{$kw}\" naturally 3-6 times total, spread across the article (roughly 0.5-1.5% density) — never clustered or stuffed.",
+            '- The SEO/meta title should be 50-60 characters and lead with the focus keyphrase.',
+        ];
+
+        $additional = array_values(array_filter(array_map(
+            static fn ($k): string => trim((string) $k),
+            (array) ($topic->secondary_keywords ?? [])
+        )));
+        if ($additional !== []) {
+            $list = '"'.implode('", "', array_slice($additional, 0, 8)).'"';
+            $rules[] = "- Additional keyphrases to work into the BODY at least once each (in a subheading, the intro, or a natural sentence — NOT in the title or H1, which are reserved for the focus keyphrase): {$list}.";
+        }
+
+        return $rules;
     }
 }

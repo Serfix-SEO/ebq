@@ -72,8 +72,8 @@ class ContentSeoScorer
 
         $add('kw_in_meta_title', 10, $kwIn($metaTitle),
             "Include the exact keyword \"{$keyword}\" in the meta title.");
-        $add('meta_title_length', 4, mb_strlen($metaTitle) >= 30 && mb_strlen($metaTitle) <= 60,
-            'Rewrite the meta title to 30-60 characters (currently '.mb_strlen($metaTitle).').');
+        $add('meta_title_length', 4, mb_strlen($metaTitle) >= 50 && mb_strlen($metaTitle) <= 60,
+            'Rewrite the meta title to the 50-60 character sweet spot (currently '.mb_strlen($metaTitle).').');
         $add('kw_in_h1', 8, $kwIn($h1),
             "Include the exact keyword \"{$keyword}\" in the H1.");
         $add('h1_length', 2, $h1 !== '' && mb_strlen($h1) <= 70,
@@ -142,8 +142,10 @@ class ContentSeoScorer
             $used = array_filter($secondary, fn ($k) => str_contains($lowerText, $k));
             $coverage = count($used) / count($secondary);
             $missing = array_diff($secondary, $used);
-            $add('secondary_coverage', 6, $coverage >= 0.6,
-                'Work these related phrases in naturally: "'.implode('", "', array_slice($missing, 0, 8)).'".');
+            // Plugin's topical-coverage check wants every additional keyphrase
+            // in the body; require ≥80% and name the stragglers for the reviser.
+            $add('secondary_coverage', 6, $coverage >= 0.8,
+                'Every additional keyphrase should appear in the body. Missing: "'.implode('", "', array_slice($missing, 0, 8)).'".');
         }
 
         // ── Linking ─────────────────────────────────────────────────────
