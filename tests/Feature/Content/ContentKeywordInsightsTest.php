@@ -90,7 +90,7 @@ class ContentKeywordInsightsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 5)
+            ->set('wizardStep', 6)
             ->assertSee(__('Keywords analyzed'))
             ->assertSee('pubg name generator')
             ->assertSee('50,000')
@@ -209,7 +209,7 @@ class ContentKeywordInsightsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 5)
+            ->set('wizardStep', 6)
             ->assertSee(__('Researching live search data for your market…'));
     }
 

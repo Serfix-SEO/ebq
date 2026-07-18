@@ -30,8 +30,8 @@ use Livewire\Component;
  *    active plan back to draft — see toHowItWorks()).
  *
  * Wizard steps: 1 business profile → 2 offerings (sell / don't-sell lists) →
- * 3 how-it-works → 4 competitors & authority → 5 keyword research →
- * 6 first articles. A DRAFT plan is created at the end of step 2 (first time
+ * 3 how-it-works → 4 images (enable + style) → 5 competitors & authority →
+ * 6 keyword research → 7 first articles. A DRAFT plan is created at end of step 2 (first time
  * only) so topic ideation AND keyword research (self-hosted keyword server,
  * minutes-long — see ContentKeywordInsights) run in the BACKGROUND while the
  * user reads steps 3-4; by steps 5-6 real data is ready to show. Finishing
@@ -83,6 +83,10 @@ class ContentCalendar extends Component
 
     /** Article-structure toggles surfaced in the wizard (step 3). */
     public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true];
+
+    /** Image setup (onboarding step + settings). */
+    public bool $imagesEnabled = true;
+    public string $imageStyle = 'photographic';
 
     /** Publishing cadence — editable from the post-onboarding Settings view. */
     public int $articlesPerWeek = self::DEFAULT_PER_WEEK;
@@ -144,6 +148,10 @@ class ContentCalendar extends Component
                 'toc' => $existing->toggle('toc'),
                 'faq' => $existing->toggle('faq'),
             ];
+            $this->imagesEnabled = $existing->images_enabled === null ? true : (bool) $existing->images_enabled;
+            $this->imageStyle = \App\Support\ContentImageStyles::isValid($existing->image_style)
+                ? (string) $existing->image_style
+                : \App\Support\ContentImageStyles::default();
             $this->articlesPerWeek = (int) ($existing->articles_per_week ?: self::DEFAULT_PER_WEEK);
             $this->articleLength = (int) ($existing->article_length ?: self::DEFAULT_LENGTH);
             $this->autoPublish = (bool) $existing->auto_publish;
@@ -197,7 +205,7 @@ class ContentCalendar extends Component
     public function goToStep(int $step): void
     {
         // Only allow jumping to steps already unlocked (never skip ahead).
-        $max = $this->draftPlanId !== null ? 6 : 2;
+        $max = $this->draftPlanId !== null ? 7 : 2;
         $this->wizardStep = max(1, min($step, $max));
     }
 
@@ -285,6 +293,8 @@ class ContentCalendar extends Component
                 'article_length' => $existing?->article_length ?? self::DEFAULT_LENGTH,
                 'auto_publish' => $existing?->auto_publish ?? false,
                 'review_hours' => $existing?->review_hours ?? 24,
+                'images_enabled' => $existing?->images_enabled ?? true,
+                'image_style' => $existing?->image_style ?? \App\Support\ContentImageStyles::default(),
                 // Merge the wizard's structure switches over the plan's stored
                 // toggles (or first-run defaults), preserving toggles the
                 // wizard doesn't surface (external_links, cta_enabled, author_box).
@@ -316,9 +326,40 @@ class ContentCalendar extends Component
         $this->wizardStep = 3;
     }
 
-    public function toCompetitors(): void
+    public function toImages(): void
     {
         $this->wizardStep = 4;
+    }
+
+    public function toCompetitors(): void
+    {
+        $this->wizardStep = 5;
+    }
+
+    /** Persist the image enable/style choice to the draft plan immediately. */
+    public function toggleImages(): void
+    {
+        $this->imagesEnabled = ! $this->imagesEnabled;
+        $this->persistImageSettings();
+    }
+
+    public function selectImageStyle(string $key): void
+    {
+        if (\App\Support\ContentImageStyles::isValid($key)) {
+            $this->imageStyle = $key;
+            $this->imagesEnabled = true; // picking a style implies wanting images
+            $this->persistImageSettings();
+        }
+    }
+
+    private function persistImageSettings(): void
+    {
+        $this->plan()?->update([
+            'images_enabled' => $this->imagesEnabled,
+            'image_style' => \App\Support\ContentImageStyles::isValid($this->imageStyle)
+                ? $this->imageStyle
+                : \App\Support\ContentImageStyles::default(),
+        ]);
     }
 
     /**
@@ -460,7 +501,7 @@ class ContentCalendar extends Component
 
     public function toKeywordResearch(): void
     {
-        $this->wizardStep = 5;
+        $this->wizardStep = 6;
         // Belt-and-braces: a resumed old draft may predate the research job.
         if (($plan = $this->plan()) !== null) {
             PrepareContentKeywordInsightsJob::dispatch($plan->id);
@@ -475,7 +516,7 @@ class ContentCalendar extends Component
 
     public function toFirstArticles(): void
     {
-        $this->wizardStep = 6;
+        $this->wizardStep = 7;
     }
 
     /**
@@ -544,6 +585,10 @@ class ContentCalendar extends Component
             'article_length' => max(800, min(4000, $this->articleLength)),
             'auto_publish' => $this->autoPublish,
             'review_hours' => max(0, min(168, $this->reviewHours)),
+            'images_enabled' => $this->imagesEnabled,
+            'image_style' => \App\Support\ContentImageStyles::isValid($this->imageStyle)
+                ? $this->imageStyle
+                : \App\Support\ContentImageStyles::default(),
             'toggles' => $toggles,
         ]);
 
@@ -854,7 +899,7 @@ class ContentCalendar extends Component
             $generating = false;
             $needsReportGen = false;
             $hasOverrides = false;
-            if ($this->wizardStep === 4 && ($w = $this->website()) !== null) {
+            if ($this->wizardStep === 5 && ($w = $this->website()) !== null) {
                 $svc = app(ContentSetupInsights::class);
                 $rawInsights = $svc->competitorAuthority($w);
                 $needsReportGen = $rawInsights === null;
@@ -865,11 +910,11 @@ class ContentCalendar extends Component
                 $hasOverrides = ! empty($overrides['added']) || ! empty($overrides['removed']);
             }
             $keywords = null;
-            if ($this->wizardStep === 5 && ($plan5 = $this->plan()) !== null) {
+            if ($this->wizardStep === 6 && ($plan5 = $this->plan()) !== null) {
                 $keywords = app(ContentKeywordInsights::class)->get($plan5);
             }
             $wizard = [
-                'draftTopics' => $this->wizardStep >= 6 ? $this->draftTopics() : collect(),
+                'draftTopics' => $this->wizardStep >= 7 ? $this->draftTopics() : collect(),
                 'insights' => $insights,
                 'generating' => $generating,
                 'needsReportGen' => $needsReportGen,

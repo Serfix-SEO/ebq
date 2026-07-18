@@ -139,6 +139,18 @@ class ContentImagesTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_plan_with_images_disabled_skips_generation(): void
+    {
+        Http::fake();
+        [, , $plan, , $article] = $this->readyArticle();
+        $plan->update(['images_enabled' => false]);
+
+        (new GenerateContentImagesJob($article->id))->handle(app(IdeogramClient::class), app(IdeogramSpendMeter::class));
+
+        $this->assertSame(0, ContentImage::query()->where('article_id', $article->id)->count());
+        Http::assertNothingSent();
+    }
+
     public function test_publish_sideloads_featured_media_and_rewrites_inline_src(): void
     {
         // Guard-free (tests can't do live DNS); the parent Publishing test binds

@@ -37,6 +37,7 @@ class ContentPlan extends Model
             'competitor_overrides' => 'array',
             'internal_urls' => 'array',
             'auto_publish' => 'boolean',
+            'images_enabled' => 'boolean',
         ];
     }
 

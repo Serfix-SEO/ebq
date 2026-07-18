@@ -136,6 +136,37 @@
                 </div>
             </div>
 
+            {{-- Images --}}
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center justify-between gap-4">
+                    <div class="min-w-0">
+                        <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Images') }}</h2>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Auto-generate a featured image and in-article visuals.') }}</p>
+                    </div>
+                    <button type="button" wire:click="toggleImages" role="switch" aria-checked="{{ $imagesEnabled ? 'true' : 'false' }}"
+                        class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition {{ $imagesEnabled ? 'bg-orange-600' : 'bg-slate-300 dark:bg-slate-700' }}">
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition {{ $imagesEnabled ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                    </button>
+                </div>
+                @if ($imagesEnabled)
+                    <div class="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                        @foreach (\App\Support\ContentImageStyles::all() as $key => $st)
+                            @php $sel = $imageStyle === $key; @endphp
+                            <button type="button" wire:click="selectImageStyle('{{ $key }}')" wire:key="set-imgstyle-{{ $key }}"
+                                class="rounded-xl border-2 p-3 text-start transition {{ $sel ? 'border-orange-500 bg-orange-50 dark:border-orange-500 dark:bg-orange-950' : 'border-slate-200 bg-white hover:border-orange-300 dark:border-slate-800 dark:bg-slate-900' }}">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ __($st['label']) }}</span>
+                                    @if ($sel)
+                                        <svg class="h-4 w-4 text-orange-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                    @endif
+                                </div>
+                                <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __($st['desc']) }}</div>
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
             {{-- Publishing cadence --}}
             <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Publishing') }}</h2>
@@ -180,7 +211,7 @@
     @elseif ($inWizard)
         {{-- ══ Setup wizard (5 steps) ══════════════════════════════════ --}}
         @php
-            $steps = [1 => __('Business'), 2 => __('Offerings'), 3 => __('How it works'), 4 => __('Competitors'), 5 => __('Keyword research'), 6 => __('First articles')];
+            $steps = [1 => __('Business'), 2 => __('Offerings'), 3 => __('How it works'), 4 => __('Images'), 5 => __('Competitors'), 6 => __('Keyword research'), 7 => __('First articles')];
             $maxUnlocked = $draftPlanId !== null ? 6 : 2;
             $stepCount = count($steps);
             $fillPct = $stepCount > 1 ? (($wizardStep - 1) / ($stepCount - 1)) * 100 : 0;
@@ -235,7 +266,7 @@
                                 <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15l-.75 18h-13.5L4.5 3zM9 3v18M15 3v18"/></svg>
                             </span>
                             <div>
-                                <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 1 of 6') }}</p>
+                                <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 1 of 7') }}</p>
                                 <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Tell us about your business') }}</h2>
                             </div>
                         </div>
@@ -285,7 +316,7 @@
                             <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.1-.9 2-2 2H5.75c-1.1 0-2-.9-2-2V9.85c0-1.1.9-2 2-2h4.25M20.25 14.15L15 14.15M20.25 14.15l-4.5-4.5M15 4.5h5.25v5.25"/></svg>
                         </span>
                         <div>
-                            <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 2 of 6') }}</p>
+                            <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 2 of 7') }}</p>
                             <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('What you offer') }}</h2>
                         </div>
                     </div>
@@ -397,7 +428,7 @@
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                         </span>
-                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 3 of 6') }}</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 3 of 7') }}</p>
                         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('How this grows your traffic') }}</h2>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Fully automatic. You just review and approve.') }}</p>
                     </div>
@@ -470,14 +501,70 @@
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                             {{ __('Back') }}
                         </button>
+                        <button wire:click="toImages" class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                            {{ __('Continue') }}
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                        </button>
+                    </div>
+
+                {{-- ── Step 4: images ───────────────────────────────── --}}
+                @elseif ($wizardStep === 4)
+                    <div class="text-center">
+                        <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                            <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M18 8.25h.008v.008H18V8.25zm.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM3 19.5V6a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 6v13.5A2.25 2.25 0 0118.75 21H5.25A2.25 2.25 0 013 19.5z"/></svg>
+                        </span>
+                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 4 of 7') }}</p>
+                        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Images for your articles') }}</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('We can generate a featured image and in-article visuals for every post.') }}</p>
+                    </div>
+
+                    {{-- Enable toggle --}}
+                    <div class="mx-auto mt-6 flex max-w-2xl items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                        <div class="min-w-0">
+                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Generate images') }}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">{{ __('Turn off if you prefer to add your own images.') }}</div>
+                        </div>
+                        <button type="button" wire:click="toggleImages" role="switch" aria-checked="{{ $imagesEnabled ? 'true' : 'false' }}"
+                            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition {{ $imagesEnabled ? 'bg-orange-600' : 'bg-slate-300 dark:bg-slate-700' }}">
+                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition {{ $imagesEnabled ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                        </button>
+                    </div>
+
+                    {{-- Style picker (only when enabled) --}}
+                    @if ($imagesEnabled)
+                        <div class="mx-auto mt-5 max-w-2xl">
+                            <div class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Pick a visual style') }}</div>
+                            <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                @foreach (\App\Support\ContentImageStyles::all() as $key => $st)
+                                    @php $sel = $imageStyle === $key; @endphp
+                                    <button type="button" wire:click="selectImageStyle('{{ $key }}')" wire:key="imgstyle-{{ $key }}"
+                                        class="rounded-2xl border-2 p-4 text-start transition {{ $sel ? 'border-orange-500 bg-orange-50 dark:border-orange-500 dark:bg-orange-950' : 'border-slate-200 bg-white hover:border-orange-300 dark:border-slate-800 dark:bg-slate-900' }}">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __($st['label']) }}</span>
+                                            @if ($sel)
+                                                <svg class="h-4 w-4 text-orange-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                            @endif
+                                        </div>
+                                        <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __($st['desc']) }}</div>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="mt-8 flex items-center justify-between">
+                        <button wire:click="goToStep(3)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+                            {{ __('Back') }}
+                        </button>
                         <button wire:click="toCompetitors" class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
                             {{ __('Continue') }}
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                         </button>
                     </div>
 
-                {{-- ── Step 4: competitors ──────────────────────────── --}}
-                @elseif ($wizardStep === 4)
+                {{-- ── Step 5: competitors ──────────────────────────── --}}
+                @elseif ($wizardStep === 5)
                     @php
                         $ins = $wizard['insights'] ?? null;
                         $generating = $wizard['generating'] ?? false;
@@ -500,7 +587,7 @@
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </span>
-                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 4 of 6') }}</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 5 of 7') }}</p>
                         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Your competitors and their authority') }}</h2>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('How your backlink profile compares to others in your space.') }}</p>
                     </div>
@@ -601,7 +688,7 @@
                     </div>
 
                     <div class="mt-7 flex items-center justify-between">
-                        <button wire:click="goToStep(3)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                        <button wire:click="goToStep(4)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                             {{ __('Back') }}
                         </button>
@@ -612,13 +699,13 @@
                     </div>
 
                 {{-- ── Step 5: keyword research ─────────────────────── --}}
-                @elseif ($wizardStep === 5)
+                @elseif ($wizardStep === 6)
                     @php $kw = $wizard['keywords'] ?? null; @endphp
                     <div class="text-center">
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg>
                         </span>
-                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 5 of 6') }}</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 6 of 7') }}</p>
                         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('The keyword research behind your plan') }}</h2>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('What your audience searches for, grouped and prioritized — this is what your articles are built on.') }}</p>
                     </div>
@@ -792,7 +879,7 @@
                     @endif
 
                     <div class="mt-7 flex items-center justify-between">
-                        <button wire:click="goToStep(4)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                        <button wire:click="goToStep(5)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                             {{ __('Back') }}
                         </button>
@@ -809,7 +896,7 @@
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a5.25 5.25 0 016.775-5.025.75.75 0 01.313 1.248l-3.32 3.319c.063.475.276.934.641 1.299.365.365.824.578 1.3.64l3.318-3.319a.75.75 0 011.248.313 5.25 5.25 0 01-5.472 6.756c-1.018-.086-1.87.1-2.309.634L7.344 21.3A3.298 3.298 0 112.7 16.657l8.684-7.151c.533-.44.72-1.291.634-2.309a5.342 5.342 0 01-.068-.447z"/></svg>
                         </span>
-                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 6 of 6') }}</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 7 of 7') }}</p>
                         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Your first articles are ready') }}</h2>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Built from what your audience is really searching for. Remove any that don\'t fit, then launch.') }}</p>
                     </div>
@@ -849,7 +936,7 @@
                     @endif
 
                     <div class="mt-7 flex items-center justify-between">
-                        <button wire:click="goToStep(5)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                        <button wire:click="goToStep(6)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                             {{ __('Back') }}
                         </button>

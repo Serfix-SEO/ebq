@@ -79,7 +79,7 @@ class ContentPagesTest extends TestCase
             ->assertOk()
             ->assertSee(__('Articles per week'))          // settings-only control
             ->assertSee(__('Auto-publish'))
-            ->assertDontSee(__('Step 3 of 6'))            // no stepper
+            ->assertDontSee(__('Step 3 of 7'))            // no stepper
             ->assertDontSee(__('How this grows your traffic')) // onboarding-only step skipped
             ->assertDontSee(__('Your competitors and their authority'));
 
@@ -141,6 +141,49 @@ class ContentPagesTest extends TestCase
         // Untouched toggles the wizard does not surface are preserved.
         $this->assertTrue($toggles['external_links']);
         $this->assertTrue($toggles['toc']);
+    }
+
+    public function test_image_step_persists_enable_and_style(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'status' => ContentPlan::STATUS_DRAFT,
+            'images_enabled' => true,
+            'image_style' => 'photographic',
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 4)
+            ->assertSee(__('Images for your articles'))
+            ->assertSee(__('Anime / Manga'))
+            ->call('selectImageStyle', 'anime')
+            ->assertHasNoErrors();
+
+        $this->assertSame('anime', $plan->fresh()->image_style);
+        $this->assertTrue((bool) $plan->fresh()->images_enabled);
+
+        // Turning images off persists too.
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->call('toggleImages');
+        $this->assertFalse((bool) $plan->fresh()->images_enabled);
+    }
+
+    public function test_invalid_image_style_is_ignored(): void
+    {
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id, 'status' => ContentPlan::STATUS_DRAFT, 'image_style' => 'anime',
+        ]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->call('selectImageStyle', 'not-a-real-style');
+
+        $this->assertSame('anime', $plan->fresh()->image_style); // unchanged
     }
 
     public function test_wizard_creates_draft_plan_and_dispatches_topic_planning(): void

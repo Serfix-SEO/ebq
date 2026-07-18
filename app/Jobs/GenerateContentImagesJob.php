@@ -68,14 +68,30 @@ class GenerateContentImagesJob implements ShouldQueue
         }
 
         $topic = $article->topic;
+        $plan = $topic?->plan;
+
+        // Per-plan opt-out: the client disabled images in onboarding/settings.
+        // (The global ContentAutopilotConfig::imagesEnabled() above is the
+        //  platform kill-switch; this is the client's own choice.)
+        if ($plan !== null && $plan->images_enabled === false) {
+            return;
+        }
+
         $focus = trim((string) ($topic?->target_keyword ?? ''));
         $additional = array_values(array_filter(array_map(
             static fn ($k): string => trim((string) $k),
             (array) ($topic?->secondary_keywords ?? [])
         )));
-        $stylePrompt = trim((string) ($topic?->plan?->image_style_prompt ?? ''));
+        // Style: the picked category's art-direction prompt, plus any free-text
+        // override the plan carries, and the category's matching Ideogram type.
+        $stylePrompt = trim(implode('. ', array_filter([
+            \App\Support\ContentImageStyles::prompt($plan?->image_style),
+            trim((string) ($plan?->image_style_prompt ?? '')),
+        ])));
         $speed = ContentAutopilotConfig::renderingSpeed();
-        $style = ContentAutopilotConfig::styleType();
+        $style = \App\Support\ContentImageStyles::isValid($plan?->image_style)
+            ? \App\Support\ContentImageStyles::ideogramStyle($plan->image_style)
+            : ContentAutopilotConfig::styleType();
 
         $html = (string) $article->html;
         $anchors = $this->sectionAnchors($html, ContentAutopilotConfig::maxInlineImages());

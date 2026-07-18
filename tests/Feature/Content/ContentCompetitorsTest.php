@@ -47,7 +47,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->set('newCompetitorDomain', 'https://www.rival-example.com/pricing')
             ->call('addCompetitor')
             ->assertHasNoErrors()
@@ -77,7 +77,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->set('newCompetitorDomain', 'dfs-rival.com')
             ->call('addCompetitor')
             ->assertSee('5,792')
@@ -109,7 +109,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($admin)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->set('newCompetitorDomain', 'admin-test-rival.com')
             ->call('addCompetitor')
             ->assertSee('999')
@@ -133,7 +133,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->set('newCompetitorDomain', 'no-dfs-example.com')
             ->call('addCompetitor')
             ->assertSee('no-dfs-example.com');
@@ -147,13 +147,13 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->set('newCompetitorDomain', $website->domain)
             ->call('addCompetitor')
             ->assertHasErrors('newCompetitorDomain');
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->set('newCompetitorDomain', 'not a domain')
             ->call('addCompetitor')
             ->assertHasErrors('newCompetitorDomain');
@@ -168,7 +168,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->call('removeCompetitor', 'rival-a.com')
             ->assertDontSee('rival-a.com')
             ->assertSee('rival-b.com');
@@ -195,7 +195,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->assertSee('auto-a.com')
             ->assertSee('auto-b.com')
             ->call('removeCompetitor', 'auto-a.com')
@@ -212,7 +212,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->set('newCompetitorDomain', 'no-moz-example.com')
             ->call('addCompetitor')
             ->assertSee('no-moz-example.com');
@@ -253,7 +253,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->call('resetCompetitors');
 
         $this->assertNull($plan->fresh()->competitor_overrides);
@@ -272,7 +272,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         $component = Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->call('removeCompetitor', 'only-a.com')
             ->assertSee("You've removed every competitor")
             ->assertSee('Reset to auto-discovered');
@@ -295,7 +295,7 @@ class ContentCompetitorsTest extends TestCase
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
-            ->set('wizardStep', 4)
+            ->set('wizardStep', 5)
             ->set('newCompetitorDomain', 'shared-rival.com')
             ->call('addCompetitor')
             ->assertSee('70')
