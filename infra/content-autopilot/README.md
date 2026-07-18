@@ -118,6 +118,23 @@ website has NO ACTIVE plan (`inWizard`):
      addCompetitor()/removeCompetitor()` persist directly (same
      immediate-write pattern as `dropTopic()`); domain input validated
      host-shaped + rejects the user's own site, capped at 8 manual entries.
+   - **Reset / Refetch** (2026-07-18): removing every competitor previously
+     left no way back. A toolbar above the table now offers **Refetch**
+     (`refreshCompetitors()` — clears the 30-day insights cache so the next
+     render recomputes from the current report snapshot) and **Reset**
+     (`resetCompetitors()` — clears `competitor_overrides` entirely,
+     restoring the plain auto-discovered list; only shown when overrides
+     exist). A distinct empty state ("you've removed every competitor")
+     appears when the merged list is empty due to the user's own edits,
+     separate from the "still generating" state.
+   - **Moz DA/PA is a global asset, not feature-local** (2026-07-18): stored
+     on `domain_metrics.moz_da`/`moz_pa`/`moz_refreshed_at` (30-day
+     freshness) instead of a `ContentSetupInsights`-only cache — the SAME
+     table CC/OPR ranks live on (see the Data asset section of
+     `AUTO_CONTENT_CALENDAR_PLAN.md` / authority-scores work). Any subsystem
+     touching a domain (backlinks, prospecting, another wizard run for a
+     different site) reuses the stored value instead of re-calling Moz,
+     which matters given the 50-rows/month free tier.
 5. **First articles** — the background-generated topics (`wire:poll.4s` until
    ready), removable; **Launch** flips the plan to active and article writing
    begins (the dispatcher only claims ACTIVE plans, so nothing bills during the
