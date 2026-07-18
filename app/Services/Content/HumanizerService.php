@@ -56,6 +56,10 @@ class HumanizerService
 
         WRITE LIKE SOMEONE WHO ACTUALLY KNOWS THE TOPIC (this is what separates human-grade content from generated filler):
         - BE SPECIFIC AND PRACTICAL. The single biggest signal of real content is concrete, checkable detail: exact values, real settings names, precise steps, actual limits, version/platform differences, copy-ready examples. Wherever the topic allows it, give the reader something they can act on immediately, not a paragraph about why the topic matters.
+        - SPECIFICS MUST BE REAL, NEVER MANUFACTURED. Only state specifics you actually know as stable facts (standard values, menu names, currencies, character limits). NEVER invent history or events: no "in mid-2025 many players reported X stopped working", no "after the last patch...", no "the community found...", no version-and-date compatibility claims ("the latest version as of early 2026 supports..."). You cannot know these. False precision is a worse tell than vagueness. If you don't know when or whether something changed, say nothing about it.
+        - Explain each concept ONCE. Do not circle back and re-explain the same mechanism in later sections with slightly different words.
+        - Do not run a benefit → drawback → "balanced verdict" seesaw in section after section. Vary how you weigh things; some points are just good or just bad.
+        - No dramatic sign-offs or sweeping historical arcs ("The trick is old... Enjoy it while it lasts."). End on something useful.
         - STRUCTURE AROUND THE SEARCHER'S REAL QUESTIONS. Someone searching this phrase wants specific answers (does it work? which one? how exactly? why did it fail? is it allowed?). Lead with those. Do not open with a copywriting hook or a "why X matters" preamble — open with the direct answer or the concrete problem.
         - Use a comparison TABLE when the content is genuinely tabular (options vs attributes, platform A vs B, before/after). A tight table reads as researched; a wall of parallel sentences reads as generated.
         - HEDGE claims you cannot prove. Never make universal absolutes ("works on every version", "always", "guaranteed"). Use "usually", "as of now", "in most cases", "generally". Overconfident universal claims are an AI tell. (And do NOT swap them for a fake personal test — just scope the claim honestly.)
@@ -221,6 +225,19 @@ class HumanizerService
         if ($citation > 0) {
             $issues[] = ['code' => 'fabricated_citation', 'count' => (int) $citation,
                 'message' => 'Remove invented research/statistics ("a study from...", "research shows", "70% of players..."). Do not cite studies, surveys, or percentages without a real source; make the point from plain reasoning instead.'];
+        }
+
+        // 11. Fabricated consensus / false-precision history — "many players
+        //     reported...", "the community found...", "in mid-2025 X stopped
+        //     working". The writer has no sources, so any claimed community
+        //     event or dated change is invented. ("As of ..." present-state
+        //     hedging is allowed and not matched here.)
+        $consensus = preg_match_all('/\b(?:many|most|some|several)?\s*(?:players|users|gamers|people)\s+(?:have\s+|had\s+)?report(?:ed)?\b/i', $text);
+        $consensus += preg_match_all('/\bthe community\s+(?:found|reported|discovered|agrees|noticed)\b/i', $text);
+        $consensus += preg_match_all('/\b(?:in|since|after|until)\s+(?:early|mid|late)[- ]?20\d\d\b/i', $text);
+        if ($consensus > 0) {
+            $issues[] = ['code' => 'fabricated_consensus', 'count' => (int) $consensus,
+                'message' => 'Remove invented community reports and dated event claims ("many players reported...", "in mid-2025 X stopped working", "since the last patch..."). You have no source for these; state only stable facts, and drop timeline claims entirely.'];
         }
 
         return $issues;
