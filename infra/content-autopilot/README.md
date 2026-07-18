@@ -135,6 +135,39 @@ website has NO ACTIVE plan (`inWizard`):
      touching a domain (backlinks, prospecting, another wizard run for a
      different site) reuses the stored value instead of re-calling Moz,
      which matters given the 50-rows/month free tier.
+   - **Competitor referring-domains switched from OpenPageRank to DataForSEO**
+     (2026-07-18): owner compared a getautoseo.com screenshot against ours
+     for the same site and found the numbers wildly different (nickfinder.com:
+     90 in our app vs ~5,800 there) — root cause was mixing the site's own
+     ACCURATE DataForSEO-sourced referring-domains figure against
+     competitors' figures sourced from free OpenPageRank, which undercounts
+     10-100x vs any real backlink index. A live side-by-side pull (OPR vs
+     Moz vs real DataForSEO) confirmed Moz and DataForSEO agree within the
+     same order of magnitude; OPR was the outlier every time. Switched to
+     `DataForSeoBacklinkClient::summary()` (`/backlinks/summary/live`,
+     $0.024/domain) — same endpoint/methodology as the site's own number —
+     guarded by the existing app-wide `DataForSeoSpendMeter`, stored on
+     `domain_metrics.dfs_referring_domains`/`dfs_backlinks`/
+     `dfs_refreshed_at` (30-day freshness, same global-asset pattern as
+     Moz). Also yields a real backlinks total per competitor (new
+     "Backlinks" table column) for free in the same call. `OpenPageRankClient`
+     dependency removed from `ContentSetupInsights` entirely.
+   - **Admin-owned sites sandbox DataForSEO calls** (2026-07-18, same-day
+     follow-up): the new DFS lookup had no billing-policy check, unlike the
+     existing report-generation path (`ensureGenerating()` already
+     sandboxes admin-owned sites). Fixed: `build()`/`withOverrides()`/
+     `metricsForDomain()` all thread `$sandbox = $website->user?->is_admin`
+     through to `dfsMetrics()`, which routes to DataForSEO's free mock host
+     and — critically — never persists the mock response into the shared
+     `domain_metrics` asset or charges the spend meter (sandbox data must
+     never contaminate the real-data cache other users' lookups rely on).
+     Caught a real, unrelated staging misconfiguration while verifying this:
+     staging's `.env` had `DATAFORSEO_FORCE_SANDBOX=false` (contradicting
+     its own inline comment and `infra/reference/staging.md`'s documented
+     isolation guarantee) — ~$0.28 real spend had already accrued this
+     month. Owner's call: intentional — QA (non-admin) accounts should see
+     real data on staging; only admin accounts need sandboxing, which is
+     exactly what this app-level fix implements (no staging env change made).
 5. **First articles** — the background-generated topics (`wire:poll.4s` until
    ready), removable; **Launch** flips the plan to active and article writing
    begins (the dispatcher only claims ACTIVE plans, so nothing bills during the
