@@ -1,6 +1,6 @@
 <div class="space-y-6">
     @if (session('content-status'))
-        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+        <div class="rounded-lg border border-success/20 bg-success/10 px-4 py-3 text-sm font-medium text-success">
             {{ session('content-status') }}
         </div>
     @endif
@@ -62,7 +62,7 @@
 
                 <div class="relative">
                 @error('plan')
-                    <p class="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:bg-rose-950 dark:text-rose-300">{{ $message }}</p>
+                    <p class="mb-4 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">{{ $message }}</p>
                 @enderror
 
                 {{-- ── Step 1: business ─────────────────────────────── --}}
@@ -106,7 +106,7 @@
                         <textarea id="w-desc" wire:model="businessDescription" rows="4" maxlength="1000"
                             class="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                             placeholder="{{ __('Describe your products, services, and who they are for…') }}"></textarea>
-                        @error('businessDescription') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        @error('businessDescription') <p class="mt-1 text-sm text-error">{{ $message }}</p> @enderror
 
                         <div class="mt-7 flex justify-end">
                             <button wire:click="toOfferings" class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 transition-transform hover:brightness-110">
@@ -130,54 +130,58 @@
                     <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">{{ __('So we write about what you actually sell, and avoid what you don\'t. Order the top list by importance.') }}</p>
 
                     {{-- Sell --}}
-                    <div class="mt-6 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-transparent p-4 dark:border-emerald-900 dark:from-emerald-950/40">
+                    <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                         <div class="flex items-center justify-between">
-                            <h3 class="flex items-center gap-1.5 text-sm font-bold text-emerald-800 dark:text-emerald-300">
-                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                            <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
+                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                </span>
                                 {{ __('What you sell') }}
                             </h3>
-                            <span class="text-xs font-medium text-emerald-700 dark:text-emerald-400">{{ __('Most important first') }}</span>
+                            <span class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Most important first') }}</span>
                         </div>
                         <div class="mt-3 space-y-2">
                             @forelse ($sellItems as $i => $item)
-                                <div class="flex items-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800" wire:key="sell-{{ $i }}">
-                                    <div class="flex flex-col text-emerald-600 dark:text-emerald-400">
-                                        <button type="button" wire:click="moveSell({{ $i }}, -1)" class="hover:text-emerald-700 disabled:opacity-30" @disabled($i === 0)>
+                                <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800" wire:key="sell-{{ $i }}">
+                                    <div class="flex flex-col text-slate-400 dark:text-slate-500">
+                                        <button type="button" wire:click="moveSell({{ $i }}, -1)" class="hover:text-slate-600 disabled:opacity-30" @disabled($i === 0)>
                                             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 6l6 6H6z"/></svg>
                                         </button>
-                                        <button type="button" wire:click="moveSell({{ $i }}, 1)" class="hover:text-emerald-700 disabled:opacity-30" @disabled($loop->last)>
+                                        <button type="button" wire:click="moveSell({{ $i }}, 1)" class="hover:text-slate-600 disabled:opacity-30" @disabled($loop->last)>
                                             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 18l-6-6h12z"/></svg>
                                         </button>
                                     </div>
-                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">{{ $i + 1 }}</span>
+                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success/10 text-xs font-bold text-success">{{ $i + 1 }}</span>
                                     <input wire:model="sellItems.{{ $i }}" type="text" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-800 focus:ring-0 dark:text-slate-100" />
-                                    <button type="button" wire:click="removeSell({{ $i }})" class="shrink-0 text-slate-300 hover:text-red-500" aria-label="{{ __('Remove') }}">
+                                    <button type="button" wire:click="removeSell({{ $i }})" class="shrink-0 text-slate-300 hover:text-error" aria-label="{{ __('Remove') }}">
                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                     </button>
                                 </div>
                             @empty
-                                <p class="text-sm text-emerald-700 dark:text-emerald-400">{{ __('Add the products, tools, or services you offer.') }}</p>
+                                <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Add the products, tools, or services you offer.') }}</p>
                             @endforelse
                         </div>
                         <div class="mt-3 flex gap-2">
                             <input wire:model="newSell" wire:keydown.enter.prevent="addSell" type="text" placeholder="{{ __('Add an offering…') }}"
-                                class="min-w-0 flex-1 rounded-xl border border-emerald-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                            <button type="button" wire:click="addSell" class="shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700">+ {{ __('Add') }}</button>
+                                class="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                            <button type="button" wire:click="addSell" class="shrink-0 rounded-xl bg-success px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-110">+ {{ __('Add') }}</button>
                         </div>
                     </div>
 
                     {{-- Don't sell --}}
-                    <div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950">
-                        <h3 class="flex items-center gap-1.5 text-sm font-bold text-rose-800 dark:text-rose-300">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                        <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-error/10 text-error">
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </span>
                             {{ __("What you don't sell") }}
                         </h3>
-                        <p class="text-xs text-rose-700 dark:text-rose-400">{{ __("Related things you don't offer, so we never write about the wrong products.") }}</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __("Related things you don't offer, so we never write about the wrong products.") }}</p>
                         <div class="mt-3 space-y-2">
                             @foreach ($dontSellItems as $i => $item)
-                                <div class="flex items-center gap-2 rounded-xl border border-rose-100 bg-white px-3 py-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800" wire:key="dont-{{ $i }}">
+                                <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800" wire:key="dont-{{ $i }}">
                                     <input wire:model="dontSellItems.{{ $i }}" type="text" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-800 focus:ring-0 dark:text-slate-100" />
-                                    <button type="button" wire:click="removeDont({{ $i }})" class="shrink-0 text-slate-300 hover:text-red-500" aria-label="{{ __('Remove') }}">
+                                    <button type="button" wire:click="removeDont({{ $i }})" class="shrink-0 text-slate-300 hover:text-error" aria-label="{{ __('Remove') }}">
                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                     </button>
                                 </div>
@@ -185,8 +189,8 @@
                         </div>
                         <div class="mt-3 flex gap-2">
                             <input wire:model="newDont" wire:keydown.enter.prevent="addDont" type="text" placeholder="{{ __('Add something you don\'t offer…') }}"
-                                class="min-w-0 flex-1 rounded-xl border border-rose-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                            <button type="button" wire:click="addDont" class="shrink-0 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-rose-700">+ {{ __('Add') }}</button>
+                                class="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                            <button type="button" wire:click="addDont" class="shrink-0 rounded-xl bg-error px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-110">+ {{ __('Add') }}</button>
                         </div>
                     </div>
 
@@ -353,14 +357,14 @@
                         <div class="mt-6 space-y-2.5">
                             @foreach ($dts as $t)
                                 <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm transition hover:border-orange-200 dark:border-slate-700 dark:bg-slate-800" wire:key="dt-{{ $t->id }}">
-                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                                     </span>
                                     <div class="min-w-0 flex-1">
                                         <div class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $t->title }}</div>
                                         <div class="text-xs text-slate-500 dark:text-slate-400">{{ $t->target_keyword }}@if($t->keyword_volume) · <span class="font-semibold text-orange-600 dark:text-orange-400">{{ number_format($t->keyword_volume) }} {{ __('searches/mo') }}</span>@endif</div>
                                     </div>
-                                    <button wire:click="dropTopic('{{ $t->id }}')" class="shrink-0 text-slate-300 hover:text-red-500" aria-label="{{ __('Remove') }}">
+                                    <button wire:click="dropTopic('{{ $t->id }}')" class="shrink-0 text-slate-300 hover:text-error" aria-label="{{ __('Remove') }}">
                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                     </button>
                                 </div>
@@ -439,13 +443,13 @@
                         <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400" for="ca-new-title">{{ __('Article title') }}</label>
                         <input id="ca-new-title" wire:model="newTitle" type="text"
                             class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                        @error('newTitle') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                        @error('newTitle') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400" for="ca-new-kw">{{ __('Target keyword') }}</label>
                         <input id="ca-new-kw" wire:model="newKeyword" type="text"
                             class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                        @error('newKeyword') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                        @error('newKeyword') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
                     </div>
                 </div>
                 <div class="mt-3 flex justify-end gap-2">
@@ -496,7 +500,7 @@
                                 <a href="{{ route('content.review', $topic->id) }}" class="text-sm font-medium text-orange-600 hover:text-orange-700">{{ __('Review') }}</a>
                             @endif
                             @if ($topic->status === \App\Models\ContentTopic::STATUS_SUGGESTED)
-                                <button wire:click="approve('{{ $topic->id }}')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700">{{ __('Approve') }}</button>
+                                <button wire:click="approve('{{ $topic->id }}')" class="text-sm font-medium text-success hover:brightness-90">{{ __('Approve') }}</button>
                             @endif
                             @if ($topic->status === \App\Models\ContentTopic::STATUS_FAILED)
                                 <button wire:click="retry('{{ $topic->id }}')" class="text-sm font-medium text-orange-600 hover:text-orange-700">{{ __('Try again') }}</button>
