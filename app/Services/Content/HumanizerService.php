@@ -39,6 +39,10 @@ class HumanizerService
         SOUND LIKE A REAL PERSON, NOT AN LLM. These are the tells AI writing leaves — avoid every one:
         - NO cute or forced metaphors and analogies (e.g. "names that stick like sticky grenades", "letter soup"). Say the plain thing plainly. A metaphor is allowed only if a normal person would actually use it.
         - DO NOT INVENT fake-specific examples to sound authoritative. Never fabricate product names, brand names, made-up username/word mash-ups, statistics, studies, or quotes. Use examples that are real and verifiable, examples taken from the brief, or examples flagged as hypothetical in plain words. Synthetic-sounding invented specifics (e.g. "Mossback Whisperfin", "1993Leaf", "GullRust") are the #1 AI giveaway.
+        - NEVER cite research, studies, universities, surveys, experts, or statistics unless a real, checkable source is given to you in the brief. Do NOT write things like "a study from the University of York found..." or "research shows that 70% of players...". Inventing academic citations to sound credible is a glaring AI tell and a factual-integrity failure. If you don't have a real source, make the point from plain reasoning instead.
+        - DO NOT pad with hypothetical scenarios or manufactured emotion. Skip "Think about the last time...", "Imagine you...", "Picture this", "We've all been there", and the pattern of (plain statement) then (invented scenario) then (why it emotionally matters). State the point and move on.
+        - Be EXACT or say nothing. Don't hedge vague half-specifics ("names are limited to 10, 12 characters depending on the platform"). Give the exact figure and platform if you actually know it, otherwise leave it out — vague hedged numbers signal a model guessing.
+        - Cover the topic at a sensible depth. Do NOT inflate a simple question into psychology, branding, philosophy, and academic research just to hit a length. Breadth for its own sake reads as SEO filler.
         - DO NOT coin jargon and present it as established (e.g. "evergreen words", "the X-plus-Y method"). Use language your reader already knows.
         - DO NOT make every section a rule or command. Vary the shape: some sections explain, some tell a short real scenario, some weigh a trade-off, some answer a question. Not every H2 should be an imperative.
         - DO NOT stack parallel example patterns ("X plus Y works: A. Y plus Z: B."). Real writers don't template their examples.
@@ -196,6 +200,20 @@ class HumanizerService
         if ($hype > 0) {
             $issues[] = ['code' => 'hype_contrast', 'count' => (int) $hype,
                 'message' => 'Remove dramatic "it doesn\'t just X, it Y" / "not just X but Y" constructions and any unevidenced hype; state the point plainly.'];
+        }
+
+        // 10. Fabricated research / citation — vague academic or statistical
+        //     claims with no source. A top AI credibility tell (and a factual
+        //     integrity problem). The article HTML rarely carries real
+        //     citations, so any of these patterns is almost certainly invented.
+        $citation = preg_match_all('/\b(?:a|one|recent)\s+(?:study|survey|report|research|paper)\s+(?:from|by|conducted|found|shows?|showed|suggests?)\b/i', $text);
+        $citation += preg_match_all('/\bresearch(?:ers)?\s+(?:at|from|found|shows?|suggests?|discovered|have found)\b/i', $text);
+        $citation += preg_match_all('/\baccording to (?:a|one|recent|the)\s+(?:study|survey|report|research)\b/i', $text);
+        $citation += preg_match_all('/\bstudies (?:show|have shown|found|suggest)\b/i', $text);
+        $citation += preg_match_all('/\b\d{1,3}%\s+of\s+(?:players|gamers|users|people|respondents)\b/i', $text);
+        if ($citation > 0) {
+            $issues[] = ['code' => 'fabricated_citation', 'count' => (int) $citation,
+                'message' => 'Remove invented research/statistics ("a study from...", "research shows", "70% of players..."). Do not cite studies, surveys, or percentages without a real source; make the point from plain reasoning instead.'];
         }
 
         return $issues;

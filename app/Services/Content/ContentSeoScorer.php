@@ -155,7 +155,7 @@ class ContentSeoScorer
                     ? "Mention the phrase \"{$keyword}\" (or a close variant) a little more — a few natural placements across the article."
                     : "The keyword \"{$keyword}\" is over-used (density ".round($density, 1)."%); remove repetitions and use pronouns or variants instead.");
 
-            if ($wordCount >= 300 && $occurrences >= 2) {
+            if ($wordCount >= 300) {
                 $words = preg_split('/\s+/', trim($lowerText)) ?: [];
                 $third = intdiv(count($words), 3);
                 $sections = [
@@ -163,9 +163,14 @@ class ContentSeoScorer
                     implode(' ', array_slice($words, $third, $third)),
                     implode(' ', array_slice($words, 2 * $third)),
                 ];
-                $hits = count(array_filter($sections, fn ($s) => str_contains($s, $keyword)));
+                // Variant-tolerant: a section "covers" the topic if it has the
+                // exact phrase OR all the keyword's words (any order). This
+                // spreads the TOPIC across the article without forcing the
+                // exact multi-word phrase to be repeated verbatim in each third
+                // (verbatim repetition is a keyword-stuffing / AI tell).
+                $hits = count(array_filter($sections, fn ($s) => str_contains($s, $keyword) || $kwLoose($s)));
                 $add('kw_distribution', 8, $hits >= 3,
-                    "Spread the exact phrase \"{$keyword}\" across the whole article — it must appear in the intro, the middle, AND the conclusion (currently in {$hits} of 3 sections).");
+                    "Make sure the topic \"{$keyword}\" is present in the intro, the middle, AND the closing third (currently {$hits} of 3). Use the words naturally — you do NOT need the exact phrase in each part.");
             }
         }
 

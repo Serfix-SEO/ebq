@@ -161,5 +161,10 @@ class ContentAutopilotConfig
         'vital role', 'comprehensive guide', 'ultimate guide to success',
         'stay ahead of the curve', 'take your .* to the next level',
         'in a nutshell', 'first and foremost', 'last but not least',
+        // Motivational-filler endings + hypothetical-scenario padding (AI tells).
+        "don't overthink it", 'do not overthink it', "there's no right answer",
+        'there is no right answer', 'authenticity matters', 'what matters most is',
+        'think about the last time', 'picture this', "we've all been there",
+        'that just clicks', 'the possibilities are endless', "it's all about",
     ];
 }
