@@ -145,6 +145,34 @@ class ContentKeywordInsightsTest extends TestCase
         $this->assertSame(1, $insights['stats']['questions']);
     }
 
+    public function test_fallback_fills_volumes_from_keywords_everywhere_when_configured(): void
+    {
+        config(['services.keywords_everywhere.key' => 'fake-ke-key']);
+        \Illuminate\Support\Facades\Http::fake([
+            'api.keywordseverywhere.com/*' => \Illuminate\Support\Facades\Http::response([
+                'data' => [
+                    ['keyword' => 'how to change pubg name', 'vol' => 8000, 'competition' => 0.2],
+                ],
+            ], 200),
+        ]);
+
+        [$user, $website, $plan] = $this->userWithPlan();
+        ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id,
+            'target_keyword' => 'how to change pubg name',
+            'keyword_volume' => null,
+            'status' => ContentTopic::STATUS_SUGGESTED,
+        ]);
+        $request = $this->storeCompletedRequest($plan, []);
+        $request->forceFill(['status' => KeywordApiRequest::STATUS_FAILED, 'result' => null])->save();
+
+        $insights = app(ContentKeywordInsights::class)->get($plan);
+
+        $this->assertTrue($insights['partial']);
+        $this->assertSame(8000, $insights['stats']['volume']);
+        $this->assertSame('low', $insights['opportunities'][0]['competition']);
+    }
+
     public function test_pending_request_within_grace_returns_null(): void
     {
         [, , $plan] = $this->userWithPlan();

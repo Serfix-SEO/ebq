@@ -11,6 +11,7 @@ use App\Services\KeywordFinder\KeywordFinderPool;
 use App\Services\KeywordResearch\AiKeywordClusterService;
 use App\Services\KeywordResearch\KeywordIntentClassifier;
 use App\Services\KeywordResearch\KeywordTermGrouper;
+use App\Services\KeywordsEverywhereClient;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -58,6 +59,7 @@ class ContentKeywordInsights
     public function __construct(
         private readonly KeywordFinderPool $pool,
         private readonly AiKeywordClusterService $clusters,
+        private readonly KeywordsEverywhereClient $ke,
     ) {}
 
     /**
@@ -298,12 +300,44 @@ class ContentKeywordInsights
             // volumes stay null — the step still shows clusters/intent/questions
         }
 
+        // Still-missing volumes: one bounded synchronous Keywords Everywhere
+        // batch (the keyword server already failed to deliver — this is the
+        // backup source, deliberately bypassing the provider setting). Fires
+        // at most once per plan per FALLBACK_TTL (the built payload is
+        // cached), ≤100 keywords/call. Fails soft to null volumes.
+        $competitions = [];
+        $missing = array_keys(array_filter($keywords, static fn ($v) => $v === null));
+        if ($missing !== []) {
+            try {
+                $response = $this->ke->getKeywordData(
+                    array_slice($missing, 0, 100),
+                    websiteId: $plan->website_id,
+                    source: 'content-wizard',
+                );
+                foreach ((array) ($response['data'] ?? []) as $row) {
+                    if (! is_array($row) || ! is_string($row['keyword'] ?? null)) {
+                        continue;
+                    }
+                    $kw = mb_strtolower(trim($row['keyword']));
+                    if (array_key_exists($kw, $keywords) && $keywords[$kw] === null && is_numeric($row['vol'] ?? null)) {
+                        $keywords[$kw] = (int) $row['vol'];
+                    }
+                    if (is_numeric($row['competition'] ?? null)) {
+                        $c = (float) $row['competition']; // KE: 0..1
+                        $competitions[$kw] = $c < 0.34 ? 'low' : ($c < 0.67 ? 'medium' : 'high');
+                    }
+                }
+            } catch (\Throwable) {
+                // fail soft
+            }
+        }
+
         $rows = [];
         foreach ($keywords as $kw => $volume) {
             $rows[] = [
                 'keyword' => $kw,
                 'volume' => $volume,
-                'competition' => 'unknown',
+                'competition' => $competitions[$kw] ?? 'unknown',
                 'intent' => KeywordIntentClassifier::classify($kw),
                 'is_question' => KeywordIntentClassifier::isQuestion($kw),
             ];

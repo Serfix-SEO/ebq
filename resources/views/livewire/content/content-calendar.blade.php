@@ -458,16 +458,19 @@
                             </div>
                         </div>
 
-                        {{-- Headline stats --}}
-                        <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {{-- Headline stats (volume card hidden until real volume data exists) --}}
+                        @php $kwHasVolume = ($kw['stats']['volume'] ?? 0) > 0; @endphp
+                        <div class="mt-4 grid grid-cols-2 gap-3 {{ $kwHasVolume ? 'sm:grid-cols-4' : 'sm:grid-cols-3' }}">
                             <div class="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-center dark:border-orange-900 dark:bg-orange-950">
                                 <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['keywords']) }}</div>
                                 <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Keywords analyzed') }}</div>
                             </div>
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-800/40">
-                                <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $kw['stats']['volume'] > 0 ? number_format($kw['stats']['volume']) : '—' }}</div>
-                                <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Monthly searches') }}</div>
-                            </div>
+                            @if ($kwHasVolume)
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                                    <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['volume']) }}</div>
+                                    <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Monthly searches') }}</div>
+                                </div>
+                            @endif
                             <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-800/40">
                                 <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['clusters']) }}</div>
                                 <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Topic groups') }}</div>
