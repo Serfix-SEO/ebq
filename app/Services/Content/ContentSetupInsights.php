@@ -125,10 +125,10 @@ class ContentSetupInsights
      *
      * @return array{domain:string, referring_domains:?int, backlinks:?int, authority:?int, da:?int, pa:?int, manual:true}
      */
-    public function metricsForDomain(string $domain): array
+    public function metricsForDomain(string $domain, bool $sandbox = false): array
     {
         $domain = trim($domain);
-        $dfs = $this->dfsMetrics($domain);
+        $dfs = $this->dfsMetrics($domain, $sandbox);
         $moz = $this->mozMetrics($domain);
 
         return [
@@ -151,6 +151,10 @@ class ContentSetupInsights
      */
     public function withOverrides(?array $insights, ContentPlan $plan): ?array
     {
+        // Same admin-sandboxes / non-admin-bills-real-money policy as the
+        // report generation path (ensureGenerating()) — never bill an
+        // admin's own testing.
+        $sandbox = (bool) $plan->website?->user?->is_admin;
         $overrides = (array) ($plan->competitor_overrides ?? []);
         $removed = array_values(array_unique(array_map(
             static fn ($d) => strtolower(trim((string) $d)), (array) ($overrides['removed'] ?? [])
@@ -179,7 +183,7 @@ class ContentSetupInsights
             if ($domain === '' || in_array($domain, $existing, true)) {
                 continue;
             }
-            $insights['competitors'][] = $this->metricsForDomain($domain);
+            $insights['competitors'][] = $this->metricsForDomain($domain, $sandbox);
             $existing[] = $domain;
         }
 
@@ -208,9 +212,14 @@ class ContentSetupInsights
      * sites) legitimately returns null — shown as "—", not backfilled from
      * a weaker source.
      *
+     * @param  bool  $sandbox  Admin-owned site → route to DataForSEO's free
+     *                         mock host (same policy as ensureGenerating()),
+     *                         and never persist the mock response into the
+     *                         shared domain_metrics asset — that table must
+     *                         only ever hold real data other users rely on.
      * @return array{referring_domains:?int, backlinks:?int}
      */
-    private function dfsMetrics(string $domain): array
+    private function dfsMetrics(string $domain, bool $sandbox = false): array
     {
         $empty = ['referring_domains' => null, 'backlinks' => null];
 
@@ -230,16 +239,22 @@ class ContentSetupInsights
             ? ['referring_domains' => $existing->dfs_referring_domains, 'backlinks' => $existing->dfs_backlinks]
             : $empty;
 
-        if (! $this->dfs->isConfigured() || $this->dfsSpend->exhausted()) {
+        if (! $this->dfs->isConfigured() || (! $sandbox && $this->dfsSpend->exhausted())) {
             return $stale;
         }
 
         $this->dfs->resetCost();
-        $summary = $this->dfs->summary($domain);
-        $this->dfsSpend->add($this->dfs->totalCost());
+        $summary = $this->dfs->useSandbox($sandbox)->summary($domain);
+        $this->dfs->useSandbox(false); // reset — this client instance may be reused elsewhere this request
 
         $referring = isset($summary['referring_domains']) ? (int) $summary['referring_domains'] : null;
         $backlinks = isset($summary['backlinks']) ? (int) $summary['backlinks'] : null;
+
+        if ($sandbox) {
+            return ['referring_domains' => $referring, 'backlinks' => $backlinks]; // mock data — never cached/billed
+        }
+
+        $this->dfsSpend->add($this->dfs->totalCost());
 
         // Global asset — any subsystem touching this domain reads the same
         // fresh DataForSEO value for 30 days instead of re-billing.
@@ -342,6 +357,10 @@ class ContentSetupInsights
 
         $myAuthority = isset($payload['scores']['citation']) ? (int) $payload['scores']['citation'] : null;
 
+        // Same admin-sandboxes / non-admin-bills-real-money policy as
+        // ensureGenerating() — never bill an admin's own testing.
+        $sandbox = (bool) $website->user?->is_admin;
+
         // Top competitors by shared keywords, capped.
         usort($competitorRows, fn ($a, $b) => (int) ($b['shared_keywords'] ?? 0) <=> (int) ($a['shared_keywords'] ?? 0));
         $competitorRows = array_slice($competitorRows, 0, self::MAX_COMPETITORS);
@@ -352,7 +371,7 @@ class ContentSetupInsights
             if ($cd === '' || $cd === $domain) {
                 continue;
             }
-            $dfs = $this->dfsMetrics($cd);
+            $dfs = $this->dfsMetrics($cd, $sandbox);
             $moz = $this->mozMetrics($cd);
             $competitors[] = [
                 'domain' => $cd,

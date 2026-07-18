@@ -94,6 +94,36 @@ class ContentCompetitorsTest extends TestCase
         $this->assertSame(44211, $row['backlinks']);
     }
 
+    public function test_admin_owned_site_sandboxes_dfs_and_never_persists_mock_data(): void
+    {
+        config(['services.dataforseo.login' => 'x', 'services.dataforseo.password' => 'y']);
+        Http::fake([
+            'sandbox.dataforseo.com/*' => Http::response([
+                'tasks' => [['cost' => 0, 'result' => [['referring_domains' => 999, 'backlinks' => 9999]]]],
+            ], 200),
+        ]);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $website = Website::factory()->for($admin)->create();
+        ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_DRAFT]);
+        $this->actingAs($admin)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 4)
+            ->set('newCompetitorDomain', 'admin-test-rival.com')
+            ->call('addCompetitor')
+            ->assertSee('999')
+            ->assertSee('9,999');
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sandbox.dataforseo.com'));
+
+        $this->assertNull(
+            DomainMetric::query()->where('domain', 'admin-test-rival.com')->first(),
+            'Sandbox/mock DataForSEO responses must never be written into the shared domain_metrics asset.'
+        );
+    }
+
     public function test_dfs_not_configured_renders_dash_without_http_call(): void
     {
         config(['services.dataforseo.login' => null, 'services.dataforseo.password' => null]);
