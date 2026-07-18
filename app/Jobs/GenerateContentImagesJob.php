@@ -132,7 +132,9 @@ class GenerateContentImagesJob implements ShouldQueue
 
             $filename = Str::ulid()->toBase32().'.png';
             $path = 'content/images/'.$filename;
-            Storage::disk('public')->put($path, $bytes);
+            // Store on the configured disk (local 'public' or Hetzner S3) with
+            // public visibility so the preview + WP sideload can fetch it.
+            Storage::disk(ContentImage::disk())->put($path, $bytes, 'public');
 
             $image = ContentImage::query()->create([
                 'article_id' => $article->id,

@@ -8,10 +8,13 @@ use Illuminate\Support\Facades\Log;
 /**
  * Ideogram v3 image generation for Content Autopilot.
  *
- * POST {base}/ideogram-v3/generate  (header `Api-Key`), body:
- *   prompt, aspect_ratio (e.g. 16x9|1x1|3x2), rendering_speed
- *   (FLASH|TURBO|DEFAULT|QUALITY), style_type (AUTO|GENERAL|REALISTIC|DESIGN),
- *   negative_prompt, num_images, seed.
+ * POST {base}/ideogram-{model}/generate  (header `Api-Key`), body:
+ *   prompt (v3) / text_prompt (v4), aspect_ratio (e.g. 16x9|1x1|3x2),
+ *   rendering_speed (FLASH|TURBO|DEFAULT|QUALITY),
+ *   style_type (AUTO|GENERAL|REALISTIC|DESIGN), negative_prompt,
+ *   num_images, seed. Model path is config('services.ideogram.model')
+ *   ('v3' default, 'v4' = Ideogram 4.0 — same Turbo pricing; the only
+ *   schema change is prompt→text_prompt, verified live 2026-07-18).
  * Response: { data: [{ url, prompt, resolution, is_image_safe, seed }] }.
  *
  * IMPORTANT: returned URLs EXPIRE — callers must download() immediately and
@@ -60,9 +63,14 @@ class IdeogramClient
 
         $speed = strtoupper((string) ($options['rendering_speed'] ?? 'TURBO'));
         $numImages = max(1, min(4, (int) ($options['num_images'] ?? 1)));
+        $model = trim((string) config('services.ideogram.model', 'v3'), '/') ?: 'v3';
+
+        // v4 renamed the prompt field to `text_prompt` (v3 still uses
+        // `prompt`); every other field is shared. Verified live 2026-07-18.
+        $promptField = $model === 'v4' ? 'text_prompt' : 'prompt';
 
         $body = array_filter([
-            'prompt' => $prompt,
+            $promptField => $prompt,
             'aspect_ratio' => $options['aspect_ratio'] ?? '16x9',
             'rendering_speed' => $speed,
             'style_type' => $options['style_type'] ?? 'AUTO',
@@ -75,7 +83,7 @@ class IdeogramClient
             $response = Http::withHeaders(['Api-Key' => config('services.ideogram.key')])
                 ->timeout((int) config('services.ideogram.timeout', 90))
                 ->retry(2, 500, throw: false)
-                ->post(rtrim((string) config('services.ideogram.base_url'), '/').'/ideogram-v3/generate', $body);
+                ->post(rtrim((string) config('services.ideogram.base_url'), '/').'/ideogram-'.$model.'/generate', $body);
         } catch (\Throwable $e) {
             Log::warning('ideogram.network_error', ['error' => $e->getMessage()]);
 

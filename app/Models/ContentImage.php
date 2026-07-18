@@ -26,10 +26,22 @@ class ContentImage extends Model
 
     protected $guarded = [];
 
-    /** Public-disk URL for the stored image, or null. */
+    /**
+     * The filesystem disk generated images live on — one source of truth for
+     * the job (write), url() (read), and the WP sideloader (fetch). 'public'
+     * by default; 's3' (Hetzner Object Storage) when configured.
+     */
+    public static function disk(): string
+    {
+        return (string) config('services.content.images_disk', 'public');
+    }
+
+    /** Public URL for the stored image (works for local + S3 disks), or null. */
     public function url(): ?string
     {
-        return $this->disk_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->disk_path) : null;
+        return $this->disk_path
+            ? \Illuminate\Support\Facades\Storage::disk(self::disk())->url($this->disk_path)
+            : null;
     }
 
     protected function casts(): array

@@ -238,10 +238,21 @@ return [
     'ideogram' => [
         'key' => env('IDEOGRAM_API_KEY'),
         'base_url' => env('IDEOGRAM_BASE_URL', 'https://api.ideogram.ai/v1'),
+        // Model generation path segment: request goes to
+        // {base_url}/ideogram-{model}/generate. Bump to switch generations
+        // without a code change (Ideogram 4.0 Turbo = 'v3' pricing tier).
+        'model' => env('IDEOGRAM_MODEL', 'v3'),
         'timeout' => (int) env('IDEOGRAM_TIMEOUT_S', 90),
         'monthly_cap_usd' => env('IDEOGRAM_MONTHLY_CAP_USD') !== null
             ? (float) env('IDEOGRAM_MONTHLY_CAP_USD')
             : null,
+    ],
+
+    // Content Autopilot generated-image storage. Default 'public' (local
+    // disk); set CONTENT_IMAGES_DISK=s3 to offload to Hetzner Object Storage.
+    // {@see \App\Models\ContentImage::disk()}.
+    'content' => [
+        'images_disk' => env('CONTENT_IMAGES_DISK', 'public'),
     ],
 
     // Content Autopilot LLM spend breaker — caps AUTOPILOT writing spend

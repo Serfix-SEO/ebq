@@ -60,6 +60,24 @@ return [
             'report' => false,
         ],
 
+        // Content Autopilot generated images (Hetzner Object Storage,
+        // S3-compatible). Dedicated env prefix so it never collides with the
+        // generic AWS_* 's3' disk. Public-read: previews + WP sideload fetch
+        // by URL. {@see \App\Models\ContentImage::disk()}.
+        'content_s3' => [
+            'driver' => 's3',
+            'key' => env('CONTENT_S3_KEY'),
+            'secret' => env('CONTENT_S3_SECRET'),
+            'region' => env('CONTENT_S3_REGION', 'nbg1'),
+            'bucket' => env('CONTENT_S3_BUCKET'),
+            'url' => env('CONTENT_S3_URL'),
+            'endpoint' => env('CONTENT_S3_ENDPOINT'),
+            'use_path_style_endpoint' => env('CONTENT_S3_PATH_STYLE', true),
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

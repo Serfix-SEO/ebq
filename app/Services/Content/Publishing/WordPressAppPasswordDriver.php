@@ -215,8 +215,9 @@ class WordPressAppPasswordDriver implements PublishDriver
         $images = $article->images()->where('status', \App\Models\ContentImage::STATUS_GENERATED)->get();
         foreach ($images as $image) {
             $localUrl = $image->url();
-            $bytes = $image->disk_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($image->disk_path)
-                ? \Illuminate\Support\Facades\Storage::disk('public')->get($image->disk_path)
+            $imgDisk = \Illuminate\Support\Facades\Storage::disk(\App\Models\ContentImage::disk());
+            $bytes = $image->disk_path && $imgDisk->exists($image->disk_path)
+                ? $imgDisk->get($image->disk_path)
                 : null;
             if ($bytes === null) {
                 continue;

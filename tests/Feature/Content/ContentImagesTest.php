@@ -32,6 +32,11 @@ class ContentImagesTest extends TestCase
             'services.ideogram.base_url' => 'https://api.ideogram.ai/v1',
             'services.ideogram.monthly_cap_usd' => 10,
         ]);
+        // The spend meter is a Redis counter — RefreshDatabase does NOT clear
+        // it, so the ->add() in the cap test would otherwise accumulate across
+        // runs and eventually push every run over the cap. Reset it per test.
+        \Illuminate\Support\Facades\Redis::connection()
+            ->del('ideogram:spend:'.now()->format('Y-m'));
     }
 
     private function readyArticle(): array
