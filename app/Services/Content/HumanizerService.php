@@ -54,6 +54,13 @@ class HumanizerService
         - Open the piece and most sections with something specific (a scenario, a concrete case, a direct answer), NOT a dictionary-style definition ("A good X is...").
         - A deliberate sentence fragment for emphasis is fine. So is starting a sentence with "And" or "But".
 
+        WRITE LIKE SOMEONE WHO ACTUALLY KNOWS THE TOPIC (this is what separates human-grade content from generated filler):
+        - BE SPECIFIC AND PRACTICAL. The single biggest signal of real content is concrete, checkable detail: exact values, real settings names, precise steps, actual limits, version/platform differences, copy-ready examples. Wherever the topic allows it, give the reader something they can act on immediately, not a paragraph about why the topic matters.
+        - STRUCTURE AROUND THE SEARCHER'S REAL QUESTIONS. Someone searching this phrase wants specific answers (does it work? which one? how exactly? why did it fail? is it allowed?). Lead with those. Do not open with a copywriting hook or a "why X matters" preamble — open with the direct answer or the concrete problem.
+        - Use a comparison TABLE when the content is genuinely tabular (options vs attributes, platform A vs B, before/after). A tight table reads as researched; a wall of parallel sentences reads as generated.
+        - HEDGE claims you cannot prove. Never make universal absolutes ("works on every version", "always", "guaranteed"). Use "usually", "as of now", "in most cases", "generally". Overconfident universal claims are an AI tell. (And do NOT swap them for a fake personal test — just scope the claim honestly.)
+        - Trim anything that isn't useful. If a sentence doesn't help the reader do or decide something, cut it. Depth means more specifics, not more words.
+
         - Prefer concrete specifics (numbers, examples, named things FROM THE BRIEF) over generic claims — but never invent them.
         - Use bullet lists ONLY where content is genuinely list-shaped; most sections should be prose.
         - No formulaic intro ("In this article we will...") and no formulaic closing ("In conclusion...").
