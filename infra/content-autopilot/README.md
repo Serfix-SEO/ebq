@@ -261,10 +261,14 @@ imagesEnabled()`). ASYNC — never blocks publish; every failure mode (images
 off, Ideogram unconfigured, `IdeogramSpendMeter` cap hit, generate/download
 error) degrades to "article without images".
 
-Flow per article: build a featured prompt (from the H1) + up to
-`maxInlineImages` inline prompts (one per non-boilerplate H2 — FAQ/takeaways
-skipped), all deterministic (no LLM call) with the plan's
-`image_style_prompt` appended. For each: `IdeogramClient::generate`
+Flow per article: an LLM art-direction call (`llmPrompts()`, stage pin
+`content.model.image_prompts`) writes a content-aware featured (hero) prompt +
+one per non-boilerplate H2 (FAQ/takeaways skipped), tailored to the article
+topic + `business_description` — niche-agnostic (photoreal for real-world
+businesses, illustration for digital/gaming/abstract; featured may carry a
+title-text overlay, inline stays text-free; no logos/watermarks/brands). Falls
+back to a deterministic prompt per item when the LLM is unavailable. Capped at
+`maxInlineImages` inline. For each: `IdeogramClient::generate`
 (num_images=1) → `download()` the short-lived URL → `Storage::disk('public')
 ->put('content/images/{ulid}.png')` → `ContentImage` row (status generated)
 → `IdeogramSpendMeter::add(cost)`. Then inject `<figure class="content-image">`
