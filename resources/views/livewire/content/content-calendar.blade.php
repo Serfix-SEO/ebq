@@ -21,8 +21,8 @@
             {{-- Progress rail --}}
             <div class="mb-8 px-2 sm:px-6">
                 <div class="relative">
-                    <div class="absolute inset-x-0 top-4 h-1 rounded-full bg-slate-200 dark:bg-slate-800"></div>
-                    <div class="absolute start-0 top-4 h-1 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-200" style="width: {{ $fillPct }}%"></div>
+                    <div class="absolute inset-x-0 h-1 rounded-full bg-slate-200 dark:bg-slate-800" style="top:0.875rem"></div>
+                    <div class="absolute start-0 h-1 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-200" style="top:0.875rem; width: {{ $fillPct }}%"></div>
                     <div class="relative flex items-start justify-between">
                         @foreach ($steps as $s => $label)
                             <button type="button" @if($s <= $maxUnlocked) wire:click="goToStep({{ $s }})" @endif
@@ -45,7 +45,7 @@
 
             <div class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-xl sm:p-8 dark:border-slate-800 dark:bg-slate-900">
                 {{-- decorative brand glow --}}
-                <div class="pointer-events-none absolute -top-10 end-0 h-56 w-56 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 opacity-10 blur-3xl"></div>
+                <div class="pointer-events-none absolute -top-10 end-0 h-56 w-56 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 opacity-20 blur-3xl"></div>
 
                 <div class="relative">
                 @error('plan')
