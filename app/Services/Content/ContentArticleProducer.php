@@ -318,8 +318,11 @@ class ContentArticleProducer
                 .'<a href="#'.e($m[2]).'">'.e($label).'</a></li>';
         }
 
+        // Title is a <div>, NOT a <p>: on-page SEO analyzers grab the first
+        // <p> as "the intro" — a TOC <p> here would hijack that slot and make
+        // every keyphrase-in-intro check read "In this article".
         return '<nav class="content-toc" aria-label="Table of contents">'
-            .'<p class="content-toc__title">In this article</p>'
+            .'<div class="content-toc__title">In this article</div>'
             .'<ul>'.implode('', $items).'</ul></nav>'."\n";
     }
 
@@ -512,12 +515,18 @@ class ContentArticleProducer
         if ($kw === '') {
             return [];
         }
+        // Rules mirror the Serfix WP plugin's on-page analyzer exactly (it
+        // grabs the first <p> as the intro, splits the body into thirds for
+        // distribution, and matches the EXACT phrase). Getting these right in
+        // the draft avoids revise rounds.
         $rules = [
-            "SEO / on-page rules for the focus keyphrase \"{$kw}\":",
-            "- Use the exact phrase \"{$kw}\" in the FIRST paragraph (the intro).",
-            "- Use the exact phrase \"{$kw}\" in at least one H2 or H3 subheading.",
-            "- Mention \"{$kw}\" naturally 3-6 times total, spread across the article (roughly 0.5-1.5% density) — never clustered or stuffed.",
-            '- The SEO/meta title should be 50-60 characters and lead with the focus keyphrase.',
+            "ON-PAGE SEO — focus keyphrase is \"{$kw}\". Follow these precisely:",
+            "- Put the EXACT phrase \"{$kw}\" in the very first sentence of the opening paragraph (before anything else).",
+            "- Repeat the EXACT phrase \"{$kw}\" in the MIDDLE third and again in the CLOSING third of the article — it must appear in the beginning, middle, AND end, not clustered in one place.",
+            "- Overall, use the EXACT phrase \"{$kw}\" about once every 150-200 words (aim for ~0.6-1% of the text), worded naturally — never stuffed.",
+            "- Use the EXACT phrase \"{$kw}\" (or a very close variant) in at least one H2 or H3 subheading.",
+            "- SEO/meta title: 50-60 characters, LEAD with \"{$kw}\", and include one CTR power word (e.g. Ultimate, Complete, Essential, Proven, Best, Easy, Guide) — a number (e.g. a year or count) helps too.",
+            '- Meta description: 120-158 characters and it must contain the focus keyphrase.',
         ];
 
         $additional = array_values(array_filter(array_map(
@@ -526,7 +535,7 @@ class ContentArticleProducer
         )));
         if ($additional !== []) {
             $list = '"'.implode('", "', array_slice($additional, 0, 8)).'"';
-            $rules[] = "- Additional keyphrases to work into the BODY at least once each (in a subheading, the intro, or a natural sentence — NOT in the title or H1, which are reserved for the focus keyphrase): {$list}.";
+            $rules[] = "- Each of these additional keyphrases must appear VERBATIM in the body at least once (a natural sentence is fine); put at least one or two of them inside an H2/H3 subheading. Do NOT reword them — use the exact phrase. Keep them out of the title and H1 (reserved for the focus keyphrase): {$list}.";
         }
 
         return $rules;

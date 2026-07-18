@@ -19,26 +19,28 @@ class ContentSeoScorerTest extends TestCase
     private function goodArticle(): array
     {
         $kw = 'pubg name generator';
-        $body = '<p>Try our pubg name generator to build a unique in-game identity in seconds. Short intro. '
-            .'This opening paragraph explains exactly what the tool does and why players use it, with concrete details.</p>';
+        $body = '<p>Try our pubg name generator to build a unique in-game identity in seconds. '
+            .'This opening paragraph explains exactly what the pubg name generator does and why players use it, with concrete details.</p>';
+        // Each section repeats the exact focus phrase so density (occ/words)
+        // clears 0.5% and it lands in every third of the body.
         $section = static fn (string $h, string $extra = '') => "<h2>{$h}</h2>"
-            .'<p>Real content sentence one goes here. Then a much longer explanatory sentence follows with specific examples and concrete numbers like 128 symbols to keep readers engaged.'.$extra.'</p>'
-            .'<p>'.str_repeat('More useful explanatory prose that expands the section with genuinely relevant detail players search for. ', 12).'</p>';
+            .'<p>A good pubg name generator gives you concrete examples and numbers like 128 symbols to keep readers engaged.'.$extra.'</p>'
+            .'<p>'.str_repeat('The pubg name generator expands this section with genuinely relevant detail players search for. ', 8).'</p>';
 
         $html = $body
             .$section('How the pubg name generator works', ' Internal link: <a href="/symbols">symbol library</a>.')
-            .$section('Choosing stylish fonts', ' See our <a href="/fonts">font styles</a> page.')
+            .$section('Choosing stylish fonts with the pubg name generator', ' See our <a href="/fonts">font styles</a> page.')
             .$section('Symbols that work in game', ' External source: <a href="https://en.wikipedia.org/wiki/Unicode">Unicode reference</a>.')
             .$section('Key takeaways for your new name')
-            .'<h2>FAQ: frequently asked questions</h2><p>Question answers go here with useful specifics for players. What matters is coverage.</p>';
+            .'<h2>FAQ: frequently asked questions</h2><p>The pubg name generator answers common player questions with useful specifics. What matters is coverage.</p>';
 
-        // Pad toward the 2000-word target.
-        $html .= '<h2>Advanced naming tactics</h2><p>'.str_repeat('Extra practical advice with varied phrasing and detail. ', 60).'</p>';
+        // Pad toward the 2000-word target while keeping the phrase present in the tail.
+        $html .= '<h2>Advanced naming tactics</h2><p>'.str_repeat('The pubg name generator offers extra practical advice with varied phrasing. ', 40).'</p>';
 
         return [
             'html' => $html,
-            'meta_title' => 'PUBG Name Generator: Stylish Names Fast',
-            'meta_description' => 'Use this pubg name generator to create stylish PUBG names with symbols and fonts. Copy unique in-game names in seconds, free and instant.',
+            'meta_title' => 'PUBG Name Generator: The Ultimate Guide to Stylish Names',
+            'meta_description' => 'Use this pubg name generator to create stylish PUBG names with symbols and fonts. Copy unique in-game names in seconds, totally free.',
             'h1' => 'PUBG Name Generator for Stylish Players',
             'slug' => 'pubg-name-generator-stylish',
             'context' => [

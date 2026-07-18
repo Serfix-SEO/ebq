@@ -80,8 +80,8 @@ class ContentSeoScorer
             'Shorten the H1 to 70 characters or fewer.');
         $add('kw_in_meta_description', 6, $kwIn($metaDescription) || $kwLoose($metaDescription),
             "Include the keyword \"{$keyword}\" (all its words) in the meta description.");
-        $add('meta_description_length', 4, mb_strlen($metaDescription) >= 120 && mb_strlen($metaDescription) <= 160,
-            'Rewrite the meta description to 120-160 characters (currently '.mb_strlen($metaDescription).').');
+        $add('meta_description_length', 4, mb_strlen($metaDescription) >= 120 && mb_strlen($metaDescription) <= 158,
+            'Rewrite the meta description to the 120-158 character sweet spot (currently '.mb_strlen($metaDescription).').');
         $add('kw_in_first_words', 6, $kwIn(implode(' ', array_slice(explode(' ', $text), 0, 100))),
             "Use the exact keyword \"{$keyword}\" within the first 100 words.");
         $add('kw_in_slug', 3, $slug !== '' && str_contains($slug, $this->slugify($keyword)),
@@ -124,14 +124,39 @@ class ContentSeoScorer
         }
 
         // ── Keyword usage ───────────────────────────────────────────────
-        if ($keyword !== '' && $wordCount > 0) {
-            $kwWords = max(1, str_word_count($keyword));
-            $occurrences = $this->countOccurrences($lowerText, $keyword);
-            $density = ($occurrences * $kwWords) / $wordCount * 100;
-            $add('kw_density', 6, $density >= 0.4 && $density <= 2.5,
-                $density < 0.4
-                    ? "Use the keyword \"{$keyword}\" more often (a few more natural mentions)."
-                    : "The keyword \"{$keyword}\" is over-used (density ".round($density, 1)."%); remove repetitions, use synonyms.");
+        // Density + distribution mirror the Serfix WP plugin's analyzer:
+        // density = exact-phrase occurrences / total words (NOT × phrase
+        // length), healthy band 0.5-3%; distribution splits the body into
+        // thirds and wants the phrase in each.
+        if ($keyword !== '' && $wordCount >= 100) {
+            $occurrences = substr_count($lowerText, $keyword);
+            $density = $occurrences / $wordCount * 100;
+            $add('kw_density', 6, $density >= 0.5 && $density <= 3.0,
+                $density < 0.5
+                    ? "Use the exact phrase \"{$keyword}\" more often — aim for ~0.5-1% density (about once per 150-200 words)."
+                    : "The keyword \"{$keyword}\" is over-used (density ".round($density, 1)."%); remove repetitions.");
+
+            if ($wordCount >= 300 && $occurrences >= 2) {
+                $words = preg_split('/\s+/', trim($lowerText)) ?: [];
+                $third = intdiv(count($words), 3);
+                $sections = [
+                    implode(' ', array_slice($words, 0, $third)),
+                    implode(' ', array_slice($words, $third, $third)),
+                    implode(' ', array_slice($words, 2 * $third)),
+                ];
+                $hits = count(array_filter($sections, fn ($s) => str_contains($s, $keyword)));
+                $add('kw_distribution', 8, $hits >= 3,
+                    "Spread the exact phrase \"{$keyword}\" across the whole article — it must appear in the intro, the middle, AND the conclusion (currently in {$hits} of 3 sections).");
+            }
+        }
+
+        // Focus keyphrase in the introduction — the plugin reads the FIRST
+        // <p> as the intro, so check that specifically (not just first 100
+        // words of stripped text).
+        if ($keyword !== '') {
+            $intro = mb_strtolower($this->firstParagraph($html));
+            $add('kw_in_intro', 10, $intro !== '' && str_contains($intro, $keyword),
+                "Put the exact phrase \"{$keyword}\" in the opening paragraph (the first <p>).");
         }
 
         $secondary = array_values(array_filter(array_map(
@@ -139,13 +164,15 @@ class ContentSeoScorer
             (array) ($context['secondary_keywords'] ?? [])
         )));
         if ($secondary !== []) {
-            $used = array_filter($secondary, fn ($k) => str_contains($lowerText, $k));
+            // Match the plugin's containsPhrase: the exact phrase with word
+            // boundaries (inflection-tolerant), not a loose substring.
+            $used = array_filter($secondary, fn ($k) => $this->containsPhrase($lowerText, $k));
             $coverage = count($used) / count($secondary);
             $missing = array_diff($secondary, $used);
             // Plugin's topical-coverage check wants every additional keyphrase
             // in the body; require ≥80% and name the stragglers for the reviser.
             $add('secondary_coverage', 6, $coverage >= 0.8,
-                'Every additional keyphrase should appear in the body. Missing: "'.implode('", "', array_slice($missing, 0, 8)).'".');
+                'Each additional keyphrase must appear VERBATIM in the body. Missing: "'.implode('", "', array_slice($missing, 0, 8)).'".');
         }
 
         // ── Linking ─────────────────────────────────────────────────────
@@ -234,6 +261,29 @@ class ContentSeoScorer
         $text = html_entity_decode(strip_tags($html));
 
         return trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+    }
+
+    /** The first <p>…</p>'s text — what on-page analyzers treat as the intro. */
+    private function firstParagraph(string $html): string
+    {
+        $html = preg_replace('/<!--[\s\S]*?-->/', ' ', $html) ?? $html;
+        if (preg_match('/<p[^>]*>([\s\S]*?)<\/p>/i', $html, $m)) {
+            return $this->toText($m[1]);
+        }
+
+        return mb_substr($this->toText($html), 0, 300);
+    }
+
+    /** Exact-phrase, word-boundary, inflection-tolerant match (mirrors the plugin). */
+    private function containsPhrase(string $haystackLower, string $phraseLower): bool
+    {
+        $phraseLower = trim($phraseLower);
+        if ($phraseLower === '') {
+            return false;
+        }
+        $re = '/(^|[^\p{L}])'.preg_quote($phraseLower, '/')."(s|es|ies|'s)?($|[^\\p{L}])/u";
+
+        return (bool) preg_match($re, $haystackLower);
     }
 
     /** @return list<string> */
