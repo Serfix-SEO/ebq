@@ -446,8 +446,13 @@ trait ContentWizard
         }
 
         $keywords = null;
+        $keywordStatus = [];
         if ($this->wizardStep === 6 && ($plan5 = $this->plan()) !== null) {
-            $keywords = app(ContentKeywordInsights::class)->get($plan5);
+            $kwSvc = app(ContentKeywordInsights::class);
+            $keywords = $kwSvc->get($plan5);
+            if ($keywords === null) {
+                $keywordStatus = $kwSvc->researchStatus($plan5);
+            }
         }
 
         return [
@@ -457,6 +462,7 @@ trait ContentWizard
             'needsReportGen' => $needsReportGen,
             'hasOverrides' => $hasOverrides,
             'keywords' => $keywords,
+            'keywordStatus' => $keywordStatus,
             'hasWebsite' => $this->website() !== null,
         ];
     }

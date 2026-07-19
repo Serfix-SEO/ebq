@@ -1120,8 +1120,13 @@ class ContentCalendar extends Component
                 $hasOverrides = ! empty($overrides['added']) || ! empty($overrides['removed']);
             }
             $keywords = null;
+            $keywordStatus = [];
             if ($this->wizardStep === 6 && ($plan5 = $this->plan()) !== null) {
-                $keywords = app(ContentKeywordInsights::class)->get($plan5);
+                $kwSvc = app(ContentKeywordInsights::class);
+                $keywords = $kwSvc->get($plan5);
+                if ($keywords === null) {
+                    $keywordStatus = $kwSvc->researchStatus($plan5);
+                }
             }
             $wizard = [
                 'draftTopics' => $this->wizardStep >= 7 ? $this->draftTopics() : collect(),
@@ -1130,6 +1135,7 @@ class ContentCalendar extends Component
                 'needsReportGen' => $needsReportGen,
                 'hasOverrides' => $hasOverrides,
                 'keywords' => $keywords,
+                'keywordStatus' => $keywordStatus,
                 'hasWebsite' => $this->website() !== null,
             ];
 

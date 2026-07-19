@@ -201,6 +201,42 @@ class ContentKeywordInsights
      *   partial: bool
      * }|null
      */
+    /**
+     * Live per-source research status for the step-6 loader (which domain we're
+     * analyzing right now). Returns [] once the digest is built.
+     *
+     * @return list<array{label:string, done:bool}>
+     */
+    public function researchStatus(ContentPlan $plan): array
+    {
+        if (Cache::has($this->insightsKey($plan))) {
+            return [];
+        }
+        $website = $plan->website;
+        $ownDomain = $website ? ($website->normalized_domain ?: $website->domain) : null;
+
+        $seed = $this->request($plan);
+        $ownSite = $this->siteRequest($this->ownDomainKey($plan));
+        $compSite = $this->siteRequest($this->competitorRequestKey($plan));
+
+        $status = [];
+        // The client's own research (seeds + own-domain crawl) as one line.
+        $status[] = [
+            'label' => $ownDomain ? __('Your site — :d', ['d' => $ownDomain]) : __('Your site'),
+            'done' => $this->settled($seed) && $this->settled($ownSite),
+        ];
+        // Competitor line (only once a competitor request exists).
+        if ($compSite !== null) {
+            $competitor = $this->topCompetitorDomain($plan, $website);
+            $status[] = [
+                'label' => $competitor ? __('Competitor — :d', ['d' => $competitor]) : __('Competitor'),
+                'done' => $this->settled($compSite),
+            ];
+        }
+
+        return $status;
+    }
+
     public function get(ContentPlan $plan): ?array
     {
         $cached = Cache::get($this->insightsKey($plan));

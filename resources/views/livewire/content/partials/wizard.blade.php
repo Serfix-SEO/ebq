@@ -552,9 +552,27 @@
                     </div>
 
                     @if ($kw === null)
-                        <div wire:poll.5s="refreshKeywordInsights" class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
-                            <svg class="h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('Researching live search data for your market…') }}</p>
+                        <div wire:poll.5s="refreshKeywordInsights" class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                            <svg class="mx-auto h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            <p class="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Researching live search data for your market…') }}</p>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('This is deep research and may take up to 4 minutes.') }}</p>
+
+                            @php $kwStatus = $wizard['keywordStatus'] ?? []; @endphp
+                            @if (! empty($kwStatus))
+                                <ul class="mx-auto mt-5 max-w-sm space-y-2 text-start">
+                                    @foreach ($kwStatus as $src)
+                                        <li class="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900" wire:key="kwsrc-{{ $loop->index }}">
+                                            @if ($src['done'])
+                                                <svg class="h-4 w-4 flex-none text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                            @else
+                                                <svg class="h-4 w-4 flex-none animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                            @endif
+                                            <span class="flex-1 truncate {{ $src['done'] ? 'text-slate-500 dark:text-slate-400' : 'font-medium text-slate-800 dark:text-slate-100' }}">{{ $src['label'] }}</span>
+                                            <span class="flex-none text-xs font-semibold {{ $src['done'] ? 'text-success' : 'text-orange-600 dark:text-orange-400' }}">{{ $src['done'] ? __('Done') : __('Analyzing…') }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
                         </div>
                     @else
                         {{-- "This is a live sample, not the whole picture" callout --}}
