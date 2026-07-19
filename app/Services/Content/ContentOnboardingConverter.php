@@ -161,6 +161,15 @@ class ContentOnboardingConverter
                 }
             }
 
+            // The public wizard IS the onboarding — a covered plan must go LIVE
+            // (like the dashboard's launch()), or the dashboard would treat the
+            // still-DRAFT plan as first-run and show the wizard again / the
+            // calendar would say "no content plan yet". Uncovered plans stay
+            // DRAFT until the user pays from Get started.
+            if ($covered) {
+                $plan->refresh()->update(['status' => ContentPlan::STATUS_ACTIVE]);
+            }
+
             // Research runs regardless; article GENERATION is gated by coverage
             // (blockReason) so an uncovered site simply can't generate until paid.
             PlanContentTopicsJob::dispatch($plan->id);

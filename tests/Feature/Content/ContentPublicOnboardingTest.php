@@ -88,6 +88,8 @@ class ContentPublicOnboardingTest extends TestCase
         // Plan persisted from the wizard + research dispatched.
         $plan = ContentPlan::query()->where('website_id', $website->id)->first();
         $this->assertSame(['Tables', 'Chairs'], $plan->offerings['sell']);
+        // Covered → plan goes LIVE so the dashboard shows the calendar, not the wizard.
+        $this->assertSame(ContentPlan::STATUS_ACTIVE, $plan->status);
         Queue::assertPushed(PlanContentTopicsJob::class);
 
         // Session marked converted.
