@@ -36,6 +36,7 @@ Route::view('/features', 'features')->name('features');
 Route::view('/wordpress-plugin', 'wordpress-plugin')->name('wordpress-plugin');
 Route::view('/pricing', 'pricing')->name('pricing');
 Route::view('/trust-score', 'trust-score')->name('trust-score');
+Route::view('/content-autopilot', 'content-landing')->name('content.landing');
 Route::view('/website-revamp', 'website-revamp')->name('website-revamp');
 Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
