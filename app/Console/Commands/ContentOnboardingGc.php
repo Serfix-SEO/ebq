@@ -30,16 +30,23 @@ class ContentOnboardingGc extends Command
             ->get();
 
         $sites = 0;
+        $users = 0;
         foreach ($stale as $session) {
-            $website = $session->website; // provisional site under the system user
+            $website = $session->website; // provisional site under a throwaway lead user
+            $leadUser = $website?->user;
             $session->delete();
-            if ($website !== null && $website->user?->is_system) {
+            if ($website !== null && $leadUser?->is_system) {
                 $website->delete();
                 $sites++;
+                // Remove the now-orphaned per-session lead user too.
+                if ($leadUser->websites()->count() === 0) {
+                    $leadUser->delete();
+                    $users++;
+                }
             }
         }
 
-        $this->info("content-onboarding GC: removed {$stale->count()} sessions, {$sites} provisional sites.");
+        $this->info("content-onboarding GC: removed {$stale->count()} sessions, {$sites} provisional sites, {$users} lead users.");
 
         return self::SUCCESS;
     }

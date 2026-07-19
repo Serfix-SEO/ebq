@@ -23,19 +23,25 @@ class ContentOnboardingConverter
     {
     }
 
-    /** The internal user that owns provisional/lead websites (never billed/cleaned). */
-    public function systemUser(): User
+    /**
+     * A FRESH throwaway system user that owns ONE provisional onboarding site.
+     * Each anonymous session gets its own — so two visitors onboarding the same
+     * domain get isolated website/plan rows (websites carry a UNIQUE
+     * (user_id, domain); a shared owner would collide AND let one visitor's
+     * convert re-parent another's site). Never billed/cleaned; GC removes it with
+     * its site, and convert() deletes it once the real site is re-parented.
+     */
+    public function newLeadUser(): User
     {
-        $user = User::query()->firstOrNew(['email' => 'content-leads@system.serfix']);
-        if (! $user->exists) {
-            // is_system is intentionally NOT mass-assignable — set it explicitly.
-            $user->forceFill([
-                'name' => 'Content Leads',
-                'password' => Str::password(32),
-                'is_system' => true,
-                'email_verified_at' => now(),
-            ])->save();
-        }
+        $user = new User;
+        // is_system is intentionally NOT mass-assignable — set it explicitly.
+        $user->forceFill([
+            'name' => 'Content Lead',
+            'email' => 'lead+'.Str::ulid()->toBase32().'@leads.serfix.internal',
+            'password' => Str::password(32),
+            'is_system' => true,
+            'email_verified_at' => now(),
+        ])->save();
 
         return $user;
     }
@@ -48,20 +54,18 @@ class ContentOnboardingConverter
      */
     public function begin(string $domain, ?string $ip): array
     {
-        // All provisional sites live under ONE system user, and websites carry a
-        // UNIQUE (user_id, domain). So a repeat onboarding of the same domain must
-        // REUSE the existing provisional site, not insert a duplicate. (Already-
-        // converted sites belong to the real user now, so they never match here.)
-        $website = Website::query()->firstOrCreate(
-            ['user_id' => $this->systemUser()->id, 'domain' => $domain],
-            [
-                // Non-null string columns with no DB default (mirror WebsiteAttachService).
-                'ga_property_id' => '',
-                'ga_google_account_id' => null,
-                'gsc_site_url' => '',
-                'gsc_google_account_id' => null,
-            ]
-        );
+        // Each session owns its site via a fresh throwaway user → same domain can
+        // be onboarded by many visitors independently (shared crawl still dedupes
+        // by normalized_domain, so only the Website rows differ, not the crawl).
+        $website = Website::query()->create([
+            'user_id' => $this->newLeadUser()->id,
+            'domain' => $domain,
+            // Non-null string columns with no DB default (mirror WebsiteAttachService).
+            'ga_property_id' => '',
+            'ga_google_account_id' => null,
+            'gsc_site_url' => '',
+            'gsc_google_account_id' => null,
+        ]);
         app(CrawlSiteBootstrapper::class)->subscribeWebsite($website);
 
         $session = ContentOnboardingSession::query()->create([
@@ -86,6 +90,8 @@ class ContentOnboardingConverter
     {
         return DB::transaction(function () use ($session, $user, $profile): Website {
             $provisional = $session->website;
+            // The throwaway per-session owner; deleted once the site moves off it.
+            $leadUser = $provisional?->user;
 
             // If the user already owns this domain, move the plan onto their
             // existing website and drop the provisional site (keeps crawl
@@ -100,6 +106,13 @@ class ContentOnboardingConverter
             } else {
                 $provisional->forceFill(['user_id' => $user->id])->save();
                 $website = $provisional;
+            }
+
+            // Retire the throwaway lead user now that its site belongs to a real
+            // account (never touch a non-system user or one that still owns sites).
+            if ($leadUser !== null && $leadUser->is_system
+                && $leadUser->id !== $user->id && $leadUser->websites()->count() === 0) {
+                $leadUser->delete();
             }
 
             // Persist profile as a DRAFT plan (covered by the trial below).

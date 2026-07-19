@@ -92,17 +92,23 @@ class ContentPublicOnboardingTest extends TestCase
 
         // Session marked converted.
         $this->assertNotNull(ContentOnboardingSession::query()->first()->converted_at);
+
+        // The throwaway per-session lead user is retired once the site moves.
+        $this->assertSame(0, User::query()->where('is_system', true)->count());
     }
 
-    public function test_repeat_domain_reuses_provisional_site(): void
+    public function test_repeat_domain_creates_isolated_sites_per_session(): void
     {
         Queue::fake();
 
         $this->post(route('content.onboarding.begin'), ['domain' => 'dup.com'])->assertRedirect();
         $this->post(route('content.onboarding.begin'), ['domain' => 'dup.com'])->assertRedirect();
 
-        // No UNIQUE (user_id, domain) crash; the second visit reuses the site.
-        $this->assertSame(1, Website::query()->where('domain', 'dup.com')->count());
+        // Many visitors can onboard the SAME domain: each gets its own throwaway
+        // owner + site (no shared-owner UNIQUE crash, no cross-visitor hijack).
+        $this->assertSame(2, Website::query()->where('domain', 'dup.com')->count());
+        $this->assertSame(2, ContentOnboardingSession::query()->count());
+        $this->assertSame(2, User::query()->where('is_system', true)->count());
     }
 
     public function test_duplicate_email_is_rejected(): void
