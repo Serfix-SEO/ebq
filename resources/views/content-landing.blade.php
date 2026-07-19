@@ -3,8 +3,8 @@
     $recaptcha = \App\Support\Recaptcha::isEnabled();
 @endphp
 <x-marketing.page
-    title="Content Autopilot — SEO articles written & published for you — Serfix"
-    description="Content Autopilot researches, writes, optimizes, illustrates and publishes an expert SEO article for your site — on autopilot. 5-day free trial, no card."
+    title="Auto SEO — Automate Your Content, Starting From $29/m"
+    description="Dominate competitors with research-backed content automation & auto-publishing. Boost traffic up to 150% in 90 days. Start from just $29/m."
     active="content"
 >
     {{-- ── Hero ──────────────────────────────────────────────── --}}
