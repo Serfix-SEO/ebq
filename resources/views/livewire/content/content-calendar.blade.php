@@ -1069,7 +1069,9 @@
                                     $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready'], true);
                                 @endphp
                                 <div wire:key="cell-{{ $topic->id }}"
-                                     @if($canDrag) draggable="true" x-on:dragstart="drag.id = '{{ $topic->id }}'" x-on:dragend="drag.id = null" @endif
+                                     @if($canDrag) draggable="true"
+                                        x-on:dragstart="drag.id = '{{ $topic->id }}'; $event.dataTransfer.setData('text/plain', '{{ $topic->id }}'); $event.dataTransfer.effectAllowed = 'move'"
+                                        x-on:dragend="drag.id = null" @endif
                                      class="mb-1 rounded-lg border p-1.5 {{ $cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800' }} {{ $canDrag ? 'cursor-grab active:cursor-grabbing' : '' }}">
                                     @if ($topic->currentArticle || $cellInFlight)
                                         <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80">
@@ -1093,6 +1095,13 @@
                                             </button>
                                         @endif
                                     </div>
+                                    @if ($canDrag)
+                                        {{-- Tap-to-reschedule: works on touch (where drag doesn't) and desktop. --}}
+                                        <input type="date" min="{{ now()->toDateString() }}" value="{{ $topic->scheduled_for?->toDateString() }}"
+                                               wire:change="reschedule('{{ $topic->id }}', $event.target.value)" draggable="false"
+                                               class="mt-1 w-full rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-600 focus:border-orange-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                               aria-label="{{ __('Change date') }}" />
+                                    @endif
                                 </div>
                             @endforeach
                         </div>
@@ -1141,16 +1150,15 @@
                                 <button wire:click="approve('{{ $topic->id }}')" class="text-sm font-medium text-success hover:brightness-90">{{ __('Approve') }}</button>
                             @endif
                             @if (in_array($topic->status, ['suggested', 'approved', 'ready'], true))
-                                {{-- Clear "change date" control (drag-to-date only exists in the grid view). --}}
-                                <label x-data
-                                    @click.prevent="$refs.dt.showPicker ? $refs.dt.showPicker() : $refs.dt.focus()"
-                                    class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:border-orange-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" title="{{ __('Change date') }}">
+                                {{-- Plain native date input: taps open the OS date picker on
+                                     mobile and desktop alike (HTML5 drag doesn't work on touch,
+                                     so this is the reliable reschedule path). --}}
+                                <span class="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                                     <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
-                                    <span class="font-medium">{{ $topic->scheduled_for ? $topic->scheduled_for->translatedFormat('M j') : __('Set date') }}</span>
-                                    <input x-ref="dt" type="date" min="{{ now()->toDateString() }}" value="{{ $topic->scheduled_for?->toDateString() }}"
+                                    <input type="date" min="{{ now()->toDateString() }}" value="{{ $topic->scheduled_for?->toDateString() }}"
                                         wire:change="reschedule('{{ $topic->id }}', $event.target.value)"
-                                        class="sr-only" aria-label="{{ __('Change date') }}" />
-                                </label>
+                                        class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:border-orange-300 focus:border-orange-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200" aria-label="{{ __('Change date') }}" />
+                                </span>
                                 <button wire:click="skip('{{ $topic->id }}')" class="text-sm text-slate-400 hover:text-slate-600">{{ __('Skip') }}</button>
                             @endif
                         </div>
