@@ -401,4 +401,33 @@ class ContentPagesTest extends TestCase
             ->assertDontSee('alert(1)', false)
             ->assertDontSee('evil()', false);
     }
+    public function test_write_now_dispatches_generation_and_opens_progress(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
+        $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id, 'status' => ContentTopic::STATUS_APPROVED, 'keyword_volume' => 4000,
+        ]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class)
+            ->call('writeNow', $topic->id)
+            ->assertSet('progressTopicId', $topic->id);
+
+        Queue::assertPushed(\App\Jobs\ProduceContentArticleJob::class);
+        $this->assertNotNull(\Illuminate\Support\Facades\Cache::get('content:gen-start:'.$topic->id));
+    }
+
+    public function test_fair_monthly_visits_is_a_conservative_band(): void
+    {
+        $t = new ContentTopic(['keyword_volume' => 10000]);
+        $band = ContentCalendar::fairMonthlyVisits($t);
+        $this->assertNotNull($band);
+        // Well below the ~28% a #1 ranking gets — reads as achievable.
+        $this->assertSame(150, $band['low']);   // 1.5%
+        $this->assertSame(500, $band['high']);  // 5%
+        $this->assertNull(ContentCalendar::fairMonthlyVisits(new ContentTopic(['keyword_volume' => 0])));
+    }
+
 }

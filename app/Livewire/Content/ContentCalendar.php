@@ -81,6 +81,9 @@ class ContentCalendar extends Component
     public string $newTitle = '';
     public string $newKeyword = '';
 
+    /** Topic whose live generation-progress panel is open (null = closed). */
+    public ?string $progressTopicId = null;
+
     /** Article-structure toggles surfaced in the wizard (step 3). */
     public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true];
 
@@ -642,6 +645,153 @@ class ContentCalendar extends Component
         }
     }
 
+    /**
+     * Client-triggered "write this now": dispatch the produce pipeline for a
+     * not-yet-written topic and open the live progress panel. If it's already
+     * generating, just open the panel.
+     */
+    public function writeNow(string $topicId): void
+    {
+        $topic = $this->topicOrFail($topicId);
+        if ($topic === null) {
+            return;
+        }
+        if (in_array($topic->status, ContentTopic::IN_FLIGHT, true)) {
+            $this->progressTopicId = $topic->id;
+
+            return;
+        }
+        if (! in_array($topic->status, [
+            ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED, ContentTopic::STATUS_FAILED,
+        ], true)) {
+            return; // ready/scheduled/published — nothing to generate
+        }
+        $topic->forceFill([
+            'status' => ContentTopic::STATUS_APPROVED,
+            'last_error' => null,
+            'stage_started_at' => now(),
+        ])->save();
+        // Record the overall start so the progress panel can show elapsed/ETA
+        // without a schema change (1h TTL comfortably covers a produce run).
+        \Illuminate\Support\Facades\Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
+        ProduceContentArticleJob::dispatch($topic->id);
+        $this->progressTopicId = $topic->id;
+    }
+
+    /** Open the progress panel for an already-in-flight topic. */
+    public function openProgress(string $topicId): void
+    {
+        $topic = $this->topicOrFail($topicId);
+        if ($topic !== null) {
+            $this->progressTopicId = $topic->id;
+        }
+    }
+
+    public function closeProgress(): void
+    {
+        $this->progressTopicId = null;
+    }
+
+    /**
+     * Live progress payload for the open topic. Ordered stages with the
+     * current one flagged, elapsed seconds, and a fair ETA. Returns null when
+     * nothing is open. Pure read — safe to call every poll.
+     *
+     * @return array{topic:ContentTopic, steps:list<array{key:string,label:string,state:string}>, elapsed:int, etaText:string, done:bool, failed:bool}|null
+     */
+    private function progressPayload(): ?array
+    {
+        if ($this->progressTopicId === null) {
+            return null;
+        }
+        $topic = $this->topicOrFail($this->progressTopicId);
+        if ($topic === null) {
+            return null;
+        }
+
+        // Map the fine-grained pipeline statuses onto four client-facing steps.
+        $stageOf = [
+            ContentTopic::STATUS_APPROVED => 'research',
+            ContentTopic::STATUS_RESEARCHING => 'research',
+            ContentTopic::STATUS_WRITING => 'write',
+            ContentTopic::STATUS_SCORING => 'polish',
+            ContentTopic::STATUS_REVISING => 'polish',
+            ContentTopic::STATUS_READY => 'done',
+            ContentTopic::STATUS_SCHEDULED => 'done',
+            ContentTopic::STATUS_PUBLISHING => 'done',
+            ContentTopic::STATUS_PUBLISHED => 'done',
+        ];
+        $order = ['research', 'write', 'polish', 'images', 'done'];
+        $labels = [
+            'research' => __('Researching your topic'),
+            'write' => __('Writing the first draft'),
+            'polish' => __('Optimizing for SEO & readability'),
+            'images' => __('Creating images'),
+            'done' => __('Ready for review'),
+        ];
+        $failed = $topic->status === ContentTopic::STATUS_FAILED;
+        $done = in_array($topic->status, [
+            ContentTopic::STATUS_READY, ContentTopic::STATUS_SCHEDULED,
+            ContentTopic::STATUS_PUBLISHING, ContentTopic::STATUS_PUBLISHED,
+        ], true);
+        // Images generate asynchronously after READY; treat "done" as having
+        // reached the images step (they finish shortly after).
+        $currentKey = $done ? 'done' : ($stageOf[$topic->status] ?? 'research');
+        $currentIdx = array_search($currentKey, $order, true) ?: 0;
+
+        $steps = [];
+        foreach ($order as $i => $key) {
+            $steps[] = [
+                'key' => $key,
+                'label' => $labels[$key],
+                'state' => $failed ? ($i === 0 ? 'failed' : 'pending')
+                    : ($i < $currentIdx ? 'done' : ($i === $currentIdx ? ($done ? 'done' : 'active') : 'pending')),
+            ];
+        }
+
+        $start = (int) \Illuminate\Support\Facades\Cache::get('content:gen-start:'.$topic->id, 0);
+        $elapsed = $start > 0 ? max(0, now()->timestamp - $start) : 0;
+        // A produce run is ~2-3 minutes; give an honest, softening ETA.
+        $etaSeconds = max(0, 165 - $elapsed);
+        $etaText = $done ? __('Done')
+            : ($failed ? __('Stopped')
+                : ($etaSeconds > 90 ? __('about 2–3 minutes left')
+                    : ($etaSeconds > 30 ? __('about a minute left')
+                        : __('almost there…'))));
+
+        return [
+            'topic' => $topic,
+            'steps' => $steps,
+            'elapsed' => $elapsed,
+            'etaText' => $etaText,
+            'done' => $done,
+            'failed' => $failed,
+        ];
+    }
+
+    /**
+     * A FAIR (deliberately conservative) monthly-visits estimate for a topic,
+     * from data we already have (keyword_volume) — no extra API cost. This is
+     * NOT the best case: it models a realistic mid-page-1 outcome, not a #1
+     * ranking. Returns a {low, high} band, or null when we have no volume.
+     *
+     * @return array{low:int, high:int}|null
+     */
+    public static function fairMonthlyVisits(ContentTopic $topic): ?array
+    {
+        $volume = (int) ($topic->keyword_volume ?? 0);
+        if ($volume <= 0) {
+            return null;
+        }
+        // Conservative CTR band for a new article that settles mid-page-1 over
+        // time: ~1.5% (pos ~10) to ~5% (pos ~5). Well below the ~28% a #1 gets,
+        // so the number reads as achievable, not hype.
+        $low = (int) round($volume * 0.015);
+        $high = (int) round($volume * 0.05);
+
+        return ['low' => max(1, $low), 'high' => max($low + 1, $high)];
+    }
+
     public function reschedule(string $topicId, string $date): void
     {
         $topic = $this->topicOrFail($topicId);
@@ -682,6 +832,31 @@ class ContentCalendar extends Component
         ]);
 
         $this->reset('newTitle', 'newKeyword', 'showAddTopic');
+    }
+
+    /** Create a topic from the inline form AND start writing it immediately. */
+    public function addAndWriteTopic(): void
+    {
+        $plan = $this->activePlan();
+        if ($plan === null) {
+            return;
+        }
+        $this->validate([
+            'newTitle' => 'required|string|min:8|max:300',
+            'newKeyword' => 'required|string|min:2|max:200',
+        ], [], ['newTitle' => __('title'), 'newKeyword' => __('keyword')]);
+
+        $topic = $plan->topics()->create([
+            'website_id' => $this->websiteId,
+            'title' => $this->newTitle,
+            'target_keyword' => mb_strtolower(trim($this->newKeyword)),
+            'source' => 'manual',
+            'status' => ContentTopic::STATUS_APPROVED,
+            'scheduled_for' => now()->startOfDay(),
+        ]);
+
+        $this->reset('newTitle', 'newKeyword', 'showAddTopic');
+        $this->writeNow($topic->id);
     }
 
     public function pauseOrResume(): void
@@ -970,6 +1145,7 @@ class ContentCalendar extends Component
             'stats' => $this->overviewStats($all),
             'audience' => $this->audienceSearches($all),
             'clusters' => $this->strategyClusters($all),
+            'progress' => $this->progressPayload(),
         ]);
     }
 
@@ -978,6 +1154,7 @@ class ContentCalendar extends Component
     {
         return [
             'settingsView' => false,
+            'progress' => null,
             'plan' => null,
             'topics' => collect(),
             'topicsByDate' => collect(),

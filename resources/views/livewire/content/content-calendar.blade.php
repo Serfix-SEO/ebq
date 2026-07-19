@@ -1029,7 +1029,11 @@
                 </div>
                 <div class="mt-3 flex justify-end gap-2">
                     <button wire:click="$toggle('showAddTopic')" class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">{{ __('Cancel') }}</button>
-                    <button wire:click="addTopic" class="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700">{{ __('Add') }}</button>
+                    <button wire:click="addTopic" class="rounded-lg border border-orange-300 px-3 py-1.5 text-sm font-semibold text-orange-700 hover:bg-orange-50 dark:border-orange-900 dark:text-orange-300">{{ __('Add to calendar') }}</button>
+                    <button wire:click="addAndWriteTopic" wire:loading.attr="disabled" wire:target="addAndWriteTopic" class="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70">
+                        <svg wire:loading wire:target="addAndWriteTopic" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                        {{ __('Write it now') }}
+                    </button>
                 </div>
             </div>
         @endif
@@ -1047,13 +1051,27 @@
                         <div class="border-b border-e border-slate-100 p-1.5 align-top dark:border-slate-800 {{ $day->format('Y-m') !== $month ? 'bg-slate-50 dark:bg-slate-950' : '' }}" style="min-height:6.5rem">
                             <div class="mb-1 text-end text-xs {{ $day->isToday() ? 'font-bold text-orange-600' : 'text-slate-400' }}">{{ $day->day }}</div>
                             @foreach ($dayTopics as $topic)
-                                @php $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status); @endphp
-                                <a href="{{ $topic->currentArticle ? route('content.review', $topic->id) : '#' }}"
-                                   @if(!$topic->currentArticle) onclick="return false" @endif
-                                   class="mb-1 block rounded-lg border border-slate-200 bg-white p-1.5 text-start hover:border-orange-300 dark:border-slate-700 dark:bg-slate-800">
-                                    <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
-                                    <span class="mt-1 inline-block rounded-full bg-{{ $p['color'] }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $p['color'] }}-700">{{ $p['label'] }}</span>
-                                </a>
+                                @php
+                                    $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status);
+                                    $cellInFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true);
+                                @endphp
+                                @if ($cellInFlight)
+                                    <button wire:click="openProgress('{{ $topic->id }}')"
+                                       class="mb-1 block w-full rounded-lg border border-orange-200 bg-orange-50 p-1.5 text-start hover:border-orange-300 dark:border-orange-900 dark:bg-orange-950">
+                                        <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
+                                        <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-{{ $p['color'] }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $p['color'] }}-700">
+                                            <svg class="h-2.5 w-2.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                            {{ $p['label'] }}
+                                        </span>
+                                    </button>
+                                @else
+                                    <a href="{{ $topic->currentArticle ? route('content.review', $topic->id) : '#' }}"
+                                       @if(!$topic->currentArticle) onclick="return false" @endif
+                                       class="mb-1 block rounded-lg border border-slate-200 bg-white p-1.5 text-start hover:border-orange-300 dark:border-slate-700 dark:bg-slate-800">
+                                        <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
+                                        <span class="mt-1 inline-block rounded-full bg-{{ $p['color'] }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $p['color'] }}-700">{{ $p['label'] }}</span>
+                                    </a>
+                                @endif
                             @endforeach
                         </div>
                     @endforeach
@@ -1066,19 +1084,39 @@
                         @php $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status); @endphp
                         <div class="flex flex-wrap items-center gap-3 px-4 py-3">
                             <div class="w-20 shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $topic->scheduled_for?->translatedFormat('M j') }}</div>
+                            @php
+                                $traffic = \App\Livewire\Content\ContentCalendar::fairMonthlyVisits($topic);
+                                $inFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true);
+                            @endphp
                             <div class="min-w-0 flex-1">
                                 <div class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</div>
-                                <div class="text-xs text-slate-500 dark:text-slate-400">{{ $topic->target_keyword }}@if($topic->keyword_volume) · {{ number_format($topic->keyword_volume) }} {{ __('searches/mo') }}@endif</div>
+                                <div class="flex flex-wrap items-center gap-x-2 text-xs text-slate-500 dark:text-slate-400">
+                                    <span>{{ $topic->target_keyword }}@if($topic->keyword_volume) · {{ number_format($topic->keyword_volume) }} {{ __('searches/mo') }}@endif</span>
+                                    @if ($traffic)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-px font-semibold text-success" title="{{ __('A fair, conservative estimate once this ranks — not a best case.') }}">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.256-1.011M21.75 6.75v5.25M21.75 6.75h-5.25"/></svg>
+                                            ~{{ number_format($traffic['low']) }}–{{ number_format($traffic['high']) }} {{ __('visits/mo') }}
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
                             <span class="rounded-full bg-{{ $p['color'] }}-100 px-2 py-0.5 text-xs font-semibold text-{{ $p['color'] }}-700">{{ $p['label'] }}</span>
-                            @if ($topic->currentArticle)
+                            @if ($inFlight)
+                                <button wire:click="openProgress('{{ $topic->id }}')" class="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700">
+                                    <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                    {{ __('Writing… view progress') }}
+                                </button>
+                            @elseif ($topic->currentArticle)
                                 <a href="{{ route('content.review', $topic->id) }}" class="text-sm font-medium text-orange-600 hover:text-orange-700">{{ __('Review') }}</a>
+                            @endif
+                            @if (! $inFlight && in_array($topic->status, ['suggested', 'approved', 'failed'], true))
+                                <button wire:click="writeNow('{{ $topic->id }}')" class="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-orange-700">
+                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+                                    {{ __('Write now') }}
+                                </button>
                             @endif
                             @if ($topic->status === \App\Models\ContentTopic::STATUS_SUGGESTED)
                                 <button wire:click="approve('{{ $topic->id }}')" class="text-sm font-medium text-success hover:brightness-90">{{ __('Approve') }}</button>
-                            @endif
-                            @if ($topic->status === \App\Models\ContentTopic::STATUS_FAILED)
-                                <button wire:click="retry('{{ $topic->id }}')" class="text-sm font-medium text-orange-600 hover:text-orange-700">{{ __('Try again') }}</button>
                             @endif
                             @if (in_array($topic->status, ['suggested', 'approved', 'ready'], true))
                                 <input type="date" min="{{ now()->addDay()->toDateString() }}" value="{{ $topic->scheduled_for?->toDateString() }}"
@@ -1168,6 +1206,71 @@
                         <text x="{{ $cx }}" y="{{ $cy - 1 }}" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">{{ $siteLabel }}</text>
                         <text x="{{ $cx }}" y="{{ $cy + 14 }}" font-size="9" fill="#fff" text-anchor="middle" opacity="0.85">{{ __('your content') }}</text>
                     </svg>
+                </div>
+            </div>
+        @endif
+
+        {{-- ── Live generation progress modal ───────────────────────── --}}
+        @if ($progress)
+            <div class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 backdrop-blur-sm sm:items-center"
+                 @if (! $progress['done'] && ! $progress['failed']) wire:poll.3s @endif
+                 x-data @keydown.escape.window="$wire.closeProgress()">
+                <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900" @click.outside="$wire.closeProgress()">
+                    {{-- header --}}
+                    <div class="flex items-start justify-between gap-3 border-b border-slate-100 p-5 dark:border-slate-800">
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
+                                {{ $progress['done'] ? __('Article ready') : ($progress['failed'] ? __('Needs attention') : __('Writing your article')) }}
+                            </p>
+                            <h3 class="mt-0.5 truncate text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $progress['topic']->title }}</h3>
+                        </div>
+                        <button type="button" wire:click="closeProgress" class="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800" aria-label="{{ __('Close') }}">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    {{-- steps --}}
+                    <div class="space-y-1 p-5">
+                        @foreach ($progress['steps'] as $step)
+                            <div class="flex items-center gap-3 rounded-xl px-3 py-2.5 {{ $step['state'] === 'active' ? 'bg-orange-50 dark:bg-orange-950/40' : '' }}">
+                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full
+                                    {{ $step['state'] === 'done' ? 'bg-success text-white'
+                                       : ($step['state'] === 'active' ? 'bg-orange-600 text-white'
+                                       : ($step['state'] === 'failed' ? 'bg-error text-white' : 'bg-slate-100 text-slate-400 dark:bg-slate-800')) }}">
+                                    @if ($step['state'] === 'done')
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                    @elseif ($step['state'] === 'active')
+                                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                    @elseif ($step['state'] === 'failed')
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    @else
+                                        <span class="h-1.5 w-1.5 rounded-full bg-current"></span>
+                                    @endif
+                                </span>
+                                <span class="flex-1 text-sm font-medium {{ $step['state'] === 'pending' ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100' }}">{{ $step['label'] }}</span>
+                                @if ($step['state'] === 'active')
+                                    <span class="text-xs font-semibold text-orange-600">{{ __('in progress') }}</span>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+
+                    {{-- footer --}}
+                    <div class="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                        @if ($progress['done'])
+                            <span class="text-sm font-semibold text-success">{{ __('All done — ready for your review.') }}</span>
+                            <a href="{{ route('content.review', $progress['topic']->id) }}" class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700">{{ __('Review article') }}</a>
+                        @elseif ($progress['failed'])
+                            <span class="text-sm text-slate-500 dark:text-slate-400">{{ __('Generation stopped. You can try again.') }}</span>
+                            <button wire:click="writeNow('{{ $progress['topic']->id }}')" class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700">{{ __('Try again') }}</button>
+                        @else
+                            <span class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                                <svg class="h-4 w-4 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                {{ $progress['etaText'] }}
+                            </span>
+                            <button wire:click="closeProgress" class="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400">{{ __('Keep working — I\'ll check back') }}</button>
+                        @endif
+                    </div>
                 </div>
             </div>
         @endif
