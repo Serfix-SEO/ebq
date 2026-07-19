@@ -67,6 +67,7 @@ class TrialCleanup extends Command
 
         $candidates = User::query()
             ->where('is_admin', false)
+            ->where('is_system', false) // the content-leads system user is never cleaned
             ->has('websites') // owns nothing => nothing to warn about or delete
             ->where('created_at', '<=', $cutoff)
             ->where(fn ($q) => $q->whereNull('current_plan_slug')->orWhere('current_plan_slug', User::TIER_TRIAL))
@@ -79,6 +80,13 @@ class TrialCleanup extends Command
         foreach ($candidates as $user) {
             // Re-check the full rule (includes the live subscription check).
             if (! TrialStatus::isExpired($user)) {
+                continue;
+            }
+
+            // Content subscribers/trialists are EXEMPT — their websites feed the
+            // content pipeline and must never be deleted by the dashboard trial
+            // cleanup, even though their dashboard trial has lapsed.
+            if (app(\App\Services\Content\ContentEntitlements::class)->hasContentAccess($user)) {
                 continue;
             }
 

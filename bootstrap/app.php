@@ -54,6 +54,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // Expired-trial lockout: confines trial-expired users to the
             // billing surface (no-op for guests/admins/subscribers/comped).
             \App\Http\Middleware\EnsureTrialNotExpired::class,
+            // Content-only users: teaser the dashboard reports/crawl surfaces
+            // (they keep full Content Autopilot). No-op for everyone else.
+            \App\Http\Middleware\EnsureDashboardAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -96,6 +96,14 @@ class TrialStatus
      */
     public static function isLockedOut(User $user): bool
     {
+        // Content-product subscribers/trialists are NEVER locked out of the app
+        // by the DASHBOARD trial — they get their content features plus teasered
+        // dashboard reports (see EnsureDashboardAccess). isExpired stays true for
+        // them, which is exactly the flag the teaser layer keys on.
+        if (app(\App\Services\Content\ContentEntitlements::class)->hasContentAccess($user)) {
+            return false;
+        }
+
         return self::isExpired($user) && ! self::isTeamMember($user);
     }
 

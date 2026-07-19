@@ -28,6 +28,10 @@ class EnsureTrialNotExpired
     private const ALLOWED_ROUTE_PREFIXES = [
         'billing.',
         'cashier.',
+        // The content product is bought separately — a lapsed dashboard user
+        // must be able to reach Get started + content checkout to buy it. The
+        // content routes carry their own EnsureContentAccess gate.
+        'content.',
     ];
 
     private const ALLOWED_ROUTES = [

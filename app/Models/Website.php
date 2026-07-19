@@ -729,6 +729,15 @@ class Website extends Model
     public function crawlPageCap(): int
     {
         $hardCap = max(1, (int) config('crawler.max_pages_per_site', 20000));
+
+        // Content-only users (content access, dashboard trial lapsed) get a
+        // SMALL internal crawl — just enough to feed the content pipeline
+        // (site profile, internal-link validation, cannibalization, keyword
+        // seeds) — while their dashboard reports/crawl UI are teasered.
+        if ($this->owner?->isContentOnly()) {
+            return max(1, min($hardCap, \App\Support\ContentAutopilotConfig::contentOnlyCrawlCap()));
+        }
+
         $quota = $this->owner?->crawlPageLimit(); // account-wide pool; null = unlimited
 
         if ($quota === null || $quota <= 0) {

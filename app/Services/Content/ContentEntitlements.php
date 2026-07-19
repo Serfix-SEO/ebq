@@ -24,18 +24,13 @@ use Illuminate\Support\Facades\DB;
  * A "generation" is the FIRST version of a topic's article — revisions create
  * higher content_articles.version rows on the same topic and never count.
  *
- * Registered as a singleton so per-request memoization holds across the many
- * effectiveFeatureFlags()/nav calls that hit it.
+ * Stateless: each method recomputes from the DB / loaded relations (no internal
+ * memo) so a mid-request state change — startTrial, checkout success, coverage
+ * edit — is reflected immediately by later calls in the same request.
  */
 class ContentEntitlements
 {
     public const SUBSCRIPTION = 'content';
-
-    /** @var array<string,bool> user id => has access */
-    private array $accessMemo = [];
-
-    /** @var array<string,bool> website id => is covered */
-    private array $coverageMemo = [];
 
     // ── Access ──────────────────────────────────────────────────────────
 
@@ -56,8 +51,7 @@ class ContentEntitlements
 
     public function hasContentAccess(User $user): bool
     {
-        return $this->accessMemo[$user->id] ??=
-            ($this->hasContentSubscription($user) || $this->onContentTrial($user));
+        return $this->hasContentSubscription($user) || $this->onContentTrial($user);
     }
 
     /** Access AND this specific website occupies a covered slot. */
@@ -67,7 +61,7 @@ class ContentEntitlements
             return false;
         }
 
-        return $this->coverageMemo[$website->id] ??= ContentPlan::query()
+        return ContentPlan::query()
             ->where('website_id', $website->id)
             ->whereNotNull('billing_covered_at')
             ->exists();
@@ -120,14 +114,12 @@ class ContentEntitlements
             ['website_id' => $website->id],
             ['billing_covered_at' => now()],
         );
-        unset($this->coverageMemo[$website->id]);
     }
 
     public function uncoverWebsite(Website $website): void
     {
         ContentPlan::query()->where('website_id', $website->id)
             ->update(['billing_covered_at' => null]);
-        unset($this->coverageMemo[$website->id]);
     }
 
     /** Clamp covered websites down to what the plan allows (newest uncovered first). */
@@ -142,9 +134,7 @@ class ContentEntitlements
 
         foreach ($covered->slice($allowed) as $plan) {
             $plan->update(['billing_covered_at' => null]);
-            unset($this->coverageMemo[$plan->website_id]);
         }
-        $this->accessMemo = [];
     }
 
     // ── Trial ───────────────────────────────────────────────────────────
@@ -159,7 +149,6 @@ class ContentEntitlements
             ])->save();
         }
         $this->coverWebsite($website);
-        unset($this->accessMemo[$user->id]);
     }
 
     // ── Usage / caps ────────────────────────────────────────────────────
