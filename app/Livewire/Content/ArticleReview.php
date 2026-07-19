@@ -193,11 +193,8 @@ class ArticleReview extends Component
     public function publishNow(): void
     {
         $topic = $this->topic();
-        if ($topic === null || $topic->currentArticle === null) {
-            return;
-        }
-        if (! in_array($topic->status, [ContentTopic::STATUS_READY, ContentTopic::STATUS_SCHEDULED], true)) {
-            return;
+        if (! ContentCalendar::publishableNow($topic)) {
+            return; // gone, wrong status, or scheduled for a future day
         }
         $connected = (bool) $topic->plan?->website
             ?->contentIntegrations()
@@ -469,11 +466,23 @@ class ArticleReview extends Component
         $failed = $topic->status === ContentTopic::STATUS_FAILED;
         $currentIdx = array_search($stageOf[$topic->status] ?? 'research', $order, true) ?: 0;
 
+        // On failure, mark the stage that ACTUALLY failed (from the error
+        // marker) rather than always blaming "research" — research is fail-soft,
+        // so real failures are almost always the write/optimize stage.
+        $failedIdx = 0;
+        if ($failed) {
+            $err = (string) $topic->last_error;
+            $failedKey = str_contains($err, 'below_publish_floor') ? 'polish'
+                : (str_contains($err, 'missing plan') ? 'research' : 'write');
+            $failedIdx = array_search($failedKey, $order, true) ?: 0;
+        }
+
         $steps = [];
         foreach ($order as $i => $key) {
             $steps[] = [
                 'label' => $labels[$key],
-                'state' => $failed ? ($i === 0 ? 'failed' : 'pending')
+                'state' => $failed
+                    ? ($i < $failedIdx ? 'done' : ($i === $failedIdx ? 'failed' : 'pending'))
                     : ($i < $currentIdx ? 'done' : ($i === $currentIdx ? 'active' : 'pending')),
             ];
         }

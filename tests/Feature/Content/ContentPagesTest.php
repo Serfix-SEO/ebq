@@ -427,6 +427,7 @@ class ContentPagesTest extends TestCase
         $plan = ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
         $topic = ContentTopic::factory()->for($plan, 'plan')->create([
             'website_id' => $website->id, 'status' => ContentTopic::STATUS_SCHEDULED,
+            'scheduled_for' => now(),
         ]);
         ContentArticle::storeVersion($topic, [
             'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
@@ -452,6 +453,7 @@ class ContentPagesTest extends TestCase
         $plan = ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
         $topic = ContentTopic::factory()->for($plan, 'plan')->create([
             'website_id' => $website->id, 'status' => ContentTopic::STATUS_READY,
+            'scheduled_for' => now(),
         ]);
         ContentArticle::storeVersion($topic, [
             'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
@@ -476,6 +478,7 @@ class ContentPagesTest extends TestCase
         $plan = ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
         $topic = ContentTopic::factory()->for($plan, 'plan')->create([
             'website_id' => $website->id, 'status' => ContentTopic::STATUS_SCHEDULED,
+            'scheduled_for' => now(),
         ]);
         ContentArticle::storeVersion($topic, [
             'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
@@ -486,6 +489,32 @@ class ContentPagesTest extends TestCase
         Livewire::test(ContentCalendar::class)->call('publishNow', $topic->id);
 
         // No connected destination → must NOT publish (and the topic stays put).
+        Queue::assertNotPushed(\App\Jobs\PublishContentArticleJob::class);
+        $this->assertSame(ContentTopic::STATUS_SCHEDULED, $topic->fresh()->status);
+    }
+
+    public function test_publish_now_is_blocked_for_a_future_dated_article(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
+        $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id, 'status' => ContentTopic::STATUS_SCHEDULED,
+            'scheduled_for' => now()->addDays(3), // future
+        ]);
+        ContentArticle::storeVersion($topic, [
+            'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
+            'html' => '<p>x</p>', 'word_count' => 100, 'seo_score' => 90, 'seo_issues' => [],
+        ]);
+        \App\Models\ContentIntegration::create([
+            'website_id' => $website->id, 'platform' => 'webhook',
+            'status' => \App\Models\ContentIntegration::STATUS_CONNECTED,
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+        Livewire::test(ContentCalendar::class)->call('publishNow', $topic->id);
+
+        // Future-dated → publish now is not allowed even with a destination.
         Queue::assertNotPushed(\App\Jobs\PublishContentArticleJob::class);
         $this->assertSame(ContentTopic::STATUS_SCHEDULED, $topic->fresh()->status);
     }

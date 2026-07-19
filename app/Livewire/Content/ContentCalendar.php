@@ -756,13 +756,8 @@ class ContentCalendar extends Component
     public function publishNow(string $topicId): void
     {
         $topic = $this->topicOrFail($topicId);
-        if ($topic === null || $topic->currentArticle === null) {
-            return;
-        }
-        if (! in_array($topic->status, [
-            ContentTopic::STATUS_READY, ContentTopic::STATUS_SCHEDULED,
-        ], true)) {
-            return;
+        if (! self::publishableNow($topic)) {
+            return; // gone, wrong status, or scheduled for a future day
         }
         if (! $this->hasPublishDestination()) {
             session()->flash('content-error', __('Connect a site in Settings → Integrations before publishing.'));
@@ -792,6 +787,24 @@ class ContentCalendar extends Component
         return $start === $end
             ? $fmt($start).' ('.$city.')'
             : $fmt($start).'–'.$fmt($end).' ('.$city.')';
+    }
+
+    /**
+     * Whether a topic can be published RIGHT NOW: it has an article, is in a
+     * publishable status, and its scheduled date is today or earlier (date only,
+     * time ignored). Future-dated articles must wait for their day.
+     */
+    public static function publishableNow(?ContentTopic $topic): bool
+    {
+        if ($topic === null || $topic->currentArticle === null) {
+            return false;
+        }
+        if (! in_array($topic->status, [ContentTopic::STATUS_READY, ContentTopic::STATUS_SCHEDULED], true)) {
+            return false;
+        }
+
+        return $topic->scheduled_for === null
+            || $topic->scheduled_for->toDateString() <= now()->toDateString();
     }
 
     /** Whether the active plan's website has a connected publishing destination. */

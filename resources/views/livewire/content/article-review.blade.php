@@ -237,7 +237,7 @@
                         @elseif ($topic->status === \App\Models\ContentTopic::STATUS_SCHEDULED)
                             <p class="rounded-lg bg-success/10 px-3 py-2 text-center text-sm text-success">{{ __('Approved and ready to go.') }}</p>
                         @endif
-                        @if (in_array($topic->status, [\App\Models\ContentTopic::STATUS_READY, \App\Models\ContentTopic::STATUS_SCHEDULED], true))
+                        @if (\App\Livewire\Content\ContentCalendar::publishableNow($topic))
                             @if ($publishConnected)
                                 <button wire:click="publishNow" wire:confirm="{{ __('Publish this article to your site now?') }}"
                                         class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-success px-4 py-2.5 text-sm font-bold text-white hover:brightness-110">

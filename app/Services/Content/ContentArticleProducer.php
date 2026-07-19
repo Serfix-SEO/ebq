@@ -91,19 +91,30 @@ class ContentArticleProducer
             $draftInput['model'] = $writeModel['model'];
         }
 
-        try {
-            $draft = $writer->draft($website, 0, $draftInput);
-        } catch (\App\Exceptions\QuotaExceededException $e) {
-            // The owner's plan ran out of AI tokens — an EXPECTED operational
-            // state, not a crash. The topic parks as failed with an internal
-            // marker; client copy stays neutral ("Needs attention").
-            $topic->fail('llm_quota_exhausted');
+        // Draft with ONE retry on a transient failure. The write LLM call
+        // occasionally blips (timeout, truncated/invalid JSON) — a single retry
+        // turns most of those "sometimes it fails" runs into a clean draft.
+        // Quota exhaustion is NOT retried (it would just fail again + re-bill).
+        $draft = ['ok' => false];
+        $lastErr = 'unknown';
+        for ($attempt = 1; $attempt <= 2; $attempt++) {
+            try {
+                $draft = $writer->draft($website, 0, $draftInput);
+            } catch (\App\Exceptions\QuotaExceededException $e) {
+                // The owner's plan ran out of AI tokens — an EXPECTED operational
+                // state, not a crash. Neutral client copy ("Needs attention").
+                $topic->fail('llm_quota_exhausted');
 
-            return null;
+                return null;
+            }
+            $this->meter->add(ContentLlmSpendMeter::EST_WRITE_USD);
+            if ($draft['ok'] ?? false) {
+                break;
+            }
+            $lastErr = (string) ($draft['error'] ?? 'unknown');
         }
-        $this->meter->add(ContentLlmSpendMeter::EST_WRITE_USD);
         if (! ($draft['ok'] ?? false)) {
-            $topic->fail('draft_failed: '.(string) ($draft['error'] ?? 'unknown'));
+            $topic->fail('draft_failed: '.$lastErr);
 
             return null;
         }

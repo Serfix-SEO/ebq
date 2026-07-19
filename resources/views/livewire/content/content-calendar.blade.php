@@ -1152,7 +1152,7 @@
                                             </button>
                                         @endif
                                     </div>
-                                    @if ($topic->currentArticle && in_array($topic->status, ['ready', 'scheduled'], true) && $publishConnected)
+                                    @if ($publishConnected && \App\Livewire\Content\ContentCalendar::publishableNow($topic))
                                         <button wire:click="publishNow('{{ $topic->id }}')" wire:confirm="{{ __('Publish this article to your site now?') }}" draggable="false"
                                                 class="mt-1 inline-flex w-full items-center justify-center gap-0.5 rounded-md bg-success px-1.5 py-0.5 text-[10px] font-bold text-white hover:brightness-110">
                                             <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
@@ -1206,7 +1206,7 @@
                             @if ($topic->status === \App\Models\ContentTopic::STATUS_SUGGESTED)
                                 <button wire:click="approve('{{ $topic->id }}')" class="text-sm font-medium text-success hover:brightness-90">{{ __('Approve') }}</button>
                             @endif
-                            @if ($topic->currentArticle && in_array($topic->status, ['ready', 'scheduled'], true))
+                            @if (\App\Livewire\Content\ContentCalendar::publishableNow($topic))
                                 @if ($publishConnected)
                                     <button wire:click="publishNow('{{ $topic->id }}')" wire:confirm="{{ __('Publish this article to your site now?') }}"
                                             class="inline-flex items-center gap-1 rounded-lg bg-success px-2.5 py-1 text-xs font-bold text-white hover:brightness-110">
