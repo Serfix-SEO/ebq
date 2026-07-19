@@ -16,7 +16,9 @@
             $trackWidth = 100 - (2 * $halfSlot);
             $fillWidth = $trackWidth * $fillPct / 100;
         @endphp
-        <div class="mx-auto w-full max-w-6xl">
+        <div class="mx-auto w-full max-w-6xl"
+             x-data="{ step: @entangle('wizardStep') }"
+             x-init="$watch('step', () => window.scrollTo({ top: 0, behavior: 'smooth' }))">
             {{-- Progress rail --}}
             <div class="mb-8 px-2 sm:px-6">
                 <div class="relative">
