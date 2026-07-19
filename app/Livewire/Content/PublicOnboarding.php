@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Content;
 
+use App\Livewire\Content\Concerns\ContentWizard;
 use App\Models\ContentOnboardingSession;
+use App\Models\ContentPlan;
 use App\Models\User;
+use App\Models\Website;
+use App\Models\WebsiteReportSnapshot;
 use App\Rules\ValidRecaptcha;
 use App\Services\Content\ContentOnboardingConverter;
 use App\Support\Audit\SafeHttpGuard;
-use App\Models\WebsiteReportSnapshot;
 use App\Support\ContentAutopilotConfig;
 use App\Support\Recaptcha;
 use Illuminate\Auth\Events\Registered;
@@ -18,25 +21,27 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
- * Public, anonymous Content Autopilot onboarding. Step 1 asks for the website
- * domain (which becomes the new user's website); steps 2-3 collect the business
- * profile and account details. On finish we create the account, re-parent the
- * provisional website, start the trial and drop the user into the dashboard —
- * where topic ideation + keyword research (dispatched here) are already running.
+ * Public, anonymous Content Autopilot onboarding — a FULL-PAGE mirror of the
+ * in-dashboard 7-step wizard (business → offerings → how-it-works → images →
+ * competitors → keyword research → first articles) with an 8th "create account"
+ * step at the end. A domain-capture screen precedes the wizard: it creates a
+ * provisional website (owned by the system "content-leads" user) so the whole
+ * pipeline — crawl, profile extraction, competitor authority, keyword research,
+ * topic ideation — runs anonymously and the visitor SEES the value before
+ * signing up. On finish we create the account, re-parent the website, start the
+ * trial and drop the user into the dashboard.
+ *
+ * The wizard logic lives in the shared {@see ContentWizard} trait; the markup is
+ * the shared livewire/content/partials/wizard partial ($publicOnboarding=true).
  */
-#[Layout('components.layouts.guest')]
+#[Layout('components.layouts.content-onboarding')]
 class PublicOnboarding extends Component
 {
-    public int $step = 1;
+    use ContentWizard;
 
+    public ?string $websiteId = null;
     public string $domain = '';
     public ?string $token = null;
-
-    public string $businessDescription = '';
-    public array $sellItems = [];
-    public array $dontSellItems = [];
-    public string $newSell = '';
-    public string $newDont = '';
 
     public string $name = '';
     public string $email = '';
@@ -60,21 +65,32 @@ class PublicOnboarding extends Component
             if ($s !== null) {
                 $this->token = $s->token;
                 $this->domain = (string) $s->domain;
-                $this->step = max(2, (int) $s->step);
+                $this->websiteId = $s->website_id;
+                $this->wizardStep = max(1, (int) $s->step);
+                $this->bootWizard();
 
                 return;
             }
         }
 
-        // Prefill the domain typed on the landing hero (?domain=…). Step 1 stays
-        // so the SSRF/reCAPTCHA/throttle guards in startWithDomain still run.
+        // Prefill the domain typed on the landing hero (?domain=…). The
+        // domain-capture screen still runs the SSRF/reCAPTCHA/throttle guards.
         $prefill = trim((string) request()->query('domain', ''));
         if ($prefill !== '') {
             $this->domain = mb_substr($prefill, 0, 255);
         }
     }
 
-    // ── Step 1: domain → provisional website ────────────────────────────
+    /** Persist wizard progress so a reload resumes where the visitor left off. */
+    public function dehydrate(): void
+    {
+        if ($this->token !== null) {
+            ContentOnboardingSession::query()->where('token', $this->token)->whereNull('converted_at')
+                ->update(['step' => max(1, min($this->wizardStep, 7))]);
+        }
+    }
+
+    // ── Domain capture (pre-wizard) → provisional website ───────────────
 
     public function startWithDomain(SafeHttpGuard $guard, ContentOnboardingConverter $converter): void
     {
@@ -94,64 +110,50 @@ class PublicOnboarding extends Component
         }
 
         $this->hitThrottle();
-        [$session] = $converter->begin($domain, request()->ip());
+        [$session, $website] = $converter->begin($domain, request()->ip());
         $this->token = $session->token;
         $this->domain = $domain;
+        $this->websiteId = $website->id;
         session(['content_onboarding_token' => $session->token]);
         $this->recaptchaToken = '';
-        $this->step = 2;
+
+        // Enter the shared wizard at step 1 (Business) with crawl-based
+        // auto-analysis armed.
+        $this->wizardStep = 1;
+        $this->bootWizard();
     }
 
-    // ── Step 2: business profile + offerings ────────────────────────────
+    // ── Provisional site/plan resolvers (no auth — session-token scoped) ─
 
-    public function addSell(): void
+    private function website(): ?Website
     {
-        $v = trim($this->newSell);
-        if ($v !== '') {
-            $this->sellItems[] = $v;
-            $this->newSell = '';
+        return $this->websiteId
+            ? Website::query()->whereKey($this->websiteId)->first()
+            : null;
+    }
+
+    private function plan(): ?ContentPlan
+    {
+        return $this->websiteId
+            ? ContentPlan::query()->where('website_id', $this->websiteId)->first()
+            : null;
+    }
+
+    // ── Step 7 → 8 (account) ────────────────────────────────────────────
+
+    public function toAccount(): void
+    {
+        if ($this->websiteId !== null) {
+            $this->wizardStep = 8;
         }
     }
 
-    public function addDont(): void
-    {
-        $v = trim($this->newDont);
-        if ($v !== '') {
-            $this->dontSellItems[] = $v;
-            $this->newDont = '';
-        }
-    }
-
-    public function removeSell(int $i): void
-    {
-        unset($this->sellItems[$i]);
-        $this->sellItems = array_values($this->sellItems);
-    }
-
-    public function removeDont(int $i): void
-    {
-        unset($this->dontSellItems[$i]);
-        $this->dontSellItems = array_values($this->dontSellItems);
-    }
-
-    public function toProfile(): void
-    {
-        $this->step = 2;
-    }
-
-    public function toDetails(): void
-    {
-        $this->validate(['businessDescription' => 'required|string|min:30|max:1000']);
-        $this->session()?->update(['step' => 3]);
-        $this->step = 3;
-    }
-
-    // ── Step 3: account → convert ───────────────────────────────────────
+    // ── Step 8: account → convert ───────────────────────────────────────
 
     public function createAccount(ContentOnboardingConverter $converter): void
     {
         if ($this->token === null) {
-            $this->step = 1;
+            $this->wizardStep = 1;
 
             return;
         }
@@ -171,7 +173,7 @@ class PublicOnboarding extends Component
 
         $session = $this->session();
         if ($session === null) {
-            $this->step = 1;
+            $this->wizardStep = 1;
 
             return;
         }
@@ -245,6 +247,9 @@ class PublicOnboarding extends Component
 
     public function render()
     {
-        return view('livewire.content.public-onboarding');
+        return view('livewire.content.public-onboarding', [
+            'publicOnboarding' => true,
+            'wizard' => $this->websiteId !== null ? $this->wizardViewData() : [],
+        ]);
     }
 }

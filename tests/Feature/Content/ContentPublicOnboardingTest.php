@@ -39,7 +39,8 @@ class ContentPublicOnboardingTest extends TestCase
         Livewire::test(PublicOnboarding::class)
             ->set('domain', 'example.com')
             ->call('startWithDomain')
-            ->assertSet('step', 2);
+            ->assertSet('wizardStep', 1)
+            ->assertSet('websiteId', fn ($v) => $v !== null);
 
         $session = ContentOnboardingSession::query()->first();
         $this->assertNotNull($session);
@@ -56,7 +57,10 @@ class ContentPublicOnboardingTest extends TestCase
             ->call('startWithDomain')
             ->set('businessDescription', 'We sell handmade wooden tables and chairs for small apartments.')
             ->set('sellItems', ['Tables', 'Chairs'])
-            ->call('toDetails')
+            ->call('toOfferings')
+            ->call('toHowItWorks')
+            ->call('toAccount')
+            ->assertSet('wizardStep', 8)
             ->set('name', 'Jane Doe')
             ->set('email', 'jane@newclient.com')
             ->set('password', 'Str0ng-Pass-123')
@@ -91,7 +95,9 @@ class ContentPublicOnboardingTest extends TestCase
             ->set('domain', 'x-site.com')
             ->call('startWithDomain')
             ->set('businessDescription', 'We sell widgets and gadgets to small businesses everywhere.')
-            ->call('toDetails')
+            ->call('toOfferings')
+            ->call('toHowItWorks')
+            ->call('toAccount')
             ->set('name', 'Bob')
             ->set('email', 'taken@x.com')
             ->set('password', 'Str0ng-Pass-123')
