@@ -93,6 +93,15 @@ class GenerateContentImagesJob implements ShouldQueue
             ? \App\Support\ContentImageStyles::ideogramStyle($plan->image_style)
             : ContentAutopilotConfig::styleType();
 
+        // Tell the review page that images are actively being generated so its
+        // progress overlay stays up until every image is done. Image rows are
+        // created only on success, so there is no in-progress row to detect —
+        // this flag (cleared in the finally below) is the signal. TTL bounds it
+        // so a crashed worker can't pin the overlay forever.
+        $imagesFlag = 'content:images:running:'.($topic?->id ?? $article->id);
+        \Illuminate\Support\Facades\Cache::put($imagesFlag, 1, now()->addMinutes(10));
+
+        try {
         $html = (string) $article->html;
         $anchors = $this->sectionAnchors($html, ContentAutopilotConfig::maxInlineImages());
 
@@ -188,6 +197,9 @@ class GenerateContentImagesJob implements ShouldQueue
             'inline' => count($inlineInjections),
             'spent' => $meter->spent(),
         ]);
+        } finally {
+            \Illuminate\Support\Facades\Cache::forget($imagesFlag);
+        }
     }
 
     // ── internals ───────────────────────────────────────────────────────

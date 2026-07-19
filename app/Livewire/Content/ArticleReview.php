@@ -396,12 +396,28 @@ class ArticleReview extends Component
             || ! \App\Support\ContentAutopilotConfig::imagesEnabled()) {
             return false;
         }
-        if ($article->images()->where('status', \App\Models\ContentImage::STATUS_GENERATED)->exists()) {
-            return false; // at least one image landed → finished
+        // The images job is actively running (it sets this flag for its whole
+        // lifetime, so we keep the overlay up until ALL images are done, not
+        // just until the first one lands).
+        if (\Illuminate\Support\Facades\Cache::has('content:images:running:'.$topic->id)) {
+            return true;
         }
-        $elapsed = $genStart > 0 ? (now()->timestamp - $genStart) : 999;
+        // Job finished and produced at least one image → done.
+        if ($article->images()->where('status', \App\Models\ContentImage::STATUS_GENERATED)->exists()) {
+            return false;
+        }
+        // Just became READY inside an ACTIVE generation (gen-start cached by
+        // writeNow/dispatch): the chained images job is dispatched but may not
+        // have started yet (queue latency). Hold the overlay for a short grace
+        // from the READY moment so there's no flash of the un-imaged draft
+        // before the job picks up. Old/manually-seeded ready articles have no
+        // gen-start, so they show their finalized view immediately.
+        if ($genStart <= 0) {
+            return false;
+        }
+        $readyTs = $article->updated_at?->timestamp ?? 0;
 
-        return $elapsed < 240; // wait up to ~4 min for images, then stop blocking
+        return $readyTs > 0 && (now()->timestamp - $readyTs) < 120;
     }
 
     private function generationProgress(ContentTopic $topic, int $genStart, bool $imagesPending = false): array
