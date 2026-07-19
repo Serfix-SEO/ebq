@@ -413,7 +413,7 @@ class ContentPagesTest extends TestCase
 
         Livewire::test(ContentCalendar::class)
             ->call('writeNow', $topic->id)
-            ->assertSet('progressTopicId', $topic->id);
+            ->assertRedirect(route('content.review', $topic->id));
 
         Queue::assertPushed(\App\Jobs\ProduceContentArticleJob::class);
         $this->assertNotNull(\Illuminate\Support\Facades\Cache::get('content:gen-start:'.$topic->id));

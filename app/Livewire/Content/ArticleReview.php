@@ -185,6 +185,18 @@ class ArticleReview extends Component
         }
     }
 
+    /** Re-run generation after a failure (from the in-flight progress card). */
+    public function retryGeneration(): void
+    {
+        $topic = $this->topic();
+        if ($topic === null || in_array($topic->status, ContentTopic::IN_FLIGHT, true)) {
+            return;
+        }
+        $topic->forceFill(['status' => ContentTopic::STATUS_APPROVED, 'last_error' => null, 'stage_started_at' => now()])->save();
+        \Illuminate\Support\Facades\Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
+        \App\Jobs\ProduceContentArticleJob::dispatch($topic->id);
+    }
+
 
     // ── live scoring ────────────────────────────────────────────────────
 
@@ -337,10 +349,69 @@ class ArticleReview extends Component
         return $html;
     }
 
+    /**
+     * Live generation progress for the in-flight state (article not written
+     * yet). Same five client-facing steps the calendar uses.
+     *
+     * @return array{steps:list<array{label:string,state:string}>, etaText:string, failed:bool}
+     */
+    private function generationProgress(ContentTopic $topic, int $genStart): array
+    {
+        $stageOf = [
+            ContentTopic::STATUS_APPROVED => 'research',
+            ContentTopic::STATUS_RESEARCHING => 'research',
+            ContentTopic::STATUS_WRITING => 'write',
+            ContentTopic::STATUS_SCORING => 'polish',
+            ContentTopic::STATUS_REVISING => 'polish',
+        ];
+        $order = ['research', 'write', 'polish', 'images', 'done'];
+        $labels = [
+            'research' => __('Researching your topic'),
+            'write' => __('Writing the first draft'),
+            'polish' => __('Optimizing for SEO & readability'),
+            'images' => __('Creating images'),
+            'done' => __('Ready for review'),
+        ];
+        $failed = $topic->status === ContentTopic::STATUS_FAILED;
+        $currentIdx = array_search($stageOf[$topic->status] ?? 'research', $order, true) ?: 0;
+
+        $steps = [];
+        foreach ($order as $i => $key) {
+            $steps[] = [
+                'label' => $labels[$key],
+                'state' => $failed ? ($i === 0 ? 'failed' : 'pending')
+                    : ($i < $currentIdx ? 'done' : ($i === $currentIdx ? 'active' : 'pending')),
+            ];
+        }
+
+        $elapsed = $genStart > 0 ? max(0, now()->timestamp - $genStart) : 0;
+        $etaSeconds = max(0, 165 - $elapsed);
+        $etaText = $failed ? __('Stopped')
+            : ($etaSeconds > 90 ? __('about 2–3 minutes left')
+                : ($etaSeconds > 30 ? __('about a minute left')
+                    : __('almost there…')));
+
+        return ['steps' => $steps, 'etaText' => $etaText, 'failed' => $failed];
+    }
+
     public function render()
     {
         $topic = $this->topic();
         $article = $topic?->currentArticle;
+
+        // No article yet: are we actively generating it? True while the topic
+        // is in a pipeline stage, or just-dispatched (gen-start cached) and
+        // still APPROVED before the worker picks it up.
+        $generating = false;
+        $progress = null;
+        if ($topic !== null && $article === null) {
+            $genStart = (int) \Illuminate\Support\Facades\Cache::get('content:gen-start:'.$topic->id, 0);
+            $generating = in_array($topic->status, ContentTopic::IN_FLIGHT, true)
+                || ($genStart > 0 && $topic->status === ContentTopic::STATUS_APPROVED);
+            if ($generating || $topic->status === ContentTopic::STATUS_FAILED) {
+                $progress = $this->generationProgress($topic, $genStart);
+            }
+        }
 
         $issueLabels = collect((array) ($article?->seo_issues ?? []))
             ->pluck('code')
@@ -351,6 +422,8 @@ class ArticleReview extends Component
         return view('livewire.content.article-review', [
             'topic' => $topic,
             'article' => $article,
+            'generating' => $generating,
+            'progress' => $progress,
             'previewHtml' => $this->sanitize((string) ($article?->html ?? '')),
             'issueLabels' => $issueLabels,
             'presentation' => $topic ? ContentCalendar::statusPresentation($topic->status) : null,

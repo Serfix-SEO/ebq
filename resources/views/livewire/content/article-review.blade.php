@@ -31,7 +31,71 @@
         </div>
     @endif
 
-    @if ($article === null)
+    @if ($article === null && $generating)
+        {{-- ── Generating: teaser skeleton behind a live progress overlay ── --}}
+        <div class="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800"
+             @if (! ($progress['failed'] ?? false)) wire:poll.3s @endif>
+            {{-- Teaser: a faint skeleton of the article being built --}}
+            <div class="pointer-events-none select-none p-6 blur sm:p-10" aria-hidden="true">
+                <div class="mx-auto max-w-3xl space-y-5 opacity-60">
+                    <h1 class="text-3xl font-extrabold tracking-tight text-slate-800 dark:text-slate-200">{{ $topic?->title }}</h1>
+                    <div class="h-40 w-full animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+                    @foreach ([5,4,5] as $bi => $blk)
+                        <div class="space-y-2.5">
+                            <div class="h-5 w-1/3 animate-pulse rounded bg-slate-300 dark:bg-slate-700"></div>
+                            @for ($i = 0; $i < $blk; $i++)
+                                <div class="h-3.5 animate-pulse rounded bg-slate-200 dark:bg-slate-800" style="width: {{ [100,96,92,88,98][$i % 5] }}%"></div>
+                            @endfor
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Overlay: the live progress card --}}
+            <div class="absolute inset-0 flex items-center justify-center bg-white/60 p-4 backdrop-blur-sm dark:bg-slate-900/60">
+                <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
+                        {{ ($progress['failed'] ?? false) ? __('Needs attention') : __('Writing your article') }}
+                    </p>
+                    <h2 class="mt-0.5 text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $topic?->title }}</h2>
+
+                    <div class="mt-4 space-y-1">
+                        @foreach (($progress['steps'] ?? []) as $step)
+                            <div class="flex items-center gap-3 rounded-xl px-3 py-2 {{ $step['state'] === 'active' ? 'bg-orange-50 dark:bg-orange-950' : '' }}">
+                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full
+                                    {{ $step['state'] === 'done' ? 'bg-success text-white'
+                                       : ($step['state'] === 'active' ? 'bg-orange-600 text-white'
+                                       : ($step['state'] === 'failed' ? 'bg-error text-white' : 'bg-slate-100 text-slate-400 dark:bg-slate-800')) }}">
+                                    @if ($step['state'] === 'done')
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                    @elseif ($step['state'] === 'active')
+                                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                    @elseif ($step['state'] === 'failed')
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    @else
+                                        <span class="h-1.5 w-1.5 rounded-full bg-current"></span>
+                                    @endif
+                                </span>
+                                <span class="flex-1 text-sm font-medium {{ $step['state'] === 'pending' ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100' }}">{{ $step['label'] }}</span>
+                                @if ($step['state'] === 'active')<span class="text-xs font-semibold text-orange-600">{{ __('in progress') }}</span>@endif
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                        @if ($progress['failed'] ?? false)
+                            <span class="flex-1">{{ __('Generation stopped. You can try again.') }}</span>
+                            <button wire:click="retryGeneration" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-700">{{ __('Try again') }}</button>
+                        @else
+                            <svg class="h-4 w-4 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            <span>{{ $progress['etaText'] ?? __('working…') }}</span>
+                            <span class="ml-auto text-xs text-slate-400">{{ __('This page updates itself.') }}</span>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    @elseif ($article === null)
         <div class="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
             {{ __('This article has not been written yet.') }}
         </div>

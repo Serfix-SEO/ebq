@@ -1056,14 +1056,14 @@
                                     $cellInFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true);
                                 @endphp
                                 @if ($cellInFlight)
-                                    <button wire:click="openProgress('{{ $topic->id }}')"
+                                    <a href="{{ route('content.review', $topic->id) }}" wire:navigate
                                        class="mb-1 block w-full rounded-lg border border-orange-200 bg-orange-50 p-1.5 text-start hover:border-orange-300 dark:border-orange-900 dark:bg-orange-950">
                                         <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
                                         <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-{{ $p['color'] }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $p['color'] }}-700">
                                             <svg class="h-2.5 w-2.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                                             {{ $p['label'] }}
                                         </span>
-                                    </button>
+                                    </a>
                                 @else
                                     <a href="{{ $topic->currentArticle ? route('content.review', $topic->id) : '#' }}"
                                        @if(!$topic->currentArticle) onclick="return false" @endif
@@ -1102,10 +1102,10 @@
                             </div>
                             <span class="rounded-full bg-{{ $p['color'] }}-100 px-2 py-0.5 text-xs font-semibold text-{{ $p['color'] }}-700">{{ $p['label'] }}</span>
                             @if ($inFlight)
-                                <button wire:click="openProgress('{{ $topic->id }}')" class="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700">
+                                <a href="{{ route('content.review', $topic->id) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700">
                                     <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                                     {{ __('Writing… view progress') }}
-                                </button>
+                                </a>
                             @elseif ($topic->currentArticle)
                                 <a href="{{ route('content.review', $topic->id) }}" class="text-sm font-medium text-orange-600 hover:text-orange-700">{{ __('Review') }}</a>
                             @endif
@@ -1210,69 +1210,5 @@
             </div>
         @endif
 
-        {{-- ── Live generation progress modal ───────────────────────── --}}
-        @if ($progress)
-            <div class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 backdrop-blur-sm sm:items-center"
-                 @if (! $progress['done'] && ! $progress['failed']) wire:poll.3s @endif
-                 x-data @keydown.escape.window="$wire.closeProgress()">
-                <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900" @click.outside="$wire.closeProgress()">
-                    {{-- header --}}
-                    <div class="flex items-start justify-between gap-3 border-b border-slate-100 p-5 dark:border-slate-800">
-                        <div class="min-w-0">
-                            <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
-                                {{ $progress['done'] ? __('Article ready') : ($progress['failed'] ? __('Needs attention') : __('Writing your article')) }}
-                            </p>
-                            <h3 class="mt-0.5 truncate text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $progress['topic']->title }}</h3>
-                        </div>
-                        <button type="button" wire:click="closeProgress" class="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800" aria-label="{{ __('Close') }}">
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-
-                    {{-- steps --}}
-                    <div class="space-y-1 p-5">
-                        @foreach ($progress['steps'] as $step)
-                            <div class="flex items-center gap-3 rounded-xl px-3 py-2.5 {{ $step['state'] === 'active' ? 'bg-orange-50 dark:bg-orange-950/40' : '' }}">
-                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full
-                                    {{ $step['state'] === 'done' ? 'bg-success text-white'
-                                       : ($step['state'] === 'active' ? 'bg-orange-600 text-white'
-                                       : ($step['state'] === 'failed' ? 'bg-error text-white' : 'bg-slate-100 text-slate-400 dark:bg-slate-800')) }}">
-                                    @if ($step['state'] === 'done')
-                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                    @elseif ($step['state'] === 'active')
-                                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                                    @elseif ($step['state'] === 'failed')
-                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                    @else
-                                        <span class="h-1.5 w-1.5 rounded-full bg-current"></span>
-                                    @endif
-                                </span>
-                                <span class="flex-1 text-sm font-medium {{ $step['state'] === 'pending' ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100' }}">{{ $step['label'] }}</span>
-                                @if ($step['state'] === 'active')
-                                    <span class="text-xs font-semibold text-orange-600">{{ __('in progress') }}</span>
-                                @endif
-                            </div>
-                        @endforeach
-                    </div>
-
-                    {{-- footer --}}
-                    <div class="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
-                        @if ($progress['done'])
-                            <span class="text-sm font-semibold text-success">{{ __('All done — ready for your review.') }}</span>
-                            <a href="{{ route('content.review', $progress['topic']->id) }}" class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700">{{ __('Review article') }}</a>
-                        @elseif ($progress['failed'])
-                            <span class="text-sm text-slate-500 dark:text-slate-400">{{ __('Generation stopped. You can try again.') }}</span>
-                            <button wire:click="writeNow('{{ $progress['topic']->id }}')" class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700">{{ __('Try again') }}</button>
-                        @else
-                            <span class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                                <svg class="h-4 w-4 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                                {{ $progress['etaText'] }}
-                            </span>
-                            <button wire:click="closeProgress" class="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400">{{ __('Keep working — I\'ll check back') }}</button>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        @endif
     @endif
 </div>
