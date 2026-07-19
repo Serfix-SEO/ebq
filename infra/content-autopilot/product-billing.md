@@ -76,12 +76,23 @@ syncSubscriptionsFromStripe` to resolve the sub type from Stripe metadata
 Branches: never-trialed → Start trial; trial spent → pricing → checkout; sub with
 free slot → Activate; slots full → Add website (addon). `content.get-started`.
 
-## Public
+## Public onboarding
 
-`/content-autopilot` landing (`content-landing.blade.php`). **PENDING**: the full
-anonymous pre-signup wizard (`PublicOnboarding` + provisional site under the
-`is_system` content-leads user + `content_onboarding_sessions` + converter +
-`SetInitialPassword` + GC command). Landing currently funnels to register.
+`/content-autopilot` landing (`content-landing.blade.php`) → CTA →
+`/content-autopilot/start` (`PublicOnboarding` Livewire, guest layout):
+1. **domain** → provisional `Website` under the seeded `is_system`
+   "content-leads" user + shared-crawl subscribe (`ContentOnboardingConverter::
+   begin`); `content_onboarding_sessions` token in the visitor session. Guards:
+   SSRF (`SafeHttpGuard`), domain normalize, reCAPTCHA, per-IP/global RateLimiter
+   (`content.onboarding.*` admin keys).
+2. **business profile + offerings**.
+3. **name/email/phone/password** → create user → `ContentOnboardingConverter::
+   convert` re-parents the site (or folds into an existing owned domain),
+   persists a covered DRAFT plan, `startTrial`, dispatches ideation + keyword
+   research → login → `content.settings`. (Password is collected here — the app
+   has NO password-reset flow, so no passwordless email.)
+`ebq:content-onboarding-gc` (hourly) deletes abandoned unconverted sessions
+>7 days + their provisional sites.
 
 ## Rollout (PROD — gated, NOT done)
 
