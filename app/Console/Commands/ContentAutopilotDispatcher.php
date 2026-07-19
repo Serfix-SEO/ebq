@@ -47,20 +47,31 @@ class ContentAutopilotDispatcher extends Command
 
     private const WRITE_AHEAD_HOURS = 48;
 
+    /** Anything due within this window MUST be generated — the normal fairness
+     *  throttle is bypassed so an imminent slot is never missed. */
+    private const CATCH_UP_HOURS = 24;
+
     private const THIN_CALENDAR_TOPICS = 7;
+
+    /** Topic ids already dispatched this tick, so the catch-up pass never double-fires. */
+    private array $claimedTopicIds = [];
 
     public function handle(ContentLlmSpendMeter $meter): int
     {
+        $this->claimedTopicIds = [];
         $reaped = $this->reapStuck();
         $topped = $this->topUpThinCalendars();
         $claimed = $meter->exhausted() ? 0 : $this->claimDueTopics((int) $this->option('claim-limit'));
+        // Safety net: guarantee anything due within 24h is generated even if the
+        // per-tick claim limit / one-per-site throttle skipped it above.
+        $rushed = $meter->exhausted() ? 0 : $this->catchUpImminent();
         $published = $this->claimPublishable();
 
         if ($meter->exhausted()) {
             Log::warning('content_autopilot.llm_cap_exhausted', ['spent' => $meter->spent(), 'cap' => $meter->cap()]);
         }
 
-        $this->info("reaped={$reaped} topup_plans={$topped} claimed={$claimed} published={$published}");
+        $this->info("reaped={$reaped} topup_plans={$topped} claimed={$claimed} rushed={$rushed} published={$published}");
 
         return self::SUCCESS;
     }
@@ -130,6 +141,48 @@ class ContentAutopilotDispatcher extends Command
                 continue;
             }
             ProduceContentArticleJob::dispatch($topic->id);
+            $this->claimedTopicIds[] = $topic->id;
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Guarantee generation for any topic due within CATCH_UP_HOURS that still has
+     * no article — bypassing the one-per-site + claim-limit fairness throttle that
+     * claimDueTopics() applies, so an imminent publish slot is never missed. Only
+     * hard blocks (no coverage / trial / monthly cap) still stop it. Imminent
+     * SUGGESTED topics are auto-approved first so they enter the pipeline.
+     */
+    private function catchUpImminent(): int
+    {
+        $cutoff = now()->addHours(self::CATCH_UP_HOURS)->toDateString();
+
+        ContentTopic::query()
+            ->where('status', ContentTopic::STATUS_SUGGESTED)
+            ->whereNotNull('scheduled_for')
+            ->where('scheduled_for', '<=', $cutoff)
+            ->whereHas('plan', fn ($q) => $q->where('status', ContentPlan::STATUS_ACTIVE))
+            ->update(['status' => ContentTopic::STATUS_APPROVED, 'stage_started_at' => now()]);
+
+        $imminent = ContentTopic::query()
+            ->whereIn('status', [ContentTopic::STATUS_APPROVED, ContentTopic::STATUS_FAILED])
+            ->whereNotNull('scheduled_for')
+            ->where('scheduled_for', '<=', $cutoff)
+            ->whereNotIn('id', $this->claimedTopicIds ?: ['-'])
+            ->whereHas('plan', fn ($q) => $q->where('status', ContentPlan::STATUS_ACTIVE))
+            ->orderBy('scheduled_for')
+            ->get();
+
+        $entitlements = app(\App\Services\Content\ContentEntitlements::class);
+        $count = 0;
+        foreach ($imminent as $topic) {
+            if ($entitlements->blockReason($topic) !== null) {
+                continue;
+            }
+            ProduceContentArticleJob::dispatch($topic->id);
+            $this->claimedTopicIds[] = $topic->id;
             $count++;
         }
 
