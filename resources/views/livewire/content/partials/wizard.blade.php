@@ -459,6 +459,7 @@
                         <div wire:poll.5s="refreshCompetitors" class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
                             <svg class="h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                             <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('Analyzing your competitive landscape…') }}</p>
+                            <p class="text-xs text-slate-400">{{ __('This can take a minute. You can continue now — it keeps working in the background.') }}</p>
                         </div>
                     @else
                         <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
@@ -734,7 +735,9 @@
                             {{ __('Back') }}
                         </button>
                         @if ($publicOnboarding)
-                            <button wire:click="toAccount" @disabled($dts->isEmpty()) wire:loading.attr="disabled" wire:target="toAccount"
+                            {{-- Never gate account creation on async research — topics keep
+                                 generating after signup, in the dashboard. --}}
+                            <button wire:click="toAccount" wire:loading.attr="disabled" wire:target="toAccount"
                                 class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
                                 {{ __('Continue') }}
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
