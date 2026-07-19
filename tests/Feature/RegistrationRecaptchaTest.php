@@ -26,7 +26,7 @@ class RegistrationRecaptchaTest extends TestCase
             'password_confirmation' => 'password',
         ]);
 
-        $response->assertRedirect(route('verification.notice'));
+        $response->assertRedirect(route('onboarding'));
         $this->assertDatabaseHas('users', ['email' => 'nocaptcha@example.com']);
     }
 
@@ -72,7 +72,7 @@ class RegistrationRecaptchaTest extends TestCase
             'g-recaptcha-response' => 'test-token',
         ]);
 
-        $response->assertRedirect(route('verification.notice'));
+        $response->assertRedirect(route('onboarding'));
         $this->assertDatabaseHas('users', ['email' => 'verified-captcha@example.com']);
         Http::assertSent(function (Request $request): bool {
             return $request->url() === 'https://www.google.com/recaptcha/api/siteverify'

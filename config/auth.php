@@ -114,4 +114,21 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Email Verification Grace Window
+    |--------------------------------------------------------------------------
+    |
+    | New users may use the app while unverified for this many days after they
+    | register. Once the window elapses, the `verified` middleware
+    | (App\Http\Middleware\EnsureEmailVerifiedAfterGrace) forces them to the
+    | verify-email screen until they confirm their address. Set to 0 to
+    | require verification immediately (standard Laravel behaviour).
+    |
+    */
+
+    'verification' => [
+        'grace_days' => (int) env('EMAIL_VERIFICATION_GRACE_DAYS', 3),
+    ],
+
 ];

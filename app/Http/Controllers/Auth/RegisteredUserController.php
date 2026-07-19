@@ -127,7 +127,11 @@ class RegisteredUserController extends Controller
             return redirect()->route('report.view', ['url' => $analyzeDomain]);
         }
 
-        return redirect()->route('verification.notice');
+        // Verification uses a grace window, so send the new (still unverified)
+        // user straight into onboarding to add their first website. They keep
+        // full access until the grace window elapses, then EnsureEmailVerified-
+        // AfterGrace forces the verify-email screen.
+        return redirect()->route('onboarding');
     }
 
     /**

@@ -69,6 +69,17 @@ class ContentKeywordInsights
      */
     public function ensureStarted(ContentPlan $plan): void
     {
+        $this->ensureOwnRequest($plan);
+        // Competitor keywords enrich the research for EVERY domain (fresh or
+        // established). Dispatched separately because the competitor list is
+        // only known after the competitors step — this fires whenever it's
+        // available (guarded once), typically on the step-6 re-dispatch.
+        $this->ensureCompetitorRequest($plan);
+    }
+
+    /** The site's own keyword ideas request (offerings + GSC seeds). */
+    private function ensureOwnRequest(ContentPlan $plan): void
+    {
         if (Cache::has($this->insightsKey($plan)) || Cache::has($this->requestKey($plan))) {
             return;
         }
@@ -109,6 +120,71 @@ class ContentKeywordInsights
     }
 
     /**
+     * A site-scope keyword request against the top competitor's domain — pulls
+     * the keywords THEY rank for into the research, for every domain. Guarded
+     * separately from the own request (competitors are only known after the
+     * competitors step, so this typically fires on the step-6 re-dispatch).
+     */
+    private function ensureCompetitorRequest(ContentPlan $plan): void
+    {
+        if (Cache::has($this->competitorRequestKey($plan))) {
+            return;
+        }
+        $website = $plan->website;
+        if ($website === null) {
+            return;
+        }
+        $competitor = $this->topCompetitorDomain($plan, $website);
+        if ($competitor === null) {
+            return; // no competitors discovered yet — retry on the next dispatch
+        }
+        $lock = 'content:kw-insights:comp-lock:'.$plan->id;
+        if (! Cache::add($lock, 1, now()->addMinutes(30))) {
+            return;
+        }
+
+        try {
+            $language = match (mb_strtolower(trim((string) $plan->language))) {
+                '', 'en' => null,
+                'ar' => 'Arabic',
+                default => (string) $plan->language,
+            };
+            $request = $this->pool->dispatchIdeas(
+                ['url' => 'https://'.$competitor, 'scope' => 'site', 'language' => $language],
+                $website->user_id,
+                $website->id,
+                countryKey: $plan->country ?: null,
+                meter: false,
+            );
+            Cache::put($this->competitorRequestKey($plan), $request->id, now()->addHours(2));
+        } catch (\Throwable $e) {
+            Log::warning('ContentKeywordInsights competitor dispatch failed', [
+                'plan_id' => $plan->id, 'competitor' => $competitor, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** Best competitor domain to mine keywords from (SERP-shared / authority top). */
+    private function topCompetitorDomain(ContentPlan $plan, Website $website): ?string
+    {
+        try {
+            $insights = app(ContentSetupInsights::class)->competitorAuthority($website);
+            $competitors = is_array($insights) ? ($insights['competitors'] ?? []) : [];
+            $own = strtolower(preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
+            foreach ($competitors as $c) {
+                $d = strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))));
+                if ($d !== '' && $d !== $own) {
+                    return $d;
+                }
+            }
+        } catch (\Throwable) {
+            // no competitor data — skip competitor keywords
+        }
+
+        return null;
+    }
+
+    /**
      * The presentation payload, or null while research is still pending.
      *
      * @return array{
@@ -127,46 +203,92 @@ class ContentKeywordInsights
             return $cached;
         }
 
-        $request = $this->request($plan);
+        $own = $this->request($plan);
+        $comp = $this->competitorRequest($plan);
 
-        if ($request !== null && $request->status === KeywordApiRequest::STATUS_COMPLETED) {
-            $rows = $this->normalizeResults((array) ($request->result ?? []));
-            if ($rows !== []) {
-                $insights = $this->build($rows, $plan, partial: false);
-                Cache::put($this->insightsKey($plan), $insights, now()->addDays(self::CACHE_TTL_DAYS));
-                $this->backfillTopicVolumes($plan, $rows);
-
-                return $insights;
-            }
+        // Wait until BOTH the own and competitor requests have settled (completed
+        // or overdue) before building, so the digest merges keywords from the site
+        // AND its top competitor in one pass (build() runs an LLM clustering call,
+        // so we don't want to recompute it as each request lands).
+        $ownSettled = $this->settled($own);
+        $compSettled = $comp === null || $this->settled($comp);
+        if (! $ownSettled || ! $compSettled) {
+            return null; // still within a grace window
         }
 
-        // Failed, produced nothing, or overdue → serve from what we already
-        // hold rather than dead-ending the step. No stored request at all
-        // (e.g. seeds were empty, job lost) counts as overdue immediately.
-        $overdue = $request === null
-            || $request->status === KeywordApiRequest::STATUS_FAILED
-            || ($request->created_at !== null && $request->created_at->lt(now()->subMinutes(self::PENDING_GRACE_MINUTES)));
+        // Merge completed results (own first, competitor dedup-appended).
+        $rows = $this->mergeRows(
+            $this->completedRows($own),
+            $this->completedRows($comp),
+        );
 
-        if ($overdue) {
+        // Nothing from the server(s) → fall back to the plan's own topics.
+        $partial = false;
+        if ($rows === []) {
             $rows = $this->fallbackRows($plan);
+            $partial = true;
             if ($rows === []) {
-                return null; // no topics yet either — genuinely still preparing
+                return null; // genuinely still preparing (no topics yet either)
             }
-            $insights = $this->build($rows, $plan, partial: true);
-            Cache::put($this->insightsKey($plan), $insights, now()->addDays(self::FALLBACK_TTL_DAYS));
-
-            return $insights;
+        } else {
+            // Partial if either source failed to deliver anything.
+            $partial = $own === null || $own->status !== KeywordApiRequest::STATUS_COMPLETED
+                || ($comp !== null && $comp->status !== KeywordApiRequest::STATUS_COMPLETED);
         }
 
-        return null; // pending within the grace window
+        $insights = $this->build($rows, $plan, partial: $partial);
+        Cache::put($this->insightsKey($plan), $insights,
+            now()->addDays($partial ? self::FALLBACK_TTL_DAYS : self::CACHE_TTL_DAYS));
+        $this->backfillTopicVolumes($plan, $rows);
+
+        return $insights;
     }
 
-    /** Clear cached insights + request pointer so a refetch redispatches. */
+    /** A request that has completed or aged past the grace window (null = overdue now). */
+    private function settled(?KeywordApiRequest $request): bool
+    {
+        if ($request === null) {
+            return true;
+        }
+
+        return $request->status === KeywordApiRequest::STATUS_COMPLETED
+            || $request->status === KeywordApiRequest::STATUS_FAILED
+            || ($request->created_at !== null && $request->created_at->lt(now()->subMinutes(self::PENDING_GRACE_MINUTES)));
+    }
+
+    /** Normalized rows from a completed request, else []. */
+    private function completedRows(?KeywordApiRequest $request): array
+    {
+        return $request !== null && $request->status === KeywordApiRequest::STATUS_COMPLETED
+            ? $this->normalizeResults((array) ($request->result ?? []))
+            : [];
+    }
+
+    /** Merge two normalized row sets, keeping the first occurrence per keyword. */
+    private function mergeRows(array $a, array $b): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ([...$a, ...$b] as $row) {
+            $kw = $row['keyword'] ?? '';
+            if ($kw === '' || isset($seen[$kw])) {
+                continue;
+            }
+            $seen[$kw] = true;
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /** Clear cached insights + both request pointers so a refetch redispatches. */
     public function forget(ContentPlan $plan): void
     {
         Cache::forget($this->insightsKey($plan));
         Cache::forget($this->requestKey($plan));
+        Cache::forget($this->competitorRequestKey($plan));
         Cache::forget('content:kw-insights:lock:'.$plan->id);
+        Cache::forget('content:kw-insights:comp-lock:'.$plan->id);
     }
 
     // ── internals ───────────────────────────────────────────────────────
@@ -181,9 +303,21 @@ class ContentKeywordInsights
         return 'content:kw-insights:req:'.$plan->id;
     }
 
+    private function competitorRequestKey(ContentPlan $plan): string
+    {
+        return 'content:kw-insights:comp-req:'.$plan->id;
+    }
+
     private function request(ContentPlan $plan): ?KeywordApiRequest
     {
         $id = Cache::get($this->requestKey($plan));
+
+        return $id ? KeywordApiRequest::query()->find($id) : null;
+    }
+
+    private function competitorRequest(ContentPlan $plan): ?KeywordApiRequest
+    {
+        $id = Cache::get($this->competitorRequestKey($plan));
 
         return $id ? KeywordApiRequest::query()->find($id) : null;
     }

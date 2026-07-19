@@ -15,6 +15,12 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Cashier\Billable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
+// Email verification uses a GRACE WINDOW, not immediate enforcement. User
+// implements MustVerifyEmail so the Registered event still sends a verification
+// mail, but the `verified` middleware is overridden by
+// App\Http\Middleware\EnsureEmailVerifiedAfterGrace: unverified users may use
+// the app for config('auth.verification.grace_days') days after signup, then
+// are forced to verify. See RegisteredUserController::store().
 class User extends Authenticatable implements MustVerifyEmail
 {
     use HasUlids;

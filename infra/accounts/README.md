@@ -34,6 +34,7 @@ session value (`current_website_id`) chosen by `WebsiteSelector`.
 | Team manager | `app/Livewire/Websites/WebsiteTeam.php:20` | Invite/edit/revoke members & invitations; role + per-feature permissions. |
 | Permissions | `app/Support/TeamPermissions.php:5` | Role constants, the 12-feature catalog, `normalize()` / `allows()`. |
 | Onboarding gate | `app/Http/Middleware/EnsureOnboarded.php:16` | Redirects website-less users to `/onboarding` (except onboarding/google/settings/billing/verification/logout routes). |
+| Verification grace | `app/Http/Middleware/EnsureEmailVerifiedAfterGrace.php` | Overrides the `verified` alias: unverified users pass for `auth.verification.grace_days` days after signup, then are forced to `verification.notice`. |
 | Admin gate | `app/Http/Middleware/EnsureAdmin.php:14` | `is_admin` 403 guard (alias `admin`, see [infra/admin](../admin/README.md)). |
 
 ## Data model
@@ -64,11 +65,23 @@ users ──< websites (user_id = owner)                 ──< website_user (m
 ## Flows
 
 **Register (password) → onboarding**
-`RegisteredUserController::store` creates the user → accepts any matching
-invitations → `Registered` event (sends verification mail) → if a `pending_plan`
-was captured from `/pricing`, redirect to Stripe checkout; otherwise
-`verification.notice`. `EnsureOnboarded` then forces `/onboarding` until a
-website exists.
+`RegisteredUserController::store` creates the user (genuinely **unverified**) →
+accepts any matching invitations → `Registered` event (sends verification mail)
+→ if a `pending_plan` was captured from `/pricing`, redirect to Stripe checkout;
+otherwise `route('onboarding')`. `EnsureOnboarded` then forces `/onboarding`
+until a website exists.
+
+**Email verification uses a GRACE WINDOW, not immediate enforcement.**
+`App\Models\User` implements `MustVerifyEmail` (so the `Registered` event still
+sends the verification mail), but the `verified` middleware alias is **overridden
+in `bootstrap/app.php`** to `App\Http\Middleware\EnsureEmailVerifiedAfterGrace`.
+That middleware lets an unverified user use the app for
+`config('auth.verification.grace_days')` days (default 3, env
+`EMAIL_VERIFICATION_GRACE_DAYS`) measured from `created_at`; once the window
+elapses, any `verified`-gated route redirects to `verification.notice` until the
+user confirms. Verified users and guests pass through. Set `grace_days` to 0 for
+standard immediate-enforcement Laravel behaviour. Google SSO users are
+force-verified at creation so they never hit the window.
 
 **Google SSO** (`auth/google/sso`): login-or-create by lowercased email,
 **force-verifies** `email_verified_at` (SSO email is trusted), persists the
@@ -124,8 +137,11 @@ non-destructive `frozenWebsiteIds()` pattern for websites.
 - **Frozen websites.** `User::frozenWebsiteIds()` computes (live, no column) which
   owned sites exceed the plan's `max_websites`; the oldest stay active. Crawl/admin
   paths must check this (see admin recrawl gotcha).
-- Onboarding/connect routes are throttled `throttle:oauth`; verification still
-  happens via the standard `verified` middleware — checkout is **not** gated on it.
+- Onboarding/connect routes are throttled `throttle:oauth`. The `verified`
+  middleware is overridden to a **grace-window** variant
+  (`EnsureEmailVerifiedAfterGrace`): unverified users pass for
+  `config('auth.verification.grace_days')` days after signup, then are forced to
+  verify. Checkout is still **not** gated on it.
 
 ## Key files
 

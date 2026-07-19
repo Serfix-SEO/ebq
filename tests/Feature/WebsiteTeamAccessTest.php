@@ -110,10 +110,9 @@ class WebsiteTeamAccessTest extends TestCase
             'password' => 'password',
             'password_confirmation' => 'password',
             'invite' => $plain,
-            // Fresh registrants are unverified and the app sits behind the
-            // `verified` middleware, so registration lands on verify-email
-            // (not the dashboard). The invite is still accepted immediately.
-        ])->assertRedirect(route('verification.notice'));
+            // Email verification is disabled, so registration lands on
+            // onboarding. The invite is still accepted immediately.
+        ])->assertRedirect(route('onboarding'));
 
         $user = User::query()->where('email', 'joiner@example.com')->first();
         $this->assertNotNull($user);

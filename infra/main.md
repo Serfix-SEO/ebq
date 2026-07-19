@@ -281,6 +281,15 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-19 (Email verification grace window)** — Verification is no longer
+  enforced at signup. `User` still implements `MustVerifyEmail` (mail still sent),
+  but the `verified` middleware alias is overridden in `bootstrap/app.php` to
+  `EnsureEmailVerifiedAfterGrace`: unverified users pass for
+  `config('auth.verification.grace_days')` days (default 3, env
+  `EMAIL_VERIFICATION_GRACE_DAYS`) from `created_at`, then are forced to
+  `verification.notice`. Registration redirects to `onboarding` within the window.
+  Docs: [accounts/README.md](./accounts/README.md). Tests:
+  `tests/Feature/EmailVerificationGraceTest.php`.
 - **2026-07-17 (Content Autopilot Phases 0–1)** — New subsystem
   [content-autopilot/](./content-autopilot/README.md): auto content calendar
   (getautoseo.com competitor; plan at repo-root `AUTO_CONTENT_CALENDAR_PLAN.md`).

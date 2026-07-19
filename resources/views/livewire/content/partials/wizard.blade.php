@@ -392,6 +392,13 @@
                         // Fresh site: no own backlink footprint → SERP-ranking framing
                         // (no authority comparison anywhere on the step).
                         $fresh = $ins !== null && (int) ($ins['my_referring_domains'] ?? 0) < 1;
+                        // Per-competitor metric columns show whenever ANY competitor
+                        // actually has metrics (e.g. a manually-added one) — only the
+                        // all-empty fresh auto-list hides them.
+                        $showCompMetrics = ! $fresh || collect($ins['competitors'] ?? [])->contains(
+                            fn ($c) => ($c['referring_domains'] ?? null) !== null
+                                || ($c['da'] ?? null) !== null || ($c['backlinks'] ?? null) !== null
+                        );
                     @endphp
                     <div class="relative text-center" @if($needsReportGen) wire:init="loadCompetitors" @endif>
                         <div class="absolute end-0 top-0 flex items-center gap-3 text-xs font-semibold">
@@ -445,12 +452,12 @@
                                 <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
                                     <tr>
                                         <th class="px-4 py-2.5 text-start font-bold">{{ __('Competitor') }}</th>
-                                        @unless ($fresh)
+                                        @if ($showCompMetrics)
                                             <th class="px-4 py-2.5 text-end font-bold">{{ __('Referring domains') }}</th>
                                             <th class="px-4 py-2.5 text-end font-bold">{{ __('Backlinks') }}</th>
                                             <th class="px-4 py-2.5 text-end font-bold">{{ __('DA') }}</th>
                                             <th class="px-4 py-2.5 text-end font-bold">{{ __('PA') }}</th>
-                                        @endunless
+                                        @endif
                                         <th class="w-10 px-2 py-2.5"></th>
                                     </tr>
                                 </thead>
@@ -466,12 +473,12 @@
                                                     {{ $c['domain'] }}
                                                 </div>
                                             </td>
-                                            @unless ($fresh)
+                                            @if ($showCompMetrics)
                                                 <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $c['referring_domains'] !== null ? number_format($c['referring_domains']) : '—' }}</td>
                                                 <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ isset($c['backlinks']) && $c['backlinks'] !== null ? number_format($c['backlinks']) : '—' }}</td>
                                                 <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] ?? '—' }}</td>
                                                 <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['pa'] ?? '—' }}</td>
-                                            @endunless
+                                            @endif
                                             <td class="px-2 py-3 text-end">
                                                 <button type="button" wire:click="removeCompetitor('{{ $c['domain'] }}')" wire:key="comp-rm-{{ $c['domain'] }}"
                                                         class="text-slate-300 opacity-0 transition hover:text-error group-hover:opacity-100" aria-label="{{ __('Remove') }}">
@@ -483,9 +490,9 @@
                                 </tbody>
                             </table>
                         </div>
-                        @unless ($fresh)
+                        @if ($showCompMetrics)
                             <p class="mt-2 text-center text-xs text-slate-400">{{ __('DA/PA from Moz; referring domains and backlinks from DataForSEO, where available.') }}</p>
-                        @endunless
+                        @endif
                     @elseif ($ins !== null && $hasOverrides)
                         {{-- Data exists, but the user's own edits emptied the table — distinct from "still loading". --}}
                         <div class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-800/40">
