@@ -3,10 +3,12 @@
 namespace App\Services\Content;
 
 use App\Models\Website;
+use App\Support\Audit\SafeHttpGuard;
 use App\Support\ContentAutopilotConfig;
 use App\Services\Llm\LlmClientFactory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 /**
  * Auto-detects the Content Autopilot business profile from data the crawler
@@ -29,14 +31,22 @@ class SiteProfileExtractor
             'content:site-profile:v1:'.$website->id,
             now()->addDays(7),
             function () use ($website, $empty): array {
+                // Prefer crawled pages; but a freshly-added site (e.g. anonymous
+                // onboarding) has no crawl yet — fall back to a live homepage
+                // fetch so the wizard still pre-fills immediately.
                 $signals = $this->crawlSignals($website);
+                if ($signals === []) {
+                    $signals = $this->liveSignals($website);
+                }
                 if ($signals === []) {
                     return $empty;
                 }
 
                 $llm = LlmClientFactory::make(ContentAutopilotConfig::modelFor('ideate')['provider']);
                 if (! $llm->isAvailable()) {
-                    return $empty;
+                    // No LLM (e.g. staging) — still seed a plain description from
+                    // the homepage title/meta so step 1 isn't blank.
+                    return $this->rawProfile($signals, $empty);
                 }
 
                 $pagesBlock = implode("\n", array_map(
@@ -85,6 +95,90 @@ class SiteProfileExtractor
                 ];
             }
         );
+    }
+
+    /**
+     * Live homepage fetch fallback (no crawl data yet). SSRF-guarded, short
+     * timeout, fails soft to []. Parses <title>, meta/og description and the
+     * first few headings so the LLM (or the raw fallback) has something to work
+     * with during onboarding.
+     *
+     * @return list<array{title:string, meta:string}>
+     */
+    private function liveSignals(Website $website): array
+    {
+        try {
+            $host = $website->normalized_domain ?: $website->domain;
+            if (! $host) {
+                return [];
+            }
+            $url = 'https://'.preg_replace('#^https?://#i', '', (string) $host);
+
+            if (! (app(SafeHttpGuard::class)->check($url)['ok'] ?? false)) {
+                return [];
+            }
+
+            $res = Http::timeout(8)->withHeaders(['User-Agent' => 'SerfixBot/1.0 (+https://serfix.io)'])
+                ->retry(1, 200)->get($url);
+            if (! $res->ok()) {
+                return [];
+            }
+            $html = (string) $res->body();
+
+            $title = '';
+            if (preg_match('#<title[^>]*>(.*?)</title>#is', $html, $m)) {
+                $title = $this->cleanText($m[1]);
+            }
+            $meta = '';
+            if (preg_match('#<meta[^>]+name=["\']description["\'][^>]+content=["\'](.*?)["\']#is', $html, $m)
+                || preg_match('#<meta[^>]+property=["\']og:description["\'][^>]+content=["\'](.*?)["\']#is', $html, $m)
+                || preg_match('#<meta[^>]+content=["\'](.*?)["\'][^>]+name=["\']description["\']#is', $html, $m)) {
+                $meta = $this->cleanText($m[1]);
+            }
+
+            $signals = [];
+            if ($title !== '' || $meta !== '') {
+                $signals[] = ['title' => mb_substr($title !== '' ? $title : (string) $host, 0, 120), 'meta' => mb_substr($meta, 0, 200)];
+            }
+            // A couple of H1/H2 headings as extra "pages" to hint offerings.
+            if (preg_match_all('#<h[12][^>]*>(.*?)</h[12]>#is', $html, $mm) && ! empty($mm[1])) {
+                foreach (array_slice($mm[1], 0, 6) as $h) {
+                    $h = $this->cleanText($h);
+                    if (mb_strlen($h) >= 3 && mb_strlen($h) <= 120) {
+                        $signals[] = ['title' => $h, 'meta' => ''];
+                    }
+                }
+            }
+
+            return $signals;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /** Strip tags/entities/whitespace from an HTML fragment. */
+    private function cleanText(string $s): string
+    {
+        return trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($s), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+    }
+
+    /**
+     * When no LLM is available, build a plain description from the homepage
+     * signals (meta preferred, else title) so the wizard is never blank.
+     *
+     * @param  list<array{title:string, meta:string}>  $signals
+     * @param  array{description:?string, sell:list<string>, dont_sell:list<string>}  $empty
+     * @return array{description:?string, sell:list<string>, dont_sell:list<string>}
+     */
+    private function rawProfile(array $signals, array $empty): array
+    {
+        $first = $signals[0] ?? null;
+        if ($first === null) {
+            return $empty;
+        }
+        $desc = $first['meta'] !== '' ? $first['meta'] : $first['title'];
+
+        return ['description' => $desc !== '' ? mb_substr($desc, 0, 1000) : null, 'sell' => [], 'dont_sell' => []];
     }
 
     /** @return list<array{title:string, meta:string}> top crawled pages */
