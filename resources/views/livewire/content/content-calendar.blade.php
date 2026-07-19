@@ -274,6 +274,8 @@
     @include('livewire.content.partials.wizard')
     @else
         {{-- ── Calendar ─────────────────────────────────────────────── --}}
+        <x-content.connect-wordpress />
+
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
                 <button wire:click="previousMonth" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="{{ __('Previous month') }}">&larr;</button>
