@@ -252,18 +252,38 @@ class ContentKeywordInsights
         $compSite = $this->siteRequest($this->competitorRequestKey($plan)); // competitor
 
         $completed = fn (?KeywordApiRequest $r) => $r !== null && $r->status === KeywordApiRequest::STATUS_COMPLETED;
+
+        // Onboarding must show COMPLETE research to earn trust — so we wait for
+        // ALL sources (offering seeds + the client's own domain + the top
+        // competitor, when one exists) to finish before building. No low-count
+        // partial flashes; the loader (with per-source status) shows until then.
+        $competitorExpected = $this->topCompetitorDomain($plan, $plan->website) !== null;
+
+        // Competitor DISCOVERY (SERP/backlinks) may still be running — in which
+        // case topCompetitorDomain() is null only because we haven't found one
+        // YET, not because there is none. Don't lock a competitor-less digest
+        // while discovery is live; wait for it to finalize (no_data/ready) first.
+        // Once it lands, the wizard's poll re-dispatch fires the competitor
+        // keyword request (ContentWizard::refreshKeywordInsights).
+        $competitorPending = $plan->website !== null
+            && ! $competitorExpected
+            && app(ContentSetupInsights::class)->isGenerating($plan->website);
+
         $allComplete = $completed($seed)
             && ($ownSite === null || $completed($ownSite))
-            && ($compSite === null || $completed($compSite));
-        $allSettled = $this->settled($seed) && $this->settled($ownSite) && $this->settled($compSite);
+            && ! $competitorPending
+            && (! $competitorExpected || $completed($compSite));
 
-        // Wait for the CLIENT's own keyword sets (offering seeds + own-domain
-        // crawl) before showing a digest — otherwise the fast seed request alone
-        // (a dozen keywords) flashes as "14 analyzed" before the 500-keyword
-        // domain set lands. The competitor set + gap still upgrade in afterwards.
-        $clientReady = ($seed === null || $completed($seed)) && ($ownSite === null || $completed($ownSite));
-        if (! $clientReady && ! $allSettled) {
-            return null; // still gathering the client's own keywords
+        // Give-up backstop (server failure / very slow): only after every
+        // dispatched request has settled AND — if a competitor is expected — its
+        // request has actually been dispatched and settled too. Discovery must
+        // have finalized too, so we don't give up before a competitor can appear.
+        $allSettled = ! $competitorPending
+            && $this->settled($seed) && $this->settled($ownSite)
+            && (! $competitorExpected || ($compSite !== null && $this->settled($compSite)));
+
+        if (! $allComplete && ! $allSettled) {
+            return null; // keep waiting — complete results only
         }
 
         // CLIENT keywords = offering seeds + their own crawled domain (scrap-
