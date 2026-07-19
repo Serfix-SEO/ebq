@@ -463,7 +463,8 @@
                         </div>
                     @else
                         <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
-                            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Your competitive landscape appears here shortly. Your content plan is already being built either way.') }}</p>
+                            <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('No competitor authority data yet') }}</p>
+                            <p class="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">{{ __("This is normal for newer sites with a small backlink footprint — there's no established authority to compare yet. Add competitors you know below, or just continue; your content plan is already being built.") }}</p>
                         </div>
                     @endif
 
