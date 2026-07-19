@@ -306,7 +306,6 @@
                     class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                     {{ $view === 'grid' ? __('List view') : __('Calendar view') }}
                 </button>
-                <button wire:click="$toggle('showAddTopic')" class="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700">+ {{ __('Add topic') }}</button>
                 <button wire:click="pauseOrResume"
                     class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                     {{ $plan->isActive() ? __('Pause') : __('Resume') }}
@@ -319,6 +318,7 @@
             <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span>{{ __('Auto-publishes daily between :window', ['window' => \App\Livewire\Content\ContentCalendar::publishWindowLabel($plan)]) }}.</span>
             <a href="{{ route('content.settings') }}" wire:navigate class="font-medium text-orange-600 hover:text-orange-700">{{ __('Change window →') }}</a>
+            <span class="text-slate-400 dark:text-slate-500">{{ __('· To move an article to another month, switch to List view and pick a date.') }}</span>
         </div>
 
         {{-- ── Overview KPIs ────────────────────────────────────────── --}}
@@ -347,33 +347,6 @@
                 {{ __('Content planning is paused. New articles are not being written.') }}
             </div>
         @endunless
-
-        @if ($showAddTopic)
-            <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400" for="ca-new-title">{{ __('Article title') }}</label>
-                        <input id="ca-new-title" wire:model="newTitle" type="text"
-                            class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                        @error('newTitle') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400" for="ca-new-kw">{{ __('Target keyword') }}</label>
-                        <input id="ca-new-kw" wire:model="newKeyword" type="text"
-                            class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                        @error('newKeyword') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
-                    </div>
-                </div>
-                <div class="mt-3 flex justify-end gap-2">
-                    <button wire:click="$toggle('showAddTopic')" class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">{{ __('Cancel') }}</button>
-                    <button wire:click="addTopic" class="rounded-lg border border-orange-300 px-3 py-1.5 text-sm font-semibold text-orange-700 hover:bg-orange-50 dark:border-orange-900 dark:text-orange-300">{{ __('Add to calendar') }}</button>
-                    <button wire:click="addAndWriteTopic" wire:loading.attr="disabled" wire:target="addAndWriteTopic" class="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70">
-                        <svg wire:loading wire:target="addAndWriteTopic" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                        {{ __('Write it now') }}
-                    </button>
-                </div>
-            </div>
-        @endif
 
         @if ($view === 'grid')
             <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -451,7 +424,18 @@
                     @forelse ($topics as $topic)
                         @php $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status); @endphp
                         <div class="flex flex-wrap items-center gap-3 px-4 py-3">
-                            <div class="w-20 shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $topic->scheduled_for?->translatedFormat('M j') }}</div>
+                            @php $canMove = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true); @endphp
+                            <div class="w-28 shrink-0">
+                                @if ($canMove)
+                                    {{-- Reschedule to ANY date (drag on the grid is same-month only). --}}
+                                    <input type="date" value="{{ $topic->scheduled_for?->toDateString() }}" min="{{ now()->toDateString() }}"
+                                        wire:change="reschedule('{{ $topic->id }}', $event.target.value)" wire:key="resched-{{ $topic->id }}"
+                                        title="{{ __('Move to another day or month') }}"
+                                        class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" />
+                                @else
+                                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $topic->scheduled_for?->translatedFormat('M j') }}</span>
+                                @endif
+                            </div>
                             @php
                                 $traffic = \App\Livewire\Content\ContentCalendar::fairMonthlyVisits($topic);
                                 $inFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true);
