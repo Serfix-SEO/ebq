@@ -58,6 +58,14 @@ class AuthenticatedSessionController extends Controller
 
         $fallback = $user ? $user->firstAccessibleRoute($websiteId) : 'dashboard';
 
+        // Content-primary users (content site, no GA/GSC): go straight to the
+        // calendar. Bypass intended() — a stale intended URL (e.g. /onboarding or
+        // /dashboard from an earlier bounce) would otherwise re-trap them in the
+        // reports onboarding.
+        if ($fallback === 'content.index') {
+            return redirect()->route('content.index');
+        }
+
         return redirect()->intended(route($fallback, absolute: false));
     }
 

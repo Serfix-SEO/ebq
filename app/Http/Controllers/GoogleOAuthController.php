@@ -138,7 +138,13 @@ class GoogleOAuthController extends Controller
             return redirect()->route('onboarding');
         }
 
-        return redirect()->intended(route($user->firstAccessibleRoute($websiteId), absolute: false));
+        $fallback = $user->firstAccessibleRoute($websiteId);
+        // Content-primary users → the calendar, bypassing any stale intended URL.
+        if ($fallback === 'content.index') {
+            return redirect()->route('content.index');
+        }
+
+        return redirect()->intended(route($fallback, absolute: false));
     }
 
     /**
