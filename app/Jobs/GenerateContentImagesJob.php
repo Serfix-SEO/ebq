@@ -110,11 +110,14 @@ class GenerateContentImagesJob implements ShouldQueue
         // LLM is unavailable or omits one.
         $llmPrompts = $this->llmPrompts($article, $topic, $anchors, $stylePrompt);
 
-        // Build the work list: featured first, then one per section anchor.
-        // The per-plan `featured_image` toggle (default ON) lets a client opt out
-        // of the hero image at the top of the article.
+        // Build the work list: featured first, then one per section anchor. The
+        // featured image is ALWAYS generated (it becomes the WordPress featured
+        // media / thumbnail); the per-plan `featured_image` toggle only controls
+        // whether it is also embedded at the TOP of the article body — off avoids
+        // a duplicate when the WP theme already renders the featured image.
+        $embedFeatured = $plan === null || $plan->toggle('featured_image');
         $jobs = [];
-        if (ContentAutopilotConfig::featuredImageEnabled() && ($plan === null || $plan->toggle('featured_image'))) {
+        if (ContentAutopilotConfig::featuredImageEnabled()) {
             $jobs[] = [
                 'role' => ContentImage::ROLE_FEATURED,
                 'anchor' => null,
@@ -181,7 +184,11 @@ class GenerateContentImagesJob implements ShouldQueue
             $url = $image->url();
             $tag = $this->figure($url, $spec['alt']);
             if ($spec['role'] === ContentImage::ROLE_FEATURED) {
-                $featuredImage = $tag;
+                // The ContentImage row above is what becomes the WP featured
+                // media. Only embed it in the body when the plan opts in.
+                if ($embedFeatured) {
+                    $featuredImage = $tag;
+                }
             } else {
                 $inlineInjections[$spec['anchor']] = $tag;
             }

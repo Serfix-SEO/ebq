@@ -294,7 +294,7 @@
                         <div class="mt-4 space-y-2.5">
                             @php
                                 $structOpts = [
-                                    ['key' => 'featured_image', 'title' => __('Featured image'), 'desc' => __('A hero image at the very top of the article.')],
+                                    ['key' => 'featured_image', 'title' => __('Featured image in article'), 'desc' => __('Show the featured image at the top of the article body. Turn off if your WordPress theme already displays it (avoids duplicates).')],
                                     ['key' => 'key_takeaways', 'title' => __('Key takeaways'), 'desc' => __('A quick bullet summary near the top.')],
                                     ['key' => 'toc', 'title' => __('“In this article” list'), 'desc' => __('A clickable table of contents after the intro.')],
                                     ['key' => 'faq', 'title' => __('FAQ section'), 'desc' => __('Common questions answered at the end.')],
