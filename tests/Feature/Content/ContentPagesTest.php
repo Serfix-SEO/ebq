@@ -332,6 +332,12 @@ class ContentPagesTest extends TestCase
             ->call('reschedule', $topic->id, now()->subDay()->toDateString());
 
         $this->assertTrue($topic->fresh()->scheduled_for->isFuture());
+
+        // Dropping onto TODAY (the current date) must work.
+        Livewire::test(ContentCalendar::class)
+            ->call('reschedule', $topic->id, now()->toDateString());
+
+        $this->assertTrue($topic->fresh()->scheduled_for->isToday());
     }
 
     public function test_review_page_shows_article_and_approves(): void

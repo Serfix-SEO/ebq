@@ -1045,15 +1045,20 @@
                         <div class="px-2 py-2">{{ $dow }}</div>
                     @endforeach
                 </div>
-                {{-- dragId holds the topic being dragged; day cells are drop targets that reschedule it. --}}
-                <div class="grid grid-cols-7" style="min-width:56rem" x-data="{ dragId: null }">
+                {{-- drag.id holds the topic being dragged. It MUST be a shared
+                     object (not a bare primitive): each day cell has its own
+                     x-data scope, and writing a primitive `dragId` from a cell
+                     would shadow the parent instead of updating it, so a drop on
+                     a DIFFERENT cell would read null. Mutating `drag.id` on the
+                     shared object propagates across every cell. --}}
+                <div class="grid grid-cols-7" style="min-width:56rem" x-data="{ drag: { id: null } }">
                     @foreach ($days as $day)
                         @php $dayTopics = $topicsByDate->get($day->toDateString(), collect()); @endphp
                         <div x-data="{ over: false }"
                              x-on:dragover.prevent="over = true"
                              x-on:dragleave="over = false"
-                             x-on:drop="over = false; if (dragId) { $wire.reschedule(dragId, '{{ $day->toDateString() }}') }; dragId = null"
-                             :class="over && dragId ? 'ring-2 ring-inset ring-orange-400' : ''"
+                             x-on:drop="over = false; if (drag.id) { $wire.reschedule(drag.id, '{{ $day->toDateString() }}') }; drag.id = null"
+                             :class="over && drag.id ? 'ring-2 ring-inset ring-orange-400' : ''"
                              class="border-b border-e border-slate-100 p-1.5 align-top dark:border-slate-800 {{ $day->format('Y-m') !== $month ? 'bg-slate-50 dark:bg-slate-950' : '' }}" style="min-height:6.5rem">
                             <div class="mb-1 text-end text-xs {{ $day->isToday() ? 'font-bold text-orange-600' : 'text-slate-400' }}">{{ $day->day }}</div>
                             @foreach ($dayTopics as $topic)
@@ -1064,10 +1069,10 @@
                                     $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready'], true);
                                 @endphp
                                 <div wire:key="cell-{{ $topic->id }}"
-                                     @if($canDrag) draggable="true" x-on:dragstart="dragId = '{{ $topic->id }}'" x-on:dragend="dragId = null" @endif
+                                     @if($canDrag) draggable="true" x-on:dragstart="drag.id = '{{ $topic->id }}'" x-on:dragend="drag.id = null" @endif
                                      class="mb-1 rounded-lg border p-1.5 {{ $cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800' }} {{ $canDrag ? 'cursor-grab active:cursor-grabbing' : '' }}">
                                     @if ($topic->currentArticle || $cellInFlight)
-                                        <a href="{{ route('content.review', $topic->id) }}" wire:navigate class="block hover:opacity-80">
+                                        <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80">
                                             <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
                                         </a>
                                     @else
@@ -1136,7 +1141,7 @@
                                 <button wire:click="approve('{{ $topic->id }}')" class="text-sm font-medium text-success hover:brightness-90">{{ __('Approve') }}</button>
                             @endif
                             @if (in_array($topic->status, ['suggested', 'approved', 'ready'], true))
-                                <input type="date" min="{{ now()->addDay()->toDateString() }}" value="{{ $topic->scheduled_for?->toDateString() }}"
+                                <input type="date" min="{{ now()->toDateString() }}" value="{{ $topic->scheduled_for?->toDateString() }}"
                                     wire:change="reschedule('{{ $topic->id }}', $event.target.value)"
                                     class="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" />
                                 <button wire:click="skip('{{ $topic->id }}')" class="text-sm text-slate-400 hover:text-slate-600">{{ __('Skip') }}</button>

@@ -714,7 +714,9 @@ class ContentCalendar extends Component
         } catch (\Throwable) {
             return;
         }
-        if ($day->isPast()) {
+        // Allow TODAY (its start-of-day is technically "past"); reject only days
+        // before today so a drop onto the current date works.
+        if ($day->lt(now()->startOfDay())) {
             return;
         }
         $topic->update(['scheduled_for' => $day]);
