@@ -46,6 +46,27 @@
                 {{-- decorative brand glow --}}
                 <div class="pointer-events-none absolute -top-10 end-0 h-56 w-56 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 opacity-20 blur-3xl"></div>
 
+                {{-- Transition overlay: step moves can be slow (they persist the plan,
+                     dispatch research, and the next step's first render pulls live data).
+                     Show an interactive "working" state so the click never feels dead. --}}
+                <div wire:loading.flex wire:target="toHowItWorks,toImages,toCompetitors,toKeywordResearch,toFirstArticles,toAccount"
+                     class="absolute inset-0 z-30 hidden flex-col items-center justify-center gap-4 rounded-3xl bg-white/85 text-center backdrop-blur-sm dark:bg-slate-900/85">
+                    <span class="relative flex h-14 w-14 items-center justify-center">
+                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-40"></span>
+                        <svg class="h-10 w-10 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                    </span>
+                    <div>
+                        <p class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                            <span wire:loading wire:target="toKeywordResearch">{{ __('Researching keywords for your site…') }}</span>
+                            <span wire:loading wire:target="toCompetitors">{{ __('Analyzing your competitors…') }}</span>
+                            <span wire:loading wire:target="toHowItWorks">{{ __('Building your content plan…') }}</span>
+                            <span wire:loading wire:target="toFirstArticles">{{ __('Lining up your first articles…') }}</span>
+                            <span wire:loading wire:target="toImages,toAccount">{{ __('One moment…') }}</span>
+                        </p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('This can take a few seconds.') }}</p>
+                    </div>
+                </div>
+
                 <div class="relative">
                 @error('plan')
                     <p class="mb-4 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">{{ $message }}</p>
