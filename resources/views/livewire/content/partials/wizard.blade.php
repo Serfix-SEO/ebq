@@ -555,7 +555,7 @@
                         <div wire:poll.5s="refreshKeywordInsights" class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
                             <svg class="mx-auto h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                             <p class="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Researching live search data for your market…') }}</p>
-                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('This is deep research and may take up to 4 minutes.') }}</p>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('We analyze your site and your competitors in depth — this can take a few minutes. Your full results appear here all at once.') }}</p>
 
                             @php $kwStatus = $wizard['keywordStatus'] ?? []; @endphp
                             @if (! empty($kwStatus))

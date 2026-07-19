@@ -297,13 +297,18 @@ class ContentKeywordInsights
             && $competitorDomains === []
             && app(ContentSetupInsights::class)->isGenerating($plan->website);
 
-        // "What people are searching for" = the client's OWN keyword set (offering
-        // seeds + their own domain crawl). Show it AS SOON AS it is ready — the
-        // competitor keywords and the gap analysis upgrade in afterwards.
+        // Show the FULL digest in one shot — never a smaller number that grows.
+        // A keyword count that jumps (517 → 1,000+) as sources land reads as
+        // "we found less than we did"; a few extra seconds of the loader is fine,
+        // seeing a partial count is not. So we wait for the client's own keyword
+        // set (offering seeds + own-domain crawl) AND every competitor before
+        // building. The loader's per-source status shows progress meanwhile.
         $clientComplete = $completed($seed) && ($ownSite === null || $completed($ownSite));
 
         $compCompleted = count(array_filter($compReqs, $completed));
         $competitorsComplete = ! $discoveryPending && $compCompleted >= $expected;
+
+        $allComplete = $clientComplete && $competitorsComplete;
 
         // Backstop: give up (build from whatever landed) only once EVERYTHING has
         // settled — client requests plus every dispatched competitor request — so
@@ -314,8 +319,8 @@ class ContentKeywordInsights
             && count(array_filter($compReqs, fn ($r) => $this->settled($r))) === count($compReqs);
         $allSettled = $this->settled($seed) && $this->settled($ownSite) && $competitorsSettled;
 
-        if (! $clientComplete && ! $allSettled) {
-            return null; // still gathering the client's own keywords
+        if (! $allComplete && ! $allSettled) {
+            return null; // keep the loader up — show complete results only
         }
 
         // CLIENT keywords = offering seeds + their own crawled domain (scrap-
@@ -340,7 +345,7 @@ class ContentKeywordInsights
             }
             $partial = true;
         } else {
-            $partial = ! ($clientComplete && $competitorsComplete); // competitors/gap still coming
+            $partial = ! $allComplete; // only true on the settled-backstop path
         }
 
         // Keyword gap: what competitors rank for that the client does NOT,
