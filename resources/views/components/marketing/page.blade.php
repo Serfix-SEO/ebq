@@ -92,6 +92,7 @@
 
             <nav aria-label="Primary" class="hidden items-center gap-7 text-sm text-slate-600 md:flex">
                 <a href="{{ route('features') }}" class="transition hover:text-slate-900 {{ $active === 'features' ? 'text-slate-900' : '' }}">{{ __('Features') }}</a>
+                <a href="{{ route('content.landing') }}" class="inline-flex items-center transition hover:text-slate-900 {{ $active === 'content' ? 'text-slate-900' : '' }}">{{ __('Content AI') }}<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('New') }}</span></a>
                 <a href="{{ route('guide') }}" class="transition hover:text-slate-900 {{ $active === 'guide' ? 'text-slate-900' : '' }}">{{ __('Guide') }}</a>
                 <a href="{{ route('pricing') }}" class="transition hover:text-slate-900 {{ $active === 'pricing' ? 'text-slate-900' : '' }}">{{ __('Pricing') }}</a>
                 <a href="{{ route('contact') }}" class="transition hover:text-slate-900 {{ $active === 'contact' ? 'text-slate-900' : '' }}">{{ __('Contact') }}</a>
@@ -136,6 +137,7 @@
             class="border-t border-slate-200/80 bg-white md:hidden">
             <nav aria-label="Primary mobile" @click="mobileOpen = false" class="mx-auto flex max-w-6xl flex-col gap-1 px-6 py-4 text-sm text-slate-600">
                 <a href="{{ route('features') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'features' ? 'font-semibold text-slate-900' : '' }}">{{ __('Features') }}</a>
+                <a href="{{ route('content.landing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'content' ? 'font-semibold text-slate-900' : '' }}">{{ __('Content AI') }}<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('New') }}</span></a>
                 <a href="{{ route('guide') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'guide' ? 'font-semibold text-slate-900' : '' }}">{{ __('Guide') }}</a>
                 <a href="{{ route('pricing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'pricing' ? 'font-semibold text-slate-900' : '' }}">{{ __('Pricing') }}</a>
                 <a href="{{ route('contact') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'contact' ? 'font-semibold text-slate-900' : '' }}">{{ __('Contact') }}</a>

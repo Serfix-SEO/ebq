@@ -32,6 +32,7 @@ rsync -az -e "$SSH" \
 echo "── migrate + reload runtime"
 $SSH "root@$STAGING" '
   php /var/www/ebq/artisan config:clear >/dev/null
+  php /var/www/ebq/artisan route:clear >/dev/null
   php /var/www/ebq/artisan view:clear >/dev/null
   php /var/www/ebq/artisan migrate --force
   php /var/www/ebq/artisan horizon:terminate >/dev/null 2>&1 || true

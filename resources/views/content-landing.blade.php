@@ -4,7 +4,7 @@
 <x-marketing.page
     title="Content Autopilot — SEO articles written & published for you — Serfix"
     description="Serfix Content Autopilot researches, writes, optimizes, illustrates and publishes an expert SEO article for your site — on autopilot. 5-day free trial, no card."
-    active="features"
+    active="content"
 >
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-slate-200 bg-white">
