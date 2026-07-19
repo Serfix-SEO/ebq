@@ -165,10 +165,10 @@ class PublicOnboarding extends Component
         session(['current_website_id' => $result['website']->id]);
         session()->forget('content_onboarding_token');
 
-        // Covered (trial or a free subscription slot) → straight to the plan.
+        // Covered (trial or a free subscription slot) → the content calendar.
         // Uncovered (trial already used, or subscription full) → Get started,
         // where they pay for this additional site.
-        $this->redirectRoute($result['covered'] ? 'content.settings' : 'content.get-started', navigate: false);
+        $this->redirectRoute($result['covered'] ? 'content.index' : 'content.get-started', navigate: false);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────

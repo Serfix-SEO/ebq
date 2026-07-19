@@ -164,7 +164,7 @@ class GoogleOAuthController extends Controller
         session(['current_website_id' => $result['website']->id]);
         session()->forget('content_onboarding_token');
 
-        return redirect()->route($result['covered'] ? 'content.settings' : 'content.get-started');
+        return redirect()->route($result['covered'] ? 'content.index' : 'content.get-started');
     }
 
     public function redirect(Request $request): RedirectResponse
