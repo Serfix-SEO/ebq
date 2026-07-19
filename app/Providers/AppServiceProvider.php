@@ -31,6 +31,11 @@ class AppServiceProvider extends ServiceProvider
         // Sharding: per-request/job routing state for the tenant/crawl tiers.
         $this->app->singleton(\App\Support\ShardContext::class);
 
+        // Content product entitlement/usage — singleton so its per-request
+        // access/coverage memo holds across the many effectiveFeatureFlags()
+        // and nav calls that hit it each request.
+        $this->app->singleton(\App\Services\Content\ContentEntitlements::class);
+
         // Cashier 16+ does NOT auto-load its own migrations — they're
         // only made available via `vendor:publish --tag=cashier-migrations`.
         // We've manually copied the subscription / subscription-item /

@@ -126,7 +126,31 @@ class User extends Authenticatable implements MustVerifyEmail
             'trial_ends_at' => 'datetime',
             'trial_deletion_notices' => 'array',
             'trial_data_deleted_at' => 'datetime',
+            'content_trial_started_at' => 'datetime',
+            'content_trial_ends_at' => 'datetime',
+            'is_system' => 'boolean',
         ];
+    }
+
+    // ── Content product entitlement proxies (see ContentEntitlements) ────
+
+    public function hasContentAccess(): bool
+    {
+        return app(\App\Services\Content\ContentEntitlements::class)->hasContentAccess($this);
+    }
+
+    public function contentSubscription(): ?\Laravel\Cashier\Subscription
+    {
+        return $this->subscription(\App\Services\Content\ContentEntitlements::SUBSCRIPTION);
+    }
+
+    /**
+     * A "content-only" user: has content access but their DASHBOARD trial has
+     * lapsed — they get content features + teasered dashboard reports/crawl.
+     */
+    public function isContentOnly(): bool
+    {
+        return $this->hasContentAccess() && \App\Support\TrialStatus::isExpired($this);
     }
 
     public function googleAccounts(): HasMany

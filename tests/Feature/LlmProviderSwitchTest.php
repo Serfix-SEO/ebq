@@ -118,6 +118,16 @@ class LlmProviderSwitchTest extends TestCase
             'autopilot_target_score' => 85,
             'autopilot_max_revisions' => 3,
             'autopilot_publish_floor' => 60,
+            // Content product billing & limits (required integer fields).
+            'content_monthly_usd' => 39,
+            'content_annual_usd' => 29,
+            'content_addon_monthly_usd' => 15,
+            'content_addon_annual_usd' => 10,
+            'content_first_month_usd' => 1,
+            'content_trial_days' => 5,
+            'content_trial_articles' => 3,
+            'content_monthly_articles_per_website' => 60,
+            'content_only_crawl_pages' => 200,
         ];
     }
 

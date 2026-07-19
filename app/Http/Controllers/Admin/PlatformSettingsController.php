@@ -63,6 +63,22 @@ class PlatformSettingsController extends Controller
                 'publish_floor' => ContentAutopilotConfig::publishFloor(),
                 'banned_phrases' => implode("\n", ContentAutopilotConfig::bannedPhrases()),
             ],
+            'content_billing' => [
+                'monthly_price_id' => (string) Setting::get('content.pricing.monthly_price_id', ''),
+                'annual_price_id' => (string) Setting::get('content.pricing.annual_price_id', ''),
+                'addon_monthly_price_id' => (string) Setting::get('content.pricing.addon_monthly_price_id', ''),
+                'addon_annual_price_id' => (string) Setting::get('content.pricing.addon_annual_price_id', ''),
+                'first_month_coupon' => (string) Setting::get('content.pricing.first_month_coupon', ''),
+                'monthly_usd' => ContentAutopilotConfig::displayPrice('monthly'),
+                'annual_usd' => ContentAutopilotConfig::displayPrice('annual'),
+                'addon_monthly_usd' => ContentAutopilotConfig::displayPrice('addon_monthly'),
+                'addon_annual_usd' => ContentAutopilotConfig::displayPrice('addon_annual'),
+                'first_month_usd' => ContentAutopilotConfig::displayPrice('first_month'),
+                'trial_days' => ContentAutopilotConfig::trialDays(),
+                'trial_articles' => ContentAutopilotConfig::trialArticles(),
+                'monthly_articles_per_website' => ContentAutopilotConfig::monthlyArticlesPerWebsite(),
+                'content_only_crawl_pages' => ContentAutopilotConfig::contentOnlyCrawlCap(),
+            ],
             'banner' => [
                 'enabled'     => ((string) Setting::get('plugin.banner.enabled', '0')) === '1',
                 'type'        => (string) Setting::get('plugin.banner.type', 'image'),
@@ -112,6 +128,23 @@ class PlatformSettingsController extends Controller
             'autopilot_max_revisions' => ['required', 'integer', 'min:0', 'max:6'],
             'autopilot_publish_floor' => ['required', 'integer', 'min:0', 'max:100'],
             'autopilot_banned_phrases' => ['nullable', 'string', 'max:8000'],
+            // Content product billing & limits (Stripe price ids + coupon +
+            // display prices + trial/monthly caps). Price ids validated to look
+            // like Stripe ids so a typo never becomes a silent no-checkout.
+            'content_monthly_price_id' => ['nullable', 'string', 'regex:/^price_/', 'max:120'],
+            'content_annual_price_id' => ['nullable', 'string', 'regex:/^price_/', 'max:120'],
+            'content_addon_monthly_price_id' => ['nullable', 'string', 'regex:/^price_/', 'max:120'],
+            'content_addon_annual_price_id' => ['nullable', 'string', 'regex:/^price_/', 'max:120'],
+            'content_first_month_coupon' => ['nullable', 'string', 'max:120'],
+            'content_monthly_usd' => ['required', 'integer', 'min:0', 'max:9999'],
+            'content_annual_usd' => ['required', 'integer', 'min:0', 'max:9999'],
+            'content_addon_monthly_usd' => ['required', 'integer', 'min:0', 'max:9999'],
+            'content_addon_annual_usd' => ['required', 'integer', 'min:0', 'max:9999'],
+            'content_first_month_usd' => ['required', 'integer', 'min:0', 'max:9999'],
+            'content_trial_days' => ['required', 'integer', 'min:0', 'max:60'],
+            'content_trial_articles' => ['required', 'integer', 'min:0', 'max:50'],
+            'content_monthly_articles_per_website' => ['required', 'integer', 'min:1', 'max:1000'],
+            'content_only_crawl_pages' => ['required', 'integer', 'min:20', 'max:100000'],
             'banner_enabled' => ['nullable', 'boolean'],
             'banner_type' => ['required', 'string', Rule::in(['image', 'youtube'])],
             'banner_title' => ['nullable', 'string', 'max:120'],
@@ -161,6 +194,27 @@ class PlatformSettingsController extends Controller
             preg_split('/\r?\n/', (string) ($data['autopilot_banned_phrases'] ?? '')) ?: []
         )));
         Setting::set('content.humanizer.banned_phrases', $phrases === [] ? null : $phrases);
+
+        // Content product billing & limits.
+        foreach ([
+            'content.pricing.monthly_price_id' => 'content_monthly_price_id',
+            'content.pricing.annual_price_id' => 'content_annual_price_id',
+            'content.pricing.addon_monthly_price_id' => 'content_addon_monthly_price_id',
+            'content.pricing.addon_annual_price_id' => 'content_addon_annual_price_id',
+            'content.pricing.first_month_coupon' => 'content_first_month_coupon',
+        ] as $settingKey => $field) {
+            $val = trim((string) ($data[$field] ?? ''));
+            Setting::set($settingKey, $val === '' ? null : $val);
+        }
+        Setting::set('content.pricing.monthly_usd', (int) $data['content_monthly_usd']);
+        Setting::set('content.pricing.annual_usd', (int) $data['content_annual_usd']);
+        Setting::set('content.pricing.addon_monthly_usd', (int) $data['content_addon_monthly_usd']);
+        Setting::set('content.pricing.addon_annual_usd', (int) $data['content_addon_annual_usd']);
+        Setting::set('content.pricing.first_month_usd', (int) $data['content_first_month_usd']);
+        Setting::set('content.limits.trial_days', (int) $data['content_trial_days']);
+        Setting::set('content.limits.trial_articles', (int) $data['content_trial_articles']);
+        Setting::set('content.limits.monthly_articles_per_website', (int) $data['content_monthly_articles_per_website']);
+        Setting::set('content.limits.content_only_crawl_pages', (int) $data['content_only_crawl_pages']);
 
         Setting::set('plugin.banner.enabled', $request->boolean('banner_enabled') ? '1' : '0');
         Setting::set('plugin.banner.type', (string) $data['banner_type']);

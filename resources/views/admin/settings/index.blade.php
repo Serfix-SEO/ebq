@@ -166,6 +166,68 @@
                 <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">AI-tell phrases the writer must avoid and the style lint flags. Clearing the box restores the built-in list.</p>
             </section>
 
+            {{-- ── Content product — billing & limits ────────────────── --}}
+            <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Content product — billing &amp; limits</h2>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Stripe price ids (create the prices in Stripe, paste the ids here), display prices, and generation limits for the separately-billed Content Autopilot product. Blank price ids disable that checkout path.
+                </p>
+
+                <h3 class="mt-5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Stripe price ids &amp; coupon</h3>
+                <div class="mt-2 grid gap-4 sm:grid-cols-2">
+                    @foreach ([
+                        'content_monthly_price_id' => ['Base — monthly', 'monthly_price_id'],
+                        'content_annual_price_id' => ['Base — annual', 'annual_price_id'],
+                        'content_addon_monthly_price_id' => ['Extra website — monthly', 'addon_monthly_price_id'],
+                        'content_addon_annual_price_id' => ['Extra website — annual', 'addon_annual_price_id'],
+                        'content_first_month_coupon' => ['First-month coupon id ($1 offer, monthly)', 'first_month_coupon'],
+                    ] as $field => $meta)
+                        <div>
+                            <label for="{{ $field }}" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $meta[0] }}</label>
+                            <input type="text" id="{{ $field }}" name="{{ $field }}"
+                                value="{{ old($field, $content_billing[$meta[1]]) }}"
+                                placeholder="{{ str_contains($field, 'coupon') ? 'coupon_id' : 'price_...' }}"
+                                class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                        </div>
+                    @endforeach
+                </div>
+
+                <h3 class="mt-6 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Display prices (USD/mo)</h3>
+                <div class="mt-2 grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                    @foreach ([
+                        'content_monthly_usd' => ['Monthly', 'monthly_usd'],
+                        'content_annual_usd' => ['Annual', 'annual_usd'],
+                        'content_addon_monthly_usd' => ['Addon monthly', 'addon_monthly_usd'],
+                        'content_addon_annual_usd' => ['Addon annual', 'addon_annual_usd'],
+                        'content_first_month_usd' => ['First month', 'first_month_usd'],
+                    ] as $field => $meta)
+                        <div>
+                            <label for="{{ $field }}" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $meta[0] }}</label>
+                            <input type="number" id="{{ $field }}" name="{{ $field }}" min="0" max="9999" required
+                                value="{{ old($field, $content_billing[$meta[1]]) }}"
+                                class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                        </div>
+                    @endforeach
+                </div>
+
+                <h3 class="mt-6 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Limits</h3>
+                <div class="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    @foreach ([
+                        'content_trial_days' => ['Trial length (days)', 'trial_days', 0, 60],
+                        'content_trial_articles' => ['Trial article limit', 'trial_articles', 0, 50],
+                        'content_monthly_articles_per_website' => ['Monthly articles / website', 'monthly_articles_per_website', 1, 1000],
+                        'content_only_crawl_pages' => ['Content-only crawl pages', 'content_only_crawl_pages', 20, 100000],
+                    ] as $field => $meta)
+                        <div>
+                            <label for="{{ $field }}" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $meta[0] }}</label>
+                            <input type="number" id="{{ $field }}" name="{{ $field }}" min="{{ $meta[2] }}" max="{{ $meta[3] }}" required
+                                value="{{ old($field, $content_billing[$meta[1]]) }}"
+                                class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+
             {{-- ── Rank tracker ─────────────────────────────────────── --}}
             <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Rank tracker</h2>

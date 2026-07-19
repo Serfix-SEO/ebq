@@ -126,6 +126,81 @@ class ContentAutopilotConfig
 
     // ── Humanizer ───────────────────────────────────────────────────────
 
+    // ── Product billing & limits (separate content product) ─────────────
+
+    /** @param 'monthly'|'annual' $interval */
+    public static function priceId(string $interval): ?string
+    {
+        $v = self::setting('content.pricing.'.($interval === 'annual' ? 'annual' : 'monthly').'_price_id');
+
+        return is_string($v) && $v !== '' ? $v : null;
+    }
+
+    /** @param 'monthly'|'annual' $interval */
+    public static function addonPriceId(string $interval): ?string
+    {
+        $v = self::setting('content.pricing.addon_'.($interval === 'annual' ? 'annual' : 'monthly').'_price_id');
+
+        return is_string($v) && $v !== '' ? $v : null;
+    }
+
+    public static function firstMonthCoupon(): ?string
+    {
+        $v = self::setting('content.pricing.first_month_coupon');
+
+        return is_string($v) && $v !== '' ? $v : null;
+    }
+
+    public static function checkoutReady(string $interval): bool
+    {
+        return self::priceId($interval) !== null;
+    }
+
+    /**
+     * Display price (USD) for marketing/UI. Keys: base monthly 39 / annual 29,
+     * addon monthly 15 / annual 10, first_month 1.
+     */
+    public static function displayPrice(string $key): int
+    {
+        $defaults = [
+            'monthly' => 39, 'annual' => 29,
+            'addon_monthly' => 15, 'addon_annual' => 10, 'first_month' => 1,
+        ];
+
+        return (int) self::setting('content.pricing.'.$key.'_usd', $defaults[$key] ?? 0);
+    }
+
+    public static function trialDays(): int
+    {
+        return max(0, (int) self::setting('content.limits.trial_days', 5));
+    }
+
+    public static function trialArticles(): int
+    {
+        return max(0, (int) self::setting('content.limits.trial_articles', 3));
+    }
+
+    public static function monthlyArticlesPerWebsite(): int
+    {
+        return max(1, (int) self::setting('content.limits.monthly_articles_per_website', 60));
+    }
+
+    /** Crawl page cap for content-only users (feeds the pipeline, not the dashboard). */
+    public static function contentOnlyCrawlCap(): int
+    {
+        return max(20, (int) self::setting('content.limits.content_only_crawl_pages', 200));
+    }
+
+    /** @return array{per_ip_hourly:int, per_ip_daily:int, global_daily:int} */
+    public static function onboardingThrottle(): array
+    {
+        return [
+            'per_ip_hourly' => max(1, (int) self::setting('content.onboarding.per_ip_hourly', 2)),
+            'per_ip_daily' => max(1, (int) self::setting('content.onboarding.per_ip_daily', 3)),
+            'global_daily' => max(1, (int) self::setting('content.onboarding.global_daily', 50)),
+        ];
+    }
+
     /** @return list<string> lowercase banned phrases (admin-extendable). */
     public static function bannedPhrases(): array
     {
