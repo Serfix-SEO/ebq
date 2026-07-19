@@ -384,6 +384,9 @@
                         $generating = $wizard['generating'] ?? false;
                         $needsReportGen = $wizard['needsReportGen'] ?? false;
                         $hasOverrides = $wizard['hasOverrides'] ?? false;
+                        // Fresh site: no own backlink footprint → SERP-ranking framing
+                        // (no authority comparison anywhere on the step).
+                        $fresh = $ins !== null && (int) ($ins['my_referring_domains'] ?? 0) < 1;
                     @endphp
                     <div class="relative text-center" @if($needsReportGen) wire:init="loadCompetitors" @endif>
                         <div class="absolute end-0 top-0 flex items-center gap-3 text-xs font-semibold">
@@ -402,16 +405,14 @@
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </span>
                         <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 5 of 7') }}</p>
-                        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Your competitors and their authority') }}</h2>
-                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('How your backlink profile compares to others in your space.') }}</p>
+                        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $fresh ? __('Who you\'re competing with') : __('Your competitors and their authority') }}</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $fresh ? __('Sites already ranking for your target searches — the competitors your articles will be up against.') : __('How your backlink profile compares to others in your space.') }}</p>
                     </div>
 
                     @if ($ins && ! empty($ins['competitors']))
-                        {{-- Fresh site: no own backlink footprint yet, so the authority
-                             comparison (referring domains / median / gap) and the per-
-                             competitor DA/PA/backlink columns are meaningless. Show just
-                             the list of who ranks for the target searches. --}}
-                        @php $fresh = (int) ($ins['my_referring_domains'] ?? 0) < 1; @endphp
+                        {{-- Established site only: authority comparison (referring domains /
+                             median / gap). Fresh sites ($fresh) skip it — the header already
+                             frames the step as a plain competitor list. --}}
                         @unless ($fresh)
                             @if ($ins['behind'])
                                 <div class="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
@@ -433,8 +434,6 @@
                                     <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $ins['gap'] !== null ? $ins['gap'].'×' : '—' }}</div>
                                 </div>
                             </div>
-                        @else
-                            <p class="mx-auto mt-3 max-w-md text-sm text-slate-500 dark:text-slate-400">{{ __('Sites already ranking for your target searches — the competitors your articles will be up against.') }}</p>
                         @endunless
                         <div class="mt-5 overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
                             <table class="w-full text-sm">
