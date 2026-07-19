@@ -1,0 +1,95 @@
+# Content Autopilot — separately-billed product (entitlement + billing)
+
+Content Autopilot is sold as its own product, decoupled from the dashboard
+plans. Built 2026-07-19 (Phases 1–6a). Prod rollout is GATED (see bottom).
+
+## Pricing (admin-configurable via /admin/settings → "Content product")
+
+| Item | Price | Stripe (LIVE) |
+|---|---|---|
+| Base monthly | $39/mo | price `serfix_content_monthly` |
+| Base annual | $29/mo billed yearly ($348) | `serfix_content_annual` |
+| Extra website monthly | $15/mo | `serfix_content_addon_monthly` |
+| Extra website annual | $10/mo billed yearly | `serfix_content_addon_annual` |
+| First month | $1 (monthly only) | coupon `serfix_content_first_month` ($38 off once) |
+| Trial | 5 days, 3 articles, no card | app-managed |
+| Cap | 60 articles/mo/website | admin key |
+
+All ids/amounts/caps live in `settings` (`content.pricing.*`, `content.limits.*`),
+NOT the `plans` table — keeping content price ids out of `plans` is what keeps
+the dashboard webhook plan-slug sync safe. Accessors on `ContentAutopilotConfig`.
+
+## Entitlement — `app/Services/Content/ContentEntitlements.php` (stateless, singleton)
+
+- **Access** = active Cashier **`content`** named subscription OR a live 5-day
+  app-managed trial (`users.content_trial_started_at/ends_at`, one per user ever).
+- **Coverage**: a subscription covers 1 website + N addon websites. WHICH sites
+  consume slots = `content_plans.billing_covered_at` (explicit, not derived).
+  `sitesAllowed` = 1 + addon subscription-item quantity. `reconcileCoverage`
+  clamps on downgrade (newest uncovered first).
+- **Usage**: a "generation" = a topic's **version-1** article (revisions never
+  count) + in-flight reservations. `blockReason(topic)` → `null | no_access |
+  not_covered | trial_limit | monthly_limit` — the shared gate.
+- `coverWebsite` creates a covered **DRAFT** stub plan (baked cadence defaults)
+  so a just-activated site opens the wizard.
+- User proxies: `hasContentAccess()`, `isContentOnly()` (access && dashboard
+  `TrialStatus::isExpired`).
+
+## Billing — `app/Http/Controllers/ContentBillingController.php`
+
+Named `content` Cashier sub (isolation from dashboard `default`). checkout
+(`skipTrial` + $1 coupon monthly-only, dead-coupon retry), success covers the
+site, add/remove-website (addon item quantity), cancel/resume. Routes
+`content.billing.*`. Webhooks: the EXISTING `serfix.io/stripe/webhook` covers
+`customer.subscription.*`; `StripeWebhookController` adds `reconcileContentFrom
+StripeCustomer` (coverage clamp + crawl-cap recompute, try/catch-guarded) and
+its plan-slug sync ignores non-`default` subs. Fixed `BillingController::
+syncSubscriptionsFromStripe` to resolve the sub type from Stripe metadata
+(was hardcoded `default`).
+
+## Gating & caps (Phase 4 = the switch)
+
+- `PlanSeeder`: `content_autopilot => false` on all tiers (re-seed = the prod flip).
+- `Website::effectiveFeatureFlags()` overrides `content_autopilot` with
+  `ContentEntitlements::hasContentAccessFor(owner, site)` — **guarded** (falls
+  back to off; runs on every nav render + plugin API).
+- `EnsureContentAccess` middleware on content product routes → no access redirects
+  to `content.get-started`; a site with existing content stays reachable so lapsed
+  users can still PUBLISH (publishing is never gated).
+- Nav collapses to a single "Get started" when the current site lacks access.
+- `ProduceContentArticleJob::handle` early-returns on `blockReason` (the ONE
+  choke point for all 5 dispatch paths); dispatcher skips blocked sites;
+  Livewire `writeNow/retry/retryGeneration` flash reason-specific upsell copy.
+
+## Cross-product policy (Phase 3)
+
+- `TrialStatus::isLockedOut` + `TrialCleanup` EXEMPT content-access users (their
+  websites are never deleted); `is_system` (content-leads user) excluded.
+- Content-only users (content access, dashboard trial lapsed): `EnsureDashboardAccess`
+  middleware teasers dashboard report/crawl routes (`dashboard/content-only-teaser`);
+  `Website::crawlPageCap` clamps to `content_only_crawl_pages` (default 200) so the
+  pipeline still gets site profile / internal links / keyword seeds.
+- `EnsureTrialNotExpired` allowlist adds `content.` so lapsed dashboard users can buy.
+
+## In-app Get started — `app/Livewire/Content/GetStarted.php`
+
+Branches: never-trialed → Start trial; trial spent → pricing → checkout; sub with
+free slot → Activate; slots full → Add website (addon). `content.get-started`.
+
+## Public
+
+`/content-autopilot` landing (`content-landing.blade.php`). **PENDING**: the full
+anonymous pre-signup wizard (`PublicOnboarding` + provisional site under the
+`is_system` content-leads user + `content_onboarding_sessions` + converter +
+`SetInitialPassword` + GC command). Landing currently funnels to register.
+
+## Rollout (PROD — gated, NOT done)
+
+Prod runs on LIVE Stripe; staging has NO Stripe keys (billing testable on prod
+or via test keys only). Prod DB migrations are DEFERRED (additive/safe; the
+webhook + effectiveFeatureFlags are try/catch-guarded so prod is safe until then).
+To launch on prod:
+1. `php artisan migrate --force` (5 pending additive content migrations).
+2. `php artisan db:seed --class=PlanSeeder` (flips content_autopilot off).
+3. Confirm `CONTENT_AUTOPILOT_UI=true` + restart FPM.
+4. Price ids already in prod settings; verify checkout with a real card.
