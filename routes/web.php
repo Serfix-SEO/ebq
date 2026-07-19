@@ -284,11 +284,18 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     // shared box-A docroot means code goes live before deploy decisions — the
     // env flag, not code presence, decides where the feature is visible.
     if (config('services.content_autopilot.ui_enabled')) {
-        Route::view('/content', 'content.index')->middleware('feature:content')->name('content.index');
-        Route::view('/content/settings', 'content.settings')->middleware('feature:content')->name('content.settings');
-        Route::view('/content/integrations', 'content.integrations')->middleware('feature:content')->name('content.integrations');
+        // Get started / buy — reachable WITHOUT content access (team permission
+        // still applies). This is where no-access users are redirected.
+        Route::view('/content/get-started', 'content.get-started')
+            ->middleware('feature:content')->name('content.get-started');
+        // The product surfaces require content access for the current website
+        // (content.access), OR an existing plan-with-topics so a lapsed user can
+        // still publish already-generated articles (handled inside the middleware).
+        Route::view('/content', 'content.index')->middleware(['feature:content', 'content.access'])->name('content.index');
+        Route::view('/content/settings', 'content.settings')->middleware(['feature:content', 'content.access'])->name('content.settings');
+        Route::view('/content/integrations', 'content.integrations')->middleware(['feature:content', 'content.access'])->name('content.integrations');
         Route::get('/content/topics/{topic}', fn (string $topic) => view('content.review', ['topicId' => $topic]))
-            ->middleware('feature:content')
+            ->middleware(['feature:content', 'content.access'])
             ->name('content.review');
     }
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');

@@ -234,6 +234,22 @@ class Website extends Model
             ? $owner->effectivePlanFeatures()
             : self::FEATURE_DEFAULTS;
 
+        // 2b. Content Autopilot is a SEPARATELY-BILLED product, NOT a plan
+        //     feature — override the plan-map value with the real content
+        //     entitlement for THIS website (content subscription/trial +
+        //     per-website coverage). Before per-site narrow + global kill so
+        //     both still AND after. Guarded: this runs on every nav render and
+        //     every plugin API hit, and must never 500 (e.g. before the content
+        //     migrations have run on an environment) — fail to "off".
+        if (array_key_exists('content_autopilot', $effective)) {
+            try {
+                $effective['content_autopilot'] = $owner !== null
+                    && app(\App\Services\Content\ContentEntitlements::class)->hasContentAccessFor($owner, $this);
+            } catch (\Throwable) {
+                $effective['content_autopilot'] = false;
+            }
+        }
+
         // 3. Per-site override — can NARROW (turn off a plan-allowed
         //    flag) but cannot WIDEN (a per-site true on a plan-disallowed
         //    flag is ignored; the plan is the ceiling).

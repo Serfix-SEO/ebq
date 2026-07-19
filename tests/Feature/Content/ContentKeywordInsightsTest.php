@@ -28,7 +28,9 @@ class ContentKeywordInsightsTest extends TestCase
 
     private function userWithPlan(array $planAttrs = []): array
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'content_trial_started_at' => now(), 'content_trial_ends_at' => now()->addDays(5),
+        ]);
         $website = Website::factory()->for($user)->create();
         $plan = ContentPlan::factory()->create(array_merge([
             'website_id' => $website->id, 'status' => ContentPlan::STATUS_DRAFT,
@@ -56,9 +58,9 @@ class ContentKeywordInsightsTest extends TestCase
     public function test_step_two_dispatches_keyword_research_job(): void
     {
         Queue::fake();
+        // A billing-covered DRAFT plan already exists (created when content was
+        // activated); the wizard's step 2 fills it in and dispatches research.
         [$user, $website] = $this->userWithPlan();
-        // No plan yet — the wizard's step 2 will create it.
-        ContentPlan::query()->where('website_id', $website->id)->delete();
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 

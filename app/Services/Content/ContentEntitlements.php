@@ -107,13 +107,23 @@ class ContentEntitlements
             ->count();
     }
 
-    /** Mark a website as covered (create a stub plan if none exists yet). */
+    /**
+     * Mark a website as covered. A brand-new stub plan is created as DRAFT so
+     * the onboarding wizard shows (an existing plan keeps its status).
+     */
     public function coverWebsite(Website $website): void
     {
-        ContentPlan::query()->updateOrCreate(
-            ['website_id' => $website->id],
-            ['billing_covered_at' => now()],
-        );
+        $plan = ContentPlan::query()->firstOrNew(['website_id' => $website->id]);
+        if (! $plan->exists) {
+            // Fresh stub: DRAFT so the wizard shows, carrying the baked cadence
+            // defaults (1 article/day, ~2000 words) so a just-activated site
+            // matches a fresh wizard plan.
+            $plan->status = ContentPlan::STATUS_DRAFT;
+            $plan->articles_per_week = 7;
+            $plan->article_length = 2000;
+        }
+        $plan->billing_covered_at = now();
+        $plan->save();
     }
 
     public function uncoverWebsite(Website $website): void

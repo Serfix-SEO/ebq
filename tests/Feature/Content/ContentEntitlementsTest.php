@@ -90,7 +90,8 @@ class ContentEntitlementsTest extends TestCase
     {
         $user = User::factory()->create();
         $site = $this->siteFor($user);
-        $plan = ContentPlan::factory()->create(['website_id' => $site->id]);
+        // Uncovered on purpose — this test drives the not_covered → covered path.
+        $plan = ContentPlan::factory()->create(['website_id' => $site->id, 'billing_covered_at' => null]);
         $topic = ContentTopic::factory()->for($plan, 'plan')->create([
             'website_id' => $site->id, 'status' => ContentTopic::STATUS_APPROVED,
         ]);

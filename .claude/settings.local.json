@@ -555,7 +555,10 @@
       "Bash(sed -i 's/^class SerperSearchClientTest extends TestCase\\\\n{/&/' tests/Unit/SerperSearchClientTest.php)",
       "Bash(perl -0pi -e 's/\\(class SerperSearchClientTest extends TestCase\\\\n\\\\{\\)/$1\\\\n    use RefreshDatabase;\\\\n/' tests/Unit/SerperSearchClientTest.php)",
       "Bash(perl -0pi -e 's/\\(class SerperAuditBenchmarkTest extends TestCase\\\\n\\\\{\\)/$1\\\\n    use RefreshDatabase;\\\\n/' tests/Unit/SerperAuditBenchmarkTest.php)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(sed -i \"s/'Nickfinder'/'Example Anchor'/; s|nickfinder\\\\.com|competitor-example.com|g\" tests/Feature/CompetitorBacklinkServiceTest.php)",
+      "Bash(sed -i 's/nickfinder\\\\.com: OPR said 90, DataForSEO says ~5,800/one real competitor: OPR said 90, DataForSEO says ~5,800/' app/Services/Content/ContentSetupInsights.php)",
+      "Bash(APP_ENV=testing php -d memory_limit=512M vendor/bin/phpunit -c phpunit.xml --filter CompetitorBacklinkServiceTest)"
     ]
   },
   "enableAllProjectMcpServers": true,

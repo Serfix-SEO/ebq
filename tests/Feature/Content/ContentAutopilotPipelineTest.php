@@ -166,6 +166,11 @@ class ContentAutopilotPipelineTest extends TestCase
         Queue::fake();
 
         $plan = ContentPlan::factory()->create();
+        // Owner needs content access for the dispatcher to claim (plan is
+        // billing-covered via the factory).
+        $plan->website->user->forceFill([
+            'content_trial_started_at' => now(), 'content_trial_ends_at' => now()->addDays(5),
+        ])->save();
         ContentTopic::factory()->for($plan, 'plan')->count(3)->create([
             'website_id' => $plan->website_id,
             'status' => ContentTopic::STATUS_APPROVED,

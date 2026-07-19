@@ -73,7 +73,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => false,
                     'ai_writer'         => true,
-                    'content_autopilot' => true,
+                    'content_autopilot' => false, // separate product (ContentEntitlements gates it), not a plan feature
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,
@@ -134,7 +134,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => false,
                     'ai_writer'         => true,
-                    'content_autopilot' => true,
+                    'content_autopilot' => false, // separate product (ContentEntitlements gates it), not a plan feature
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,
@@ -193,7 +193,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
-                    'content_autopilot' => true,
+                    'content_autopilot' => false, // separate product (ContentEntitlements gates it), not a plan feature
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,
@@ -253,7 +253,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
-                    'content_autopilot' => true,
+                    'content_autopilot' => false, // separate product (ContentEntitlements gates it), not a plan feature
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,
@@ -312,7 +312,7 @@ class PlanSeeder extends Seeder
                 'plan_features'      => [
                     'chatbot'           => true,
                     'ai_writer'         => true,
-                    'content_autopilot' => true,
+                    'content_autopilot' => false, // separate product (ContentEntitlements gates it), not a plan feature
                     'ai_inline'         => true,
                     'live_audit'        => true,
                     'hq'                => true,

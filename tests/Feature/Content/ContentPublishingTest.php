@@ -392,7 +392,9 @@ class ContentPublishingTest extends TestCase
 
     public function test_integrations_page_renders(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'content_trial_started_at' => now(), 'content_trial_ends_at' => now()->addDays(5),
+        ]);
         $website = Website::factory()->for($user)->create();
         ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
 

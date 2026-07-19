@@ -10,6 +10,7 @@ use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\Website;
+use App\Services\Content\ContentEntitlements;
 use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentSetupInsights;
 use App\Services\Content\SiteProfileExtractor;
@@ -174,7 +175,12 @@ class ContentCalendar extends Component
             $tz = (string) ($existing->timezone ?? '');
             $this->publishTimezone = in_array($tz, timezone_identifiers_list(), true)
                 ? $tz : auth()->user()?->timezoneForDisplay() ?? 'UTC';
-            if ($existing->status === ContentPlan::STATUS_DRAFT) {
+            // Auto-jump past the offerings step only for a DRAFT that is
+            // genuinely in progress (business profile filled or ideation already
+            // ran). A bare billing-coverage stub (just-activated site, wizard
+            // not started) must begin at step 1.
+            if ($existing->status === ContentPlan::STATUS_DRAFT
+                && (filled($existing->business_description) || $existing->topics()->exists())) {
                 $this->wizardStep = max($this->wizardStep, 3);
             }
             $this->analyzing = false;
@@ -658,10 +664,27 @@ class ContentCalendar extends Component
     public function retry(string $topicId): void
     {
         $topic = $this->topicOrFail($topicId);
-        if ($topic !== null && $topic->status === ContentTopic::STATUS_FAILED) {
-            $topic->forceFill(['status' => ContentTopic::STATUS_APPROVED, 'last_error' => null, 'stage_started_at' => null])->save();
-            ProduceContentArticleJob::dispatch($topic->id);
+        if ($topic === null || $topic->status !== ContentTopic::STATUS_FAILED) {
+            return;
         }
+        if (($reason = app(ContentEntitlements::class)->blockReason($topic)) !== null) {
+            session()->flash('content-error', self::generationBlockMessage($reason));
+
+            return;
+        }
+        $topic->forceFill(['status' => ContentTopic::STATUS_APPROVED, 'last_error' => null, 'stage_started_at' => null])->save();
+        ProduceContentArticleJob::dispatch($topic->id);
+    }
+
+    /** Client-safe copy for a blocked generation, with an upsell CTA where apt. */
+    public static function generationBlockMessage(string $reason): string
+    {
+        return match ($reason) {
+            'trial_limit' => __('You have used all your free trial articles. Subscribe to keep generating.'),
+            'monthly_limit' => __('You have reached this website\'s monthly article limit. It resets next month.'),
+            'not_covered' => __('This website is not on your content plan yet. Add it from Get started.'),
+            default => __('Content Autopilot is not active for this website. Start it from Get started.'),
+        };
     }
 
     /**
@@ -685,6 +708,13 @@ class ContentCalendar extends Component
             ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED, ContentTopic::STATUS_FAILED,
         ], true)) {
             return; // ready/scheduled/published — nothing to generate
+        }
+        // Entitlement/limit pre-check (same rule the job enforces) — never
+        // dispatch a generation that would just be blocked; show why instead.
+        if (($reason = app(ContentEntitlements::class)->blockReason($topic)) !== null) {
+            session()->flash('content-error', self::generationBlockMessage($reason));
+
+            return;
         }
         $topic->forceFill([
             'status' => ContentTopic::STATUS_APPROVED,

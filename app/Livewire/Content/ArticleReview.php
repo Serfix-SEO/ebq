@@ -217,6 +217,11 @@ class ArticleReview extends Component
         if ($topic === null || in_array($topic->status, ContentTopic::IN_FLIGHT, true)) {
             return;
         }
+        if (($reason = app(\App\Services\Content\ContentEntitlements::class)->blockReason($topic)) !== null) {
+            session()->flash('review-status', ContentCalendar::generationBlockMessage($reason));
+
+            return;
+        }
         $topic->forceFill(['status' => ContentTopic::STATUS_APPROVED, 'last_error' => null, 'stage_started_at' => now()])->save();
         \Illuminate\Support\Facades\Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
         \App\Jobs\ProduceContentArticleJob::dispatch($topic->id);

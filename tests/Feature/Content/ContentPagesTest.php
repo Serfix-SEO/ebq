@@ -28,7 +28,14 @@ class ContentPagesTest extends TestCase
 
     private function userWithWebsite(): array
     {
-        $user = User::factory()->create();
+        // Content is now a separately-gated product — give the user an active
+        // content trial so these content-feature tests have access. Coverage of
+        // the specific website comes from the ContentPlan factory
+        // (billing_covered_at) or is covered explicitly where a test needs it.
+        $user = User::factory()->create([
+            'content_trial_started_at' => now(),
+            'content_trial_ends_at' => now()->addDays(5),
+        ]);
         $website = Website::factory()->for($user)->create();
 
         return [$user, $website];
@@ -42,6 +49,7 @@ class ContentPagesTest extends TestCase
     public function test_content_page_shows_empty_state_without_plan(): void
     {
         [$user, $website] = $this->userWithWebsite();
+        app(\App\Services\Content\ContentEntitlements::class)->coverWebsite($website);
 
         $this->actingAs($user)
             ->withSession(['current_website_id' => $website->id])
@@ -54,6 +62,7 @@ class ContentPagesTest extends TestCase
     public function test_settings_page_renders_wizard_without_plan(): void
     {
         [$user, $website] = $this->userWithWebsite();
+        app(\App\Services\Content\ContentEntitlements::class)->coverWebsite($website);
 
         $this->actingAs($user)
             ->withSession(['current_website_id' => $website->id])
@@ -196,6 +205,7 @@ class ContentPagesTest extends TestCase
     {
         Queue::fake();
         [$user, $website] = $this->userWithWebsite();
+        app(\App\Services\Content\ContentEntitlements::class)->coverWebsite($website);
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
@@ -521,14 +531,18 @@ class ContentPagesTest extends TestCase
 
     public function test_review_page_is_tenant_scoped(): void
     {
-        [$user] = $this->userWithWebsite();
+        [$user, $ownWebsite] = $this->userWithWebsite();
+        app(\App\Services\Content\ContentEntitlements::class)->coverWebsite($ownWebsite);
         [$otherUser, $otherWebsite] = $this->userWithWebsite();
         $otherPlan = ContentPlan::factory()->create(['website_id' => $otherWebsite->id]);
         $otherTopic = ContentTopic::factory()->for($otherPlan, 'plan')->create([
             'website_id' => $otherWebsite->id,
         ]);
 
+        // User has content access on their OWN site (passes the access gate),
+        // then the review page must 404 on another tenant's topic.
         $this->actingAs($user)
+            ->withSession(['current_website_id' => $ownWebsite->id])
             ->get(route('content.review', $otherTopic->id))
             ->assertNotFound();
     }

@@ -120,11 +120,20 @@ class ContentAutopilotDispatcher extends Command
             ->unique('website_id')
             ->take(max(1, $limit));
 
+        // Skip topics whose website can't generate right now (no content
+        // access/coverage, trial or monthly cap) so blocked sites aren't
+        // re-claimed and re-dispatched every tick. The job re-checks anyway.
+        $entitlements = app(\App\Services\Content\ContentEntitlements::class);
+        $count = 0;
         foreach ($due as $topic) {
+            if ($entitlements->blockReason($topic) !== null) {
+                continue;
+            }
             ProduceContentArticleJob::dispatch($topic->id);
+            $count++;
         }
 
-        return $due->count();
+        return $count;
     }
 
     /** Phase 3: dispatch publish jobs for topics whose moment has come. */
