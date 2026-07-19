@@ -228,6 +228,38 @@
                         <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition {{ $autoPublish ? 'translate-x-6' : 'translate-x-1' }}"></span>
                     </button>
                 </div>
+
+                {{-- Publish window: articles auto-publish only between these hours, in this timezone. --}}
+                <div class="mt-4 rounded-xl border border-slate-100 p-3 dark:border-slate-800">
+                    <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ __('Publish window') }}</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">{{ __('Articles publish automatically between these hours. Anything already due publishes as soon as the window opens; you can also “Publish now” from the calendar anytime.') }}</div>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('From') }}</label>
+                            <select wire:model="publishHourStart" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                @for ($h = 0; $h < 24; $h++)
+                                    <option value="{{ $h }}">{{ sprintf('%d:00 %s', ($h % 12) ?: 12, $h < 12 ? 'AM' : 'PM') }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('To') }}</label>
+                            <select wire:model="publishHourEnd" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                @for ($h = 0; $h < 24; $h++)
+                                    <option value="{{ $h }}">{{ sprintf('%d:00 %s', ($h % 12) ?: 12, $h < 12 ? 'AM' : 'PM') }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Timezone') }}</label>
+                            <select wire:model="publishTimezone" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                @foreach (timezone_identifiers_list() as $tz)
+                                    <option value="{{ $tz }}">{{ str_replace('_', ' ', $tz) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="flex justify-end">
@@ -999,6 +1031,13 @@
                     {{ $plan->isActive() ? __('Pause') : __('Resume') }}
                 </button>
             </div>
+        </div>
+
+        {{-- Publish-window hint so clients aren't confused about when things go live. --}}
+        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
+            <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>{{ __('Auto-publishes daily between :window', ['window' => \App\Livewire\Content\ContentCalendar::publishWindowLabel($plan)]) }}.</span>
+            <a href="{{ route('content.settings') }}" wire:navigate class="font-medium text-orange-600 hover:text-orange-700">{{ __('Change window →') }}</a>
         </div>
 
         {{-- ── Overview KPIs ────────────────────────────────────────── --}}

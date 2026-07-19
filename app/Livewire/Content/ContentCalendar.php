@@ -97,11 +97,19 @@ class ContentCalendar extends Component
     public bool $autoPublish = false;
     public int $reviewHours = 24;
 
+    /** Publish window (auto-publish only fires inside it), in $publishTimezone. */
+    public int $publishHourStart = 9;
+    public int $publishHourEnd = 11;
+    public string $publishTimezone = 'UTC';
+
     public function mount(string $mode = 'calendar'): void
     {
         $this->mode = in_array($mode, ['calendar', 'settings'], true) ? $mode : 'calendar';
         $this->websiteId = session('current_website_id');
         $this->month = now()->format('Y-m');
+        // Default the publish timezone to the signed-in user's — bootWizard()
+        // overrides it from an existing plan when one exists.
+        $this->publishTimezone = auth()->user()?->timezoneForDisplay() ?? 'UTC';
         $this->bootWizard();
     }
 
@@ -159,6 +167,13 @@ class ContentCalendar extends Component
             $this->articleLength = (int) ($existing->article_length ?: self::DEFAULT_LENGTH);
             $this->autoPublish = (bool) $existing->auto_publish;
             $this->reviewHours = (int) ($existing->review_hours ?? 24);
+            $this->publishHourStart = (int) ($existing->publish_hour_start ?? 9);
+            $this->publishHourEnd = (int) ($existing->publish_hour_end ?? 11);
+            // Fall back to the user's own timezone rather than the UTC column
+            // default, so the window reads in local time out of the box.
+            $tz = (string) ($existing->timezone ?? '');
+            $this->publishTimezone = in_array($tz, timezone_identifiers_list(), true)
+                ? $tz : auth()->user()?->timezoneForDisplay() ?? 'UTC';
             if ($existing->status === ContentPlan::STATUS_DRAFT) {
                 $this->wizardStep = max($this->wizardStep, 3);
             }
@@ -588,6 +603,10 @@ class ContentCalendar extends Component
             'article_length' => max(800, min(4000, $this->articleLength)),
             'auto_publish' => $this->autoPublish,
             'review_hours' => max(0, min(168, $this->reviewHours)),
+            'publish_hour_start' => max(0, min(23, $this->publishHourStart)),
+            'publish_hour_end' => max(0, min(23, $this->publishHourEnd)),
+            'timezone' => in_array($this->publishTimezone, timezone_identifiers_list(), true)
+                ? $this->publishTimezone : 'UTC',
             'images_enabled' => $this->imagesEnabled,
             'image_style' => \App\Support\ContentImageStyles::isValid($this->imageStyle)
                 ? $this->imageStyle
@@ -756,6 +775,23 @@ class ContentCalendar extends Component
         }
         PublishContentArticleJob::dispatch($topic->id);
         session()->flash('content-status', __('Publishing now — it can take a moment to appear on your site.'));
+    }
+
+    /**
+     * Human label for a plan's auto-publish window, e.g. "9:00–11:00 (Karachi)".
+     * When start==end it's a single hour. Timezone shown as its short city name.
+     */
+    public static function publishWindowLabel(?ContentPlan $plan): string
+    {
+        $start = (int) ($plan->publish_hour_start ?? 9);
+        $end = (int) ($plan->publish_hour_end ?? 11);
+        $tz = (string) ($plan->timezone ?: 'UTC');
+        $city = str_replace('_', ' ', last(explode('/', $tz)) ?: $tz);
+        $fmt = static fn (int $h) => sprintf('%d:00 %s', ($h % 12) ?: 12, $h < 12 ? 'AM' : 'PM');
+
+        return $start === $end
+            ? $fmt($start).' ('.$city.')'
+            : $fmt($start).'–'.$fmt($end).' ('.$city.')';
     }
 
     /** Whether the active plan's website has a connected publishing destination. */

@@ -362,14 +362,32 @@ class ContentPublishingTest extends TestCase
     public function test_dispatcher_respects_publish_window(): void
     {
         Queue::fake();
-        // Window that can never match: only publish on ISO day that isn't today.
+        // Window that can never match: only publish on an ISO day that isn't today.
         $notToday = now()->isoWeekday() === 1 ? 2 : 1;
-        [, $website] = array_slice($this->scheduledArticle(['publish_days' => [$notToday]]), 0, 2);
+        [, $website, , $topic] = $this->scheduledArticle(['publish_days' => [$notToday]]);
+        // Due TODAY (not overdue) — the window must gate it until the window opens.
+        $topic->update(['scheduled_for' => now()->startOfDay()]);
         $this->wordpressIntegration($website);
 
         $this->artisan('ebq:content-autopilot')->assertSuccessful();
 
         Queue::assertNotPushed(PublishContentArticleJob::class);
+    }
+
+    public function test_dispatcher_flushes_overdue_articles_outside_the_window(): void
+    {
+        Queue::fake();
+        // Outside the window (day never matches today), but the article's own
+        // scheduled date already passed — a missed window must never leave it
+        // stuck, so it publishes anyway as catch-up.
+        $notToday = now()->isoWeekday() === 1 ? 2 : 1;
+        [, $website, , $topic] = $this->scheduledArticle(['publish_days' => [$notToday]]);
+        $topic->update(['scheduled_for' => now()->subDays(2)]); // overdue
+        $this->wordpressIntegration($website);
+
+        $this->artisan('ebq:content-autopilot')->assertSuccessful();
+
+        Queue::assertPushed(PublishContentArticleJob::class);
     }
 
     public function test_integrations_page_renders(): void

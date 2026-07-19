@@ -138,12 +138,12 @@ class ContentAutopilotDispatcher extends Command
             ->get();
 
         foreach ($plans as $plan) {
-            if (! $this->withinPublishWindow($plan)) {
-                continue;
-            }
+            $inWindow = $this->withinPublishWindow($plan);
+            $today = now($plan->timezone ?: 'UTC')->toDateString();
 
-            // Auto-publish: promote READY topics whose veto window elapsed.
-            if ($plan->auto_publish) {
+            // Auto-publish: promote READY topics whose veto window elapsed (only
+            // in-window, so they publish during the client's chosen hours).
+            if ($inWindow && $plan->auto_publish) {
                 $plan->topics()
                     ->where('status', ContentTopic::STATUS_READY)
                     ->where('stage_started_at', '<=', now()->subHours(max(0, (int) $plan->review_hours)))
@@ -151,13 +151,19 @@ class ContentAutopilotDispatcher extends Command
                     ->each(fn (ContentTopic $t) => $t->enterStage(ContentTopic::STATUS_SCHEDULED));
             }
 
-            // Publish everything scheduled and due (one per plan per tick —
-            // steady drip, matches the 1/day cadence).
-            $topic = $plan->topics()
-                ->where('status', ContentTopic::STATUS_SCHEDULED)
-                ->where(fn ($q) => $q->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', now($plan->timezone ?: 'UTC')->toDateString()))
-                ->orderBy('scheduled_for')
-                ->first();
+            // In-window: publish anything due today or earlier. Outside the
+            // window: still flush OVERDUE items (scheduled date already passed)
+            // so a missed window never leaves an article stuck forever — the
+            // date the client picked is honoured as a floor, not a hard gate.
+            $q = $plan->topics()->where('status', ContentTopic::STATUS_SCHEDULED);
+            if ($inWindow) {
+                $q->where(fn ($x) => $x->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', $today));
+            } else {
+                $q->whereNotNull('scheduled_for')->whereDate('scheduled_for', '<', $today);
+            }
+
+            // One per plan per tick — steady drip, matches the 1/day cadence.
+            $topic = $q->orderBy('scheduled_for')->first();
             if ($topic !== null) {
                 PublishContentArticleJob::dispatch($topic->id);
                 $dispatched++;

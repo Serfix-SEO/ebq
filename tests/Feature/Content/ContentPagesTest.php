@@ -91,6 +91,9 @@ class ContentPagesTest extends TestCase
             ->set('autoPublish', true)
             ->set('language', 'German')
             ->set('country', 'de')
+            ->set('publishHourStart', 14)
+            ->set('publishHourEnd', 16)
+            ->set('publishTimezone', 'Asia/Karachi')
             ->call('saveSettings')
             ->assertHasNoErrors();
 
@@ -101,6 +104,9 @@ class ContentPagesTest extends TestCase
         $this->assertTrue((bool) $fresh->auto_publish);
         $this->assertSame('German', $fresh->language);
         $this->assertSame('de', $fresh->country);
+        $this->assertSame(14, (int) $fresh->publish_hour_start);
+        $this->assertSame(16, (int) $fresh->publish_hour_end);
+        $this->assertSame('Asia/Karachi', $fresh->timezone);
     }
 
     public function test_settings_page_shows_wizard_for_draft_plan(): void
