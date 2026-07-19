@@ -1,12 +1,30 @@
 {{-- Final onboarding step: collect account details, then convert the session. --}}
 <div class="mx-auto max-w-lg">
     <div class="text-center">
-        <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
-            <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0"/></svg>
+        <span class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/30">
+            <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </span>
-        <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Last step') }}</p>
-        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Create your account') }}</h2>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Start your :days-day free trial — no card required. Already have an account? Sign in below and we\'ll attach this website to it.', ['days' => \App\Support\ContentAutopilotConfig::trialDays()]) }}</p>
+        <p class="text-xs font-bold uppercase tracking-[0.15em] text-orange-600 dark:text-orange-400">{{ __('Last step') }}</p>
+        <h2 class="mt-1 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">{{ __('Save your content plan') }}</h2>
+        <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
+            @if (filled($domain ?? ''))
+                {{ __('Your plan for :domain is ready.', ['domain' => $domain]) }}
+            @endif
+            {{ __('Create a free account to save it and start publishing. Already have one? Sign in and we\'ll attach this website to it.') }}
+        </p>
+
+        {{-- Reassurance chips --}}
+        <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+            @foreach ([
+                __(':days-day free trial', ['days' => \App\Support\ContentAutopilotConfig::trialDays()]),
+                __('No card required'),
+                __('You approve everything'),
+            ] as $chip)
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <svg class="h-3.5 w-3.5 flex-none text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>{{ $chip }}
+                </span>
+            @endforeach
+        </div>
     </div>
 
     {{-- Continue with Google (new users sign up, existing users log in) --}}
@@ -86,5 +104,6 @@
                 <span wire:loading wire:target="createAccount">{{ __('Creating your account…') }}</span>
             </button>
         </div>
+        <p class="pt-1 text-center text-xs leading-5 text-slate-400">{{ __('No credit card now. Your :days-day trial starts when you finish — cancel anytime.', ['days' => \App\Support\ContentAutopilotConfig::trialDays()]) }}</p>
     </form>
 </div>
