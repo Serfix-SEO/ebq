@@ -51,6 +51,12 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   list toggle, approve/skip/retry/reschedule/add-topic, pause/resume). If no
   plan exists yet, shows a lightweight empty state ("No content plan yet")
   linking to Settings instead of rendering the wizard inline.
+  **Grid interactions (2026-07-19):** every generatable topic card carries a
+  small "Write" button (`writeNow()` → dispatch + redirect to the detail page
+  where live progress renders); topic cards are `draggable` and each day cell is
+  a drop target that calls `reschedule(topicId, date)` (Alpine `dragId` on the
+  grid wrapper, per-cell `over` highlight). Same reschedule guard as the list
+  (suggested/approved/ready only; past dates rejected).
 - **Settings** — `/content/settings` (new route, `content.settings`,
   `mode="settings"`). **Always** renders the 5-step wizard: first use creates
   the plan (unchanged flow below); revisiting later re-opens the SAME wizard
@@ -63,8 +69,17 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
 - `/content/topics/{topic}` → `livewire:content.article-review`: preview
   (script/`on*` attributes stripped), quality ring (`reports/charts/ring`),
   plain-language improvement labels (`ArticleReview::issueLabel` maps scorer
-  codes to client-safe copy), search-result preview, Approve → `scheduled`,
-  Request-new-draft → re-dispatch. Tenancy via `accessibleWebsitesQuery()`.
+  codes to client-safe copy), a full live plugin-style check list
+  (`checkLabel` per scorer code, re-scored on edit), search-result preview,
+  Approve → `scheduled`. Tenancy via `accessibleWebsitesQuery()`.
+  **2026-07-19 additions:** (a) "What this article is worth" card —
+  `ArticleReview::trafficWorth()` → a FAIR conservative monthly-visitor estimate
+  from `keyword_volume` (headline = low end via `ContentCalendar::
+  fairMonthlyVisits`, e.g. 550 searches → ~8 extra visits/mo; never a best case,
+  never a $ figure per [[no-dollar-projections-ui]]); (b) a note that articles
+  publish as classic HTML and the client converts to Gutenberg blocks in WP
+  themselves (SEO fields + images carry over). Check labels updated to the
+  current bands (title 40-60, meta 130-155, density 0.5-2.5%).
 - **Gating layers** (landmine, cost 3 test rounds): a new plan feature key
   must be added in FOUR places — `PlanSeeder plan_features`,
   `Plan::FEATURE_KEYS` (featureMap whitelist), `Website::FEATURE_KEYS`
@@ -253,6 +268,10 @@ Deferred from the original Phase-3 spec: the WP-plugin v2.1
 featured-image sideload (no `content_images` rows exist until Phase 4).
 
 ## Images (Phase 4, 2026-07-18)
+
+**Cap: 2 images/article (2026-07-19)** — featured + 1 inline. Driven by
+`content.images.max_inline` default **1** (owner cap); `featuredImageEnabled()`
+adds the featured on top. Admin can still raise max_inline to 4.
 
 `GenerateContentImagesJob` (queue `content`, tries=1 — images bill real
 money, retries would double-charge): chained from `ProduceContentArticleJob`
