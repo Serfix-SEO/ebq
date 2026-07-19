@@ -338,6 +338,17 @@ class ContentPagesTest extends TestCase
             ->call('reschedule', $topic->id, now()->toDateString());
 
         $this->assertTrue($topic->fresh()->scheduled_for->isToday());
+
+        // A SCHEDULED topic (shown to the client as "Approved") must also be
+        // reschedulable — this was the status with no date control before.
+        $scheduled = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id,
+            'status' => ContentTopic::STATUS_SCHEDULED,
+            'scheduled_for' => now()->addDays(2),
+        ]);
+        Livewire::test(ContentCalendar::class)
+            ->call('reschedule', $scheduled->id, now()->addDays(5)->toDateString());
+        $this->assertSame(now()->addDays(5)->toDateString(), $scheduled->fresh()->scheduled_for->toDateString());
     }
 
     public function test_review_page_shows_article_and_approves(): void

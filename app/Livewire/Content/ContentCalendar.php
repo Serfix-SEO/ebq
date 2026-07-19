@@ -704,8 +704,12 @@ class ContentCalendar extends Component
     public function reschedule(string $topicId, string $date): void
     {
         $topic = $this->topicOrFail($topicId);
+        // Includes SCHEDULED — that status is shown to the client as "Approved"
+        // (see statusPresentation) and is exactly the queued-to-publish item they
+        // most want to move to a different day. Only published/in-flight are out.
         if ($topic === null || ! in_array($topic->status, [
-            ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED, ContentTopic::STATUS_READY,
+            ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED,
+            ContentTopic::STATUS_READY, ContentTopic::STATUS_SCHEDULED,
         ], true)) {
             return;
         }

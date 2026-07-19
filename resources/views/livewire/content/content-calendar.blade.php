@@ -1066,7 +1066,7 @@
                                     $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status);
                                     $cellInFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true);
                                     $canWrite = ! $cellInFlight && in_array($topic->status, ['suggested', 'approved', 'failed'], true);
-                                    $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready'], true);
+                                    $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true);
                                 @endphp
                                 <div wire:key="cell-{{ $topic->id }}"
                                      @if($canDrag) draggable="true"
@@ -1149,10 +1149,12 @@
                             @if ($topic->status === \App\Models\ContentTopic::STATUS_SUGGESTED)
                                 <button wire:click="approve('{{ $topic->id }}')" class="text-sm font-medium text-success hover:brightness-90">{{ __('Approve') }}</button>
                             @endif
-                            @if (in_array($topic->status, ['suggested', 'approved', 'ready'], true))
+                            @if (in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true))
                                 {{-- Plain native date input: taps open the OS date picker on
                                      mobile and desktop alike (HTML5 drag doesn't work on touch,
-                                     so this is the reliable reschedule path). --}}
+                                     so this is the reliable reschedule path). 'scheduled' shows
+                                     to the client as "Approved" — include it or that row has no
+                                     date control. --}}
                                 <span class="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                                     <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
                                     <input type="date" min="{{ now()->toDateString() }}" value="{{ $topic->scheduled_for?->toDateString() }}"
