@@ -82,10 +82,13 @@ class ContentAutopilotConfig
         return (bool) self::setting('content.images.featured_enabled', true);
     }
 
-    /** Max INLINE images per article (featured not counted). 0–4. */
+    /**
+     * Max INLINE images per article (featured not counted). 0–4.
+     * Default 1 → featured + 1 inline = 2 images total (owner cap 2026-07-19).
+     */
     public static function maxInlineImages(): int
     {
-        return max(0, min(4, (int) self::setting('content.images.max_inline', 2)));
+        return max(0, min(4, (int) self::setting('content.images.max_inline', 1)));
     }
 
     public static function renderingSpeed(): string

@@ -80,9 +80,9 @@ class ContentImagesTest extends TestCase
         (new GenerateContentImagesJob($article->id))->handle(app(IdeogramClient::class), app(IdeogramSpendMeter::class));
 
         $images = ContentImage::query()->where('article_id', $article->id)->get();
-        // 1 featured + 2 inline (maxInlineImages default 2). FAQ section skipped.
+        // 1 featured + 1 inline = 2 total (maxInlineImages default 1, owner cap 2026-07-19).
         $this->assertSame(1, $images->where('role', ContentImage::ROLE_FEATURED)->count());
-        $this->assertSame(2, $images->where('role', ContentImage::ROLE_INLINE)->count());
+        $this->assertSame(1, $images->where('role', ContentImage::ROLE_INLINE)->count());
         $this->assertTrue($images->every(fn ($i) => $i->status === ContentImage::STATUS_GENERATED));
 
         // Bytes persisted to the public disk.

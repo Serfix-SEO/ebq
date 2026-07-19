@@ -1045,33 +1045,50 @@
                         <div class="px-2 py-2">{{ $dow }}</div>
                     @endforeach
                 </div>
-                <div class="grid grid-cols-7" style="min-width:56rem">
+                {{-- dragId holds the topic being dragged; day cells are drop targets that reschedule it. --}}
+                <div class="grid grid-cols-7" style="min-width:56rem" x-data="{ dragId: null }">
                     @foreach ($days as $day)
                         @php $dayTopics = $topicsByDate->get($day->toDateString(), collect()); @endphp
-                        <div class="border-b border-e border-slate-100 p-1.5 align-top dark:border-slate-800 {{ $day->format('Y-m') !== $month ? 'bg-slate-50 dark:bg-slate-950' : '' }}" style="min-height:6.5rem">
+                        <div x-data="{ over: false }"
+                             x-on:dragover.prevent="over = true"
+                             x-on:dragleave="over = false"
+                             x-on:drop="over = false; if (dragId) { $wire.reschedule(dragId, '{{ $day->toDateString() }}') }; dragId = null"
+                             :class="over && dragId ? 'ring-2 ring-inset ring-orange-400' : ''"
+                             class="border-b border-e border-slate-100 p-1.5 align-top dark:border-slate-800 {{ $day->format('Y-m') !== $month ? 'bg-slate-50 dark:bg-slate-950' : '' }}" style="min-height:6.5rem">
                             <div class="mb-1 text-end text-xs {{ $day->isToday() ? 'font-bold text-orange-600' : 'text-slate-400' }}">{{ $day->day }}</div>
                             @foreach ($dayTopics as $topic)
                                 @php
                                     $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status);
                                     $cellInFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true);
+                                    $canWrite = ! $cellInFlight && in_array($topic->status, ['suggested', 'approved', 'failed'], true);
+                                    $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready'], true);
                                 @endphp
-                                @if ($cellInFlight)
-                                    <a href="{{ route('content.review', $topic->id) }}" wire:navigate
-                                       class="mb-1 block w-full rounded-lg border border-orange-200 bg-orange-50 p-1.5 text-start hover:border-orange-300 dark:border-orange-900 dark:bg-orange-950">
+                                <div wire:key="cell-{{ $topic->id }}"
+                                     @if($canDrag) draggable="true" x-on:dragstart="dragId = '{{ $topic->id }}'" x-on:dragend="dragId = null" @endif
+                                     class="mb-1 rounded-lg border p-1.5 {{ $cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800' }} {{ $canDrag ? 'cursor-grab active:cursor-grabbing' : '' }}">
+                                    @if ($topic->currentArticle || $cellInFlight)
+                                        <a href="{{ route('content.review', $topic->id) }}" wire:navigate class="block hover:opacity-80">
+                                            <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
+                                        </a>
+                                    @else
                                         <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
-                                        <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-{{ $p['color'] }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $p['color'] }}-700">
-                                            <svg class="h-2.5 w-2.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                    @endif
+                                    <div class="mt-1 flex items-center justify-between gap-1">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-{{ $p['color'] }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $p['color'] }}-700">
+                                            @if ($cellInFlight)
+                                                <svg class="h-2.5 w-2.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                            @endif
                                             {{ $p['label'] }}
                                         </span>
-                                    </a>
-                                @else
-                                    <a href="{{ $topic->currentArticle ? route('content.review', $topic->id) : '#' }}"
-                                       @if(!$topic->currentArticle) onclick="return false" @endif
-                                       class="mb-1 block rounded-lg border border-slate-200 bg-white p-1.5 text-start hover:border-orange-300 dark:border-slate-700 dark:bg-slate-800">
-                                        <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
-                                        <span class="mt-1 inline-block rounded-full bg-{{ $p['color'] }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $p['color'] }}-700">{{ $p['label'] }}</span>
-                                    </a>
-                                @endif
+                                        @if ($canWrite)
+                                            <button wire:click="writeNow('{{ $topic->id }}')" wire:loading.attr="disabled" wire:target="writeNow('{{ $topic->id }}')"
+                                                    class="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-orange-700" title="{{ __('Write now') }}">
+                                                <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+                                                {{ __('Write') }}
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
                             @endforeach
                         </div>
                     @endforeach

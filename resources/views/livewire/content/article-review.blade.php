@@ -166,12 +166,45 @@
                         @endif
                     </div>
 
+                    @if ($traffic)
+                        <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                            <div class="flex items-center gap-2">
+                                <svg class="h-4 w-4 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.256-1.011M21.75 6.75v5.25M21.75 6.75h-5.25"/></svg>
+                                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('What this article is worth') }}</div>
+                            </div>
+                            <div class="mt-3 flex items-baseline gap-1.5">
+                                <span class="text-2xl font-extrabold text-success">+{{ number_format($traffic['low']) }}</span>
+                                <span class="text-sm text-slate-500 dark:text-slate-400">{{ __('extra visitors / month') }}</span>
+                            </div>
+                            <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                                @if ($traffic['volume'] > 0)
+                                    {{ __('":kw" gets about :v searches a month. This is a fair, conservative estimate for a new article that settles onto page one over time — realistically :low–:high visits/mo, not the best case.', [
+                                        'kw' => $topic->target_keyword,
+                                        'v' => number_format($traffic['volume']),
+                                        'low' => number_format($traffic['low']),
+                                        'high' => number_format($traffic['high']),
+                                    ]) }}
+                                @else
+                                    {{ __('A fair, conservative estimate once this ranks — not the best case.') }}
+                                @endif
+                            </p>
+                        </div>
+                    @endif
+
                     <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                         <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Search preview') }}</div>
                         <div class="mt-3 rounded-lg border border-slate-100 p-3 dark:border-slate-800">
                             <div class="truncate text-sm font-medium text-blue-700 dark:text-blue-400">{{ $article->meta_title }}</div>
                             <div class="mt-0.5 text-xs text-emerald-700 dark:text-emerald-500">{{ $topic->website?->domain }}/{{ $article->slug }}</div>
                             <div class="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">{{ $article->meta_description }}</div>
+                        </div>
+                    </div>
+
+                    {{-- Item 5: articles publish as classic HTML; the client converts to blocks in WP if wanted. --}}
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                        <div class="flex items-start gap-2">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+                            <span>{{ __('This publishes to WordPress as clean HTML in the classic editor. If you prefer Gutenberg blocks, open the post in WordPress and use “Convert to blocks” — your SEO fields and images carry over unchanged.') }}</span>
                         </div>
                     </div>
                 @endif

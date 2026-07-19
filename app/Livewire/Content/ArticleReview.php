@@ -306,16 +306,16 @@ class ArticleReview extends Component
     {
         return match ($code) {
             'kw_in_meta_title' => __('Keyphrase in SEO title'),
-            'meta_title_length' => __('SEO title length (50–60)'),
+            'meta_title_length' => __('SEO title length (40–60)'),
             'title_power_word' => __('Power word in title'),
             'kw_in_h1' => __('Keyphrase in H1'),
             'h1_length' => __('H1 length'),
             'kw_in_meta_description' => __('Keyphrase in meta description'),
-            'meta_description_length' => __('Meta description length (120–158)'),
+            'meta_description_length' => __('Meta description length (130–155)'),
             'kw_in_first_words' => __('Keyphrase in the opening words'),
             'kw_in_intro' => __('Keyphrase in the first paragraph'),
             'kw_in_slug' => __('Keyphrase in URL'),
-            'kw_density' => __('Keyphrase density (0.5–3%)'),
+            'kw_density' => __('Keyphrase density (0.5–2.5%)'),
             'kw_distribution' => __('Keyphrase spread across the article'),
             'secondary_coverage' => __('Additional keyphrases covered'),
             'word_count' => __('Article length'),
@@ -337,6 +337,31 @@ class ArticleReview extends Component
             'style_clean' => __('Natural writing style'),
             default => __('Quality check'),
         };
+    }
+
+    /**
+     * A FAIR per-article traffic estimate from `keyword_volume` (no extra API
+     * cost). Deliberately conservative: this is what a NEW article realistically
+     * earns settling mid-page-1 over time — NOT the ~28% a #1 ranking captures.
+     * The headline is the low end so the number reads as achievable, not hype
+     * (e.g. 550 searches/mo → "~8 extra visitors/mo", band 8–28).
+     *
+     * @return array{volume:int, low:int, high:int, ctr_low:float, ctr_high:float}|null
+     */
+    public static function trafficWorth(ContentTopic $topic): ?array
+    {
+        $band = ContentCalendar::fairMonthlyVisits($topic);
+        if ($band === null) {
+            return null;
+        }
+
+        return [
+            'volume' => (int) $topic->keyword_volume,
+            'low' => $band['low'],
+            'high' => $band['high'],
+            'ctr_low' => 1.5,
+            'ctr_high' => 5.0,
+        ];
     }
 
     /** Strip anything active before rendering/storing. */
@@ -426,6 +451,7 @@ class ArticleReview extends Component
             'progress' => $progress,
             'previewHtml' => $this->sanitize((string) ($article?->html ?? '')),
             'issueLabels' => $issueLabels,
+            'traffic' => $topic ? self::trafficWorth($topic) : null,
             'presentation' => $topic ? ContentCalendar::statusPresentation($topic->status) : null,
         ]);
     }
