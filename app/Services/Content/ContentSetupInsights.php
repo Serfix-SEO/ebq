@@ -84,6 +84,10 @@ class ContentSetupInsights
         if ($this->competitorAuthority($website) !== null) {
             return false;
         }
+        // SERP competitor discovery still running → keep polling.
+        if (Cache::has('content:serp-comp:'.$website->id)) {
+            return true;
+        }
         if (! Cache::has('content:comp-gen:'.$website->id)) {
             return false;
         }
@@ -104,21 +108,24 @@ class ContentSetupInsights
         if ($this->competitorAuthority($website) !== null) {
             return; // already have data
         }
-        $lock = 'content:comp-gen:'.$website->id;
-        if (Cache::has($lock)) {
-            return;
-        }
-        Cache::put($lock, 1, now()->addMinutes(30));
-
         $domain = $website->normalized_domain ?: $website->domain;
-        // FORCE the paid attempt: a "partial" / young-site snapshot may already
-        // exist from the free-feed path, which the freshness gate treats as
-        // fresh and would skip. The wizard explicitly wants the deeper
-        // (backlink/competitor) data, so bypass the gate this one time.
-        // sandbox for admins (+ forced on staging via env); non-admins bill
-        // real spend, which the report pipeline meters. One-time per site.
-        $sandbox = (bool) $website->user?->is_admin;
-        GenerateWebsiteReport::dispatch($domain, true, $sandbox);
+
+        // (1) Backlink report — FORCE the paid attempt (a "partial"/young-site
+        // snapshot may already exist from the free-feed path, which the freshness
+        // gate treats as fresh and would skip). Cache::add = atomic once-per-30min.
+        if (Cache::add('content:comp-gen:'.$website->id, 1, now()->addMinutes(30))) {
+            // sandbox for admins (+ forced on staging via env); non-admins bill
+            // real spend, which the report pipeline meters.
+            $sandbox = (bool) $website->user?->is_admin;
+            GenerateWebsiteReport::dispatch($domain, true, $sandbox);
+        }
+
+        // (2) SERP competitor discovery from the content plan's target keywords —
+        // finds competitors for a fresh site with no backlink footprint. Async so
+        // it never blocks the wizard render; the flag drives the polling state.
+        if (Cache::add('content:serp-comp:'.$website->id, 1, now()->addMinutes(30))) {
+            \App\Jobs\Content\DiscoverContentCompetitorsJob::dispatch($website->id);
+        }
     }
 
     /** Clear the cache so a fresh snapshot is re-read (called after generation). */
@@ -359,8 +366,20 @@ class ContentSetupInsights
         $competitorRows = array_values(array_filter((array) ($payload['competitors'] ?? []), 'is_array'));
         $myReferring = (int) ($payload['totals']['referring_domains'] ?? $snapshot->referring_domains ?? 0);
 
-        // No competitor list AND no own referring domains → nothing to show;
-        // signal the caller to generate a real report.
+        // Fresh / low-authority site: the backlink report finds no competitors.
+        // Fall back to SERP competitors discovered ASYNC by
+        // DiscoverContentCompetitorsJob (the content plan's TARGET keywords are
+        // genuine searches, so whoever ranks for them is a real competitor even
+        // when the site has no backlink footprint yet). Read-only here — never
+        // run SERP inline, or the step's 5s poll would re-bill it every tick.
+        if ($competitorRows === []) {
+            $competitorRows = array_values(array_filter(
+                (array) Cache::get('content:serp-competitors:'.$website->id, []),
+                'is_array'
+            ));
+        }
+
+        // Still nothing AND no own referring domains → signal "generate a report".
         if ($competitorRows === [] && $myReferring === 0) {
             return null;
         }
