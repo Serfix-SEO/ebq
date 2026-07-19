@@ -386,35 +386,46 @@
                     </div>
 
                     @if ($ins && ! empty($ins['competitors']))
-                        @if ($ins['behind'])
-                            <div class="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                                {{ __('Room to grow') }}
+                        {{-- Fresh site: no own backlink footprint yet, so the authority
+                             comparison (referring domains / median / gap) and the per-
+                             competitor DA/PA/backlink columns are meaningless. Show just
+                             the list of who ranks for the target searches. --}}
+                        @php $fresh = (int) ($ins['my_referring_domains'] ?? 0) < 1; @endphp
+                        @unless ($fresh)
+                            @if ($ins['behind'])
+                                <div class="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                    {{ __('Room to grow') }}
+                                </div>
+                            @endif
+                            <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                                <div class="rounded-2xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-900 dark:bg-orange-950">
+                                    <div class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Your referring domains') }}</div>
+                                    <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($ins['my_referring_domains']) }}</div>
+                                </div>
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/40">
+                                    <div class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Competitor median') }}</div>
+                                    <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $ins['median'] !== null ? number_format($ins['median']) : '—' }}</div>
+                                </div>
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/40">
+                                    <div class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Current gap') }}</div>
+                                    <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $ins['gap'] !== null ? $ins['gap'].'×' : '—' }}</div>
+                                </div>
                             </div>
-                        @endif
-                        <div class="mt-5 grid gap-3 sm:grid-cols-3">
-                            <div class="rounded-2xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-900 dark:bg-orange-950">
-                                <div class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Your referring domains') }}</div>
-                                <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($ins['my_referring_domains']) }}</div>
-                            </div>
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/40">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Competitor median') }}</div>
-                                <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $ins['median'] !== null ? number_format($ins['median']) : '—' }}</div>
-                            </div>
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/40">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Current gap') }}</div>
-                                <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $ins['gap'] !== null ? $ins['gap'].'×' : '—' }}</div>
-                            </div>
-                        </div>
+                        @else
+                            <p class="mx-auto mt-3 max-w-md text-sm text-slate-500 dark:text-slate-400">{{ __('Sites already ranking for your target searches — the competitors your articles will be up against.') }}</p>
+                        @endunless
                         <div class="mt-5 overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
                             <table class="w-full text-sm">
                                 <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
                                     <tr>
                                         <th class="px-4 py-2.5 text-start font-bold">{{ __('Competitor') }}</th>
-                                        <th class="px-4 py-2.5 text-end font-bold">{{ __('Referring domains') }}</th>
-                                        <th class="px-4 py-2.5 text-end font-bold">{{ __('Backlinks') }}</th>
-                                        <th class="px-4 py-2.5 text-end font-bold">{{ __('DA') }}</th>
-                                        <th class="px-4 py-2.5 text-end font-bold">{{ __('PA') }}</th>
+                                        @unless ($fresh)
+                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Referring domains') }}</th>
+                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Backlinks') }}</th>
+                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('DA') }}</th>
+                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('PA') }}</th>
+                                        @endunless
                                         <th class="w-10 px-2 py-2.5"></th>
                                     </tr>
                                 </thead>
@@ -430,10 +441,12 @@
                                                     {{ $c['domain'] }}
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $c['referring_domains'] !== null ? number_format($c['referring_domains']) : '—' }}</td>
-                                            <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ isset($c['backlinks']) && $c['backlinks'] !== null ? number_format($c['backlinks']) : '—' }}</td>
-                                            <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] ?? '—' }}</td>
-                                            <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['pa'] ?? '—' }}</td>
+                                            @unless ($fresh)
+                                                <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $c['referring_domains'] !== null ? number_format($c['referring_domains']) : '—' }}</td>
+                                                <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ isset($c['backlinks']) && $c['backlinks'] !== null ? number_format($c['backlinks']) : '—' }}</td>
+                                                <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] ?? '—' }}</td>
+                                                <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['pa'] ?? '—' }}</td>
+                                            @endunless
                                             <td class="px-2 py-3 text-end">
                                                 <button type="button" wire:click="removeCompetitor('{{ $c['domain'] }}')" wire:key="comp-rm-{{ $c['domain'] }}"
                                                         class="text-slate-300 opacity-0 transition hover:text-error group-hover:opacity-100" aria-label="{{ __('Remove') }}">
@@ -445,7 +458,9 @@
                                 </tbody>
                             </table>
                         </div>
-                        <p class="mt-2 text-center text-xs text-slate-400">{{ __('DA/PA from Moz; referring domains and backlinks from DataForSEO, where available.') }}</p>
+                        @unless ($fresh)
+                            <p class="mt-2 text-center text-xs text-slate-400">{{ __('DA/PA from Moz; referring domains and backlinks from DataForSEO, where available.') }}</p>
+                        @endunless
                     @elseif ($ins !== null && $hasOverrides)
                         {{-- Data exists, but the user's own edits emptied the table — distinct from "still loading". --}}
                         <div class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-800/40">

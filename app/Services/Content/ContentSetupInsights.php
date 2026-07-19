@@ -52,7 +52,7 @@ class ContentSetupInsights
 {
     private const CACHE_TTL_DAYS = 30;
 
-    private const MAX_COMPETITORS = 3;
+    private const MAX_COMPETITORS = 5;
 
     public function __construct(
         private readonly ClientReportService $reports,
@@ -394,14 +394,20 @@ class ContentSetupInsights
         usort($competitorRows, fn ($a, $b) => (int) ($b['shared_keywords'] ?? 0) <=> (int) ($a['shared_keywords'] ?? 0));
         $competitorRows = array_slice($competitorRows, 0, self::MAX_COMPETITORS);
 
+        // A fresh site (no own referring domains) shows just the competitor LIST —
+        // the DA/PA/backlink columns and the authority comparison are hidden in
+        // the UI, so skip the per-competitor DataForSEO + Moz lookups entirely
+        // (no wasted spend).
+        $fresh = $myReferring < 1;
+
         $competitors = [];
         foreach ($competitorRows as $c) {
             $cd = trim((string) ($c['domain'] ?? ''));
             if ($cd === '' || $cd === $domain) {
                 continue;
             }
-            $dfs = $this->dfsMetrics($cd, $sandbox);
-            $moz = $this->mozMetrics($cd);
+            $dfs = $fresh ? ['referring_domains' => null, 'backlinks' => null] : $this->dfsMetrics($cd, $sandbox);
+            $moz = $fresh ? ['domain_authority' => null, 'page_authority' => null] : $this->mozMetrics($cd);
             $competitors[] = [
                 'domain' => $cd,
                 'referring_domains' => $dfs['referring_domains'],
