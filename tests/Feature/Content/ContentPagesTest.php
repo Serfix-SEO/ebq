@@ -441,6 +441,32 @@ class ContentPagesTest extends TestCase
         Livewire::test(ContentCalendar::class)->call('publishNow', $topic->id);
 
         Queue::assertPushed(\App\Jobs\PublishContentArticleJob::class);
+        // Flips to PUBLISHING immediately so the calendar shows in-progress.
+        $this->assertSame(ContentTopic::STATUS_PUBLISHING, $topic->fresh()->status);
+    }
+
+    public function test_article_review_publish_now_dispatches_and_marks_publishing(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
+        $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id, 'status' => ContentTopic::STATUS_READY,
+        ]);
+        ContentArticle::storeVersion($topic, [
+            'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
+            'html' => '<p>x</p>', 'word_count' => 100, 'seo_score' => 90, 'seo_issues' => [],
+        ]);
+        \App\Models\ContentIntegration::create([
+            'website_id' => $website->id, 'platform' => 'webhook',
+            'status' => \App\Models\ContentIntegration::STATUS_CONNECTED,
+        ]);
+
+        Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('publishNow');
+
+        Queue::assertPushed(\App\Jobs\PublishContentArticleJob::class);
+        $this->assertSame(ContentTopic::STATUS_PUBLISHING, $topic->fresh()->status);
     }
 
     public function test_publish_now_without_connection_flashes_error_and_does_not_dispatch(): void

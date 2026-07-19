@@ -185,6 +185,34 @@ class ArticleReview extends Component
         }
     }
 
+    /**
+     * Publish this article to the connected destination(s) immediately, bypassing
+     * the plan's publish window. Mirrors ContentCalendar::publishNow — requires a
+     * connected integration, flips to PUBLISHING so the page shows progress.
+     */
+    public function publishNow(): void
+    {
+        $topic = $this->topic();
+        if ($topic === null || $topic->currentArticle === null) {
+            return;
+        }
+        if (! in_array($topic->status, [ContentTopic::STATUS_READY, ContentTopic::STATUS_SCHEDULED], true)) {
+            return;
+        }
+        $connected = (bool) $topic->plan?->website
+            ?->contentIntegrations()
+            ->where('status', \App\Models\ContentIntegration::STATUS_CONNECTED)
+            ->exists();
+        if (! $connected) {
+            session()->flash('review-status', __('Connect a site in Settings → Integrations before publishing.'));
+
+            return;
+        }
+        $topic->enterStage(ContentTopic::STATUS_PUBLISHING);
+        \App\Jobs\PublishContentArticleJob::dispatch($topic->id);
+        session()->flash('review-status', __('Publishing now — it can take a moment to appear on your site.'));
+    }
+
     /** Re-run generation after a failure (from the in-flight progress card). */
     public function retryGeneration(): void
     {
@@ -476,8 +504,13 @@ class ArticleReview extends Component
         $imagesPending = false;
         if ($topic !== null) {
             $genStart = (int) \Illuminate\Support\Facades\Cache::get('content:gen-start:'.$topic->id, 0);
-            $inFlight = in_array($topic->status, ContentTopic::IN_FLIGHT, true)
-                || ($genStart > 0 && $topic->status === ContentTopic::STATUS_APPROVED);
+            // GENERATION stages only — PUBLISHING is in-flight too but must NOT
+            // trigger the "writing" overlay; it keeps the article view + a
+            // Publishing badge.
+            $inFlight = in_array($topic->status, [
+                ContentTopic::STATUS_RESEARCHING, ContentTopic::STATUS_WRITING,
+                ContentTopic::STATUS_SCORING, ContentTopic::STATUS_REVISING,
+            ], true) || ($genStart > 0 && $topic->status === ContentTopic::STATUS_APPROVED);
             $imagesPending = $this->imagesStillGenerating($topic, $article, $genStart);
             // Actively finalizing, OR failed before any draft (show the retry card).
             $generating = $inFlight || $imagesPending;
@@ -502,6 +535,8 @@ class ArticleReview extends Component
             'previewHtml' => $this->sanitize((string) ($article?->html ?? '')),
             'issueLabels' => $issueLabels,
             'traffic' => $topic ? self::trafficWorth($topic) : null,
+            'publishConnected' => (bool) $topic?->plan?->website
+                ?->contentIntegrations()->where('status', \App\Models\ContentIntegration::STATUS_CONNECTED)->exists(),
             'presentation' => $topic ? ContentCalendar::statusPresentation($topic->status) : null,
         ]);
     }

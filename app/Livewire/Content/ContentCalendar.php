@@ -769,10 +769,10 @@ class ContentCalendar extends Component
 
             return;
         }
-        // The publish job only acts on SCHEDULED/PUBLISHING topics.
-        if ($topic->status === ContentTopic::STATUS_READY) {
-            $topic->enterStage(ContentTopic::STATUS_SCHEDULED);
-        }
+        // Flip to PUBLISHING synchronously so this Livewire re-render already
+        // shows the in-progress state (spinner) without a manual refresh — the
+        // publish job accepts SCHEDULED or PUBLISHING.
+        $topic->enterStage(ContentTopic::STATUS_PUBLISHING);
         PublishContentArticleJob::dispatch($topic->id);
         session()->flash('content-status', __('Publishing now — it can take a moment to appear on your site.'));
     }
@@ -1138,6 +1138,7 @@ class ContentCalendar extends Component
             'audience' => $this->audienceSearches($all),
             'clusters' => $this->strategyClusters($all),
             'publishConnected' => $this->hasPublishDestination(),
+            'hasInFlight' => $topics->contains(fn ($t) => in_array($t->status, ContentTopic::IN_FLIGHT, true)),
         ]);
     }
 
@@ -1156,6 +1157,7 @@ class ContentCalendar extends Component
             'audience' => [],
             'clusters' => [],
             'publishConnected' => false,
+            'hasInFlight' => false,
         ];
     }
 }

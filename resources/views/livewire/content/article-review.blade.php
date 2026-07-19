@@ -115,7 +115,8 @@
             {{ __('This article has not been written yet.') }}
         </div>
     @else
-        <div class="grid gap-6 lg:grid-cols-3">
+        {{-- Poll while publishing so the status flips to Published without a reload. --}}
+        <div class="grid gap-6 lg:grid-cols-3" @if($topic?->status === \App\Models\ContentTopic::STATUS_PUBLISHING) wire:poll.5s @endif>
             {{-- ── Quality panel ────────────────────────────────────── --}}
             <div class="space-y-4">
                 @if ($editing)
@@ -235,6 +236,17 @@
                             </button>
                         @elseif ($topic->status === \App\Models\ContentTopic::STATUS_SCHEDULED)
                             <p class="rounded-lg bg-success/10 px-3 py-2 text-center text-sm text-success">{{ __('Approved and ready to go.') }}</p>
+                        @endif
+                        @if (in_array($topic->status, [\App\Models\ContentTopic::STATUS_READY, \App\Models\ContentTopic::STATUS_SCHEDULED], true))
+                            @if ($publishConnected)
+                                <button wire:click="publishNow" wire:confirm="{{ __('Publish this article to your site now?') }}"
+                                        class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-success px-4 py-2.5 text-sm font-bold text-white hover:brightness-110">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+                                    {{ __('Publish now') }}
+                                </button>
+                            @else
+                                <a href="{{ route('content.integrations') }}" wire:navigate class="block w-full rounded-lg border border-slate-300 px-4 py-2.5 text-center text-sm font-medium text-orange-600 hover:bg-orange-50 dark:border-slate-700 dark:hover:bg-slate-800">{{ __('Connect a site to publish →') }}</a>
+                            @endif
                         @endif
                     @endif
                 </div>

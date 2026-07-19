@@ -1,4 +1,5 @@
 <div class="space-y-6" x-data
+    @if(($hasInFlight ?? false)) wire:poll.5s @endif
     @content-settings-saved.window="window.scrollTo({ top: 0, behavior: 'smooth' })">
     @if (session('content-status'))
         <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 6000)"
