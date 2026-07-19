@@ -575,6 +575,11 @@
                             @endif
                         </div>
                     @else
+                        {{-- Own keywords are in; competitors/gap still upgrading → keep polling so
+                             the digest refreshes in place (the loader's poll is gone once $kw is set). --}}
+                        @if (! empty($kw['competitors_pending']))
+                            <div wire:poll.6s="refreshKeywordInsights" class="hidden"></div>
+                        @endif
                         {{-- "This is a live sample, not the whole picture" callout --}}
                         <div class="mt-6 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
@@ -775,6 +780,21 @@
                                         <p class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ __('Showing :shown of :total — see the full list once you finish setting up.', ['shown' => count($kw['gap']), 'total' => number_format($kw['gap_total'])]) }}</p>
                                     </div>
                                 @endif
+                            </div>
+                        @elseif (! empty($kw['competitors_pending']))
+                            {{-- Own keywords are shown; the competitor gap analysis is still running. --}}
+                            <div class="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-800/40">
+                                <svg class="h-5 w-5 flex-none animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                <div class="min-w-0">
+                                    <p class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                        @if (($kw['competitors_total'] ?? 0) > 0)
+                                            {{ __('Analyzing :done of :total competitors for your keyword gap…', ['done' => (int) ($kw['competitors_done'] ?? 0), 'total' => (int) $kw['competitors_total']]) }}
+                                        @else
+                                            {{ __('Analyzing your competitors for your keyword gap…') }}
+                                        @endif
+                                    </p>
+                                    <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('The keywords your competitors rank for and you don\'t will appear here in a moment.') }}</p>
+                                </div>
                             </div>
                         @endif
 

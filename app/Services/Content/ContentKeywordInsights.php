@@ -55,11 +55,14 @@ class ContentKeywordInsights
     /** Keyword-server hard cap per ideas request (infra/keywords). */
     private const MAX_SEEDS = 20;
 
+    /** Competitor domains we mine keywords from for the gap analysis. */
+    private const MAX_COMPETITORS = 3;
+
     /** Give the (concurrency-1, minutes-per-job) server this long before falling back. */
     private const PENDING_GRACE_MINUTES = 15;
 
-    /** Partial (some sources still pending) results re-check this often. */
-    private const PARTIAL_TTL_SECONDS = 60;
+    /** Partial (competitors/gap still pending) results re-check this often. */
+    private const PARTIAL_TTL_SECONDS = 15;
 
     public function __construct(
         private readonly KeywordFinderPool $pool,
@@ -80,7 +83,15 @@ class ContentKeywordInsights
         // pass through an LLM scrap filter (drop login / create-account / cart…).
         $this->ensureOwnRequest($plan);
         $this->ensureSiteRequest($plan, $this->ownDomainKey($plan), fn () => $plan->website?->normalized_domain ?: $plan->website?->domain);
-        $this->ensureSiteRequest($plan, $this->competitorRequestKey($plan), fn () => $this->topCompetitorDomain($plan, $plan->website));
+
+        // Up to MAX_COMPETITORS competitor domains, one keyword request each, so
+        // the gap analysis is triangulated across several rivals (not one). Late
+        // dispatch is fine — the wizard poll re-runs ensureStarted once the
+        // competitors step has discovered them.
+        $competitors = $this->topCompetitorDomains($plan, $plan->website, self::MAX_COMPETITORS);
+        foreach ($competitors as $i => $domain) {
+            $this->ensureSiteRequest($plan, $this->competitorRequestKey($plan, $i), fn () => $domain);
+        }
     }
 
     /**
@@ -169,27 +180,31 @@ class ContentKeywordInsights
         }
     }
 
-    /** Best competitor domain to mine keywords from (SERP-shared / authority top). */
-    private function topCompetitorDomain(ContentPlan $plan, ?Website $website): ?string
+    /** Top competitor domains to mine keywords from (SERP-shared / authority order). */
+    private function topCompetitorDomains(ContentPlan $plan, ?Website $website, int $limit = self::MAX_COMPETITORS): array
     {
         if ($website === null) {
-            return null;
+            return [];
         }
+        $out = [];
         try {
             $insights = app(ContentSetupInsights::class)->competitorAuthority($website);
             $competitors = is_array($insights) ? ($insights['competitors'] ?? []) : [];
             $own = strtolower(preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
             foreach ($competitors as $c) {
                 $d = strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))));
-                if ($d !== '' && $d !== $own) {
-                    return $d;
+                if ($d !== '' && $d !== $own && ! in_array($d, $out, true)) {
+                    $out[] = $d;
+                    if (count($out) >= $limit) {
+                        break;
+                    }
                 }
             }
         } catch (\Throwable) {
             // no competitor data — skip competitor keywords
         }
 
-        return null;
+        return $out;
     }
 
     /**
@@ -218,22 +233,37 @@ class ContentKeywordInsights
         $website = $plan->website;
         $ownDomain = $website ? ($website->normalized_domain ?: $website->domain) : null;
 
+        // "Done" here means genuinely COMPLETED — never merely "settled". A
+        // request that hasn't been dispatched yet (null) must read as still
+        // analyzing, not flash a misleading instant "Done".
+        $completed = fn (?KeywordApiRequest $r) => $r !== null && $r->status === KeywordApiRequest::STATUS_COMPLETED;
+
         $seed = $this->request($plan);
         $ownSite = $this->siteRequest($this->ownDomainKey($plan));
-        $compSite = $this->siteRequest($this->competitorRequestKey($plan));
 
         $status = [];
         // The client's own research (seeds + own-domain crawl) as one line.
         $status[] = [
             'label' => $ownDomain ? __('Your site — :d', ['d' => $ownDomain]) : __('Your site'),
-            'done' => $this->settled($seed) && $this->settled($ownSite),
+            'done' => $completed($seed) && ($ownSite !== null && $completed($ownSite)),
         ];
-        // Competitor line (only once a competitor request exists).
-        if ($compSite !== null) {
-            $competitor = $this->topCompetitorDomain($plan, $website);
+
+        // One line per competitor (up to MAX_COMPETITORS). While discovery is
+        // still running we don't know the domains yet, so show generic
+        // placeholder lines so the user can see all rivals are being analyzed.
+        $competitorDomains = $this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS);
+        $discoveryPending = $website !== null
+            && $competitorDomains === []
+            && app(ContentSetupInsights::class)->isGenerating($website);
+        $lines = $discoveryPending ? self::MAX_COMPETITORS : count($competitorDomains);
+        for ($i = 0; $i < $lines; $i++) {
+            $domain = $competitorDomains[$i] ?? null;
+            $req = $domain !== null ? $this->siteRequest($this->competitorRequestKey($plan, $i)) : null;
             $status[] = [
-                'label' => $competitor ? __('Competitor — :d', ['d' => $competitor]) : __('Competitor'),
-                'done' => $this->settled($compSite),
+                'label' => $domain
+                    ? __('Competitor :n — :d', ['n' => $i + 1, 'd' => $domain])
+                    : __('Competitor :n', ['n' => $i + 1]),
+                'done' => $completed($req),
             ];
         }
 
@@ -249,41 +279,43 @@ class ContentKeywordInsights
 
         $seed = $this->request($plan);                        // offering seeds
         $ownSite = $this->siteRequest($this->ownDomainKey($plan)); // client domain
-        $compSite = $this->siteRequest($this->competitorRequestKey($plan)); // competitor
 
         $completed = fn (?KeywordApiRequest $r) => $r !== null && $r->status === KeywordApiRequest::STATUS_COMPLETED;
 
-        // Onboarding must show COMPLETE research to earn trust — so we wait for
-        // ALL sources (offering seeds + the client's own domain + the top
-        // competitor, when one exists) to finish before building. No low-count
-        // partial flashes; the loader (with per-source status) shows until then.
-        $competitorExpected = $this->topCompetitorDomain($plan, $plan->website) !== null;
+        // Competitor requests — one per discovered rival, up to MAX_COMPETITORS.
+        $competitorDomains = $this->topCompetitorDomains($plan, $plan->website, self::MAX_COMPETITORS);
+        $expected = count($competitorDomains);
+        $compReqs = [];
+        foreach (array_keys($competitorDomains) as $i) {
+            $compReqs[$i] = $this->siteRequest($this->competitorRequestKey($plan, $i));
+        }
 
-        // Competitor DISCOVERY (SERP/backlinks) may still be running — in which
-        // case topCompetitorDomain() is null only because we haven't found one
-        // YET, not because there is none. Don't lock a competitor-less digest
-        // while discovery is live; wait for it to finalize (no_data/ready) first.
-        // Once it lands, the wizard's poll re-dispatch fires the competitor
-        // keyword request (ContentWizard::refreshKeywordInsights).
-        $competitorPending = $plan->website !== null
-            && ! $competitorExpected
+        // Competitor DISCOVERY (SERP/backlinks) may still be running — no domains
+        // found YET, not necessarily none. Don't treat competitors as "done"
+        // while discovery is live; the wizard poll re-dispatches once they land.
+        $discoveryPending = $plan->website !== null
+            && $competitorDomains === []
             && app(ContentSetupInsights::class)->isGenerating($plan->website);
 
-        $allComplete = $completed($seed)
-            && ($ownSite === null || $completed($ownSite))
-            && ! $competitorPending
-            && (! $competitorExpected || $completed($compSite));
+        // "What people are searching for" = the client's OWN keyword set (offering
+        // seeds + their own domain crawl). Show it AS SOON AS it is ready — the
+        // competitor keywords and the gap analysis upgrade in afterwards.
+        $clientComplete = $completed($seed) && ($ownSite === null || $completed($ownSite));
 
-        // Give-up backstop (server failure / very slow): only after every
-        // dispatched request has settled AND — if a competitor is expected — its
-        // request has actually been dispatched and settled too. Discovery must
-        // have finalized too, so we don't give up before a competitor can appear.
-        $allSettled = ! $competitorPending
-            && $this->settled($seed) && $this->settled($ownSite)
-            && (! $competitorExpected || ($compSite !== null && $this->settled($compSite)));
+        $compCompleted = count(array_filter($compReqs, $completed));
+        $competitorsComplete = ! $discoveryPending && $compCompleted >= $expected;
 
-        if (! $allComplete && ! $allSettled) {
-            return null; // keep waiting — complete results only
+        // Backstop: give up (build from whatever landed) only once EVERYTHING has
+        // settled — client requests plus every dispatched competitor request — so
+        // a dead keyword server can't hang the step forever.
+        $compDispatched = count(array_filter($compReqs, static fn ($r) => $r !== null));
+        $competitorsSettled = ! $discoveryPending
+            && $compDispatched >= $expected
+            && count(array_filter($compReqs, fn ($r) => $this->settled($r))) === count($compReqs);
+        $allSettled = $this->settled($seed) && $this->settled($ownSite) && $competitorsSettled;
+
+        if (! $clientComplete && ! $allSettled) {
+            return null; // still gathering the client's own keywords
         }
 
         // CLIENT keywords = offering seeds + their own crawled domain (scrap-
@@ -292,8 +324,11 @@ class ContentKeywordInsights
             $this->completedRows($seed),
             $this->filterScrap($this->completedRows($ownSite), $plan),
         );
-        // COMPETITOR keywords, also scrap-filtered.
-        $competitorRows = $this->filterScrap($this->completedRows($compSite), $plan);
+        // COMPETITOR keywords, merged across every completed rival, scrap-filtered.
+        $competitorRows = [];
+        foreach ($compReqs as $req) {
+            $competitorRows = $this->mergeRows($competitorRows, $this->filterScrap($this->completedRows($req), $plan));
+        }
 
         $rows = $this->mergeRows($clientRows, $competitorRows);
 
@@ -305,14 +340,17 @@ class ContentKeywordInsights
             }
             $partial = true;
         } else {
-            $partial = ! $allComplete; // more sources still coming
+            $partial = ! ($clientComplete && $competitorsComplete); // competitors/gap still coming
         }
 
         // Keyword gap: what competitors rank for that the client does NOT,
         // ranked by relevance to what the client sells.
         $gap = $this->computeGap($clientRows, $competitorRows, $plan);
 
-        $insights = $this->build($rows, $plan, partial: $partial, gap: $gap['rows'], gapTotal: $gap['total']);
+        $insights = $this->build($rows, $plan, partial: $partial, gap: $gap['rows'], gapTotal: $gap['total'],
+            competitorsPending: ! $competitorsComplete,
+            competitorsDone: $compCompleted,
+            competitorsTotal: max($expected, $compDispatched, $discoveryPending ? self::MAX_COMPETITORS : 0));
         // Partial results are cached briefly so the next poll upgrades them as the
         // remaining requests complete; the final digest is cached 30 days.
         Cache::put($this->insightsKey($plan), $insights,
@@ -499,11 +537,13 @@ class ContentKeywordInsights
     {
         Cache::forget($this->insightsKey($plan));
         Cache::forget($this->requestKey($plan));
-        Cache::forget($this->competitorRequestKey($plan));
         Cache::forget($this->ownDomainKey($plan));
         Cache::forget('content:kw-insights:lock:'.$plan->id);
-        Cache::forget($this->competitorRequestKey($plan).':lock');
         Cache::forget($this->ownDomainKey($plan).':lock');
+        for ($i = 0; $i < self::MAX_COMPETITORS; $i++) {
+            Cache::forget($this->competitorRequestKey($plan, $i));
+            Cache::forget($this->competitorRequestKey($plan, $i).':lock');
+        }
     }
 
     // ── internals ───────────────────────────────────────────────────────
@@ -518,9 +558,9 @@ class ContentKeywordInsights
         return 'content:kw-insights:req:'.$plan->id;
     }
 
-    private function competitorRequestKey(ContentPlan $plan): string
+    private function competitorRequestKey(ContentPlan $plan, int $i = 0): string
     {
-        return 'content:kw-insights:comp-req:'.$plan->id;
+        return 'content:kw-insights:comp-req:'.$plan->id.':'.$i;
     }
 
     private function ownDomainKey(ContentPlan $plan): string
@@ -716,7 +756,8 @@ class ContentKeywordInsights
      *
      * @param  list<array{keyword:string, volume:?int, competition:string, intent:string, is_question:bool}>  $rows
      */
-    private function build(array $rows, ContentPlan $plan, bool $partial, array $gap = [], int $gapTotal = 0): array
+    private function build(array $rows, ContentPlan $plan, bool $partial, array $gap = [], int $gapTotal = 0,
+        bool $competitorsPending = false, int $competitorsDone = 0, int $competitorsTotal = 0): array
     {
         $plannedKeywords = $plan->topics()->pluck('target_keyword')
             ->map(fn ($k) => mb_strtolower(trim((string) $k)))->filter()->flip()->all();
@@ -809,6 +850,9 @@ class ContentKeywordInsights
             'gap' => $gap,
             'gap_total' => $gapTotal,
             'partial' => $partial,
+            'competitors_pending' => $competitorsPending,
+            'competitors_done' => $competitorsDone,
+            'competitors_total' => $competitorsTotal,
         ];
     }
 
