@@ -33,6 +33,8 @@ Schedule::command('ebq:publish-scheduled-plugin-releases')->everyMinute();
 // after the Trial plan's trial_days. Hourly — the 12h stage needs sub-daily
 // resolution. Disabled entirely while trial_days = 0.
 Schedule::command('ebq:trial-cleanup')->hourly()->withoutOverlapping();
+// GC abandoned anonymous content-onboarding runs + their provisional websites.
+Schedule::command('ebq:content-onboarding-gc')->hourly()->withoutOverlapping();
 
 // One-shot 30%-discount promo to ACTIVE trial users (day 2+ of trial, once
 // per user ever — users.trial_discount_email_sent_at). Expired users get the

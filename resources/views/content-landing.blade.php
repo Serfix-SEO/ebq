@@ -17,7 +17,7 @@
                 {{ __('Serfix researches your niche, writes a genuinely useful article, checks it against technical SEO, adds images, and publishes it to your site — on autopilot. You review and approve everything.') }}
             </p>
             <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                <a href="{{ route('content.onboarding') }}" class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
                     {{ __('Start :days-day free trial', ['days' => $cfg::trialDays()]) }}
                 </a>
                 <span class="text-sm text-slate-500">{{ __(':n free articles · no card required', ['n' => $cfg::trialArticles()]) }}</span>
@@ -67,7 +67,7 @@
                 {{ __('Up to :n articles per website each month. Each additional website: $:m/mo (or $:a/mo billed yearly).', ['n' => $cfg::monthlyArticlesPerWebsite(), 'm' => $cfg::displayPrice('addon_monthly'), 'a' => $cfg::displayPrice('addon_annual')]) }}
             </p>
             <div class="mt-8 text-center">
-                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                <a href="{{ route('content.onboarding') }}" class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
                     {{ __('Get started free') }}
                 </a>
             </div>
