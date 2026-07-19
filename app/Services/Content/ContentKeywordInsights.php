@@ -13,6 +13,7 @@ use App\Services\KeywordResearch\KeywordIntentClassifier;
 use App\Services\KeywordResearch\KeywordTermGrouper;
 use App\Services\KeywordsEverywhereClient;
 use App\Services\Llm\LlmClientFactory;
+use App\Services\SerperSearchClient;
 use App\Support\ContentAutopilotConfig;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -352,10 +353,15 @@ class ContentKeywordInsights
         // ranked by relevance to what the client sells.
         $gap = $this->computeGap($clientRows, $competitorRows, $plan);
 
+        // "People also ask" / "People also search for" straight from Google's
+        // SERP for the client's top query (one cached Serper call).
+        $peopleAlso = $this->peopleAlsoSearch($plan, $rows);
+
         $insights = $this->build($rows, $plan, partial: $partial, gap: $gap['rows'], gapTotal: $gap['total'],
             competitorsPending: ! $competitorsComplete,
             competitorsDone: $compCompleted,
-            competitorsTotal: max($expected, $compDispatched, $discoveryPending ? self::MAX_COMPETITORS : 0));
+            competitorsTotal: max($expected, $compDispatched, $discoveryPending ? self::MAX_COMPETITORS : 0),
+            peopleAlso: $peopleAlso);
         // Partial results are cached briefly so the next poll upgrades them as the
         // remaining requests complete; the final digest is cached 30 days.
         Cache::put($this->insightsKey($plan), $insights,
@@ -465,6 +471,95 @@ class ContentKeywordInsights
         // total = every competitor keyword the client isn't targeting (the full
         // gap they'll unlock after onboarding), not just the shown sample.
         return ['rows' => $rows, 'total' => count($gap)];
+    }
+
+    /**
+     * Google's "People also ask" (questions) and "People also search for"
+     * (related searches) for the client's top query — the real SERP demand
+     * signal. One Serper call, geo-targeted, cached 30 days. Fails soft to
+     * empty (the section just hides).
+     *
+     * @return array{ask: list<string>, search: list<string>, query: string}
+     */
+    private function peopleAlsoSearch(ContentPlan $plan, array $rows): array
+    {
+        $empty = ['ask' => [], 'search' => [], 'query' => ''];
+        try {
+            $query = $this->primaryQuery($plan, $rows);
+            if ($query === '') {
+                return $empty;
+            }
+            $gl = strtolower(trim((string) ($plan->country ?: 'us'))) ?: 'us';
+            $cacheKey = 'content:kw-paa:'.$plan->id.':'.md5($query.'|'.$gl);
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                return $cached;
+            }
+
+            $json = app(SerperSearchClient::class)->query([
+                'q' => $query,
+                'type' => 'search',
+                'gl' => $gl,
+                '__website_id' => $plan->website_id,
+                '__owner_user_id' => $plan->website?->user_id,
+                '__source' => 'content_autopilot.people_also',
+            ]);
+            if (! is_array($json)) {
+                return $empty;
+            }
+
+            $ask = [];
+            foreach ((array) ($json['peopleAlsoAsk'] ?? []) as $p) {
+                $q = trim((string) (is_array($p) ? ($p['question'] ?? '') : $p));
+                if ($q !== '') {
+                    $ask[$q] = true;
+                }
+            }
+            $search = [];
+            foreach ((array) ($json['relatedSearches'] ?? []) as $p) {
+                $q = trim((string) (is_array($p) ? ($p['query'] ?? '') : $p));
+                if ($q !== '') {
+                    $search[$q] = true;
+                }
+            }
+
+            $result = [
+                'ask' => array_slice(array_keys($ask), 0, 8),
+                'search' => array_slice(array_keys($search), 0, 12),
+                'query' => $query,
+            ];
+            Cache::put($cacheKey, $result, now()->addDays(self::CACHE_TTL_DAYS));
+
+            return $result;
+        } catch (\Throwable) {
+            return $empty;
+        }
+    }
+
+    /** The single query to probe Google with: highest-volume keyword, else a head offering. */
+    private function primaryQuery(ContentPlan $plan, array $rows): string
+    {
+        $best = '';
+        $bestVol = -1;
+        foreach ($rows as $r) {
+            $v = (int) ($r['volume'] ?? 0);
+            if ($v > $bestVol && ($r['keyword'] ?? '') !== '') {
+                $bestVol = $v;
+                $best = (string) $r['keyword'];
+            }
+        }
+        if ($best !== '') {
+            return $best;
+        }
+        foreach ((array) (($plan->offerings ?? [])['sell'] ?? []) as $item) {
+            $item = trim((string) preg_replace('/\s*\(.*?\)\s*/', ' ', mb_strtolower((string) $item)));
+            $words = preg_split('/\s+/', $item, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            if ($words !== []) {
+                return implode(' ', array_slice($words, 0, 4));
+            }
+        }
+
+        return '';
     }
 
     /** Significant tokens from what the client sells + their business description. */
@@ -762,7 +857,8 @@ class ContentKeywordInsights
      * @param  list<array{keyword:string, volume:?int, competition:string, intent:string, is_question:bool}>  $rows
      */
     private function build(array $rows, ContentPlan $plan, bool $partial, array $gap = [], int $gapTotal = 0,
-        bool $competitorsPending = false, int $competitorsDone = 0, int $competitorsTotal = 0): array
+        bool $competitorsPending = false, int $competitorsDone = 0, int $competitorsTotal = 0,
+        array $peopleAlso = []): array
     {
         $plannedKeywords = $plan->topics()->pluck('target_keyword')
             ->map(fn ($k) => mb_strtolower(trim((string) $k)))->filter()->flip()->all();
@@ -863,6 +959,7 @@ class ContentKeywordInsights
             'intents' => $intents,
             'questions' => $questions,
             'top_searches' => $topSearches,
+            'people_also' => $peopleAlso,
             'opportunities' => $opportunities,
             'gap' => $gap,
             'gap_total' => $gapTotal,

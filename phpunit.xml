@@ -48,6 +48,7 @@
              makes a real credit-billed HTTP call (found 2026-07-11). Same
              philosophy as the REDIS_DB pin above. -->
         <env name="KEYWORDS_EVERYWHERE_API_KEY" value=""/>
+        <env name="SERPER_API_KEY" value=""/>
         <!-- Same rule for the LLM providers: a leaked key would let any test
              that resolves LlmClient (or validates the admin settings form,
              which fetches the live /models list) make real network calls —
