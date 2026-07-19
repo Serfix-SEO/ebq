@@ -506,7 +506,6 @@
                         <div wire:poll.5s="refreshCompetitors" class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
                             <svg class="h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                             <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('Analyzing your competitive landscape…') }}</p>
-                            <p class="text-xs text-slate-400">{{ __('This can take a minute. You can continue now — it keeps working in the background.') }}</p>
                         </div>
                     @else
                         <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
@@ -556,7 +555,6 @@
                         <div wire:poll.5s="refreshKeywordInsights" class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
                             <svg class="h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                             <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('Researching live search data for your market…') }}</p>
-                            <p class="text-xs text-slate-400">{{ __('This runs in the background — feel free to continue and check back.') }}</p>
                         </div>
                     @else
                         {{-- "This is a live sample, not the whole picture" callout --}}
@@ -751,9 +749,6 @@
                             </div>
                         @endif
 
-                        @if ($kw['partial'])
-                            <p class="mt-2 text-center text-xs text-slate-400">{{ __('Research keeps deepening in the background — this view refreshes as more data lands.') }}</p>
-                        @endif
                     @endif
 
                     <div class="mt-7 flex items-center justify-between">
@@ -808,7 +803,7 @@
                             </span>
                             <div class="min-w-0">
                                 <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('This is just the beginning — your calendar keeps filling itself') }}</p>
-                                <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __('New topics keep generating in the background, so you always have articles lined up. Publishing starts at 1 article per day — you can change the pace anytime.') }}</p>
+                                <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __('New topics keep generating automatically, so you always have articles lined up. Publishing starts at 1 article per day — you can change the pace anytime.') }}</p>
                             </div>
                         </div>
                     @endif
