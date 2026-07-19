@@ -31,31 +31,40 @@
         </div>
     @endif
 
-    @if ($article === null && $generating)
-        {{-- ── Generating: teaser skeleton behind a live progress overlay ── --}}
+    @if ($generating)
+        {{-- ── Generating: the real draft (or a skeleton) blurred behind a live
+             progress overlay. Stays up through research → write → polish →
+             REVISIONS → images until the article is fully finalized. ── --}}
         <div class="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800"
              @if (! ($progress['failed'] ?? false)) wire:poll.3s @endif>
-            {{-- Teaser: a faint skeleton of the article being built --}}
-            <div class="pointer-events-none select-none p-6 blur sm:p-10" aria-hidden="true">
-                <div class="mx-auto max-w-3xl space-y-5 opacity-60">
-                    <h1 class="text-3xl font-extrabold tracking-tight text-slate-800 dark:text-slate-200">{{ $topic?->title }}</h1>
-                    <div class="h-40 w-full animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"></div>
-                    @foreach ([5,4,5] as $bi => $blk)
-                        <div class="space-y-2.5">
-                            <div class="h-5 w-1/3 animate-pulse rounded bg-slate-300 dark:bg-slate-700"></div>
-                            @for ($i = 0; $i < $blk; $i++)
-                                <div class="h-3.5 animate-pulse rounded bg-slate-200 dark:bg-slate-800" style="width: {{ [100,96,92,88,98][$i % 5] }}%"></div>
-                            @endfor
-                        </div>
-                    @endforeach
-                </div>
+            {{-- Teaser behind: the draft-in-progress if we have one, else a skeleton --}}
+            <div class="pointer-events-none max-h-[38rem] select-none overflow-hidden p-6 blur sm:p-10" aria-hidden="true">
+                @if ($article)
+                    <div class="prose prose-slate mx-auto max-w-3xl opacity-60 dark:prose-invert">
+                        <h1>{{ $article->h1 ?: $topic?->title }}</h1>
+                        {!! $previewHtml !!}
+                    </div>
+                @else
+                    <div class="mx-auto max-w-3xl space-y-5 opacity-60">
+                        <h1 class="text-3xl font-extrabold tracking-tight text-slate-800 dark:text-slate-200">{{ $topic?->title }}</h1>
+                        <div class="h-40 w-full animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+                        @foreach ([5,4,5] as $bi => $blk)
+                            <div class="space-y-2.5">
+                                <div class="h-5 w-1/3 animate-pulse rounded bg-slate-300 dark:bg-slate-700"></div>
+                                @for ($i = 0; $i < $blk; $i++)
+                                    <div class="h-3.5 animate-pulse rounded bg-slate-200 dark:bg-slate-800" style="width: {{ [100,96,92,88,98][$i % 5] }}%"></div>
+                                @endfor
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
 
             {{-- Overlay: the live progress card --}}
             <div class="absolute inset-0 flex items-center justify-center bg-white/60 p-4 backdrop-blur-sm dark:bg-slate-900/60">
                 <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
                     <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
-                        {{ ($progress['failed'] ?? false) ? __('Needs attention') : __('Writing your article') }}
+                        {{ ($progress['failed'] ?? false) ? __('Needs attention') : __('Creating your article') }}
                     </p>
                     <h2 class="mt-0.5 text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $topic?->title }}</h2>
 

@@ -202,9 +202,25 @@
                         return true;
                     })->map(function ($item) use ($current) {
                         $item['href'] = route($item['route']);
-                        $item['active'] = str_starts_with($current, explode('.', $item['route'])[0]);
+                        // Precise: the item is active only on its own route or a
+                        // true child of it (route.'.') — NEVER a sibling. The old
+                        // first-segment match lit every content.* item at once.
+                        $item['active'] = $current === $item['route']
+                            || str_starts_with($current, $item['route'].'.');
                         return $item;
                     })->values();
+
+                    // Fallback for detail routes that are not menu items (e.g.
+                    // content.review): if nothing matched precisely, light the
+                    // FIRST item that shares the current route's base segment
+                    // (the group's landing page), not every sibling.
+                    if (! $items->contains('active', true)) {
+                        $curBase = explode('.', $current)[0];
+                        $idx = $items->search(fn ($item) => explode('.', $item['route'])[0] === $curBase);
+                        if ($idx !== false) {
+                            $items = $items->map(fn ($item, $i) => $i === $idx ? array_merge($item, ['active' => true]) : $item)->values();
+                        }
+                    }
                     return ['label' => $group['label'], 'items' => $items];
                 })->filter(fn ($g) => $g['items']->isNotEmpty())->values();
 

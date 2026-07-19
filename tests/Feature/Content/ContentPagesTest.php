@@ -366,6 +366,37 @@ class ContentPagesTest extends TestCase
         $this->assertSame(ContentTopic::STATUS_SCHEDULED, $topic->fresh()->status);
     }
 
+    public function test_progress_overlay_persists_while_revising_with_a_draft(): void
+    {
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create(['website_id' => $website->id]);
+        // A draft already exists (the writer stored version 1) but the topic is
+        // still REVISING — the user must keep seeing progress, not a half-baked
+        // draft article view.
+        $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id,
+            'status' => ContentTopic::STATUS_REVISING,
+        ]);
+        ContentArticle::storeVersion($topic, [
+            'h1' => 'Draft In Progress',
+            'meta_title' => 'Draft In Progress',
+            'meta_description' => 'Description here.',
+            'slug' => 'draft-in-progress',
+            'html' => '<h2>Section</h2><p>Body text.</p>',
+            'word_count' => 500,
+            'seo_score' => 70,
+            'seo_issues' => [],
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_website_id' => $website->id])
+            ->get(route('content.review', $topic->id))
+            ->assertOk()
+            ->assertSee(__('Creating your article'))      // progress overlay is up
+            ->assertSee(__('Optimizing for SEO & readability'))
+            ->assertDontSee(__('Content quality'));         // NOT the finalized article panel
+    }
+
     public function test_review_page_is_tenant_scoped(): void
     {
         [$user] = $this->userWithWebsite();

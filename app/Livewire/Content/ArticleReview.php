@@ -380,7 +380,31 @@ class ArticleReview extends Component
      *
      * @return array{steps:list<array{label:string,state:string}>, etaText:string, failed:bool}
      */
-    private function generationProgress(ContentTopic $topic, int $genStart): array
+    /**
+     * True while the article is written (topic READY) but its images are still
+     * being created by the chained job — part of "finalized" for the user. Self
+     * limits: stops once ≥1 image lands or after a bounded wait, and only when
+     * images are actually enabled for this plan.
+     */
+    private function imagesStillGenerating(ContentTopic $topic, ?ContentArticle $article, int $genStart): bool
+    {
+        if ($article === null || $topic->status !== ContentTopic::STATUS_READY) {
+            return false;
+        }
+        $plan = $topic->plan;
+        if ($plan === null || $plan->images_enabled === false
+            || ! \App\Support\ContentAutopilotConfig::imagesEnabled()) {
+            return false;
+        }
+        if ($article->images()->where('status', \App\Models\ContentImage::STATUS_GENERATED)->exists()) {
+            return false; // at least one image landed → finished
+        }
+        $elapsed = $genStart > 0 ? (now()->timestamp - $genStart) : 999;
+
+        return $elapsed < 240; // wait up to ~4 min for images, then stop blocking
+    }
+
+    private function generationProgress(ContentTopic $topic, int $genStart, bool $imagesPending = false): array
     {
         $stageOf = [
             ContentTopic::STATUS_APPROVED => 'research',
@@ -388,6 +412,7 @@ class ArticleReview extends Component
             ContentTopic::STATUS_WRITING => 'write',
             ContentTopic::STATUS_SCORING => 'polish',
             ContentTopic::STATUS_REVISING => 'polish',
+            ContentTopic::STATUS_READY => 'images',
         ];
         $order = ['research', 'write', 'polish', 'images', 'done'];
         $labels = [
@@ -424,17 +449,26 @@ class ArticleReview extends Component
         $topic = $this->topic();
         $article = $topic?->currentArticle;
 
-        // No article yet: are we actively generating it? True while the topic
-        // is in a pipeline stage, or just-dispatched (gen-start cached) and
-        // still APPROVED before the worker picks it up.
+        // Keep the live progress overlay (with the draft blurred behind it) for
+        // the WHOLE build, not just before the first draft exists: the writer
+        // stores a draft the moment writing starts, but the topic is still
+        // researching/writing/scoring/REVISING — and images generate after the
+        // READY flip — so the user must keep seeing progress until everything is
+        // finalized, not a half-optimised draft.
         $generating = false;
         $progress = null;
-        if ($topic !== null && $article === null) {
+        $imagesPending = false;
+        if ($topic !== null) {
             $genStart = (int) \Illuminate\Support\Facades\Cache::get('content:gen-start:'.$topic->id, 0);
-            $generating = in_array($topic->status, ContentTopic::IN_FLIGHT, true)
+            $inFlight = in_array($topic->status, ContentTopic::IN_FLIGHT, true)
                 || ($genStart > 0 && $topic->status === ContentTopic::STATUS_APPROVED);
-            if ($generating || $topic->status === ContentTopic::STATUS_FAILED) {
-                $progress = $this->generationProgress($topic, $genStart);
+            $imagesPending = $this->imagesStillGenerating($topic, $article, $genStart);
+            // Actively finalizing, OR failed before any draft (show the retry card).
+            $generating = $inFlight || $imagesPending;
+            $failedNoDraft = $article === null && $topic->status === ContentTopic::STATUS_FAILED;
+            if ($generating || $failedNoDraft) {
+                $progress = $this->generationProgress($topic, $genStart, $imagesPending);
+                $generating = $generating || $failedNoDraft;
             }
         }
 
