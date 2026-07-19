@@ -78,19 +78,38 @@ free slot → Activate; slots full → Add website (addon). `content.get-started
 
 ## Public onboarding
 
-`/content-autopilot` landing (`content-landing.blade.php`) → CTA →
-`/content-autopilot/start` (`PublicOnboarding` Livewire, guest layout):
-1. **domain** → provisional `Website` under the seeded `is_system`
+`/content-autopilot` landing (`content-landing.blade.php`, hero has a domain
+input carrying `?domain=`) → `/content-autopilot/start` (`PublicOnboarding`
+Livewire, full-page layout `components.layouts.content-onboarding`). It is the
+**FULL dashboard wizard run anonymously** (upgraded 2026-07-19), not a cut-down
+form:
+1. **domain-capture screen** → provisional `Website` under the seeded `is_system`
    "content-leads" user + shared-crawl subscribe (`ContentOnboardingConverter::
    begin`); `content_onboarding_sessions` token in the visitor session. Guards:
    SSRF (`SafeHttpGuard`), domain normalize, reCAPTCHA, per-IP/global RateLimiter
    (`content.onboarding.*` admin keys).
-2. **business profile + offerings**.
-3. **name/email/phone/password** → create user → `ContentOnboardingConverter::
-   convert` re-parents the site (or folds into an existing owned domain),
-   persists a covered DRAFT plan, `startTrial`, dispatches ideation + keyword
-   research → login → `content.settings`. (Password is collected here — the app
-   has NO password-reset flow, so no passwordless email.)
+2. **7-step wizard** (business → offerings → how-it-works → images → competitors
+   → keyword research → first articles) — identical to the dashboard, so the
+   visitor sees crawl/competitor/keyword/topic value BEFORE signup. Runs the real
+   pipeline on the provisional site (profile extraction, competitor authority,
+   keyword research, topic ideation) with **NO entitlement gate**.
+3. **create account** (name/email/phone/password) → `ContentOnboardingConverter::
+   convert` re-parents the site (or folds into an existing owned domain), persists
+   a covered DRAFT plan, `startTrial`, dispatches ideation + keyword research →
+   login → `content.settings`. (Password collected here — the app has NO
+   password-reset flow, so no passwordless email.)
+
+**Shared-blade architecture** (so dashboard + public stay pixel-identical without
+duplicating markup): the wizard markup lives in
+`resources/views/livewire/content/partials/wizard.blade.php` (+ `wizard-account.
+blade.php` for step 8), `@include`d by both `content-calendar.blade.php` and
+`public-onboarding.blade.php`. Public-only bits (8th step, "Continue"→`toAccount`,
+account panel) gate behind `$publicOnboarding` (false for dashboard → byte-
+identical render — **dashboard `ContentCalendar` PHP is untouched**). The wizard
+logic is shared via trait `App\Livewire\Content\Concerns\ContentWizard` (the
+anonymous twin: provisional `website()`/`plan()` resolvers, no auth/entitlement
+gate); `PublicOnboarding::dehydrate()` persists `wizardStep` for reload-resume.
+
 `ebq:content-onboarding-gc` (hourly) deletes abandoned unconverted sessions
 >7 days + their provisional sites.
 
