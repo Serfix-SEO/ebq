@@ -7,9 +7,7 @@ use App\Models\ContentOnboardingSession;
 use App\Models\ContentPlan;
 use App\Models\User;
 use App\Models\Website;
-use App\Rules\ValidRecaptcha;
 use App\Services\Content\ContentOnboardingConverter;
-use App\Support\Recaptcha;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -41,10 +39,10 @@ class PublicOnboarding extends Component
 
     public string $name = '';
     public string $email = '';
+    public string $dialCode = '+1';
     public string $phone = '';
     public string $password = '';
     public string $password_confirmation = '';
-    public string $recaptchaToken = '';
 
     public function mount()
     {
@@ -117,7 +115,6 @@ class PublicOnboarding extends Component
 
             return;
         }
-        $this->assertRecaptcha();
         $email = mb_strtolower(trim($this->email));
         $existing = User::query()->where('email', $email)->first();
 
@@ -145,7 +142,7 @@ class PublicOnboarding extends Component
             $user = User::query()->create([
                 'name' => $data['name'],
                 'email' => $email,
-                'phone' => $data['phone'] !== '' ? trim($data['phone']) : null,
+                'phone' => $data['phone'] !== '' ? trim($this->dialCode.' '.$data['phone']) : null,
                 'password' => $data['password'],
             ]);
             event(new Registered($user));
@@ -180,16 +177,6 @@ class PublicOnboarding extends Component
     {
         return $this->token === null ? null
             : ContentOnboardingSession::query()->where('token', $this->token)->first();
-    }
-
-    private function assertRecaptcha(): void
-    {
-        if (Recaptcha::isEnabled()) {
-            validator(['g-recaptcha-response' => $this->recaptchaToken],
-                ['g-recaptcha-response' => ['required', 'string', new ValidRecaptcha]],
-                ['g-recaptcha-response.required' => __('Please complete the reCAPTCHA to continue.')]
-            )->validate();
-        }
     }
 
     public function render()

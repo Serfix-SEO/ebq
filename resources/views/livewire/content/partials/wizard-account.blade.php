@@ -1,5 +1,4 @@
 {{-- Final onboarding step: collect account details, then convert the session. --}}
-@php $recaptcha = \App\Support\Recaptcha::isEnabled(); @endphp
 <div class="mx-auto max-w-lg">
     <div class="text-center">
         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
@@ -34,7 +33,36 @@
         </div>
         <div>
             <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">{{ __('Phone') }} <span class="font-normal text-slate-400">({{ __('optional') }})</span></label>
-            <input type="text" wire:model="phone" class="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+            @php $dialCodes = \App\Support\DialCodes::all(); @endphp
+            <div class="mt-1 flex gap-2" x-data="{ open: false, q: '' }" @click.outside="open = false">
+                {{-- Searchable country dial-code picker (bound to $wire.dialCode) --}}
+                <div class="relative w-28 flex-none">
+                    <button type="button" @click="open = ! open"
+                        class="flex w-full items-center justify-between gap-1 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                        <span x-text="$wire.dialCode || '+1'"></span>
+                        <svg class="h-4 w-4 flex-none text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                    </button>
+                    <div x-show="open" x-cloak x-transition.opacity
+                        class="absolute z-30 mt-1 w-64 rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                        <input type="text" x-model="q" placeholder="{{ __('Search country') }}" autocomplete="off"
+                            class="w-full rounded-t-xl border-b border-slate-200 px-3 py-2 text-sm focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                        <ul class="max-h-56 overflow-auto py-1">
+                            @foreach ($dialCodes as $c)
+                                <li x-show="q === '' || '{{ strtolower($c['name']).' '.$c['dial'] }}'.includes(q.toLowerCase())">
+                                    <button type="button" @click="$wire.set('dialCode', '{{ $c['dial'] }}'); open = false; q = ''"
+                                        class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
+                                        <span class="flex-none">{{ $c['flag'] }}</span>
+                                        <span class="flex-1 truncate text-slate-700 dark:text-slate-200">{{ $c['name'] }}</span>
+                                        <span class="flex-none text-slate-400">{{ $c['dial'] }}</span>
+                                    </button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+                <input type="tel" wire:model="phone" inputmode="tel" autocomplete="tel-national" placeholder="{{ __('Phone number') }}"
+                    class="w-full flex-1 rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+            </div>
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
@@ -47,9 +75,6 @@
                 <input type="password" wire:model="password_confirmation" autocomplete="new-password" class="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
             </div>
         </div>
-        @if ($recaptcha)
-            <div wire:ignore class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}" data-callback="onContentCaptcha"></div>
-        @endif
         <div class="flex items-center justify-between gap-3 pt-1">
             <button type="button" wire:click="goToStep(7)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
@@ -63,8 +88,3 @@
         </div>
     </form>
 </div>
-
-@if ($recaptcha)
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-    <script>window.onContentCaptcha = (t) => { @this.set('recaptchaToken', t); };</script>
-@endif
