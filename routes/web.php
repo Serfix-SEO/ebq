@@ -166,6 +166,24 @@ Route::middleware(['web', 'auth'])->group(function (): void {
         ->name('billing.cancel-checkout');
     Route::get('/billing/portal', [\App\Http\Controllers\BillingController::class, 'portal'])
         ->name('billing.portal');
+
+    // Content Autopilot product — its own Stripe named subscription (`content`)
+    // + per-website addon. Separate controller so the dashboard `default` flow
+    // (checkout guard, swap, plan-slug sync) is never touched.
+    Route::get('/content/billing/checkout', [\App\Http\Controllers\ContentBillingController::class, 'checkout'])
+        ->name('content.billing.checkout');
+    Route::get('/content/billing/success', [\App\Http\Controllers\ContentBillingController::class, 'success'])
+        ->name('content.billing.success');
+    Route::get('/content/billing/cancel-checkout', [\App\Http\Controllers\ContentBillingController::class, 'cancelCheckout'])
+        ->name('content.billing.cancel-checkout');
+    Route::post('/content/billing/add-website', [\App\Http\Controllers\ContentBillingController::class, 'addWebsite'])
+        ->name('content.billing.add-website');
+    Route::post('/content/billing/remove-website', [\App\Http\Controllers\ContentBillingController::class, 'removeWebsite'])
+        ->name('content.billing.remove-website');
+    Route::post('/content/billing/cancel', [\App\Http\Controllers\ContentBillingController::class, 'cancel'])
+        ->name('content.billing.cancel');
+    Route::post('/content/billing/resume', [\App\Http\Controllers\ContentBillingController::class, 'resume'])
+        ->name('content.billing.resume');
 });
 
 // OAuth-style one-click link from the WordPress plugin.

@@ -466,7 +466,13 @@ class BillingController extends Controller
 
             $price = $stripeSub->items->data[0] ?? null;
             $payload = [
-                'type' => 'default',
+                // Resolve the named subscription type the way Cashier's own
+                // webhook does (metadata name/type set by SubscriptionBuilder).
+                // Hardcoding 'default' would mis-type the content subscription
+                // as a second 'default' row and corrupt plan-slug sync.
+                'type' => $stripeSub->metadata['type']
+                    ?? $stripeSub->metadata['name']
+                    ?? 'default',
                 'stripe_id' => $stripeSub->id,
                 'stripe_status' => $stripeSub->status,
                 'stripe_price' => $price?->price?->id,

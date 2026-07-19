@@ -96,9 +96,9 @@
                         <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Organic competitors') }}</p>
                         <ul class="mt-2 space-y-1.5 text-[12px]">
                             @foreach ([
-                                ['nickfinder.com', '477', '5.5'],
-                                ['lingojam.com', '280', '11.4'],
-                                ['stylish-names.net', '254', '10.0'],
+                                ['competitor-one.com', '477', '5.5'],
+                                ['competitor-two.com', '280', '11.4'],
+                                ['competitor-three.net', '254', '10.0'],
                             ] as [$d, $kw, $pos])
                                 <li class="flex items-center justify-between rounded-md bg-white px-3 py-1.5 ring-1 ring-slate-200">
                                     <span class="font-medium text-slate-800">{{ $d }}</span>

@@ -36,7 +36,9 @@ class StripeWebhookController extends CashierController
     public function handleCustomerSubscriptionUpdated(array $payload): Response
     {
         $response = parent::handleCustomerSubscriptionUpdated($payload);
-        $this->syncPlanSlugFromStripeCustomer($payload['data']['object']['customer'] ?? null);
+        $customer = $payload['data']['object']['customer'] ?? null;
+        $this->syncPlanSlugFromStripeCustomer($customer);
+        $this->reconcileContentFromStripeCustomer($customer);
         return $response;
     }
 
@@ -45,15 +47,50 @@ class StripeWebhookController extends CashierController
         // Use the parent's `updated` handler — Cashier doesn't define a
         // dedicated `created` override; the same row-upsert logic is fine.
         $response = parent::handleCustomerSubscriptionUpdated($payload);
-        $this->syncPlanSlugFromStripeCustomer($payload['data']['object']['customer'] ?? null);
+        $customer = $payload['data']['object']['customer'] ?? null;
+        $this->syncPlanSlugFromStripeCustomer($customer);
+        $this->reconcileContentFromStripeCustomer($customer);
         return $response;
     }
 
     public function handleCustomerSubscriptionDeleted(array $payload): Response
     {
         $response = parent::handleCustomerSubscriptionDeleted($payload);
-        $this->syncPlanSlugFromStripeCustomer($payload['data']['object']['customer'] ?? null);
+        $customer = $payload['data']['object']['customer'] ?? null;
+        $this->syncPlanSlugFromStripeCustomer($customer);
+        $this->reconcileContentFromStripeCustomer($customer);
         return $response;
+    }
+
+    /**
+     * The content product is a SEPARATE named subscription (`content`) — plan
+     * slug sync above deliberately ignores it. Here we (a) clamp per-website
+     * coverage down to what the content sub now allows (a portal-side cancel or
+     * addon-quantity change reduces the slots), and (b) recompute crawl caps
+     * since a user's content-only status may have flipped, which changes their
+     * crawl page cap without touching any Website row.
+     */
+    private function reconcileContentFromStripeCustomer(?string $stripeCustomerId): void
+    {
+        if (! $stripeCustomerId) {
+            return;
+        }
+        $user = User::query()->where('stripe_id', $stripeCustomerId)->first();
+        if (! $user) {
+            return;
+        }
+        // Defensive: a webhook must NEVER 500 from content-product bookkeeping
+        // (e.g. before the content migrations have run on this environment) —
+        // Stripe would just retry into the same error. Fail soft instead.
+        try {
+            app(\App\Services\Content\ContentEntitlements::class)->reconcileCoverage($user);
+
+            $user->websites()->whereNotNull('crawl_site_id')->with('crawlSite')->get()
+                ->pluck('crawlSite')->filter()->unique('id')
+                ->each(fn (CrawlSite $cs) => $cs->recomputeEffectiveCap());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('content coverage reconcile skipped: '.$e->getMessage());
+        }
     }
 
     /**
