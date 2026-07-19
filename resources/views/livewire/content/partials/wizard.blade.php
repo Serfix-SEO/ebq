@@ -49,7 +49,7 @@
                 {{-- Transition overlay: step moves can be slow (they persist the plan,
                      dispatch research, and the next step's first render pulls live data).
                      Show an interactive "working" state so the click never feels dead. --}}
-                <div wire:loading.flex wire:target="toHowItWorks,toImages,toCompetitors,toKeywordResearch,toFirstArticles,toAccount"
+                <div wire:loading.flex wire:target="analyzeSite,toOfferings,toHowItWorks,toImages,toCompetitors,loadCompetitors,toKeywordResearch,toFirstArticles,toAccount,createAccount"
                      class="absolute inset-0 z-30 hidden flex-col items-center justify-center gap-4 rounded-3xl bg-white/85 text-center backdrop-blur-sm dark:bg-slate-900/85">
                     <span class="relative flex h-14 w-14 items-center justify-center">
                         <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-40"></span>
@@ -57,13 +57,16 @@
                     </span>
                     <div>
                         <p class="text-sm font-bold text-slate-900 dark:text-slate-100">
-                            <span wire:loading wire:target="toKeywordResearch">{{ __('Researching keywords for your site…') }}</span>
-                            <span wire:loading wire:target="toCompetitors">{{ __('Analyzing your competitors…') }}</span>
+                            <span wire:loading wire:target="analyzeSite">{{ __('Reading your website…') }}</span>
+                            <span wire:loading wire:target="toOfferings">{{ __('Saving your business profile…') }}</span>
                             <span wire:loading wire:target="toHowItWorks">{{ __('Building your content plan…') }}</span>
+                            <span wire:loading wire:target="toCompetitors,loadCompetitors">{{ __('Finding your competitors…') }}</span>
+                            <span wire:loading wire:target="toKeywordResearch">{{ __('Researching keywords for your site…') }}</span>
                             <span wire:loading wire:target="toFirstArticles">{{ __('Lining up your first articles…') }}</span>
-                            <span wire:loading wire:target="toImages,toAccount">{{ __('One moment…') }}</span>
+                            <span wire:loading wire:target="createAccount">{{ __('Creating your account…') }}</span>
+                            <span wire:loading wire:target="toImages">{{ __('One moment…') }}</span>
                         </p>
-                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('This can take a few seconds.') }}</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('This can take a few seconds — please keep this tab open.') }}</p>
                     </div>
                 </div>
 
