@@ -678,9 +678,9 @@
                                     </div>
                                 @endif
 
-                                {{-- What people are searching for: Google's People also ask + People also search for --}}
+                                {{-- What people are searching for: Google's "People also search for" (related searches) --}}
                                 @php $pa = $kw['people_also'] ?? []; @endphp
-                                @if (! empty($pa['ask']) || ! empty($pa['search']))
+                                @if (! empty($pa['search']))
                                     <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                                         <h3 class="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
                                             <span class="flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400">
@@ -688,31 +688,15 @@
                                             </span>
                                             {{ __('What people are searching for') }}
                                         </h3>
-                                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Real questions and searches Google shows around your topic — exactly what your audience wants answered.') }}</p>
-
-                                        @if (! empty($pa['ask']))
-                                            <p class="mt-4 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('People also ask') }}</p>
-                                            <div class="mt-2 space-y-2">
-                                                @foreach ($pa['ask'] as $q)
-                                                    <div class="flex items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50/60 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-800/40" wire:key="paa-{{ $loop->index }}">
-                                                        <svg class="mt-0.5 h-4 w-4 flex-none text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 9a2.5 2.5 0 013.9-2 2.3 2.3 0 01.3 3.5c-.7.7-1.7 1-1.7 2M12 17h.01"/></svg>
-                                                        <span class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ $q }}</span>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        @endif
-
-                                        @if (! empty($pa['search']))
-                                            <p class="mt-4 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('People also search for') }}</p>
-                                            <div class="mt-2 flex flex-wrap gap-2">
-                                                @foreach ($pa['search'] as $rs)
-                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200" wire:key="pas-{{ $loop->index }}">
-                                                        <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3"/></svg>
-                                                        {{ $rs }}
-                                                    </span>
-                                                @endforeach
-                                            </div>
-                                        @endif
+                                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Related searches Google shows around your topic — what your audience explores next.') }}</p>
+                                        <div class="mt-3 flex flex-wrap gap-2">
+                                            @foreach ($pa['search'] as $rs)
+                                                <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200" wire:key="pas-{{ $loop->index }}">
+                                                    <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3"/></svg>
+                                                    {{ $rs }}
+                                                </span>
+                                            @endforeach
+                                        </div>
                                     </div>
                                 @endif
 

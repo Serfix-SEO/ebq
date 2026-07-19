@@ -929,13 +929,33 @@ class ContentKeywordInsights
         $intents = array_filter($intents);
         arsort($intents);
 
-        // ── Questions the audience asks.
-        $questions = array_values(array_filter($rows, fn ($r) => $r['is_question']));
-        usort($questions, fn ($a, $b) => ($b['volume'] ?? -1) <=> ($a['volume'] ?? -1));
-        $questions = array_map(
-            fn ($r) => ['keyword' => $r['keyword'], 'volume' => $r['volume']],
-            array_slice($questions, 0, 8)
-        );
+        // ── Questions the audience asks: our keyword-derived questions PLUS
+        // Google's real "People also ask" (which don't come with a volume). Many
+        // markets have few question-shaped keywords, so without the PAA merge the
+        // "Questions asked" stat and section would sit at 0.
+        $questionRows = array_values(array_filter($rows, fn ($r) => $r['is_question']));
+        usort($questionRows, fn ($a, $b) => ($b['volume'] ?? -1) <=> ($a['volume'] ?? -1));
+        $questionList = [];
+        $seenQuestion = [];
+        foreach ($questionRows as $r) {
+            $key = mb_strtolower(trim((string) $r['keyword']));
+            if ($key === '' || isset($seenQuestion[$key])) {
+                continue;
+            }
+            $seenQuestion[$key] = true;
+            $questionList[] = ['keyword' => $r['keyword'], 'volume' => $r['volume']];
+        }
+        foreach ((array) ($peopleAlso['ask'] ?? []) as $q) {
+            $q = trim((string) $q);
+            $key = mb_strtolower($q);
+            if ($key === '' || isset($seenQuestion[$key])) {
+                continue;
+            }
+            $seenQuestion[$key] = true;
+            $questionList[] = ['keyword' => $q, 'volume' => null];
+        }
+        $questionsTotal = count($questionList);
+        $questions = array_slice($questionList, 0, 8);
 
         // ── Opportunities: volume weighted by how winnable the keyword looks.
         $weight = ['low' => 1.0, 'medium' => 0.7, 'unknown' => 0.55, 'high' => 0.4];
@@ -952,7 +972,7 @@ class ContentKeywordInsights
             'stats' => [
                 'keywords' => count($rows),
                 'volume' => (int) array_sum(array_map(fn ($r) => (int) ($r['volume'] ?? 0), $rows)),
-                'questions' => count(array_filter($rows, fn ($r) => $r['is_question'])),
+                'questions' => $questionsTotal,
                 'clusters' => count($clusters),
             ],
             'clusters' => $clusters,
