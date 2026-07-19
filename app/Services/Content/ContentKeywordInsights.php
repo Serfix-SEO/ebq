@@ -257,11 +257,13 @@ class ContentKeywordInsights
             && ($compSite === null || $completed($compSite));
         $allSettled = $this->settled($seed) && $this->settled($ownSite) && $this->settled($compSite);
 
-        // Show data as SOON as any source lands, then upgrade — don't wait for all
-        // three (on a concurrency-1 keyword server they serialize past the grace
-        // window, which used to strand the step on the topic fallback).
-        if (! $completed($seed) && ! $completed($ownSite) && ! $completed($compSite) && ! $allSettled) {
-            return null; // nothing back yet, still within grace
+        // Wait for the CLIENT's own keyword sets (offering seeds + own-domain
+        // crawl) before showing a digest — otherwise the fast seed request alone
+        // (a dozen keywords) flashes as "14 analyzed" before the 500-keyword
+        // domain set lands. The competitor set + gap still upgrade in afterwards.
+        $clientReady = ($seed === null || $completed($seed)) && ($ownSite === null || $completed($ownSite));
+        if (! $clientReady && ! $allSettled) {
+            return null; // still gathering the client's own keywords
         }
 
         // CLIENT keywords = offering seeds + their own crawled domain (scrap-
