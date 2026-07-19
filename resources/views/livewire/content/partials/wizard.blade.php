@@ -739,7 +739,13 @@
                                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                                     </span>
                                     <div class="min-w-0">
-                                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Keyword gap — competitors rank, you don\'t (yet)') }}</h3>
+                                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                            @if (($kw['gap_total'] ?? 0) > count($kw['gap']))
+                                                {{ __(':count keywords you\'re not targeting yet', ['count' => number_format($kw['gap_total'])]) }}
+                                            @else
+                                                {{ __('Keyword gap — competitors rank, you don\'t (yet)') }}
+                                            @endif
+                                        </h3>
                                         <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('High-demand searches your competitors show up for and you\'re missing — prime targets for your new articles.') }}</p>
                                     </div>
                                 </div>
@@ -764,6 +770,11 @@
                                         @endforeach
                                     </tbody>
                                 </table>
+                                @if (($kw['gap_total'] ?? 0) > count($kw['gap']))
+                                    <div class="border-t border-slate-100 bg-slate-50 px-4 py-3 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                                        <p class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ __('Showing :shown of :total — see the full list once you finish setting up.', ['shown' => count($kw['gap']), 'total' => number_format($kw['gap_total'])]) }}</p>
+                                    </div>
+                                @endif
                             </div>
                         @endif
 

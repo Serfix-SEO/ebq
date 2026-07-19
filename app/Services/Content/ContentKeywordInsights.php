@@ -281,7 +281,7 @@ class ContentKeywordInsights
         // ranked by relevance to what the client sells.
         $gap = $this->computeGap($clientRows, $competitorRows, $plan);
 
-        $insights = $this->build($rows, $plan, partial: $partial, gap: $gap);
+        $insights = $this->build($rows, $plan, partial: $partial, gap: $gap['rows'], gapTotal: $gap['total']);
         Cache::put($this->insightsKey($plan), $insights,
             now()->addDays($partial ? self::FALLBACK_TTL_DAYS : self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
@@ -351,12 +351,12 @@ class ContentKeywordInsights
      * first, then volume — so a gold buyer sees "sell gold coins", not a
      * competitor's unrelated high-volume blog term.
      *
-     * @return list<array{keyword:string, volume:?int, competition:string}>
+     * @return array{rows: list<array{keyword:string, volume:?int, competition:string}>, total: int}
      */
     private function computeGap(array $clientRows, array $competitorRows, ContentPlan $plan): array
     {
         if ($competitorRows === []) {
-            return [];
+            return ['rows' => [], 'total' => 0];
         }
         $client = array_flip(array_column($clientRows, 'keyword'));
         $offering = $this->offeringTokens($plan);
@@ -370,7 +370,7 @@ class ContentKeywordInsights
             $gap[] = $r;
         }
         if ($gap === []) {
-            return [];
+            return ['rows' => [], 'total' => 0];
         }
 
         // Prefer on-topic keywords; only fall back to raw volume if too few match.
@@ -380,11 +380,15 @@ class ContentKeywordInsights
         usort($pool, static fn ($a, $b) => ($b['_rel'] <=> $a['_rel'])
             ?: ((int) ($b['volume'] ?? 0) <=> (int) ($a['volume'] ?? 0)));
 
-        return array_map(static fn ($r) => [
+        $rows = array_map(static fn ($r) => [
             'keyword' => $r['keyword'],
             'volume' => $r['volume'],
             'competition' => $r['competition'],
         ], array_slice($pool, 0, 8));
+
+        // total = every competitor keyword the client isn't targeting (the full
+        // gap they'll unlock after onboarding), not just the shown sample.
+        return ['rows' => $rows, 'total' => count($gap)];
     }
 
     /** Significant tokens from what the client sells + their business description. */
@@ -679,7 +683,7 @@ class ContentKeywordInsights
      *
      * @param  list<array{keyword:string, volume:?int, competition:string, intent:string, is_question:bool}>  $rows
      */
-    private function build(array $rows, ContentPlan $plan, bool $partial, array $gap = []): array
+    private function build(array $rows, ContentPlan $plan, bool $partial, array $gap = [], int $gapTotal = 0): array
     {
         $plannedKeywords = $plan->topics()->pluck('target_keyword')
             ->map(fn ($k) => mb_strtolower(trim((string) $k)))->filter()->flip()->all();
@@ -770,6 +774,7 @@ class ContentKeywordInsights
             'questions' => $questions,
             'opportunities' => $opportunities,
             'gap' => $gap,
+            'gap_total' => $gapTotal,
             'partial' => $partial,
         ];
     }
