@@ -48,15 +48,20 @@ class ContentOnboardingConverter
      */
     public function begin(string $domain, ?string $ip): array
     {
-        $website = Website::query()->create([
-            'user_id' => $this->systemUser()->id,
-            'domain' => $domain,
-            // Non-null string columns with no DB default (mirror WebsiteAttachService).
-            'ga_property_id' => '',
-            'ga_google_account_id' => null,
-            'gsc_site_url' => '',
-            'gsc_google_account_id' => null,
-        ]);
+        // All provisional sites live under ONE system user, and websites carry a
+        // UNIQUE (user_id, domain). So a repeat onboarding of the same domain must
+        // REUSE the existing provisional site, not insert a duplicate. (Already-
+        // converted sites belong to the real user now, so they never match here.)
+        $website = Website::query()->firstOrCreate(
+            ['user_id' => $this->systemUser()->id, 'domain' => $domain],
+            [
+                // Non-null string columns with no DB default (mirror WebsiteAttachService).
+                'ga_property_id' => '',
+                'ga_google_account_id' => null,
+                'gsc_site_url' => '',
+                'gsc_google_account_id' => null,
+            ]
+        );
         app(CrawlSiteBootstrapper::class)->subscribeWebsite($website);
 
         $session = ContentOnboardingSession::query()->create([

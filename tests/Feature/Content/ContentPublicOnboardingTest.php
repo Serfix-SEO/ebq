@@ -94,6 +94,17 @@ class ContentPublicOnboardingTest extends TestCase
         $this->assertNotNull(ContentOnboardingSession::query()->first()->converted_at);
     }
 
+    public function test_repeat_domain_reuses_provisional_site(): void
+    {
+        Queue::fake();
+
+        $this->post(route('content.onboarding.begin'), ['domain' => 'dup.com'])->assertRedirect();
+        $this->post(route('content.onboarding.begin'), ['domain' => 'dup.com'])->assertRedirect();
+
+        // No UNIQUE (user_id, domain) crash; the second visit reuses the site.
+        $this->assertSame(1, Website::query()->where('domain', 'dup.com')->count());
+    }
+
     public function test_duplicate_email_is_rejected(): void
     {
         Queue::fake();
