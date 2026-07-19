@@ -140,6 +140,11 @@ class ContentCalendar extends Component
 
         $existing = $this->plan();
         if ($existing !== null) {
+            // Content planning is always on — no manual pause. Reactivate any plan
+            // that was paused before the pause control was removed.
+            if ($existing->status === ContentPlan::STATUS_PAUSED) {
+                $existing->update(['status' => ContentPlan::STATUS_ACTIVE]);
+            }
             $this->draftPlanId = $existing->id;
             $this->businessDescription = $this->businessDescription ?: (string) $existing->business_description;
             $offerings = (array) ($existing->offerings ?? []);
@@ -797,6 +802,17 @@ class ContentCalendar extends Component
         if ($day->lt(now()->startOfDay())) {
             return;
         }
+        // Strict one-article-per-day: refuse a day that already has another topic.
+        $taken = ContentTopic::query()
+            ->where('website_id', $topic->website_id)
+            ->where('id', '!=', $topic->id)
+            ->whereDate('scheduled_for', $day->toDateString())
+            ->exists();
+        if ($taken) {
+            session()->flash('content-error', __('There is already an article scheduled for that day — pick another.'));
+
+            return;
+        }
         $topic->update(['scheduled_for' => $day]);
     }
 
@@ -847,6 +863,21 @@ class ContentCalendar extends Component
      * publishable status, and its scheduled date is today or earlier (date only,
      * time ignored). Future-dated articles must wait for their day.
      */
+    /**
+     * A READY article whose images are still being generated — shown as
+     * "Finalizing images…" so it doesn't read "Ready for review" prematurely.
+     * The flag is set at image dispatch and cleared on every image-job exit.
+     */
+    public static function imagesPending(?ContentTopic $topic): bool
+    {
+        $article = $topic?->currentArticle;
+
+        return $topic !== null
+            && $topic->status === ContentTopic::STATUS_READY
+            && $article !== null
+            && \Illuminate\Support\Facades\Cache::has('content:images:pending:'.$article->id);
+    }
+
     public static function publishableNow(?ContentTopic $topic): bool
     {
         if ($topic === null || $topic->currentArticle === null) {
@@ -917,11 +948,6 @@ class ContentCalendar extends Component
         $this->writeNow($topic->id);
     }
 
-    public function pauseOrResume(): void
-    {
-        $plan = $this->activePlan();
-        $plan?->update(['status' => $plan->isActive() ? ContentPlan::STATUS_PAUSED : ContentPlan::STATUS_ACTIVE]);
-    }
 
     // ── Presentation helpers ────────────────────────────────────────────
 
@@ -1211,6 +1237,7 @@ class ContentCalendar extends Component
             'clusters' => $this->strategyClusters($all),
             'publishConnected' => $this->hasPublishDestination(),
             'hasInFlight' => $topics->contains(fn ($t) => in_array($t->status, ContentTopic::IN_FLIGHT, true)),
+            'hasImagesPending' => $topics->contains(fn ($t) => self::imagesPending($t)),
         ]);
     }
 

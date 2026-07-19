@@ -58,12 +58,21 @@ class GenerateContentImagesJob implements ShouldQueue
 
     public function handle(IdeogramClient $ideogram, IdeogramSpendMeter $meter): void
     {
+        // Calendar "Finalizing images…" flag (set at dispatch in the producer).
+        // Clear it on EVERY exit path so the article never sticks in that state.
+        $pending = 'content:images:pending:'.$this->articleId;
+        $clearPending = static fn () => \Illuminate\Support\Facades\Cache::forget($pending);
+
         if (! ContentAutopilotConfig::imagesEnabled() || ! $ideogram->isConfigured() || $meter->exhausted()) {
+            $clearPending();
+
             return;
         }
 
         $article = ContentArticle::query()->with('topic.plan')->find($this->articleId);
         if ($article === null || ! $article->is_current || $article->images()->where('status', ContentImage::STATUS_GENERATED)->exists()) {
+            $clearPending();
+
             return; // gone, superseded, or already has images
         }
 
@@ -74,6 +83,8 @@ class GenerateContentImagesJob implements ShouldQueue
         // (The global ContentAutopilotConfig::imagesEnabled() above is the
         //  platform kill-switch; this is the client's own choice.)
         if ($plan !== null && $plan->images_enabled === false) {
+            $clearPending();
+
             return;
         }
 
@@ -208,6 +219,7 @@ class GenerateContentImagesJob implements ShouldQueue
         ]);
         } finally {
             \Illuminate\Support\Facades\Cache::forget($imagesFlag);
+            $clearPending();
         }
     }
 

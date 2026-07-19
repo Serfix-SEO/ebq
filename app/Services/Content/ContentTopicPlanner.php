@@ -263,11 +263,23 @@ class ContentTopicPlanner
         }
         $days = array_slice($days, 0, $perWeek);
 
+        // Strict one-article-per-day: never reuse a day this plan already has a
+        // topic on. Each top-up batch restarts at "tomorrow", so without this the
+        // new dates would collide with existing topics and stack 2+ on a day.
+        $used = $plan->topics()
+            ->whereNotNull('scheduled_for')
+            ->pluck('scheduled_for')
+            ->map(fn ($d) => \Illuminate\Support\Carbon::parse($d)->toDateString())
+            ->flip()->all();
+
         $dates = [];
         $cursor = now()->addDay()->startOfDay();
-        while (count($dates) < $count) {
-            if (in_array($cursor->isoWeekday(), $days, true)) {
+        $guard = 0;
+        while (count($dates) < $count && $guard++ < 3660) { // ~10y safety valve
+            $key = $cursor->toDateString();
+            if (in_array($cursor->isoWeekday(), $days, true) && ! isset($used[$key])) {
                 $dates[] = $cursor->copy();
+                $used[$key] = true;
             }
             $cursor->addDay();
         }

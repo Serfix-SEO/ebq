@@ -1,5 +1,5 @@
 <div class="space-y-6" x-data
-    @if(($hasInFlight ?? false)) wire:poll.5s @endif
+    @if(($hasInFlight ?? false) || ($hasImagesPending ?? false)) wire:poll.5s @endif
     @content-settings-saved.window="window.scrollTo({ top: 0, behavior: 'smooth' })">
     @if (session('content-status'))
         <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 6000)"
@@ -306,10 +306,6 @@
                     class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                     {{ $view === 'grid' ? __('List view') : __('Calendar view') }}
                 </button>
-                <button wire:click="pauseOrResume"
-                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                    {{ $plan->isActive() ? __('Pause') : __('Resume') }}
-                </button>
             </div>
         </div>
 
@@ -342,12 +338,6 @@
             </p>
         @endif
 
-        @unless ($plan->isActive())
-            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                {{ __('Content planning is paused. New articles are not being written.') }}
-            </div>
-        @endunless
-
         @if ($view === 'grid')
             <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 <div class="grid grid-cols-7 border-b border-slate-200 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400" style="min-width:56rem">
@@ -374,7 +364,8 @@
                             @foreach ($dayTopics as $topic)
                                 @php
                                     $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status);
-                                    $cellInFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true);
+                                    $imgPending = \App\Livewire\Content\ContentCalendar::imagesPending($topic);
+                                    $cellInFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true) || $imgPending;
                                     $canWrite = ! $cellInFlight && in_array($topic->status, ['suggested', 'approved', 'failed'], true);
                                     $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true);
                                 @endphp
@@ -391,11 +382,12 @@
                                         <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
                                     @endif
                                     <div class="mt-1 flex items-center justify-between gap-1">
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-{{ $p['color'] }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $p['color'] }}-700">
+                                        @php $chipColor = $imgPending ? 'amber' : $p['color']; @endphp
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-{{ $chipColor }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $chipColor }}-700">
                                             @if ($cellInFlight)
                                                 <svg class="h-2.5 w-2.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                                             @endif
-                                            {{ $p['label'] }}
+                                            {{ $imgPending ? __('Finalizing images…') : $p['label'] }}
                                         </span>
                                         @if ($canWrite)
                                             <button wire:click="writeNow('{{ $topic->id }}')" wire:loading.attr="disabled" wire:target="writeNow('{{ $topic->id }}')"
@@ -405,7 +397,7 @@
                                             </button>
                                         @endif
                                     </div>
-                                    @if ($publishConnected && \App\Livewire\Content\ContentCalendar::publishableNow($topic))
+                                    @if ($publishConnected && ! $imgPending && \App\Livewire\Content\ContentCalendar::publishableNow($topic))
                                         <button wire:click="publishNow('{{ $topic->id }}')" wire:confirm="{{ __('Publish this article to your site now?') }}" draggable="false"
                                                 class="mt-1 inline-flex w-full items-center justify-center gap-0.5 rounded-md bg-success px-1.5 py-0.5 text-[10px] font-bold text-white hover:brightness-110">
                                             <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
@@ -422,7 +414,10 @@
             <div class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 <div class="divide-y divide-slate-100 dark:divide-slate-800">
                     @forelse ($topics as $topic)
-                        @php $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status); @endphp
+                        @php
+                            $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status);
+                            $imgPending = \App\Livewire\Content\ContentCalendar::imagesPending($topic);
+                        @endphp
                         <div class="flex flex-wrap items-center gap-3 px-4 py-3">
                             @php $canMove = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true); @endphp
                             <div class="w-28 shrink-0">
@@ -452,12 +447,18 @@
                                     @endif
                                 </div>
                             </div>
-                            <span class="rounded-full bg-{{ $p['color'] }}-100 px-2 py-0.5 text-xs font-semibold text-{{ $p['color'] }}-700">{{ $p['label'] }}</span>
+                            @php $chipColor = $imgPending ? 'amber' : $p['color']; @endphp
+                            <span class="rounded-full bg-{{ $chipColor }}-100 px-2 py-0.5 text-xs font-semibold text-{{ $chipColor }}-700">{{ $imgPending ? __('Finalizing images…') : $p['label'] }}</span>
                             @if ($inFlight)
                                 <a href="{{ route('content.review', $topic->id) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700">
                                     <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                                     {{ __('Writing… view progress') }}
                                 </a>
+                            @elseif ($imgPending)
+                                <span class="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600">
+                                    <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                    {{ __('Finalizing images…') }}
+                                </span>
                             @elseif ($topic->currentArticle)
                                 <a href="{{ route('content.review', $topic->id) }}" class="text-sm font-medium text-orange-600 hover:text-orange-700">{{ __('Review') }}</a>
                             @endif
@@ -470,7 +471,7 @@
                             @if ($topic->status === \App\Models\ContentTopic::STATUS_SUGGESTED)
                                 <button wire:click="approve('{{ $topic->id }}')" class="text-sm font-medium text-success hover:brightness-90">{{ __('Approve') }}</button>
                             @endif
-                            @if (\App\Livewire\Content\ContentCalendar::publishableNow($topic))
+                            @if (! $imgPending && \App\Livewire\Content\ContentCalendar::publishableNow($topic))
                                 @if ($publishConnected)
                                     <button wire:click="publishNow('{{ $topic->id }}')" wire:confirm="{{ __('Publish this article to your site now?') }}"
                                             class="inline-flex items-center gap-1 rounded-lg bg-success px-2.5 py-1 text-xs font-bold text-white hover:brightness-110">

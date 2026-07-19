@@ -86,6 +86,10 @@ class ProduceContentArticleJob implements ShouldQueue, ShouldBeUnique
         // + spend cap). Only when production actually succeeded.
         if ($article !== null && $topic->fresh()->status === ContentTopic::STATUS_READY
             && \App\Support\ContentAutopilotConfig::imagesEnabled()) {
+            // Mark images pending BEFORE dispatch so the calendar shows
+            // "Finalizing images…" (not "Ready for review") with no queue-latency
+            // gap. GenerateContentImagesJob clears it on every exit path.
+            \Illuminate\Support\Facades\Cache::put('content:images:pending:'.$article->id, 1, now()->addMinutes(15));
             GenerateContentImagesJob::dispatch($article->id);
         }
     }
