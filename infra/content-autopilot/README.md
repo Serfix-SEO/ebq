@@ -48,9 +48,20 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
 
 - **Content Calendar** — `/content` (`Route::view` + `mode="calendar"`,
   `feature:content` middleware). Shows the **calendar only** (month grid +
-  list toggle, approve/skip/retry/reschedule/add-topic, pause/resume). If no
-  plan exists yet, shows a lightweight empty state ("No content plan yet")
-  linking to Settings instead of rendering the wizard inline.
+  list toggle, approve/skip/retry/reschedule). **No pause + no add-topic** —
+  planning is always on (a paused plan is reactivated on load; `pauseOrResume`
+  removed 2026-07-19) and topics come only from the planner. Cross-month move:
+  List view has a per-topic date picker (grid drag is same-month). A READY
+  article whose images are still generating shows **"Finalizing images…"** (not
+  "Ready for review") and hides Review/Publish — driven by the
+  `content:images:pending:<articleId>` cache flag (set at image dispatch in
+  `ProduceContentArticleJob`, cleared on every `GenerateContentImagesJob` exit).
+  If no plan exists yet, shows a lightweight empty state ("No content plan yet").
+
+- **Scheduling is strict one-article-per-day.** `ContentTopicPlanner::scheduleDates()`
+  skips any day the plan already has a topic on (each top-up batch restarts at
+  "tomorrow", so without this dates collided and stacked); manual reschedule
+  refuses an already-taken day.
   **Grid interactions (2026-07-19):** every generatable topic card carries a
   small "Write" button (`writeNow()` → dispatch + redirect to the detail page
   where live progress renders); topic cards are `draggable` and each day cell is
