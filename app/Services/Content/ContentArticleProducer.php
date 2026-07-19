@@ -193,6 +193,7 @@ class ContentArticleProducer
             }
             if ($cleaned !== null) {
                 $this->meter->add(ContentLlmSpendMeter::EST_REVISE_USD);
+                $preCleanScore = $article->seo_score;
                 $candidate = $this->storeScoredVersion($topic, $context, $cleaned + [
                     'generation_meta' => [
                         'provider' => $writeModel['provider'],
@@ -200,7 +201,13 @@ class ContentArticleProducer
                         'stage' => 'de_ai_cleanup',
                     ],
                 ]);
-                if ($candidate->seo_score >= ContentAutopilotConfig::publishFloor()) {
+                // Keep the cleaned version only if it did NOT regress SEO. The
+                // de-AI pass rewrites prose and can dilute keyword density, drop
+                // an external link, or strip a keyword from a heading; when that
+                // happens we keep the pre-clean version (a 1-point tolerance
+                // covers rounding) so the cleanup never drags us below target.
+                if ($candidate->seo_score >= $preCleanScore - 1
+                    && $candidate->seo_score >= ContentAutopilotConfig::publishFloor()) {
                     $article = $candidate;
                 }
             }

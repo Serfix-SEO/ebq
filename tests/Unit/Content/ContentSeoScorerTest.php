@@ -141,4 +141,58 @@ class ContentSeoScorerTest extends TestCase
 
         $this->assertContains('kw_density', array_column($result['issues'], 'code'));
     }
+
+    /**
+     * A long-tail 5-word keyphrase used a natural number of times (a handful of
+     * mentions across ~1900 words) can never reach 0.5% as verbatim runs, yet is
+     * genuinely well-optimised. Phrase-length-weighted density must NOT flag it.
+     */
+    public function test_long_tail_keyphrase_density_not_flagged(): void
+    {
+        $kw = 'how to make bgmi username memorable';
+        $filler = str_repeat('This paragraph gives players concrete, practical naming advice with useful specifics. ', 30);
+        $mention = "<p>Learning {$kw} comes down to a few repeatable habits. {$filler}</p>";
+        // 6 natural mentions of the exact 5-word phrase, one in each third.
+        $html = str_repeat($mention, 2)
+            ."<h2>How to Make BGMI Username Memorable with Alliteration</h2>{$mention}"
+            .str_repeat($mention, 3);
+
+        $result = $this->scorer->score(
+            $html,
+            'How to Make a BGMI Username Memorable (Simple Guide)',
+            'Learn how to make BGMI username memorable with simple, repeatable naming tricks that actually stick with your squad and rivals alike today.',
+            'How to Make BGMI Username Memorable',
+            'how-to-make-bgmi-username-memorable',
+            ['target_keyword' => $kw, 'toggles' => [], 'style_issues' => []]
+        );
+
+        $this->assertNotContains('kw_density', array_column($result['issues'], 'code'), json_encode($result['issues']));
+    }
+
+    /** The keyphrase living in an H3 (not an H2) still satisfies kw_in_a_heading. */
+    public function test_keyword_in_h3_satisfies_heading_check(): void
+    {
+        $a = $this->goodArticle();
+        // Give it four H2s with the phrase only inside an H3 subheading.
+        $html = '<p>Intro about the pubg name generator right here.</p>'
+            .'<h2>Overview</h2><p>Body one about the pubg name generator.</p>'
+            .'<h3>Using the pubg name generator step by step</h3><p>Detail.</p>'
+            .'<h2>Fonts</h2><p>Body two mentions the pubg name generator again.</p>'
+            .'<h2>Symbols</h2><p>Body three.</p><h2>Wrap up</h2><p>The pubg name generator recap.</p>';
+
+        $result = $this->scorer->score($html, $a['meta_title'], $a['meta_description'], $a['h1'], $a['slug'], $a['context']);
+
+        $this->assertNotContains('kw_in_a_heading', array_column($result['issues'], 'code'));
+    }
+
+    /** A 43-char meta title is acceptable (40-60 band), not a hard fail. */
+    public function test_short_but_reasonable_meta_title_passes(): void
+    {
+        $a = $this->goodArticle();
+        $title = 'PUBG Name Generator: Stylish Names Guide'; // 40 chars, inside 40-60
+
+        $result = $this->scorer->score($a['html'], $title, $a['meta_description'], $a['h1'], $a['slug'], $a['context']);
+
+        $this->assertNotContains('meta_title_length', array_column($result['issues'], 'code'), 'len='.mb_strlen($title));
+    }
 }
