@@ -35,10 +35,15 @@
         {{-- ── Generating: the real draft (or a skeleton) blurred behind a live
              progress overlay. Stays up through research → write → polish →
              REVISIONS → images until the article is fully finalized. ── --}}
+        {{-- Cap the whole block to roughly one viewport (inline style — Tailwind
+             arbitrary max-h-[…] isn't in the prebuilt bundle) so the centered
+             progress card always lands on the first fold, no matter how long the
+             draft teaser behind it grows. --}}
         <div class="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800"
+             style="max-height: calc(100vh - 11rem)"
              @if (! ($progress['failed'] ?? false)) wire:poll.3s @endif>
             {{-- Teaser behind: the draft-in-progress if we have one, else a skeleton --}}
-            <div class="pointer-events-none max-h-[38rem] select-none overflow-hidden p-6 blur sm:p-10" aria-hidden="true">
+            <div class="pointer-events-none select-none overflow-hidden p-6 blur sm:p-10" aria-hidden="true">
                 @if ($article)
                     <div class="prose prose-slate mx-auto max-w-3xl opacity-60 dark:prose-invert">
                         <h1>{{ $article->h1 ?: $topic?->title }}</h1>
@@ -60,9 +65,10 @@
                 @endif
             </div>
 
-            {{-- Overlay: the live progress card --}}
-            <div class="absolute inset-0 flex items-center justify-center bg-white/60 p-4 backdrop-blur-sm dark:bg-slate-900/60">
-                <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            {{-- Overlay: the live progress card — scrolls within the capped box
+                 if the card is taller than the viewport (small screens). --}}
+            <div class="absolute inset-0 flex items-center justify-center overflow-y-auto bg-white/60 p-4 backdrop-blur-sm dark:bg-slate-900/60">
+                <div class="my-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
                     <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
                         {{ ($progress['failed'] ?? false) ? __('Needs attention') : __('Creating your article') }}
                     </p>
