@@ -614,42 +614,6 @@
                             </div>
                         </div>
 
-                        {{-- Top search terms + monthly demand --}}
-                        @if (! empty($kw['top_searches']))
-                            <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
-                                <div class="flex items-start gap-3 bg-gradient-to-r from-orange-50 to-white px-4 py-3 dark:from-orange-950 dark:to-slate-900">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
-                                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3"/></svg>
-                                    </span>
-                                    <div class="min-w-0">
-                                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Top searches by demand') }}</h3>
-                                        <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('The highest-demand search terms in your market — the exact keywords your articles will target.') }}</p>
-                                    </div>
-                                </div>
-                                <table class="w-full text-sm">
-                                    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                                        <tr>
-                                            <th class="px-4 py-2.5 text-start font-bold">{{ __('Search term') }}</th>
-                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Monthly searches') }}</th>
-                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Competition') }}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                                        @foreach ($kw['top_searches'] as $s)
-                                            <tr class="bg-white dark:bg-slate-900" wire:key="kwts-{{ $loop->index }}">
-                                                <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{{ $s['keyword'] }}</td>
-                                                <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $s['volume'] !== null ? number_format($s['volume']) : '—' }}</td>
-                                                <td class="px-4 py-3 text-end">
-                                                    @php $sc = ['low' => 'bg-success/10 text-success', 'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300', 'high' => 'bg-error/10 text-error', 'unknown' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'][$s['competition']] ?? 'bg-slate-100 text-slate-500'; @endphp
-                                                    <span class="rounded-full px-2 py-0.5 text-xs font-bold {{ $sc }}">{{ ['low' => __('Low'), 'medium' => __('Medium'), 'high' => __('High'), 'unknown' => '—'][$s['competition']] ?? '—' }}</span>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
-
                         <div class="mt-4 grid gap-4 lg:grid-cols-2">
                             {{-- Topic clusters --}}
                             @if (! empty($kw['clusters']))
@@ -810,67 +774,106 @@
                             </div>
                         @endif
 
-                        {{-- Keyword gap: what competitors rank for that the client doesn't --}}
-                        @if (! empty($kw['gap']))
-                            <div class="mt-4 overflow-hidden rounded-2xl border border-orange-200 shadow-sm dark:border-orange-900">
-                                <div class="flex items-start gap-3 bg-gradient-to-r from-orange-50 to-white px-4 py-3 dark:from-orange-950 dark:to-slate-900">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
-                                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                                    </span>
-                                    <div class="min-w-0">
-                                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
-                                            @if (($kw['gap_total'] ?? 0) > count($kw['gap']))
-                                                {{ __(':count keywords you\'re not targeting yet', ['count' => number_format($kw['gap_total'])]) }}
-                                            @else
-                                                {{ __('Keyword gap — competitors rank, you don\'t (yet)') }}
-                                            @endif
-                                        </h3>
-                                        <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('High-demand searches your competitors show up for and you\'re missing — prime targets for your new articles.') }}</p>
+                        {{-- Keyword gap + Top searches by demand, side by side (half each) --}}
+                        <div class="mt-4 grid items-start gap-4 lg:grid-cols-2">
+                            {{-- Keyword gap: what competitors rank for that the client doesn't --}}
+                            @if (! empty($kw['gap']))
+                                <div class="overflow-hidden rounded-2xl border border-orange-200 shadow-sm dark:border-orange-900">
+                                    <div class="flex items-start gap-3 bg-gradient-to-r from-orange-50 to-white px-4 py-3 dark:from-orange-950 dark:to-slate-900">
+                                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                                @if (($kw['gap_total'] ?? 0) > count($kw['gap']))
+                                                    {{ __(':count keywords you\'re not targeting yet', ['count' => number_format($kw['gap_total'])]) }}
+                                                @else
+                                                    {{ __('Keyword gap — competitors rank, you don\'t (yet)') }}
+                                                @endif
+                                            </h3>
+                                            <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('High-demand searches your competitors show up for and you\'re missing — prime targets for your new articles.') }}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <table class="w-full text-sm">
-                                    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                                        <tr>
-                                            <th class="px-4 py-2.5 text-start font-bold">{{ __('Keyword') }}</th>
-                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Monthly searches') }}</th>
-                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Competition') }}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                                        @foreach ($kw['gap'] as $g)
-                                            <tr class="bg-white dark:bg-slate-900" wire:key="kwg-{{ $loop->index }}">
-                                                <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{{ $g['keyword'] }}</td>
-                                                <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $g['volume'] !== null ? number_format($g['volume']) : '—' }}</td>
-                                                <td class="px-4 py-3 text-end">
-                                                    @php $gc = ['low' => 'bg-success/10 text-success', 'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300', 'high' => 'bg-error/10 text-error', 'unknown' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'][$g['competition']] ?? 'bg-slate-100 text-slate-500'; @endphp
-                                                    <span class="rounded-full px-2 py-0.5 text-xs font-bold {{ $gc }}">{{ ['low' => __('Low'), 'medium' => __('Medium'), 'high' => __('High'), 'unknown' => '—'][$g['competition']] ?? '—' }}</span>
-                                                </td>
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                                            <tr>
+                                                <th class="px-4 py-2.5 text-start font-bold">{{ __('Keyword') }}</th>
+                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('Monthly searches') }}</th>
+                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('Competition') }}</th>
                                             </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                                @if (($kw['gap_total'] ?? 0) > count($kw['gap']))
-                                    <div class="border-t border-slate-100 bg-slate-50 px-4 py-3 text-center dark:border-slate-800 dark:bg-slate-800/40">
-                                        <p class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ __('Showing :shown of :total — see the full list once you finish setting up.', ['shown' => count($kw['gap']), 'total' => number_format($kw['gap_total'])]) }}</p>
-                                    </div>
-                                @endif
-                            </div>
-                        @elseif (! empty($kw['competitors_pending']))
-                            {{-- Own keywords are shown; the competitor gap analysis is still running. --}}
-                            <div class="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-800/40">
-                                <svg class="h-5 w-5 flex-none animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                                <div class="min-w-0">
-                                    <p class="text-sm font-bold text-slate-900 dark:text-slate-100">
-                                        @if (($kw['competitors_total'] ?? 0) > 0)
-                                            {{ __('Analyzing :done of :total competitors for your keyword gap…', ['done' => (int) ($kw['competitors_done'] ?? 0), 'total' => (int) $kw['competitors_total']]) }}
-                                        @else
-                                            {{ __('Analyzing your competitors for your keyword gap…') }}
-                                        @endif
-                                    </p>
-                                    <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('The keywords your competitors rank for and you don\'t will appear here in a moment.') }}</p>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                            @foreach ($kw['gap'] as $g)
+                                                <tr class="bg-white dark:bg-slate-900" wire:key="kwg-{{ $loop->index }}">
+                                                    <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{{ $g['keyword'] }}</td>
+                                                    <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $g['volume'] !== null ? number_format($g['volume']) : '—' }}</td>
+                                                    <td class="px-4 py-3 text-end">
+                                                        @php $gc = ['low' => 'bg-success/10 text-success', 'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300', 'high' => 'bg-error/10 text-error', 'unknown' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'][$g['competition']] ?? 'bg-slate-100 text-slate-500'; @endphp
+                                                        <span class="rounded-full px-2 py-0.5 text-xs font-bold {{ $gc }}">{{ ['low' => __('Low'), 'medium' => __('Medium'), 'high' => __('High'), 'unknown' => '—'][$g['competition']] ?? '—' }}</span>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                    @if (($kw['gap_total'] ?? 0) > count($kw['gap']))
+                                        <div class="border-t border-slate-100 bg-slate-50 px-4 py-3 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                                            <p class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ __('Showing :shown of :total — see the full list once you finish setting up.', ['shown' => count($kw['gap']), 'total' => number_format($kw['gap_total'])]) }}</p>
+                                        </div>
+                                    @endif
                                 </div>
-                            </div>
-                        @endif
+                            @elseif (! empty($kw['competitors_pending']))
+                                {{-- Own keywords are shown; the competitor gap analysis is still running. --}}
+                                <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-800/40">
+                                    <svg class="h-5 w-5 flex-none animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                            @if (($kw['competitors_total'] ?? 0) > 0)
+                                                {{ __('Analyzing :done of :total competitors for your keyword gap…', ['done' => (int) ($kw['competitors_done'] ?? 0), 'total' => (int) $kw['competitors_total']]) }}
+                                            @else
+                                                {{ __('Analyzing your competitors for your keyword gap…') }}
+                                            @endif
+                                        </p>
+                                        <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('The keywords your competitors rank for and you don\'t will appear here in a moment.') }}</p>
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- Top searches by demand --}}
+                            @if (! empty($kw['top_searches']))
+                                <div class="overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
+                                    <div class="flex items-start gap-3 bg-gradient-to-r from-orange-50 to-white px-4 py-3 dark:from-orange-950 dark:to-slate-900">
+                                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3"/></svg>
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Top searches by demand') }}</h3>
+                                            <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('The highest-demand search terms in your market — the exact keywords your articles will target.') }}</p>
+                                        </div>
+                                    </div>
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                                            <tr>
+                                                <th class="px-4 py-2.5 text-start font-bold">{{ __('Search term') }}</th>
+                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('Monthly searches') }}</th>
+                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('Competition') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                            @foreach ($kw['top_searches'] as $s)
+                                                <tr class="bg-white dark:bg-slate-900" wire:key="kwts-{{ $loop->index }}">
+                                                    <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{{ $s['keyword'] }}</td>
+                                                    <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $s['volume'] !== null ? number_format($s['volume']) : '—' }}</td>
+                                                    <td class="px-4 py-3 text-end">
+                                                        @php $sc = ['low' => 'bg-success/10 text-success', 'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300', 'high' => 'bg-error/10 text-error', 'unknown' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'][$s['competition']] ?? 'bg-slate-100 text-slate-500'; @endphp
+                                                        <span class="rounded-full px-2 py-0.5 text-xs font-bold {{ $sc }}">{{ ['low' => __('Low'), 'medium' => __('Medium'), 'high' => __('High'), 'unknown' => '—'][$s['competition']] ?? '—' }}</span>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+                        </div>
 
                     @endif
 
