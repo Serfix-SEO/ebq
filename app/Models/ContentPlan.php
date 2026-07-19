@@ -63,6 +63,7 @@ class ContentPlan extends Model
             'toc' => true,
             'key_takeaways' => true,
             'faq' => true,
+            'featured_image' => true,
             'external_links' => true,
             'author_box' => false,
             'cta_enabled' => false,

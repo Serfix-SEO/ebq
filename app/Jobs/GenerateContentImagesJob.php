@@ -111,8 +111,10 @@ class GenerateContentImagesJob implements ShouldQueue
         $llmPrompts = $this->llmPrompts($article, $topic, $anchors, $stylePrompt);
 
         // Build the work list: featured first, then one per section anchor.
+        // The per-plan `featured_image` toggle (default ON) lets a client opt out
+        // of the hero image at the top of the article.
         $jobs = [];
-        if (ContentAutopilotConfig::featuredImageEnabled()) {
+        if (ContentAutopilotConfig::featuredImageEnabled() && ($plan === null || $plan->toggle('featured_image'))) {
             $jobs[] = [
                 'role' => ContentImage::ROLE_FEATURED,
                 'anchor' => null,

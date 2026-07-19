@@ -45,7 +45,7 @@ trait ContentWizard
     public string $newDont = '';
     public string $newCompetitorDomain = '';
 
-    public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true];
+    public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true, 'featured_image' => true];
 
     public bool $imagesEnabled = true;
     public string $imageStyle = 'photographic';
@@ -70,6 +70,7 @@ trait ContentWizard
                 'key_takeaways' => $existing->toggle('key_takeaways'),
                 'toc' => $existing->toggle('toc'),
                 'faq' => $existing->toggle('faq'),
+                'featured_image' => $existing->toggle('featured_image'),
             ];
             $this->imagesEnabled = $existing->images_enabled === null ? true : (bool) $existing->images_enabled;
             $this->imageStyle = ContentImageStyles::isValid($existing->image_style)
@@ -205,6 +206,7 @@ trait ContentWizard
                         'key_takeaways' => (bool) ($this->structureToggles['key_takeaways'] ?? true),
                         'toc' => (bool) ($this->structureToggles['toc'] ?? true),
                         'faq' => (bool) ($this->structureToggles['faq'] ?? true),
+                        'featured_image' => (bool) ($this->structureToggles['featured_image'] ?? true),
                     ]
                 ),
                 'business_description' => $this->businessDescription,
