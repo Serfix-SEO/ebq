@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ContentOnboardingSession;
 use App\Models\User;
 use App\Models\WebsiteInvitation;
+use App\Services\Content\ContentOnboardingConverter;
 use App\Services\Google\GoogleOAuthService;
 use App\Services\ClientActivityLogger;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +16,26 @@ use Laravel\Socialite\Facades\Socialite;
 
 class GoogleOAuthController extends Controller
 {
+    /**
+     * "Continue with Google" from the public Content Autopilot onboarding. Reuses
+     * the whitelisted SSO callback URL (no new redirect URI to register) with
+     * MINIMAL scopes — content signup needs identity only, not Analytics/GSC. The
+     * onboarding-session token stays in the Laravel session across the round-trip;
+     * ssoCallback() finishes the attach + billing routing.
+     */
+    public function contentOnboardingRedirect(Request $request): RedirectResponse
+    {
+        if (Auth::check()) {
+            return redirect()->route('content.get-started');
+        }
+        $request->session()->put('google_sso.intent', 'content_onboarding');
+
+        return Socialite::driver('google')
+            ->redirectUrl(route('google.sso.callback', absolute: true))
+            ->scopes(['openid', 'profile', 'email'])
+            ->redirect();
+    }
+
     public function ssoRedirect(Request $request): RedirectResponse
     {
         // Keep intent in session so callback can distinguish login/register
@@ -90,8 +112,18 @@ class GoogleOAuthController extends Controller
         }
 
         Auth::login($user, true);
-        $oauthService->persistAccount($user, $googleUser);
         $logger->log($isNewUser ? 'auth.register_google' : 'auth.login_google', userId: $user->id, meta: ['ip' => $request->ip()]);
+
+        // Public Content Autopilot onboarding: attach the onboarded site to this
+        // account and route by coverage. Skip the GSC/Analytics account persist —
+        // content signup requested identity scopes only.
+        if ($request->session()->get('google_sso.intent') === 'content_onboarding') {
+            $request->session()->forget('google_sso.intent');
+
+            return $this->finishContentOnboarding($user);
+        }
+
+        $oauthService->persistAccount($user, $googleUser);
 
         $websiteId = session('current_website_id');
         if (($websiteId === null || $websiteId === '')) {
@@ -107,6 +139,32 @@ class GoogleOAuthController extends Controller
         }
 
         return redirect()->intended(route($user->firstAccessibleRoute($websiteId), absolute: false));
+    }
+
+    /**
+     * Finish a Google-SSO content onboarding: convert the provisional session
+     * onto the (new or existing) user. The plan already carries the wizard
+     * profile, so an empty profile is passed (the OAuth round-trip loses the
+     * Livewire state). Routes to the plan when covered (trial / free slot) or to
+     * Get started when the site needs paying for (trial used / subscription full).
+     */
+    private function finishContentOnboarding(User $user): RedirectResponse
+    {
+        $token = (string) session('content_onboarding_token', '');
+        $session = $token !== ''
+            ? ContentOnboardingSession::query()->where('token', $token)->whereNull('converted_at')->first()
+            : null;
+
+        if ($session === null) {
+            // Nothing to attach (expired/converted) — send them to Get started.
+            return redirect()->route('content.get-started');
+        }
+
+        $result = app(ContentOnboardingConverter::class)->convert($session, $user, []);
+        session(['current_website_id' => $result['website']->id]);
+        session()->forget('content_onboarding_token');
+
+        return redirect()->route($result['covered'] ? 'content.settings' : 'content.get-started');
     }
 
     public function redirect(Request $request): RedirectResponse

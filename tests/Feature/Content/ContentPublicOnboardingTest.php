@@ -114,8 +114,9 @@ class ContentPublicOnboardingTest extends TestCase
     public function test_duplicate_email_is_rejected(): void
     {
         Queue::fake();
-        User::factory()->create(['email' => 'taken@x.com']);
+        User::factory()->create(['email' => 'taken@x.com', 'password' => \Illuminate\Support\Facades\Hash::make('Real-Pass-999')]);
 
+        // Existing account + WRONG password → login fails (error on password).
         $this->beginAndResume('x-site.com')
             ->set('businessDescription', 'We sell widgets and gadgets to small businesses everywhere.')
             ->call('toOfferings')
@@ -123,12 +124,68 @@ class ContentPublicOnboardingTest extends TestCase
             ->call('toAccount')
             ->set('name', 'Bob')
             ->set('email', 'taken@x.com')
-            ->set('password', 'Str0ng-Pass-123')
-            ->set('password_confirmation', 'Str0ng-Pass-123')
+            ->set('password', 'Wrong-Pass-123')
             ->call('createAccount')
-            ->assertHasErrors('email');
+            ->assertHasErrors('password');
 
         $this->assertNull(ContentOnboardingSession::query()->first()->converted_at);
+    }
+
+    public function test_existing_user_logs_in_and_gets_the_website_attached(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create([
+            'email' => 'owner@acct.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('Real-Pass-999'),
+        ]);
+
+        $this->beginAndResume('brandnew.com')
+            ->set('businessDescription', 'We sell handmade candles and home fragrance for cozy apartments.')
+            ->call('toOfferings')
+            ->call('toHowItWorks')
+            ->call('toAccount')
+            ->set('email', 'owner@acct.com')
+            ->set('password', 'Real-Pass-999')
+            ->call('createAccount');
+
+        $user->refresh();
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::check());
+        $website = $user->websites()->where('domain', 'brandnew.com')->first();
+        $this->assertNotNull($website, 'onboarded website attached to the existing account');
+        // Never trialed before → trial starts + site is covered.
+        $this->assertTrue(app(ContentEntitlements::class)->hasContentAccessFor($user, $website));
+        $this->assertNotNull(ContentOnboardingSession::query()->first()->converted_at);
+    }
+
+    public function test_second_site_on_trial_is_attached_but_uncovered(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create([
+            'email' => 'ontrial@acct.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('Real-Pass-999'),
+        ]);
+        // Already on trial with one covered site (trial allows exactly one).
+        $firstSite = Website::factory()->for($user)->create();
+        $user->forceFill([
+            'content_trial_started_at' => now(), 'content_trial_ends_at' => now()->addDays(5),
+        ])->save();
+        ContentPlan::factory()->create(['website_id' => $firstSite->id, 'billing_covered_at' => now()]);
+
+        $this->beginAndResume('secondsite.com')
+            ->set('businessDescription', 'We offer dog walking and pet sitting services across the city.')
+            ->call('toOfferings')
+            ->call('toHowItWorks')
+            ->call('toAccount')
+            ->set('email', 'ontrial@acct.com')
+            ->set('password', 'Real-Pass-999')
+            ->call('createAccount')
+            ->assertRedirect(route('content.get-started'));
+
+        $user->refresh();
+        $newSite = $user->websites()->where('domain', 'secondsite.com')->first();
+        $this->assertNotNull($newSite, 'second site attached to the account');
+        // Trial = 1 site, so the second is attached but NOT covered (needs payment).
+        $this->assertFalse(app(ContentEntitlements::class)->hasContentAccessFor($user, $newSite));
     }
 
     public function test_gc_removes_stale_unconverted_sessions_and_sites(): void

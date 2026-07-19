@@ -118,17 +118,38 @@ class PublicOnboarding extends Component
             return;
         }
         $this->assertRecaptcha();
-        $data = $this->validate([
-            'name' => 'required|string|max:120',
-            'email' => 'required|email|max:190',
-            'phone' => 'nullable|string|max:40',
-            'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
-        ]);
+        $email = mb_strtolower(trim($this->email));
+        $existing = User::query()->where('email', $email)->first();
 
-        if (User::query()->where('email', mb_strtolower($data['email']))->exists()) {
-            throw ValidationException::withMessages([
-                'email' => __('An account with this email already exists. Please log in to continue.'),
+        if ($existing !== null) {
+            // Already has an account → log them in with the password they typed
+            // and attach this website to that account (they may already have
+            // other websites — convert() just adds this one).
+            $this->validate([
+                'email' => 'required|email|max:190',
+                'password' => 'required|string',
             ]);
+            if (! Auth::attempt(['email' => $email, 'password' => $this->password], true)) {
+                throw ValidationException::withMessages([
+                    'password' => __('An account with this email already exists, but that password is wrong. Enter your password, or continue with Google.'),
+                ]);
+            }
+            $user = $existing;
+        } else {
+            $data = $this->validate([
+                'name' => 'required|string|max:120',
+                'email' => 'required|email|max:190',
+                'phone' => 'nullable|string|max:40',
+                'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
+            ]);
+            $user = User::query()->create([
+                'name' => $data['name'],
+                'email' => $email,
+                'phone' => $data['phone'] !== '' ? trim($data['phone']) : null,
+                'password' => $data['password'],
+            ]);
+            event(new Registered($user));
+            Auth::login($user);
         }
 
         $session = $this->session();
@@ -138,25 +159,19 @@ class PublicOnboarding extends Component
             return;
         }
 
-        $user = User::query()->create([
-            'name' => $data['name'],
-            'email' => mb_strtolower($data['email']),
-            'phone' => $data['phone'] !== '' ? trim($data['phone']) : null,
-            'password' => $data['password'],
-        ]);
-
-        $website = $converter->convert($session, $user, [
+        $result = $converter->convert($session, $user, [
             'business_description' => $this->businessDescription,
             'sell' => $this->sellItems,
             'dont_sell' => $this->dontSellItems,
         ]);
 
-        event(new Registered($user));
-        Auth::login($user);
-        session(['current_website_id' => $website->id]);
+        session(['current_website_id' => $result['website']->id]);
         session()->forget('content_onboarding_token');
 
-        $this->redirectRoute('content.settings', navigate: false);
+        // Covered (trial or a free subscription slot) → straight to the plan.
+        // Uncovered (trial already used, or subscription full) → Get started,
+        // where they pay for this additional site.
+        $this->redirectRoute($result['covered'] ? 'content.settings' : 'content.get-started', navigate: false);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────

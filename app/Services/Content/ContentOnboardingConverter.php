@@ -86,16 +86,24 @@ class ContentOnboardingConverter
      * topic ideation + keyword research. Idempotent-ish: a converted session
      * is a no-op.
      */
-    public function convert(ContentOnboardingSession $session, User $user, array $profile): Website
+    /**
+     * @param  array{business_description?:?string, sell?:array, dont_sell?:array}  $profile
+     *         Wizard profile. May be EMPTY (e.g. Google SSO round-trip loses the
+     *         Livewire state) — the plan already carries the persisted profile
+     *         from the wizard, so empty input must NOT wipe it.
+     * @return array{website: Website, covered: bool}
+     *         covered=false → the site is attached but not on a plan yet (trial
+     *         already used for another site, or subscription slots full) → the
+     *         caller sends the user to Get started to pay for this (additional) site.
+     */
+    public function convert(ContentOnboardingSession $session, User $user, array $profile): array
     {
-        return DB::transaction(function () use ($session, $user, $profile): Website {
+        return DB::transaction(function () use ($session, $user, $profile): array {
             $provisional = $session->website;
-            // The throwaway per-session owner; deleted once the site moves off it.
             $leadUser = $provisional?->user;
 
-            // If the user already owns this domain, move the plan onto their
-            // existing website and drop the provisional site (keeps crawl
-            // subscriber bookkeeping correct); else re-parent the provisional.
+            // Attach the onboarded site: fold into the user's existing site for
+            // this domain if they already have one, else re-parent the provisional.
             $existing = $user->websites()
                 ->where('normalized_domain', $provisional?->normalized_domain)
                 ->first();
@@ -108,36 +116,59 @@ class ContentOnboardingConverter
                 $website = $provisional;
             }
 
-            // Retire the throwaway lead user now that its site belongs to a real
-            // account (never touch a non-system user or one that still owns sites).
+            // Retire the throwaway lead user (system-owned, now owns no sites).
             if ($leadUser !== null && $leadUser->is_system
                 && $leadUser->id !== $user->id && $leadUser->websites()->count() === 0) {
                 $leadUser->delete();
             }
 
-            // Persist profile as a DRAFT plan (covered by the trial below).
+            // DRAFT plan carrying the profile. Only overwrite fields the caller
+            // actually supplied — an empty profile keeps what the wizard persisted.
             $plan = ContentPlan::query()->firstOrNew(['website_id' => $website->id]);
             if (! $plan->exists) {
                 $plan->status = ContentPlan::STATUS_DRAFT;
                 $plan->articles_per_week = 7;
                 $plan->article_length = 2000;
             }
-            $plan->business_description = (string) ($profile['business_description'] ?? $plan->business_description);
-            $plan->offerings = [
-                'sell' => array_values(array_filter((array) ($profile['sell'] ?? []))),
-                'dont_sell' => array_values(array_filter((array) ($profile['dont_sell'] ?? []))),
-            ];
+            if (array_key_exists('business_description', $profile) && filled($profile['business_description'])) {
+                $plan->business_description = (string) $profile['business_description'];
+            }
+            if (array_key_exists('sell', $profile) || array_key_exists('dont_sell', $profile)) {
+                $plan->offerings = [
+                    'sell' => array_values(array_filter((array) ($profile['sell'] ?? ($plan->offerings['sell'] ?? [])))),
+                    'dont_sell' => array_values(array_filter((array) ($profile['dont_sell'] ?? ($plan->offerings['dont_sell'] ?? [])))),
+                ];
+            }
             $plan->save();
 
-            // Trial + coverage, then background research so the calendar is
-            // ready when the user lands in the dashboard.
-            $this->entitlements->startTrial($user, $website);
+            // ── Coverage / billing decision ──────────────────────────────────
+            // Trial allows exactly ONE site. Priority: already-covered → keep;
+            // never-trialed & no sub → start the trial (covers this site);
+            // active subscription with a free slot → cover it; otherwise leave
+            // UNCOVERED — the user must pay (single site, or the per-extra-site
+            // addon) from Get started.
+            $covered = ContentPlan::query()->where('website_id', $website->id)
+                ->whereNotNull('billing_covered_at')->exists();
+
+            if (! $covered) {
+                if ($user->content_trial_started_at === null && ! $this->entitlements->hasContentSubscription($user)) {
+                    $this->entitlements->startTrial($user, $website);
+                    $covered = true;
+                } elseif ($this->entitlements->hasContentAccess($user)
+                    && $this->entitlements->sitesCovered($user) < $this->entitlements->sitesAllowed($user)) {
+                    $this->entitlements->coverWebsite($website);
+                    $covered = true;
+                }
+            }
+
+            // Research runs regardless; article GENERATION is gated by coverage
+            // (blockReason) so an uncovered site simply can't generate until paid.
             PlanContentTopicsJob::dispatch($plan->id);
             PrepareContentKeywordInsightsJob::dispatch($plan->id);
 
             $session->forceFill(['converted_user_id' => $user->id, 'converted_at' => now()])->save();
 
-            return $website;
+            return ['website' => $website, 'covered' => $covered];
         });
     }
 }

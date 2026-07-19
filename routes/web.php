@@ -43,6 +43,10 @@ Route::post('/content-autopilot/start', \App\Http\Controllers\Content\PublicOnbo
     ->name('content.onboarding.begin');
 Route::get('/content-autopilot/start', \App\Livewire\Content\PublicOnboarding::class)
     ->name('content.onboarding');
+// "Continue with Google" from the onboarding account step (reuses the whitelisted
+// SSO callback via a session intent flag).
+Route::get('/content-autopilot/auth/google', [GoogleOAuthController::class, 'contentOnboardingRedirect'])
+    ->name('content.onboarding.google');
 Route::view('/website-revamp', 'website-revamp')->name('website-revamp');
 Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
