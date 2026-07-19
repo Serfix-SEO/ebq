@@ -535,7 +535,13 @@ class ContentCalendar extends Component
     /** Poll target on step 5 — re-rendering re-reads the insights. */
     public function refreshKeywordInsights(): void
     {
-        // no-op: render() re-evaluates ContentKeywordInsights::get()
+        // render() re-evaluates get(); also re-attempt the keyword dispatch
+        // (throttled) so a competitor request that wasn't ready at step-6 entry
+        // still fires once competitors land.
+        if (($plan = $this->plan()) !== null
+            && \Illuminate\Support\Facades\Cache::add('content:kw-redispatch:'.$plan->id, 1, 20)) {
+            PrepareContentKeywordInsightsJob::dispatch($plan->id);
+        }
     }
 
     public function toFirstArticles(): void

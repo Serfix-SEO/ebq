@@ -56,7 +56,10 @@ class ContentKeywordInsights
     private const MAX_SEEDS = 20;
 
     /** Give the (concurrency-1, minutes-per-job) server this long before falling back. */
-    private const PENDING_GRACE_MINUTES = 12;
+    private const PENDING_GRACE_MINUTES = 15;
+
+    /** Partial (some sources still pending) results re-check this often. */
+    private const PARTIAL_TTL_SECONDS = 60;
 
     public function __construct(
         private readonly KeywordFinderPool $pool,
@@ -248,10 +251,17 @@ class ContentKeywordInsights
         $ownSite = $this->siteRequest($this->ownDomainKey($plan)); // client domain
         $compSite = $this->siteRequest($this->competitorRequestKey($plan)); // competitor
 
-        // Build only once all dispatched requests have settled (completed/overdue)
-        // — build() runs an LLM clustering call, so we don't recompute per landing.
-        if (! $this->settled($seed) || ! $this->settled($ownSite) || ! $this->settled($compSite)) {
-            return null;
+        $completed = fn (?KeywordApiRequest $r) => $r !== null && $r->status === KeywordApiRequest::STATUS_COMPLETED;
+        $allComplete = $completed($seed)
+            && ($ownSite === null || $completed($ownSite))
+            && ($compSite === null || $completed($compSite));
+        $allSettled = $this->settled($seed) && $this->settled($ownSite) && $this->settled($compSite);
+
+        // Show data as SOON as any source lands, then upgrade — don't wait for all
+        // three (on a concurrency-1 keyword server they serialize past the grace
+        // window, which used to strand the step on the topic fallback).
+        if (! $completed($seed) && ! $completed($ownSite) && ! $completed($compSite) && ! $allSettled) {
+            return null; // nothing back yet, still within grace
         }
 
         // CLIENT keywords = offering seeds + their own crawled domain (scrap-
@@ -265,16 +275,15 @@ class ContentKeywordInsights
 
         $rows = $this->mergeRows($clientRows, $competitorRows);
 
-        $partial = false;
         if ($rows === []) {
+            // All settled but the server(s) returned nothing → topic fallback.
             $rows = $this->fallbackRows($plan);
-            $partial = true;
             if ($rows === []) {
-                return null; // genuinely still preparing (no topics yet either)
+                return null;
             }
+            $partial = true;
         } else {
-            $partial = ($seed !== null && $seed->status !== KeywordApiRequest::STATUS_COMPLETED)
-                || ($compSite !== null && $compSite->status !== KeywordApiRequest::STATUS_COMPLETED);
+            $partial = ! $allComplete; // more sources still coming
         }
 
         // Keyword gap: what competitors rank for that the client does NOT,
@@ -282,8 +291,10 @@ class ContentKeywordInsights
         $gap = $this->computeGap($clientRows, $competitorRows, $plan);
 
         $insights = $this->build($rows, $plan, partial: $partial, gap: $gap['rows'], gapTotal: $gap['total']);
+        // Partial results are cached briefly so the next poll upgrades them as the
+        // remaining requests complete; the final digest is cached 30 days.
         Cache::put($this->insightsKey($plan), $insights,
-            now()->addDays($partial ? self::FALLBACK_TTL_DAYS : self::CACHE_TTL_DAYS));
+            $partial ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
 
         return $insights;
