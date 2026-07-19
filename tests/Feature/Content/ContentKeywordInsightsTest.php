@@ -226,8 +226,10 @@ class ContentKeywordInsightsTest extends TestCase
 
         $captured = [];
         $mock = \Mockery::mock(\App\Services\KeywordFinder\KeywordFinderPool::class);
+        // Multiple research angles now dispatch (offering seeds + the client's own
+        // domain + top competitor); each must carry the plan's geo/language.
         $mock->shouldReceive('dispatchIdeas')
-            ->once()
+            ->atLeast()->once()
             ->andReturnUsing(function ($opts, $userId, $websiteId, $only = null, $countryKey = null, $meter = true) use (&$captured) {
                 $captured = compact('opts', 'countryKey', 'meter');
 

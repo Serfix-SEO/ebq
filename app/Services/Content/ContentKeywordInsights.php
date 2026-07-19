@@ -12,6 +12,8 @@ use App\Services\KeywordResearch\AiKeywordClusterService;
 use App\Services\KeywordResearch\KeywordIntentClassifier;
 use App\Services\KeywordResearch\KeywordTermGrouper;
 use App\Services\KeywordsEverywhereClient;
+use App\Services\Llm\LlmClientFactory;
+use App\Support\ContentAutopilotConfig;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -69,12 +71,57 @@ class ContentKeywordInsights
      */
     public function ensureStarted(ContentPlan $plan): void
     {
+        // Three research angles, merged in get(): (1) offering seeds, (2) the
+        // CLIENT's own domain (what they actually rank for — site-scope), and
+        // (3) the top competitor's domain. (2) and (3) are crawl-derived so they
+        // pass through an LLM scrap filter (drop login / create-account / cart…).
         $this->ensureOwnRequest($plan);
-        // Competitor keywords enrich the research for EVERY domain (fresh or
-        // established). Dispatched separately because the competitor list is
-        // only known after the competitors step — this fires whenever it's
-        // available (guarded once), typically on the step-6 re-dispatch.
-        $this->ensureCompetitorRequest($plan);
+        $this->ensureSiteRequest($plan, $this->ownDomainKey($plan), fn () => $plan->website?->normalized_domain ?: $plan->website?->domain);
+        $this->ensureSiteRequest($plan, $this->competitorRequestKey($plan), fn () => $this->topCompetitorDomain($plan, $plan->website));
+    }
+
+    /**
+     * A site-scope keyword request against $domainResolver()'s domain (client's
+     * own or a competitor), stored under $cacheKey. Guarded once per key.
+     */
+    private function ensureSiteRequest(ContentPlan $plan, string $cacheKey, \Closure $domainResolver): void
+    {
+        if (Cache::has($cacheKey)) {
+            return;
+        }
+        $website = $plan->website;
+        if ($website === null) {
+            return;
+        }
+        $domain = $domainResolver();
+        $domain = $domain ? strtolower(preg_replace('/^www\./', '', trim((string) $domain))) : '';
+        if ($domain === '') {
+            return; // not known yet (e.g. competitor before the competitors step)
+        }
+        $lock = $cacheKey.':lock';
+        if (! Cache::add($lock, 1, now()->addMinutes(30))) {
+            return;
+        }
+
+        try {
+            $language = match (mb_strtolower(trim((string) $plan->language))) {
+                '', 'en' => null,
+                'ar' => 'Arabic',
+                default => (string) $plan->language,
+            };
+            $request = $this->pool->dispatchIdeas(
+                ['url' => 'https://'.$domain, 'scope' => 'site', 'language' => $language],
+                $website->user_id,
+                $website->id,
+                countryKey: $plan->country ?: null,
+                meter: false,
+            );
+            Cache::put($cacheKey, $request->id, now()->addHours(2));
+        } catch (\Throwable $e) {
+            Log::warning('ContentKeywordInsights site request failed', [
+                'plan_id' => $plan->id, 'domain' => $domain, 'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     /** The site's own keyword ideas request (offerings + GSC seeds). */
@@ -119,54 +166,12 @@ class ContentKeywordInsights
         }
     }
 
-    /**
-     * A site-scope keyword request against the top competitor's domain — pulls
-     * the keywords THEY rank for into the research, for every domain. Guarded
-     * separately from the own request (competitors are only known after the
-     * competitors step, so this typically fires on the step-6 re-dispatch).
-     */
-    private function ensureCompetitorRequest(ContentPlan $plan): void
-    {
-        if (Cache::has($this->competitorRequestKey($plan))) {
-            return;
-        }
-        $website = $plan->website;
-        if ($website === null) {
-            return;
-        }
-        $competitor = $this->topCompetitorDomain($plan, $website);
-        if ($competitor === null) {
-            return; // no competitors discovered yet — retry on the next dispatch
-        }
-        $lock = 'content:kw-insights:comp-lock:'.$plan->id;
-        if (! Cache::add($lock, 1, now()->addMinutes(30))) {
-            return;
-        }
-
-        try {
-            $language = match (mb_strtolower(trim((string) $plan->language))) {
-                '', 'en' => null,
-                'ar' => 'Arabic',
-                default => (string) $plan->language,
-            };
-            $request = $this->pool->dispatchIdeas(
-                ['url' => 'https://'.$competitor, 'scope' => 'site', 'language' => $language],
-                $website->user_id,
-                $website->id,
-                countryKey: $plan->country ?: null,
-                meter: false,
-            );
-            Cache::put($this->competitorRequestKey($plan), $request->id, now()->addHours(2));
-        } catch (\Throwable $e) {
-            Log::warning('ContentKeywordInsights competitor dispatch failed', [
-                'plan_id' => $plan->id, 'competitor' => $competitor, 'message' => $e->getMessage(),
-            ]);
-        }
-    }
-
     /** Best competitor domain to mine keywords from (SERP-shared / authority top). */
-    private function topCompetitorDomain(ContentPlan $plan, Website $website): ?string
+    private function topCompetitorDomain(ContentPlan $plan, ?Website $website): ?string
     {
+        if ($website === null) {
+            return null;
+        }
         try {
             $insights = app(ContentSetupInsights::class)->competitorAuthority($website);
             $competitors = is_array($insights) ? ($insights['competitors'] ?? []) : [];
@@ -203,26 +208,27 @@ class ContentKeywordInsights
             return $cached;
         }
 
-        $own = $this->request($plan);
-        $comp = $this->competitorRequest($plan);
+        $seed = $this->request($plan);                        // offering seeds
+        $ownSite = $this->siteRequest($this->ownDomainKey($plan)); // client domain
+        $compSite = $this->siteRequest($this->competitorRequestKey($plan)); // competitor
 
-        // Wait until BOTH the own and competitor requests have settled (completed
-        // or overdue) before building, so the digest merges keywords from the site
-        // AND its top competitor in one pass (build() runs an LLM clustering call,
-        // so we don't want to recompute it as each request lands).
-        $ownSettled = $this->settled($own);
-        $compSettled = $comp === null || $this->settled($comp);
-        if (! $ownSettled || ! $compSettled) {
-            return null; // still within a grace window
+        // Build only once all dispatched requests have settled (completed/overdue)
+        // — build() runs an LLM clustering call, so we don't recompute per landing.
+        if (! $this->settled($seed) || ! $this->settled($ownSite) || ! $this->settled($compSite)) {
+            return null;
         }
 
-        // Merge completed results (own first, competitor dedup-appended).
-        $rows = $this->mergeRows(
-            $this->completedRows($own),
-            $this->completedRows($comp),
+        // CLIENT keywords = offering seeds + their own crawled domain (scrap-
+        // filtered — the site-scope set includes login / cart / account junk).
+        $clientRows = $this->mergeRows(
+            $this->completedRows($seed),
+            $this->filterScrap($this->completedRows($ownSite), $plan),
         );
+        // COMPETITOR keywords, also scrap-filtered.
+        $competitorRows = $this->filterScrap($this->completedRows($compSite), $plan);
 
-        // Nothing from the server(s) → fall back to the plan's own topics.
+        $rows = $this->mergeRows($clientRows, $competitorRows);
+
         $partial = false;
         if ($rows === []) {
             $rows = $this->fallbackRows($plan);
@@ -231,17 +237,99 @@ class ContentKeywordInsights
                 return null; // genuinely still preparing (no topics yet either)
             }
         } else {
-            // Partial if either source failed to deliver anything.
-            $partial = $own === null || $own->status !== KeywordApiRequest::STATUS_COMPLETED
-                || ($comp !== null && $comp->status !== KeywordApiRequest::STATUS_COMPLETED);
+            $partial = ($seed !== null && $seed->status !== KeywordApiRequest::STATUS_COMPLETED)
+                || ($compSite !== null && $compSite->status !== KeywordApiRequest::STATUS_COMPLETED);
         }
 
-        $insights = $this->build($rows, $plan, partial: $partial);
+        // Keyword gap: what competitors rank for that the client does NOT.
+        $gap = $this->computeGap($clientRows, $competitorRows);
+
+        $insights = $this->build($rows, $plan, partial: $partial, gap: $gap);
         Cache::put($this->insightsKey($plan), $insights,
             now()->addDays($partial ? self::FALLBACK_TTL_DAYS : self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
 
         return $insights;
+    }
+
+    /** LLM removes website UI / account / navigation junk keywords (login, cart…). */
+    private function filterScrap(array $rows, ContentPlan $plan): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+        $keywords = array_values(array_unique(array_column($rows, 'keyword')));
+        $cacheKey = 'content:kw-scrap:'.md5(implode('|', $keywords));
+        $scrap = Cache::get($cacheKey);
+        if ($scrap === null) {
+            $scrap = $this->llmScrapKeywords($keywords);
+            Cache::put($cacheKey, $scrap, now()->addDays(self::CACHE_TTL_DAYS));
+        }
+        if ($scrap === []) {
+            return $rows;
+        }
+        $scrapSet = array_flip($scrap);
+
+        return array_values(array_filter($rows, static fn ($r) => ! isset($scrapSet[$r['keyword']])));
+    }
+
+    /** @return list<string> lowercased scrap keywords the LLM flagged as UI/account junk */
+    private function llmScrapKeywords(array $keywords): array
+    {
+        try {
+            $model = ContentAutopilotConfig::modelFor('ideate');
+            $llm = LlmClientFactory::make($model['provider']);
+            if (! $llm->isAvailable()) {
+                return [];
+            }
+            $list = implode("\n", array_slice($keywords, 0, 250));
+            $response = $llm->completeJson([
+                ['role' => 'system', 'content' => 'You clean keyword lists for SEO content research. Respond with valid JSON only.'],
+                ['role' => 'user', 'content' => <<<PROMPT
+                From the keyword list below, return ONLY the entries that are website UI,
+                account, or navigation junk — things nobody researches content for, e.g.
+                "login", "sign in", "create account", "my account", "cart", "checkout",
+                "password reset", "dashboard", "logout", "terms of service", "contact us".
+                Do NOT include real topical / product / informational search terms.
+
+                {$list}
+
+                Return JSON: {"scrap": ["...", "..."]}
+                PROMPT],
+            ], ['temperature' => 0.1, 'max_tokens' => 800, 'timeout' => 30, '__source' => 'content_autopilot.kw_scrap']);
+
+            $scrap = is_array($response['scrap'] ?? null) ? $response['scrap'] : [];
+
+            return array_values(array_filter(array_map(
+                static fn ($s) => mb_strtolower(trim((string) $s)), $scrap
+            )));
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * Keyword gap: competitor keywords (with volume) the client isn't targeting.
+     *
+     * @return list<array{keyword:string, volume:?int, competition:string}>
+     */
+    private function computeGap(array $clientRows, array $competitorRows): array
+    {
+        if ($competitorRows === []) {
+            return [];
+        }
+        $client = array_flip(array_column($clientRows, 'keyword'));
+        $gap = array_values(array_filter(
+            $competitorRows,
+            static fn ($r) => ! isset($client[$r['keyword']]) && (int) ($r['volume'] ?? 0) > 0
+        ));
+        usort($gap, static fn ($a, $b) => (int) ($b['volume'] ?? 0) <=> (int) ($a['volume'] ?? 0));
+
+        return array_map(static fn ($r) => [
+            'keyword' => $r['keyword'],
+            'volume' => $r['volume'],
+            'competition' => $r['competition'],
+        ], array_slice($gap, 0, 8));
     }
 
     /** A request that has completed or aged past the grace window (null = overdue now). */
@@ -287,8 +375,10 @@ class ContentKeywordInsights
         Cache::forget($this->insightsKey($plan));
         Cache::forget($this->requestKey($plan));
         Cache::forget($this->competitorRequestKey($plan));
+        Cache::forget($this->ownDomainKey($plan));
         Cache::forget('content:kw-insights:lock:'.$plan->id);
-        Cache::forget('content:kw-insights:comp-lock:'.$plan->id);
+        Cache::forget($this->competitorRequestKey($plan).':lock');
+        Cache::forget($this->ownDomainKey($plan).':lock');
     }
 
     // ── internals ───────────────────────────────────────────────────────
@@ -308,6 +398,11 @@ class ContentKeywordInsights
         return 'content:kw-insights:comp-req:'.$plan->id;
     }
 
+    private function ownDomainKey(ContentPlan $plan): string
+    {
+        return 'content:kw-insights:site-req:'.$plan->id;
+    }
+
     private function request(ContentPlan $plan): ?KeywordApiRequest
     {
         $id = Cache::get($this->requestKey($plan));
@@ -315,9 +410,10 @@ class ContentKeywordInsights
         return $id ? KeywordApiRequest::query()->find($id) : null;
     }
 
-    private function competitorRequest(ContentPlan $plan): ?KeywordApiRequest
+    /** Resolve a site-scope keyword request stored under an arbitrary cache key. */
+    private function siteRequest(string $cacheKey): ?KeywordApiRequest
     {
-        $id = Cache::get($this->competitorRequestKey($plan));
+        $id = Cache::get($cacheKey);
 
         return $id ? KeywordApiRequest::query()->find($id) : null;
     }
@@ -495,7 +591,7 @@ class ContentKeywordInsights
      *
      * @param  list<array{keyword:string, volume:?int, competition:string, intent:string, is_question:bool}>  $rows
      */
-    private function build(array $rows, ContentPlan $plan, bool $partial): array
+    private function build(array $rows, ContentPlan $plan, bool $partial, array $gap = []): array
     {
         $plannedKeywords = $plan->topics()->pluck('target_keyword')
             ->map(fn ($k) => mb_strtolower(trim((string) $k)))->filter()->flip()->all();
@@ -585,6 +681,7 @@ class ContentKeywordInsights
             'intents' => $intents,
             'questions' => $questions,
             'opportunities' => $opportunities,
+            'gap' => $gap,
             'partial' => $partial,
         ];
     }
