@@ -16,14 +16,28 @@
             <p class="mx-auto mt-5 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
                 {{ __('Serfix researches your niche, writes a genuinely useful article, checks it against technical SEO, adds images, and publishes it to your site — on autopilot. You review and approve everything.') }}
             </p>
-            <form method="GET" action="{{ route('content.onboarding') }}" class="mx-auto mt-8 flex max-w-lg flex-col gap-3 sm:flex-row">
-                <input type="text" name="domain" placeholder="yourwebsite.com" aria-label="{{ __('Your website') }}"
-                    class="flex-1 rounded-xl border border-slate-300 px-4 py-3.5 text-sm text-slate-900 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500" />
-                <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
-                    {{ __('Get started') }}
-                </button>
+            @php $recaptcha = \App\Support\Recaptcha::isEnabled(); @endphp
+            <form method="POST" action="{{ route('content.onboarding.begin') }}" class="mx-auto mt-8 max-w-lg">
+                @csrf
+                <div class="flex flex-col gap-3 sm:flex-row">
+                    <input type="text" name="domain" value="{{ old('domain') }}" placeholder="yourwebsite.com" aria-label="{{ __('Your website') }}"
+                        class="flex-1 rounded-xl border border-slate-300 px-4 py-3.5 text-sm text-slate-900 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500" />
+                    <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                        {{ __('Get started') }}
+                    </button>
+                </div>
+                @error('domain') <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p> @enderror
+                @error('g-recaptcha-response') <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p> @enderror
+                @if ($recaptcha)
+                    <div class="mt-4 flex justify-center">
+                        <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
+                    </div>
+                @endif
             </form>
             <p class="mt-3 text-sm text-slate-500">{{ __(':days-day free trial · :n free articles · no card required', ['days' => $cfg::trialDays(), 'n' => $cfg::trialArticles()]) }}</p>
+            @if ($recaptcha)
+                <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+            @endif
         </div>
     </section>
 

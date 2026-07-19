@@ -7,15 +7,11 @@ use App\Models\ContentOnboardingSession;
 use App\Models\ContentPlan;
 use App\Models\User;
 use App\Models\Website;
-use App\Models\WebsiteReportSnapshot;
 use App\Rules\ValidRecaptcha;
 use App\Services\Content\ContentOnboardingConverter;
-use App\Support\Audit\SafeHttpGuard;
-use App\Support\ContentAutopilotConfig;
 use App\Support\Recaptcha;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -58,7 +54,7 @@ class PublicOnboarding extends Component
             return $this->redirectRoute('content.get-started', navigate: false);
         }
 
-        // Resume an unconverted session if the visitor already started.
+        // Resume the onboarding session created on the landing page.
         $token = (string) session('content_onboarding_token', '');
         if ($token !== '') {
             $s = ContentOnboardingSession::query()->where('token', $token)->whereNull('converted_at')->first();
@@ -73,12 +69,9 @@ class PublicOnboarding extends Component
             }
         }
 
-        // Prefill the domain typed on the landing hero (?domain=…). The
-        // domain-capture screen still runs the SSRF/reCAPTCHA/throttle guards.
-        $prefill = trim((string) request()->query('domain', ''));
-        if ($prefill !== '') {
-            $this->domain = mb_substr($prefill, 0, 255);
-        }
+        // No captured domain → the visitor skipped the landing form. The domain
+        // is collected ONCE, on the landing page (with reCAPTCHA); send them there.
+        return $this->redirectRoute('content.landing', navigate: false);
     }
 
     /** Persist wizard progress so a reload resumes where the visitor left off. */
@@ -88,39 +81,6 @@ class PublicOnboarding extends Component
             ContentOnboardingSession::query()->where('token', $this->token)->whereNull('converted_at')
                 ->update(['step' => max(1, min($this->wizardStep, 7))]);
         }
-    }
-
-    // ── Domain capture (pre-wizard) → provisional website ───────────────
-
-    public function startWithDomain(SafeHttpGuard $guard, ContentOnboardingConverter $converter): void
-    {
-        $this->assertRecaptcha();
-        $this->assertThrottle();
-
-        $raw = trim($this->domain);
-        if ($raw !== '' && ! preg_match('#^https?://#i', $raw)) {
-            $raw = 'https://'.$raw;
-        }
-        if (! ($guard->check($raw)['ok'] ?? false)) {
-            throw ValidationException::withMessages(['domain' => __('Enter a public website address (https://…).')]);
-        }
-        $domain = WebsiteReportSnapshot::normalizeDomain($raw);
-        if ($domain === '') {
-            throw ValidationException::withMessages(['domain' => __('Enter a valid website domain.')]);
-        }
-
-        $this->hitThrottle();
-        [$session, $website] = $converter->begin($domain, request()->ip());
-        $this->token = $session->token;
-        $this->domain = $domain;
-        $this->websiteId = $website->id;
-        session(['content_onboarding_token' => $session->token]);
-        $this->recaptchaToken = '';
-
-        // Enter the shared wizard at step 1 (Business) with crawl-based
-        // auto-analysis armed.
-        $this->wizardStep = 1;
-        $this->bootWizard();
     }
 
     // ── Provisional site/plan resolvers (no auth — session-token scoped) ─
@@ -215,34 +175,6 @@ class PublicOnboarding extends Component
                 ['g-recaptcha-response.required' => __('Please complete the reCAPTCHA to continue.')]
             )->validate();
         }
-    }
-
-    private function throttleKeys(): array
-    {
-        $ip = (string) request()->ip();
-
-        return ['content-onboard:h:'.$ip, 'content-onboard:d:'.$ip, 'content-onboard:global:d'];
-    }
-
-    private function assertThrottle(): void
-    {
-        $t = ContentAutopilotConfig::onboardingThrottle();
-        [$hour, $day, $global] = $this->throttleKeys();
-        if (RateLimiter::tooManyAttempts($hour, $t['per_ip_hourly'])
-            || RateLimiter::tooManyAttempts($day, $t['per_ip_daily'])
-            || RateLimiter::tooManyAttempts($global, $t['global_daily'])) {
-            throw ValidationException::withMessages([
-                'domain' => __('We are getting a lot of sign-ups right now. Please try again a little later.'),
-            ]);
-        }
-    }
-
-    private function hitThrottle(): void
-    {
-        [$hour, $day, $global] = $this->throttleKeys();
-        RateLimiter::hit($hour, 3600);
-        RateLimiter::hit($day, 86400);
-        RateLimiter::hit($global, 86400);
     }
 
     public function render()

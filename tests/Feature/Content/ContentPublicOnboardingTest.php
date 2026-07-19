@@ -32,15 +32,24 @@ class ContentPublicOnboardingTest extends TestCase
         });
     }
 
+    /** Begin an onboarding session via the landing-page POST, return the resumable component. */
+    private function beginAndResume(string $domain)
+    {
+        $this->post(route('content.onboarding.begin'), ['domain' => $domain])
+            ->assertRedirect(route('content.onboarding'));
+
+        $token = ContentOnboardingSession::query()->latest('id')->first()->token;
+        session(['content_onboarding_token' => $token]);
+
+        return Livewire::test(PublicOnboarding::class);
+    }
+
     public function test_domain_step_creates_provisional_site_under_system_user(): void
     {
         Queue::fake();
 
-        Livewire::test(PublicOnboarding::class)
-            ->set('domain', 'example.com')
-            ->call('startWithDomain')
-            ->assertSet('wizardStep', 1)
-            ->assertSet('websiteId', fn ($v) => $v !== null);
+        $this->post(route('content.onboarding.begin'), ['domain' => 'example.com'])
+            ->assertRedirect(route('content.onboarding'));
 
         $session = ContentOnboardingSession::query()->first();
         $this->assertNotNull($session);
@@ -52,9 +61,8 @@ class ContentPublicOnboardingTest extends TestCase
     {
         Queue::fake();
 
-        $component = Livewire::test(PublicOnboarding::class)
-            ->set('domain', 'newclient.com')
-            ->call('startWithDomain')
+        $this->beginAndResume('newclient.com')
+            ->assertSet('wizardStep', 1)
             ->set('businessDescription', 'We sell handmade wooden tables and chairs for small apartments.')
             ->set('sellItems', ['Tables', 'Chairs'])
             ->call('toOfferings')
@@ -91,9 +99,7 @@ class ContentPublicOnboardingTest extends TestCase
         Queue::fake();
         User::factory()->create(['email' => 'taken@x.com']);
 
-        Livewire::test(PublicOnboarding::class)
-            ->set('domain', 'x-site.com')
-            ->call('startWithDomain')
+        $this->beginAndResume('x-site.com')
             ->set('businessDescription', 'We sell widgets and gadgets to small businesses everywhere.')
             ->call('toOfferings')
             ->call('toHowItWorks')
@@ -111,7 +117,8 @@ class ContentPublicOnboardingTest extends TestCase
     public function test_gc_removes_stale_unconverted_sessions_and_sites(): void
     {
         Queue::fake();
-        Livewire::test(PublicOnboarding::class)->set('domain', 'stale.com')->call('startWithDomain');
+        $this->post(route('content.onboarding.begin'), ['domain' => 'stale.com'])
+            ->assertRedirect(route('content.onboarding'));
 
         $session = ContentOnboardingSession::query()->first();
         $websiteId = $session->website_id;
