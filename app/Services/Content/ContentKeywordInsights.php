@@ -814,6 +814,17 @@ class ContentKeywordInsights
             }
         }
 
+        // ── What people are searching for: the highest-volume real search terms,
+        // ranked purely by monthly searches (not winnability). This is the plain
+        // "here's the demand we found" list.
+        $searches = array_values(array_filter($rows, fn ($r) => (int) ($r['volume'] ?? 0) > 0));
+        usort($searches, fn ($a, $b) => (int) ($b['volume'] ?? 0) <=> (int) ($a['volume'] ?? 0));
+        $topSearches = array_map(fn ($r) => [
+            'keyword' => $r['keyword'],
+            'volume' => $r['volume'],
+            'competition' => $r['competition'],
+        ], array_slice($searches, 0, 12));
+
         // ── Intent mix.
         $intents = array_fill_keys(KeywordIntentClassifier::INTENTS, 0);
         foreach ($rows as $r) {
@@ -851,6 +862,7 @@ class ContentKeywordInsights
             'clusters' => $clusters,
             'intents' => $intents,
             'questions' => $questions,
+            'top_searches' => $topSearches,
             'opportunities' => $opportunities,
             'gap' => $gap,
             'gap_total' => $gapTotal,

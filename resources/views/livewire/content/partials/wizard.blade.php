@@ -614,6 +614,42 @@
                             </div>
                         </div>
 
+                        {{-- What people are searching for: the real search terms + monthly demand --}}
+                        @if (! empty($kw['top_searches']))
+                            <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
+                                <div class="flex items-start gap-3 bg-gradient-to-r from-orange-50 to-white px-4 py-3 dark:from-orange-950 dark:to-slate-900">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3"/></svg>
+                                    </span>
+                                    <div class="min-w-0">
+                                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('What people are searching for') }}</h3>
+                                        <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('The real, highest-demand searches in your market — the exact terms your articles will target.') }}</p>
+                                    </div>
+                                </div>
+                                <table class="w-full text-sm">
+                                    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                                        <tr>
+                                            <th class="px-4 py-2.5 text-start font-bold">{{ __('Search term') }}</th>
+                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Monthly searches') }}</th>
+                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Competition') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                        @foreach ($kw['top_searches'] as $s)
+                                            <tr class="bg-white dark:bg-slate-900" wire:key="kwts-{{ $loop->index }}">
+                                                <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{{ $s['keyword'] }}</td>
+                                                <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $s['volume'] !== null ? number_format($s['volume']) : '—' }}</td>
+                                                <td class="px-4 py-3 text-end">
+                                                    @php $sc = ['low' => 'bg-success/10 text-success', 'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300', 'high' => 'bg-error/10 text-error', 'unknown' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'][$s['competition']] ?? 'bg-slate-100 text-slate-500'; @endphp
+                                                    <span class="rounded-full px-2 py-0.5 text-xs font-bold {{ $sc }}">{{ ['low' => __('Low'), 'medium' => __('Medium'), 'high' => __('High'), 'unknown' => '—'][$s['competition']] ?? '—' }}</span>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+
                         <div class="mt-4 grid gap-4 lg:grid-cols-2">
                             {{-- Topic clusters --}}
                             @if (! empty($kw['clusters']))
