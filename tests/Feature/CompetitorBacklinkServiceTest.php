@@ -126,24 +126,24 @@ class CompetitorBacklinkServiceTest extends TestCase
         Http::fake([
             '*keywordseverywhere.com*' => Http::response([
                 'data' => [[
-                    'anchor_text' => 'Nickfinder',
+                    'anchor_text' => 'Example Anchor',
                     'domain_source' => 'lifewire.com',
-                    'domain_target' => 'nickfinder.com',
+                    'domain_target' => 'competitor-example.com',
                     'url_source' => 'https://www.lifewire.com/how-to-rename-airpods-4691178',
-                    'url_target' => 'https://nickfinder.com/AirPods',
+                    'url_target' => 'https://competitor-example.com/AirPods',
                 ]],
                 'credits_consumed' => 1,
                 'time_taken' => 4.9032,
             ], 200),
         ]);
 
-        $written = app(CompetitorBacklinkService::class)->refresh('nickfinder.com');
+        $written = app(CompetitorBacklinkService::class)->refresh('competitor-example.com');
 
         $this->assertSame(1, $written);
-        $row = CompetitorBacklink::query()->where('competitor_domain', 'nickfinder.com')->firstOrFail();
+        $row = CompetitorBacklink::query()->where('competitor_domain', 'competitor-example.com')->firstOrFail();
         $this->assertSame('https://www.lifewire.com/how-to-rename-airpods-4691178', $row->referring_page_url);
         $this->assertSame('lifewire.com', $row->referring_domain);
-        $this->assertSame('Nickfinder', $row->anchor_text);
+        $this->assertSame('Example Anchor', $row->anchor_text);
         // KE's domain-backlinks endpoint doesn't currently return DA or follow-type.
         $this->assertNull($row->domain_authority);
         $this->assertNull($row->backlink_type);

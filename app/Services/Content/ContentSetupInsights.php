@@ -28,7 +28,7 @@ use Illuminate\Support\Facades\Cache;
  *     the site's own referring-domains number already comes from DataForSEO;
  *     an earlier version enriched competitors via free OpenPageRank instead,
  *     which undercounted referring domains 10-100x vs this real index (e.g.
- *     nickfinder.com: OPR said 90, DataForSEO says ~5,800) and made the
+ *     one real competitor: OPR said 90, DataForSEO says ~5,800) and made the
  *     median/gap comparison badly wrong — sometimes showing the client AHEAD
  *     when they were actually far behind. Stored on the shared `domain_metrics`
  *     asset (`dfs_referring_domains`/`dfs_backlinks`/`dfs_refreshed_at`, 30-day
