@@ -18,6 +18,23 @@
         </div>
     @endif
 
+    @if (session('content-error'))
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 8000)"
+            class="relative flex items-start gap-3 overflow-hidden rounded-2xl border border-error/25 bg-white p-4 ps-5 shadow-sm dark:border-error/25 dark:bg-slate-900">
+            <span class="absolute inset-y-0 start-0 w-1 bg-error"></span>
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-error/10 text-error">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+            </span>
+            <div class="min-w-0 flex-1 pt-0.5">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ session('content-error') }}</p>
+                <a href="{{ route('content.integrations') }}" wire:navigate class="mt-0.5 inline-block text-xs font-medium text-orange-600 hover:text-orange-700">{{ __('Open Integrations →') }}</a>
+            </div>
+            <button type="button" @click="show = false" class="shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800" aria-label="{{ __('Dismiss') }}">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+    @endif
+
     @if (! $hasWebsite)
         <div class="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
             {{ __('Add a website first to start planning content.') }}
@@ -1095,12 +1112,12 @@
                                             </button>
                                         @endif
                                     </div>
-                                    @if ($canDrag)
-                                        {{-- Tap-to-reschedule: works on touch (where drag doesn't) and desktop. --}}
-                                        <input type="date" min="{{ now()->toDateString() }}" value="{{ $topic->scheduled_for?->toDateString() }}"
-                                               wire:change="reschedule('{{ $topic->id }}', $event.target.value)" draggable="false"
-                                               class="mt-1 w-full rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-600 focus:border-orange-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                                               aria-label="{{ __('Change date') }}" />
+                                    @if ($topic->currentArticle && in_array($topic->status, ['ready', 'scheduled'], true) && $publishConnected)
+                                        <button wire:click="publishNow('{{ $topic->id }}')" wire:confirm="{{ __('Publish this article to your site now?') }}" draggable="false"
+                                                class="mt-1 inline-flex w-full items-center justify-center gap-0.5 rounded-md bg-success px-1.5 py-0.5 text-[10px] font-bold text-white hover:brightness-110">
+                                            <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+                                            {{ __('Publish now') }}
+                                        </button>
                                     @endif
                                 </div>
                             @endforeach
@@ -1149,18 +1166,21 @@
                             @if ($topic->status === \App\Models\ContentTopic::STATUS_SUGGESTED)
                                 <button wire:click="approve('{{ $topic->id }}')" class="text-sm font-medium text-success hover:brightness-90">{{ __('Approve') }}</button>
                             @endif
-                            @if (in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true))
-                                {{-- Plain native date input: taps open the OS date picker on
-                                     mobile and desktop alike (HTML5 drag doesn't work on touch,
-                                     so this is the reliable reschedule path). 'scheduled' shows
-                                     to the client as "Approved" — include it or that row has no
-                                     date control. --}}
-                                <span class="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                                    <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
-                                    <input type="date" min="{{ now()->toDateString() }}" value="{{ $topic->scheduled_for?->toDateString() }}"
-                                        wire:change="reschedule('{{ $topic->id }}', $event.target.value)"
-                                        class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:border-orange-300 focus:border-orange-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200" aria-label="{{ __('Change date') }}" />
-                                </span>
+                            @if ($topic->currentArticle && in_array($topic->status, ['ready', 'scheduled'], true))
+                                @if ($publishConnected)
+                                    <button wire:click="publishNow('{{ $topic->id }}')" wire:confirm="{{ __('Publish this article to your site now?') }}"
+                                            class="inline-flex items-center gap-1 rounded-lg bg-success px-2.5 py-1 text-xs font-bold text-white hover:brightness-110">
+                                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+                                        {{ __('Publish now') }}
+                                    </button>
+                                    @if ($topic->status === 'scheduled')
+                                        <span class="text-xs text-slate-400 dark:text-slate-500">{{ __('auto-publishes :date', ['date' => $topic->scheduled_for?->translatedFormat('M j') ?? __('soon')]) }}</span>
+                                    @endif
+                                @else
+                                    <a href="{{ route('content.integrations') }}" wire:navigate class="text-xs font-medium text-orange-600 hover:text-orange-700">{{ __('Connect a site to publish →') }}</a>
+                                @endif
+                            @endif
+                            @if (in_array($topic->status, ['suggested', 'approved', 'ready'], true))
                                 <button wire:click="skip('{{ $topic->id }}')" class="text-sm text-slate-400 hover:text-slate-600">{{ __('Skip') }}</button>
                             @endif
                         </div>

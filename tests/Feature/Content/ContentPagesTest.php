@@ -414,6 +414,50 @@ class ContentPagesTest extends TestCase
             ->assertDontSee(__('Content quality'));         // NOT the finalized article panel
     }
 
+    public function test_publish_now_dispatches_when_a_destination_is_connected(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
+        $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id, 'status' => ContentTopic::STATUS_SCHEDULED,
+        ]);
+        ContentArticle::storeVersion($topic, [
+            'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
+            'html' => '<p>x</p>', 'word_count' => 100, 'seo_score' => 90, 'seo_issues' => [],
+        ]);
+        \App\Models\ContentIntegration::create([
+            'website_id' => $website->id, 'platform' => 'webhook',
+            'status' => \App\Models\ContentIntegration::STATUS_CONNECTED,
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+        Livewire::test(ContentCalendar::class)->call('publishNow', $topic->id);
+
+        Queue::assertPushed(\App\Jobs\PublishContentArticleJob::class);
+    }
+
+    public function test_publish_now_without_connection_flashes_error_and_does_not_dispatch(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithWebsite();
+        $plan = ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
+        $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $website->id, 'status' => ContentTopic::STATUS_SCHEDULED,
+        ]);
+        ContentArticle::storeVersion($topic, [
+            'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
+            'html' => '<p>x</p>', 'word_count' => 100, 'seo_score' => 90, 'seo_issues' => [],
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+        Livewire::test(ContentCalendar::class)->call('publishNow', $topic->id);
+
+        // No connected destination → must NOT publish (and the topic stays put).
+        Queue::assertNotPushed(\App\Jobs\PublishContentArticleJob::class);
+        $this->assertSame(ContentTopic::STATUS_SCHEDULED, $topic->fresh()->status);
+    }
+
     public function test_review_page_is_tenant_scoped(): void
     {
         [$user] = $this->userWithWebsite();

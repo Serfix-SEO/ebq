@@ -5,6 +5,8 @@ namespace App\Livewire\Content;
 use App\Jobs\PlanContentTopicsJob;
 use App\Jobs\PrepareContentKeywordInsightsJob;
 use App\Jobs\ProduceContentArticleJob;
+use App\Jobs\PublishContentArticleJob;
+use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\Website;
@@ -726,6 +728,45 @@ class ContentCalendar extends Component
         $topic->update(['scheduled_for' => $day]);
     }
 
+    /**
+     * Publish a ready/scheduled article to the connected destination(s) RIGHT
+     * NOW — bypasses the plan's publish window (that gate lives only in the
+     * dispatcher). Requires a connected integration; otherwise we tell the
+     * client to connect one instead of silently doing nothing.
+     */
+    public function publishNow(string $topicId): void
+    {
+        $topic = $this->topicOrFail($topicId);
+        if ($topic === null || $topic->currentArticle === null) {
+            return;
+        }
+        if (! in_array($topic->status, [
+            ContentTopic::STATUS_READY, ContentTopic::STATUS_SCHEDULED,
+        ], true)) {
+            return;
+        }
+        if (! $this->hasPublishDestination()) {
+            session()->flash('content-error', __('Connect a site in Settings → Integrations before publishing.'));
+
+            return;
+        }
+        // The publish job only acts on SCHEDULED/PUBLISHING topics.
+        if ($topic->status === ContentTopic::STATUS_READY) {
+            $topic->enterStage(ContentTopic::STATUS_SCHEDULED);
+        }
+        PublishContentArticleJob::dispatch($topic->id);
+        session()->flash('content-status', __('Publishing now — it can take a moment to appear on your site.'));
+    }
+
+    /** Whether the active plan's website has a connected publishing destination. */
+    private function hasPublishDestination(): bool
+    {
+        return (bool) $this->activePlan()?->website
+            ?->contentIntegrations()
+            ->where('status', ContentIntegration::STATUS_CONNECTED)
+            ->exists();
+    }
+
     public function addTopic(): void
     {
         $plan = $this->activePlan();
@@ -1060,6 +1101,7 @@ class ContentCalendar extends Component
             'stats' => $this->overviewStats($all),
             'audience' => $this->audienceSearches($all),
             'clusters' => $this->strategyClusters($all),
+            'publishConnected' => $this->hasPublishDestination(),
         ]);
     }
 
@@ -1077,6 +1119,7 @@ class ContentCalendar extends Component
             'stats' => [],
             'audience' => [],
             'clusters' => [],
+            'publishConnected' => false,
         ];
     }
 }
