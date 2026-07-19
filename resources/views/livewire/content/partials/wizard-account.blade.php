@@ -46,7 +46,7 @@
             </button>
             <button type="submit" wire:loading.attr="disabled" wire:target="createAccount" class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110 disabled:opacity-70">
                 <svg wire:loading wire:target="createAccount" class="-ms-1 me-1 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                <span wire:loading.remove wire:target="createAccount">{{ __('Start free trial') }}</span>
+                <span wire:loading.remove wire:target="createAccount">{{ __('Get started') }}</span>
                 <span wire:loading wire:target="createAccount">{{ __('Creating your account…') }}</span>
             </button>
         </div>
