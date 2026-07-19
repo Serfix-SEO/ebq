@@ -61,7 +61,16 @@ class PublicOnboarding extends Component
                 $this->token = $s->token;
                 $this->domain = (string) $s->domain;
                 $this->step = max(2, (int) $s->step);
+
+                return;
             }
+        }
+
+        // Prefill the domain typed on the landing hero (?domain=…). Step 1 stays
+        // so the SSRF/reCAPTCHA/throttle guards in startWithDomain still run.
+        $prefill = trim((string) request()->query('domain', ''));
+        if ($prefill !== '') {
+            $this->domain = mb_substr($prefill, 0, 255);
         }
     }
 
