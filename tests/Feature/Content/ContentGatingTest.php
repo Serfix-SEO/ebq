@@ -59,6 +59,17 @@ class ContentGatingTest extends TestCase
         $this->assertTrue($this->passesAccess($user, $site));
     }
 
+    public function test_content_site_without_analytics_lands_on_the_content_calendar(): void
+    {
+        $user = User::factory()->create();
+        // Content-covered site with NO Analytics / Search Console connected.
+        $site = Website::factory()->for($user)->create(['ga_property_id' => '', 'gsc_site_url' => '']);
+        app(ContentEntitlements::class)->startTrial($user, $site);
+
+        // Must NOT drop into the dashboard's GA/GSC onboarding.
+        $this->assertSame('content.index', $user->firstAccessibleRoute($site->id));
+    }
+
     public function test_produce_job_is_blocked_without_content_access(): void
     {
         // Owner has NO content access; plan uncovered.

@@ -256,6 +256,17 @@ class User extends Authenticatable implements MustVerifyEmail
     public function firstAccessibleRoute(?string $websiteId): string
     {
         if ($websiteId !== null && $websiteId !== '') {
+            // A content-covered site with NO Analytics / Search Console connected
+            // is a Content Autopilot site — land on the content calendar, not the
+            // dashboard (whose empty GA/GSC state reads as the reports onboarding
+            // and traps content-only users who never connected those sources).
+            if ($this->hasFeatureAccess('content', $websiteId)) {
+                $website = Website::query()->select(['id', 'ga_property_id', 'gsc_site_url'])->find($websiteId);
+                if ($website !== null && blank($website->ga_property_id) && blank($website->gsc_site_url)) {
+                    return 'content.index';
+                }
+            }
+
             foreach (TeamPermissions::FEATURES as $key => $meta) {
                 if ($this->hasFeatureAccess($key, $websiteId)) {
                     return $meta['route'];
