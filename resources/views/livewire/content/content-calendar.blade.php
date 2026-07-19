@@ -277,6 +277,24 @@
         {{-- ── Calendar ─────────────────────────────────────────────── --}}
         <x-content.connect-wordpress />
 
+        {{-- Auto-publish off → nudge with a one-click toggle; hides once on. --}}
+        @unless ($autoPublish)
+            <div class="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center dark:border-amber-900/50 dark:bg-amber-950/40">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Auto-publish is off') }}</p>
+                    <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{{ __('Articles wait as drafts for your review. Turn on auto-publish to publish them automatically as they\'re written.') }}</p>
+                </div>
+                <button type="button" wire:click="enableAutoPublish" wire:loading.attr="disabled" wire:target="enableAutoPublish"
+                    class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110 disabled:opacity-70">
+                    <svg wire:loading wire:target="enableAutoPublish" class="-ms-1 me-1 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                    {{ __('Turn on auto-publish') }}
+                </button>
+            </div>
+        @endunless
+
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
                 <button wire:click="previousMonth" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="{{ __('Previous month') }}">&larr;</button>

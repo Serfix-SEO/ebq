@@ -410,6 +410,21 @@ class ContentCalendar extends Component
     }
 
     /**
+     * Turn auto-publish ON from the calendar banner. Once enabled, new articles
+     * publish automatically (to a connected destination); the banner then hides.
+     */
+    public function enableAutoPublish(): void
+    {
+        $plan = $this->plan();
+        if ($plan === null) {
+            return;
+        }
+        $plan->update(['auto_publish' => true]);
+        $this->autoPublish = true;
+        session()->flash('content-status', __('Auto-publish is on. New articles will publish automatically once your site is connected.'));
+    }
+
+    /**
      * Step 4 wire:init — ensure competitor authority data exists. If the site
      * has no usable report snapshot yet, kick off a one-time real generation
      * (spend-metered; sandbox on staging) and let the step poll until ready.
