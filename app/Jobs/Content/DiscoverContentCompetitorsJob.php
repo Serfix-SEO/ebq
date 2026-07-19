@@ -151,7 +151,7 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
                 List 10 LONG-TAIL, buyer-intent Google search queries (each 4–8 words) a
                 real customer would type to find and choose a business like this one.
                 Include location/qualifier modifiers where natural. Do NOT return short
-                generic head terms (e.g. "gold price", "sell gold").
+                1–3 word generic head terms — only specific, intent-rich phrases.
 
                 Return JSON: {"queries": ["...", "..."]}
                 PROMPT],
