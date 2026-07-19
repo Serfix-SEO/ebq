@@ -720,46 +720,8 @@
                             </div>
                         </div>
 
-                        {{-- Opportunities --}}
-                        @if (! empty($kw['opportunities']))
-                            <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
-                                <table class="w-full text-sm">
-                                    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                                        <tr>
-                                            <th class="px-4 py-2.5 text-start font-bold">{{ __('Biggest opportunities') }}</th>
-                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Monthly searches') }}</th>
-                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Competition') }}</th>
-                                            <th class="px-4 py-2.5 text-end font-bold">{{ __('Status') }}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                                        @foreach ($kw['opportunities'] as $opp)
-                                            <tr class="bg-white dark:bg-slate-900" wire:key="kwo-{{ $loop->index }}">
-                                                <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{{ $opp['keyword'] }}</td>
-                                                <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $opp['volume'] !== null ? number_format($opp['volume']) : '—' }}</td>
-                                                <td class="px-4 py-3 text-end">
-                                                    @php $compClass = ['low' => 'bg-success/10 text-success', 'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300', 'high' => 'bg-error/10 text-error', 'unknown' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'][$opp['competition']] ?? 'bg-slate-100 text-slate-500'; @endphp
-                                                    <span class="rounded-full px-2 py-0.5 text-xs font-bold {{ $compClass }}">{{ ['low' => __('Low'), 'medium' => __('Medium'), 'high' => __('High'), 'unknown' => '—'][$opp['competition']] ?? '—' }}</span>
-                                                </td>
-                                                <td class="px-4 py-3 text-end">
-                                                    @if ($opp['planned'])
-                                                        <span class="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-bold text-success">
-                                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                                            {{ __('In your calendar') }}
-                                                        </span>
-                                                    @else
-                                                        <span class="text-xs text-slate-400">{{ __('Tracked') }}</span>
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
-
-                        {{-- Keyword gap + Top searches by demand, side by side (half each) --}}
-                        <div class="mt-4 grid items-start gap-4 lg:grid-cols-2">
+                        {{-- Keyword gap + Top searches by demand, side by side (half each, equal height) --}}
+                        <div class="mt-4 grid gap-4 lg:grid-cols-2">
                             {{-- Keyword gap: what competitors rank for that the client doesn't --}}
                             @if (! empty($kw['gap']))
                                 <div class="overflow-hidden rounded-2xl border border-orange-200 shadow-sm dark:border-orange-900">
