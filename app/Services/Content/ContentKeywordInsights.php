@@ -277,8 +277,9 @@ class ContentKeywordInsights
                 || ($compSite !== null && $compSite->status !== KeywordApiRequest::STATUS_COMPLETED);
         }
 
-        // Keyword gap: what competitors rank for that the client does NOT.
-        $gap = $this->computeGap($clientRows, $competitorRows);
+        // Keyword gap: what competitors rank for that the client does NOT,
+        // ranked by relevance to what the client sells.
+        $gap = $this->computeGap($clientRows, $competitorRows, $plan);
 
         $insights = $this->build($rows, $plan, partial: $partial, gap: $gap);
         Cache::put($this->insightsKey($plan), $insights,
@@ -345,27 +346,78 @@ class ContentKeywordInsights
     }
 
     /**
-     * Keyword gap: competitor keywords (with volume) the client isn't targeting.
+     * Keyword gap: competitor keywords (with volume) the client isn't targeting,
+     * ranked by RELEVANCE to what the client actually sells (offering overlap)
+     * first, then volume — so a gold buyer sees "sell gold coins", not a
+     * competitor's unrelated high-volume blog term.
      *
      * @return list<array{keyword:string, volume:?int, competition:string}>
      */
-    private function computeGap(array $clientRows, array $competitorRows): array
+    private function computeGap(array $clientRows, array $competitorRows, ContentPlan $plan): array
     {
         if ($competitorRows === []) {
             return [];
         }
         $client = array_flip(array_column($clientRows, 'keyword'));
-        $gap = array_values(array_filter(
-            $competitorRows,
-            static fn ($r) => ! isset($client[$r['keyword']]) && (int) ($r['volume'] ?? 0) > 0
-        ));
-        usort($gap, static fn ($a, $b) => (int) ($b['volume'] ?? 0) <=> (int) ($a['volume'] ?? 0));
+        $offering = $this->offeringTokens($plan);
+
+        $gap = [];
+        foreach ($competitorRows as $r) {
+            if (isset($client[$r['keyword']]) || (int) ($r['volume'] ?? 0) <= 0) {
+                continue;
+            }
+            $r['_rel'] = $this->relevanceScore((string) $r['keyword'], $offering);
+            $gap[] = $r;
+        }
+        if ($gap === []) {
+            return [];
+        }
+
+        // Prefer on-topic keywords; only fall back to raw volume if too few match.
+        $relevant = array_values(array_filter($gap, static fn ($r) => $r['_rel'] > 0));
+        $pool = count($relevant) >= 3 ? $relevant : $gap;
+
+        usort($pool, static fn ($a, $b) => ($b['_rel'] <=> $a['_rel'])
+            ?: ((int) ($b['volume'] ?? 0) <=> (int) ($a['volume'] ?? 0)));
 
         return array_map(static fn ($r) => [
             'keyword' => $r['keyword'],
             'volume' => $r['volume'],
             'competition' => $r['competition'],
-        ], array_slice($gap, 0, 8));
+        ], array_slice($pool, 0, 8));
+    }
+
+    /** Significant tokens from what the client sells + their business description. */
+    private function offeringTokens(ContentPlan $plan): array
+    {
+        $stop = ['the', 'and', 'for', 'with', 'you', 'your', 'our', 'that', 'this', 'are',
+            'from', 'they', 'all', 'can', 'get', 'buy', 'sell', 'best', 'top', 'new', 'more'];
+        $text = mb_strtolower(implode(' ',
+            array_merge((array) (($plan->offerings ?? [])['sell'] ?? []), [(string) $plan->business_description])
+        ));
+        $tokens = preg_split('/[^a-z0-9]+/', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return array_values(array_unique(array_filter(
+            $tokens,
+            static fn ($t) => mb_strlen($t) >= 3 && ! in_array($t, $stop, true)
+        )));
+    }
+
+    /** How many offering tokens the keyword contains (word-boundary matches). */
+    private function relevanceScore(string $keyword, array $offeringTokens): int
+    {
+        if ($offeringTokens === []) {
+            return 0;
+        }
+        $words = array_flip(preg_split('/[^a-z0-9]+/', mb_strtolower($keyword), -1, PREG_SPLIT_NO_EMPTY) ?: []);
+        $score = 0;
+        foreach ($offeringTokens as $t) {
+            if (isset($words[$t])) {
+                $score++;
+            }
+        }
+
+        return $score;
     }
 
     /** A request that has completed or aged past the grace window (null = overdue now). */
