@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\ContentPlan;
+use App\Models\ContentTopic;
 use App\Services\Content\ContentEntitlements;
 use Closure;
 use Illuminate\Http\Request;
@@ -11,11 +11,14 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Gates the Content Autopilot product surfaces (calendar / settings /
  * integrations / review) behind an actual content entitlement for the CURRENT
- * website. Users without access are sent to Get started (to trial or buy).
+ * website — PER SITE. A user with other covered (trial/paid) sites is never
+ * blocked on those; only the specific uncovered site is gated. Uncovered sites
+ * are sent to Get started to pay (single site, or the per-extra-site addon).
  *
- * Exception: a website that already has a content plan WITH topics stays
- * reachable even when access lapsed, so the client can still PUBLISH articles
- * already generated during their trial/subscription (publishing is never gated).
+ * Exception: a site that already has GENERATED ARTICLES stays reachable even
+ * when access lapsed, so the client can still PUBLISH what a past
+ * trial/subscription produced (publishing is never gated). A brand-new, never-
+ * paid site only has ideation TOPICS (no articles) → it is still blocked.
  */
 class EnsureContentAccess
 {
@@ -40,12 +43,13 @@ class EnsureContentAccess
             return $next($request);
         }
 
-        // Lapsed but has generated content on this site → allow (publish-only).
-        $hasExistingContent = ContentPlan::query()
+        // Lapsed but has GENERATED ARTICLES on this site → allow (publish-only).
+        // A never-paid site only has ideation topics (no articles) → stays gated.
+        $hasPublishableContent = ContentTopic::query()
             ->where('website_id', $website->id)
-            ->whereHas('topics')
+            ->whereHas('articles')
             ->exists();
-        if ($hasExistingContent) {
+        if ($hasPublishableContent) {
             return $next($request);
         }
 
