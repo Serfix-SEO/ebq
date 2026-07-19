@@ -54,6 +54,13 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\Llm\LlmClient::class,
             fn () => \App\Services\Llm\LlmClientFactory::make(),
         );
+
+        // The subscriptions / subscription_items tables use ULID primary keys, so
+        // Cashier must use our ULID-generating models — the stock ones insert no
+        // id and every subscription create fails ("Field 'id' doesn't have a
+        // default value"). Surfaced by the first real Stripe checkout.
+        Cashier::useSubscriptionModel(\App\Models\Subscription::class);
+        Cashier::useSubscriptionItemModel(\App\Models\SubscriptionItem::class);
     }
 
     /**
