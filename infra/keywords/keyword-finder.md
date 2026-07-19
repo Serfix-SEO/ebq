@@ -181,13 +181,21 @@ the webhook completes it. UI shows an indigo "Instant result" badge when `$fromC
   must update `.env` on **both** boxes (+ `docker restart ebq-horizon-1`). Recovery: re-POST
   the same `request_id` + stored `payload` to the server with the fixed `webhook_url` — the
   webhook is idempotent per `request_id`, so the original rows complete in place.
-- **The node fleet IGNORES the per-request `webhook_url`** — `dispatchWebhook` only reads
-  `config.webhookUrl` from the node's own `.env` (`src/webhook.js`); the `webhook_url` field
-  our pool sends is dead weight. Node 1's `.env` was fixed to serfix.io on 2026-07-07. The
-  old-domain vhosts also carry a method-preserving **308** redirect for `/webhooks/*` (before
-  the 301 catch-all, both `/etc/apache2/sites-enabled/ebq.io.conf` and `ebq.io-le-ssl.conf`)
-  as defense-in-depth — node webhook `fetch` follows a 301 as GET (payload lost, Laravel 405);
-  308 preserves POST+body. Keep those rules.
+- **The node fleet honors the per-request `webhook_url` since 2026-07-19 — but only
+  allowlisted origins.** `src/webhook.js` `resolveWebhookUrl()` uses the job's `webhook_url`
+  when it starts with `https://serfix.io/` or `https://staging.serfix.io/`, else falls back to
+  the node `.env` `WEBHOOK_URL` (prod). Added because staging dispatches (staging has its own
+  DB) got their results POSTed to prod, where the unknown `request_id` was dropped and the
+  staging row sat `running` until the reaper failed it. A new environment must be added to
+  `ALLOWED_WEBHOOK_PREFIXES` on every node or its results silently go to prod. Pre-patch
+  originals: `src/{webhook,server}.js.bak-2026-07-19` on the node. (Historic: before
+  2026-07-19 the field was ignored entirely; Node 1's `.env` was fixed to serfix.io on
+  2026-07-07.) The old-domain vhosts also carry a method-preserving **308** redirect for
+  `/webhooks/*` (before the 301 catch-all, both `/etc/apache2/sites-enabled/ebq.io.conf` and
+  `ebq.io-le-ssl.conf`) as defense-in-depth — node webhook `fetch` follows a 301 as GET
+  (payload lost, Laravel 405); 308 preserves POST+body. Keep those rules.
+- **`/status` blocks while a job is running** (single browser, `checkLoggedIn()` waits its
+  turn) — a `/status` timeout alone doesn't mean the node is wedged; check `/queue` first.
 
 ## Node internals (Node 1, learned 2026-07-07 via SSH)
 
@@ -221,9 +229,11 @@ private `10.0.0.3`) — not a separate machine. Root SSH is password-auth (no sh
   the quota/detection-budget answer). CSV downloads are concurrency-safe (unique `hrtime`
   suffix). Rollback of the whole rewrite: `src.bak-2026-07-07/` on the node. App log:
   `/var/log/keywordfetcher.log` (systemd `StandardOutput=append:`).
-- Webhook delivery: 3 attempts (0s/+1s/+3s backoff), 10s timeout each, HMAC-SHA256 of raw
-  body, then **gives up permanently** (`src/webhook.js`) — a down receiver still loses
-  results; the app-side reaper (`ebq:reap-stuck-keyword-requests`) is the backstop.
+- Webhook delivery: target = allowlisted per-job `webhook_url` else `.env` `WEBHOOK_URL`;
+  3 attempts (0s/+1s/+3s backoff), 10s timeout each, HMAC-SHA256 of raw body (same
+  `WEBHOOK_SECRET` regardless of target — every env's server row must hold that secret),
+  then **gives up permanently** (`src/webhook.js`) — a down receiver still loses results;
+  each env's app-side reaper (`ebq:reap-stuck-keyword-requests`) is the backstop.
 - **Crash incident (2026-07-07, first hour of concurrency 2):** a tab died mid-job (renderer
   crash, no OOM logged) while `page.waitForEvent('download')` was pending but not yet awaited
   → unhandled rejection → **Node 22 killed the whole process** → every in-flight job lost, no

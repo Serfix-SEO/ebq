@@ -81,8 +81,18 @@ class ContentSetupInsights
     /** True when the wizard should show a "generating" state + poll. */
     public function isGenerating(Website $website): bool
     {
-        return Cache::has('content:comp-gen:'.$website->id)
-            && $this->competitorAuthority($website) === null;
+        if ($this->competitorAuthority($website) !== null) {
+            return false;
+        }
+        if (! Cache::has('content:comp-gen:'.$website->id)) {
+            return false;
+        }
+        // The lock lives 30 min, but generation is really over once the report
+        // has FINALIZED (partial/ready/no_data). Without this, a low-authority
+        // site whose snapshot has no competitors would spin the whole 30 min.
+        $snap = WebsiteReportSnapshot::forDomain($website->normalized_domain ?: $website->domain);
+
+        return $snap === null || $snap->status === 'enriching';
     }
 
     /**
