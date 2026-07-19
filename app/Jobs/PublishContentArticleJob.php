@@ -98,10 +98,24 @@ class PublishContentArticleJob implements ShouldQueue
                 continue; // platform not yet supported (plugin/shopify)
             }
 
+            // Carry the external post id forward across article VERSIONS: when
+            // a topic is regenerated it produces a new article row, and without
+            // this the new publication would have no external_id and publish a
+            // DUPLICATE post (…-2 slug) instead of updating the original. Seed
+            // the new row's external_id from the topic's most recent delivered
+            // publication so it routes through update() (which also re-sideloads
+            // images onto the existing post).
+            $priorExternalId = ContentPublication::query()
+                ->whereIn('article_id', $topic->articles()->select('id'))
+                ->where('integration_id', $integration->id)
+                ->whereNotNull('external_id')
+                ->orderByDesc('id')
+                ->value('external_id');
+
             // Idempotency anchor: claim/reuse the unique row BEFORE any HTTP.
             $publication = ContentPublication::query()->firstOrCreate(
                 ['article_id' => $article->id, 'integration_id' => $integration->id],
-                ['status' => ContentPublication::STATUS_QUEUED],
+                ['status' => ContentPublication::STATUS_QUEUED, 'external_id' => $priorExternalId],
             );
             if ($publication->status === ContentPublication::STATUS_CONFIRMED) {
                 $confirmed++;

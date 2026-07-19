@@ -219,6 +219,45 @@ class ContentPublishingTest extends TestCase
         $this->assertSame(ContentTopic::STATUS_PUBLISHED, $topic->fresh()->status);
     }
 
+    public function test_regenerated_article_updates_the_same_post_not_a_duplicate(): void
+    {
+        Http::fake([
+            'client-blog.com/wp-json/wp/v2/posts/500' => Http::response(['id' => 500, 'link' => 'https://client-blog.com/p/', 'status' => 'publish'], 200),
+        ]);
+
+        [, $website, , $topic, $oldArticle] = $this->scheduledArticle();
+        $integration = $this->wordpressIntegration($website);
+
+        // The topic was already published once (old article version → post 500).
+        ContentPublication::query()->create([
+            'article_id' => $oldArticle->id,
+            'integration_id' => $integration->id,
+            'status' => ContentPublication::STATUS_CONFIRMED,
+            'external_id' => '500',
+            'external_url' => 'https://client-blog.com/p/',
+            'attempts' => 1,
+        ]);
+
+        // Regenerate: a NEW current article version supersedes the old one.
+        $newArticle = ContentArticle::storeVersion($topic, [
+            'h1' => 'A Publishable Article (v2)',
+            'meta_title' => 'A Publishable Article', 'meta_description' => 'Updated.',
+            'slug' => 'a-publishable-article', 'html' => '<h2>New body</h2><p>Text.</p>',
+            'word_count' => 520, 'seo_score' => 92, 'seo_issues' => [],
+        ]);
+        $topic->update(['status' => ContentTopic::STATUS_SCHEDULED, 'scheduled_for' => now()->subDay()]);
+
+        (new PublishContentArticleJob($topic->id))->handle(
+            app(\App\Services\Content\Publishing\PublishDriverFactory::class),
+            app(\App\Support\Audit\SafeHttpGuard::class),
+        );
+
+        // Routed to UPDATE of post 500 (no second create), using the new article.
+        Http::assertSent(fn ($req) => str_contains($req->url(), '/wp/v2/posts/500'));
+        Http::assertNotSent(fn ($req) => str_ends_with($req->url(), '/wp/v2/posts'));
+        $this->assertSame('500', ContentPublication::query()->where('article_id', $newArticle->id)->value('external_id'));
+    }
+
     public function test_hard_failure_on_every_platform_fails_the_topic(): void
     {
         Http::fake([

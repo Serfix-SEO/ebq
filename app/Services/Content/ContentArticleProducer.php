@@ -112,7 +112,15 @@ class ContentArticleProducer
         $h1 = (string) ($draft['h1'] ?? '') !== '' ? (string) $draft['h1'] : $topic->title;
         $metaTitle = mb_substr($h1, 0, 60);
         $metaDescription = mb_substr(trim((string) ($draft['summary'] ?? '')), 0, 158);
-        $slug = Str::slug(mb_substr($topic->target_keyword.' '.Str::limit($h1, 40, ''), 0, 90));
+        // Slug from the H1 when it already contains the keyphrase (it almost
+        // always does) — prepending target_keyword otherwise doubled it
+        // ("pubg-blank-name-pubg-blank-name-…"). Fall back to keyword+H1 only
+        // when the H1 somehow omits the keyphrase, so the slug still carries it.
+        $kwLower = mb_strtolower(trim((string) $topic->target_keyword));
+        $slugBase = ($kwLower !== '' && str_contains(mb_strtolower($h1), $kwLower))
+            ? $h1
+            : trim($topic->target_keyword.' '.$h1);
+        $slug = Str::slug(mb_substr($slugBase, 0, 80));
 
         $article = $this->storeScoredVersion($topic, $context, [
             'h1' => $h1,
