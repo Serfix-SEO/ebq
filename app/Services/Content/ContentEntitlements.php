@@ -179,11 +179,23 @@ class ContentEntitlements
             ->distinct()
             ->count('content_topics.id');
 
+        // Reserved = actively generating (IN_FLIGHT) OR just kicked off but the
+        // job hasn't flipped it to RESEARCHING yet. writeNow() sets an APPROVED
+        // topic's stage_started_at=now() right before dispatch, so counting
+        // recently-started APPROVED topics closes the rapid-click race where a
+        // user fires several "Write now" before any becomes IN_FLIGHT and blows
+        // past the trial/monthly cap.
         $reserved = ContentTopic::query()
             ->where('website_id', $websiteId)
-            ->whereIn('status', ContentTopic::IN_FLIGHT)
-            ->when($excludeTopicId, fn ($q) => $q->where('id', '!=', $excludeTopicId))
             ->whereDoesntHave('articles')
+            ->when($excludeTopicId, fn ($q) => $q->where('id', '!=', $excludeTopicId))
+            ->where(function ($q) {
+                $q->whereIn('status', ContentTopic::IN_FLIGHT)
+                    ->orWhere(fn ($q2) => $q2
+                        ->where('status', ContentTopic::STATUS_APPROVED)
+                        ->whereNotNull('stage_started_at')
+                        ->where('stage_started_at', '>=', now()->subMinutes(60)));
+            })
             ->count();
 
         return $done + $reserved;

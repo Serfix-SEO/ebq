@@ -86,6 +86,41 @@ class ContentEntitlementsTest extends TestCase
         $this->assertSame(1, $this->ent()->usageForWebsite($site->id, now()->startOfMonth()));
     }
 
+    public function test_recently_started_approved_counts_as_reserved(): void
+    {
+        // Rapid "Write now" clicks must not blow past the trial cap: an APPROVED
+        // topic just kicked off (stage_started_at=now, no article yet) is reserved.
+        $user = User::factory()->create();
+        $site = $this->siteFor($user);
+        $plan = ContentPlan::factory()->create(['website_id' => $site->id]);
+        $this->ent()->startTrial($user, $site);
+
+        // Two completed generations.
+        for ($i = 0; $i < 2; $i++) {
+            $t = ContentTopic::factory()->for($plan, 'plan')->create(['website_id' => $site->id]);
+            $this->generate($t);
+        }
+        // A third, just kicked off (writeNow set APPROVED + stage_started_at=now).
+        ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $site->id,
+            'status' => ContentTopic::STATUS_APPROVED,
+            'stage_started_at' => now(),
+        ]);
+        // A stale APPROVED (never generated) must NOT be reserved.
+        ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $site->id,
+            'status' => ContentTopic::STATUS_APPROVED,
+            'stage_started_at' => now()->subHours(3),
+        ]);
+
+        // 2 done + 1 reserved = 3 → the next "Write now" is blocked.
+        $fourth = ContentTopic::factory()->for($plan, 'plan')->create([
+            'website_id' => $site->id, 'status' => ContentTopic::STATUS_APPROVED,
+        ]);
+        $this->assertSame('trial_limit', $this->ent()->blockReason($fourth));
+        $this->assertSame(3, $this->ent()->usageForWebsite($site->id, $user->fresh()->content_trial_started_at, $fourth->id));
+    }
+
     public function test_block_reason_matrix(): void
     {
         $user = User::factory()->create();

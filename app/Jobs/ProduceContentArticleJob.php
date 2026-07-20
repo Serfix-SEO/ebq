@@ -67,6 +67,9 @@ class ProduceContentArticleJob implements ShouldQueue, ShouldBeUnique
             Log::info('content_autopilot.generation_blocked', [
                 'topic_id' => $topic->id, 'website_id' => $topic->website_id, 'reason' => $reason,
             ]);
+            // Clear the "generation started" marker so the review/calendar overlay
+            // doesn't sit on "Researching your topic…" for a run that never happens.
+            \Illuminate\Support\Facades\Cache::forget('content:gen-start:'.$topic->id);
 
             return;
         }
