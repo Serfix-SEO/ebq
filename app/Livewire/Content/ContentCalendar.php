@@ -716,8 +716,8 @@ class ContentCalendar extends Component
     public static function generationBlockMessage(string $reason): string
     {
         return match ($reason) {
-            'trial_limit' => __('You have used all your free trial articles. Subscribe to keep generating.'),
-            'monthly_limit' => __('You have reached this website\'s monthly article limit. It resets next month.'),
+            'trial_limit' => __('Your free trial includes :n article generations, and you\'ve used them all. Choose a plan to keep generating.', ['n' => \App\Support\ContentAutopilotConfig::trialArticles()]),
+            'monthly_limit' => __('You\'ve reached your plan\'s limit of :n articles this month for this website. It resets next month, or upgrade for more.', ['n' => \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite()]),
             'not_covered' => __('This website is not on your content plan yet. Add it from Get started.'),
             default => __('Content Autopilot is not active for this website. Start it from Get started.'),
         };
