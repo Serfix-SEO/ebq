@@ -88,11 +88,17 @@ class ContentKeywordInsights
      */
     public function ensureStarted(ContentPlan $plan): void
     {
-        // Step-6 research is now ENTIRELY DataForSEO. The self-hosted keyword
-        // server is no longer used by content (it still serves the other product):
-        // harvest the client's own domain + top-3 competitors, then classify the
-        // harvested keywords (own vs relevant gap). The whole step-6 digest — pillars,
-        // top searches, questions, intents — is built from that classified set.
+        // Three research angles, merged in get(): (1) offering seeds, (2) the
+        // CLIENT's own domain (what they actually rank for — site-scope), and
+        // (3) the top competitor's domain. (2) and (3) are crawl-derived so they
+        // pass through an LLM scrap filter (drop login / create-account / cart…).
+        $this->ensureOwnRequest($plan);
+        $this->ensureSiteRequest($plan, $this->ownDomainKey($plan), fn () => $plan->website?->normalized_domain ?: $plan->website?->domain);
+
+        // Competitor keyword gap now comes from DataForSEO Labs (fast, 3 rivals) —
+        // NOT the concurrency-1 keyword server. Dispatch the shared per-domain
+        // harvest for the client + top-3 competitors; then classify the harvested
+        // keywords once (own vs relevant gap) for the gap card + planner to reuse.
         // See DATAFORSEO_KEYWORD_GAP_PLAN.md.
         $this->ensureHarvest($plan);
         $this->ensureClassify($plan);
@@ -311,42 +317,41 @@ class ContentKeywordInsights
             return [];
         }
         $website = $plan->website;
-        if ($website === null) {
-            return [];
-        }
-        $country = $this->planCountry($plan);
-        $ownDomain = strtolower(preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
+        $ownDomain = $website ? ($website->normalized_domain ?: $website->domain) : null;
 
-        $harvested = fn (string $d) => $d !== '' && DomainKeywordRanking::query()
-            ->where('domain', $d)->where('country', $country)->exists();
+        // "Done" here means genuinely COMPLETED — never merely "settled". A
+        // request that hasn't been dispatched yet (null) must read as still
+        // analyzing, not flash a misleading instant "Done".
+        $completed = fn (?KeywordApiRequest $r) => $r !== null && $r->status === KeywordApiRequest::STATUS_COMPLETED;
+
+        $seed = $this->request($plan);
+        $ownSite = $this->siteRequest($this->ownDomainKey($plan));
 
         $status = [];
-        // Client's own domain — done once its keywords are harvested from DataForSEO.
+        // The client's own research (seeds + own-domain crawl) as one line.
         $status[] = [
-            'label' => $ownDomain !== '' ? __('Your site — :d', ['d' => $ownDomain]) : __('Your site'),
-            'done' => $harvested($ownDomain),
+            'label' => $ownDomain ? __('Your site — :d', ['d' => $ownDomain]) : __('Your site'),
+            'done' => $completed($seed) && ($ownSite !== null && $completed($ownSite)),
         ];
 
         // One line per competitor (up to MAX_COMPETITORS). While discovery is
-        // still running we don't know the domains yet, so show placeholder lines.
+        // still running we don't know the domains yet, so show generic
+        // placeholder lines so the user can see all rivals are being analyzed.
         $competitorDomains = $this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS);
-        $discoveryPending = $competitorDomains === [] && app(ContentSetupInsights::class)->isGenerating($website);
+        $discoveryPending = $website !== null
+            && $competitorDomains === []
+            && app(ContentSetupInsights::class)->isGenerating($website);
         $lines = $discoveryPending ? self::MAX_COMPETITORS : count($competitorDomains);
         for ($i = 0; $i < $lines; $i++) {
             $domain = $competitorDomains[$i] ?? null;
+            $req = $domain !== null ? $this->siteRequest($this->competitorRequestKey($plan, $i)) : null;
             $status[] = [
                 'label' => $domain
                     ? __('Competitor :n — :d', ['n' => $i + 1, 'd' => $domain])
                     : __('Competitor :n', ['n' => $i + 1]),
-                'done' => $domain !== null && $harvested($domain),
+                'done' => $completed($req),
             ];
         }
-
-        // Final relevance pass over everything we found.
-        $status[] = [
-            'label' => __('Prioritizing your keywords'),
-            'done' => $plan->keywords_classified_at !== null,
-        ];
 
         return $status;
     }
@@ -362,86 +367,53 @@ class ContentKeywordInsights
             return $this->withCompetitorData($cached, $plan);
         }
 
-        // The ENTIRE digest is now built from the plan's DataForSEO-classified
-        // keywords (own + relevant gap). Hold a loader until competitors are
-        // discovered, every domain is harvested, and classification is done — so
-        // the client only ever sees the FINAL, complete, on-topic set.
-        $website = $plan->website;
-        if ($website === null) {
-            return null;
-        }
-        $country = $this->planCountry($plan);
-        $competitors = $this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS);
-        if ($competitors === []) {
-            return null; // discovery still running
-        }
-        foreach ($competitors as $d) {
-            if (! DomainKeywordRanking::query()->where('domain', $d)->where('country', $country)->exists()) {
-                return null; // harvest not landed yet
-            }
-        }
-        if ($plan->keywords_classified_at === null) {
-            return null; // classification in progress
+        $seed = $this->request($plan);                        // offering seeds
+        $ownSite = $this->siteRequest($this->ownDomainKey($plan)); // client domain
+
+        $completed = fn (?KeywordApiRequest $r) => $r !== null && $r->status === KeywordApiRequest::STATUS_COMPLETED;
+
+        // The digest (clusters / top searches / questions / intents) is built from
+        // the CLIENT's own research (offering seeds + own-domain crawl) via the
+        // self-hosted keyword server. The competitor GAP is now a DataForSEO Labs
+        // overlay ({@see withCompetitorData}) that fills in asynchronously — so we
+        // no longer gate the digest on any competitor keyword-server request.
+        $clientComplete = $completed($seed) && ($ownSite === null || $completed($ownSite));
+        $allSettled = $this->settled($seed) && $this->settled($ownSite);
+
+        if (! $clientComplete && ! $allSettled) {
+            return null; // keep the loader up — show complete client results only
         }
 
-        $rows = $this->classifiedRows($plan, $country);
+        // CLIENT keywords = offering seeds + their own crawled domain (scrap-
+        // filtered — the site-scope set includes login / cart / account junk).
+        $rows = $this->mergeRows(
+            $this->completedRows($seed),
+            $this->filterScrap($this->completedRows($ownSite), $plan),
+        );
+
         if ($rows === []) {
-            // Classified but nothing usable (very rare) → topic fallback.
+            // Server returned nothing → topic fallback.
             $rows = $this->fallbackRows($plan);
             if ($rows === []) {
                 return null;
             }
+            $partial = true;
+        } else {
+            $partial = ! $clientComplete;
         }
 
         // "People also ask" / "People also search for" straight from Google's
         // SERP for the client's top query (one cached Serper call).
         $peopleAlso = $this->peopleAlsoSearch($plan, $rows);
 
-        $insights = $this->build($rows, $plan, partial: false, peopleAlso: $peopleAlso);
-        Cache::put($this->insightsKey($plan), $insights, now()->addDays(self::CACHE_TTL_DAYS));
+        $insights = $this->build($rows, $plan, partial: $partial, peopleAlso: $peopleAlso);
+        // Partial results are cached briefly so the next poll upgrades them; the
+        // final digest is cached 30 days. The gap overlay refreshes on every read.
+        Cache::put($this->insightsKey($plan), $insights,
+            $partial ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
 
         return $this->withCompetitorData($insights, $plan);
-    }
-
-    /**
-     * The plan's classified keywords (own + relevant gap) joined with the shared
-     * keyword_metrics facts, normalized to the digest row shape. Highest-volume
-     * first, capped — this is the full DataForSEO-sourced keyword set the step-6
-     * digest (pillars / top searches / questions / intents) is built from.
-     *
-     * @return list<array{keyword:string, volume:?int, competition:string, intent:string, is_question:bool}>
-     */
-    private function classifiedRows(ContentPlan $plan, string $country): array
-    {
-        $records = ContentPlanKeyword::query()
-            ->from('content_plan_keywords as cpk')
-            ->join('keyword_metrics as km', function ($j) use ($country) {
-                $j->on('km.keyword_hash', '=', 'cpk.keyword_hash')
-                    ->where('km.country', $country)->where('km.data_source', 'dfs_labs');
-            })
-            ->where('cpk.plan_id', $plan->id)
-            ->orderByDesc('km.search_volume')
-            ->limit(1000)
-            ->get(['cpk.keyword', 'km.search_volume', 'km.competition']);
-
-        $rows = [];
-        foreach ($records as $r) {
-            $kw = mb_strtolower(trim((string) $r->keyword));
-            if ($kw === '') {
-                continue;
-            }
-            $c = $r->competition;
-            $rows[] = [
-                'keyword' => $kw,
-                'volume' => $r->search_volume !== null ? (int) $r->search_volume : null,
-                'competition' => is_numeric($c) ? ($c < 0.34 ? 'low' : ($c < 0.67 ? 'medium' : 'high')) : 'unknown',
-                'intent' => KeywordIntentClassifier::classify($kw),
-                'is_question' => KeywordIntentClassifier::isQuestion($kw),
-            ];
-        }
-
-        return $rows;
     }
 
     /**
