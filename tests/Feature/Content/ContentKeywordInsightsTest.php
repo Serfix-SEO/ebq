@@ -101,6 +101,47 @@ class ContentKeywordInsightsTest extends TestCase
             ->assertSee('how to change pubg name');
     }
 
+    public function test_digest_overlays_competitor_traffic_estimate(): void
+    {
+        [, $website, $plan] = $this->userWithPlan();
+
+        // competitorAuthority() is read from its cache — inject one competitor.
+        \Illuminate\Support\Facades\Cache::put('content:setup-insights:v1:'.$website->id, [
+            'my_referring_domains' => 0, 'my_authority' => null,
+            'competitors' => [[
+                'domain' => 'rival.com', 'referring_domains' => null, 'backlinks' => null,
+                'authority' => null, 'da' => null, 'pa' => null,
+            ]],
+            'median' => null, 'gap' => null, 'behind' => false,
+        ], now()->addDay());
+
+        // Batched DFS enrichment already stored the rival's organic ETV.
+        \App\Models\DomainMetric::query()->create([
+            'domain' => 'rival.com',
+            'dfs_metrics' => ['metrics' => ['organic' => ['etv' => 4200.0, 'count' => 310]]],
+            'dfs_metrics_refreshed_at' => now(),
+        ]);
+
+        // Seed + one completed competitor keyword request so the digest builds.
+        $this->storeCompletedRequest($plan, [
+            ['keyword' => 'name generator', 'avgMonthlySearches' => 1000, 'competitionIndex' => 10],
+        ]);
+        $compReq = KeywordApiRequest::query()->create([
+            'request_id' => (string) \Illuminate\Support\Str::uuid(),
+            'type' => KeywordApiRequest::TYPE_IDEAS, 'mode' => 'keywords',
+            'payload' => [], 'status' => KeywordApiRequest::STATUS_COMPLETED,
+            'result' => ['results' => [['keyword' => 'best name maker', 'avgMonthlySearches' => 500, 'competitionIndex' => 20]]],
+            'website_id' => $plan->website_id,
+        ]);
+        \Illuminate\Support\Facades\Cache::put('content:kw-insights:comp-req:'.$plan->id.':0', $compReq->id, now()->addHours(2));
+
+        $insights = app(ContentKeywordInsights::class)->get($plan);
+
+        $this->assertNotNull($insights);
+        $this->assertSame(4200, $insights['traffic']['estimated']);
+        $this->assertSame(1, $insights['traffic']['competitors']);
+    }
+
     public function test_insights_classify_intent_questions_and_opportunities(): void
     {
         [, , $plan] = $this->userWithPlan();

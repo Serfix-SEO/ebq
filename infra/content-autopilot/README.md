@@ -226,7 +226,14 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
      free), async (`content` queue), spend-metered (`DataForSeoSpendMeter`),
      admin-sandboxed (mock data never persisted). Dispatch sits inside
      `build()` (30-day cache miss) so it fires at most once per freshness
-     window — no per-poll re-billing.
+     window — no per-poll re-billing. Surfaced as the step-6 **"Est. monthly
+     traffic"** stat card (`ContentKeywordInsights::estimatedMonthlyTraffic()`
+     → `$kw['traffic']['estimated']`): the SUM of competitors' organic ETV
+     from `domain_metrics.dfs_metrics` (`metrics.organic.etv`). Overlaid
+     FRESH on every `get()` (even on a cached digest) since the async DFS
+     enrichment can land after the digest is first cached; card hides when 0
+     (not landed / no DFS data) and is gated behind `$showVolumes` so public
+     onboarding keeps it behind the teaser.
 5. **Keyword research** (2026-07-18) — `ContentKeywordInsights`: the client-
    facing digest of the research behind their plan. Background flow:
    `PrepareContentKeywordInsightsJob` fires at the end of step 2 (alongside

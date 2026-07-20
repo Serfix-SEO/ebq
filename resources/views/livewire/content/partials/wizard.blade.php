@@ -608,13 +608,29 @@
                             </div>
                         </div>
 
-                        {{-- Headline stats (volume card hidden until real volume data exists) --}}
-                        @php $kwHasVolume = ($kw['stats']['volume'] ?? 0) > 0 && $showVolumes; @endphp
-                        <div class="mt-4 grid grid-cols-2 gap-3 {{ $kwHasVolume ? 'sm:grid-cols-4' : 'sm:grid-cols-3' }}">
+                        {{-- Headline stats (volume + traffic cards hidden until that data exists) --}}
+                        @php
+                            $kwHasVolume = ($kw['stats']['volume'] ?? 0) > 0 && $showVolumes;
+                            // Estimated monthly traffic = combined organic traffic of the
+                            // competitors we analyzed (DataForSEO). Gated with volumes so
+                            // public onboarding keeps it behind the teaser.
+                            $kwHasTraffic = ($kw['traffic']['estimated'] ?? 0) > 0 && $showVolumes;
+                            $kwStatCount = 3 + ($kwHasVolume ? 1 : 0) + ($kwHasTraffic ? 1 : 0);
+                            // Only grid-cols-3/4 are in the prebuilt Tailwind bundle; a 5-card
+                            // row uses cols-3 (3 + 2 wrap) rather than an uncompiled cols-5.
+                            $kwStatGrid = $kwStatCount >= 5 ? 'sm:grid-cols-3' : ($kwStatCount === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-3');
+                        @endphp
+                        <div class="mt-4 grid grid-cols-2 gap-3 {{ $kwStatGrid }}">
                             <div class="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-center dark:border-orange-900 dark:bg-orange-950">
                                 <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['keywords']) }}</div>
                                 <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Keywords analyzed') }}</div>
                             </div>
+                            @if ($kwHasTraffic)
+                                <div class="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-center dark:border-orange-900 dark:bg-orange-950" title="{{ __('Combined organic monthly traffic of the competitors we analyzed.') }}">
+                                    <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['traffic']['estimated']) }}</div>
+                                    <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Est. monthly traffic') }}</div>
+                                </div>
+                            @endif
                             @if ($kwHasVolume)
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-800/40">
                                     <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['volume']) }}</div>

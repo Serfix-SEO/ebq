@@ -3,6 +3,7 @@
 namespace App\Services\Content;
 
 use App\Models\ContentPlan;
+use App\Models\DomainMetric;
 use App\Models\KeywordApiRequest;
 use App\Models\KeywordMetric;
 use App\Models\SearchConsoleData;
@@ -278,7 +279,11 @@ class ContentKeywordInsights
     {
         $cached = Cache::get($this->insightsKey($plan));
         if ($cached !== null) {
-            return $cached;
+            // Overlay the competitor traffic estimate fresh — the batched
+            // DataForSEO enrichment is async and may land AFTER this digest was
+            // first cached, so we don't want a stale (missing) traffic figure
+            // baked in for the whole 30-day TTL.
+            return $this->withEstimatedTraffic($cached, $plan);
         }
 
         $seed = $this->request($plan);                        // offering seeds
@@ -371,7 +376,74 @@ class ContentKeywordInsights
             $partial ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
 
+        return $this->withEstimatedTraffic($insights, $plan);
+    }
+
+    /**
+     * Overlay the "total estimated monthly traffic" figure onto the digest:
+     * the combined organic monthly traffic (DataForSEO Labs ETV) of this plan's
+     * competitors, read from the shared domain_metrics asset that
+     * {@see EnrichCompetitorDomainMetricsJob} batch-populates. Shows the size of
+     * the organic opportunity in this market. Zero/absent (enrichment not landed
+     * yet, or DataForSEO had no data) → the card just hides.
+     */
+    private function withEstimatedTraffic(array $insights, ContentPlan $plan): array
+    {
+        $insights['traffic'] = $this->estimatedMonthlyTraffic($plan);
+
         return $insights;
+    }
+
+    /**
+     * @return array{estimated:int, competitors:int}
+     */
+    private function estimatedMonthlyTraffic(ContentPlan $plan): array
+    {
+        $empty = ['estimated' => 0, 'competitors' => 0];
+        $website = $plan->website;
+        if ($website === null) {
+            return $empty;
+        }
+
+        try {
+            $insights = app(ContentSetupInsights::class)->competitorAuthority($website);
+        } catch (\Throwable) {
+            return $empty;
+        }
+        $domains = [];
+        foreach ((array) ($insights['competitors'] ?? []) as $c) {
+            $d = strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))));
+            if ($d !== '') {
+                $domains[$d] = true;
+            }
+        }
+        if ($domains === []) {
+            return $empty;
+        }
+
+        try {
+            $rows = DomainMetric::query()
+                ->whereIn('domain', array_keys($domains))
+                ->whereNotNull('dfs_metrics')
+                ->get(['domain', 'dfs_metrics']);
+        } catch (\Throwable) {
+            return $empty;
+        }
+
+        $total = 0.0;
+        $count = 0;
+        foreach ($rows as $m) {
+            // bulk_traffic_estimation stores {metrics:{organic:{etv,...},paid:{...}}}.
+            $etv = data_get($m->dfs_metrics, 'metrics.organic.etv');
+            if (is_numeric($etv) && (float) $etv > 0) {
+                $total += (float) $etv;
+                $count++;
+            }
+        }
+
+        return $count === 0
+            ? $empty
+            : ['estimated' => (int) round($total), 'competitors' => $count];
     }
 
     /** LLM removes website UI / account / navigation junk keywords (login, cart…). */
