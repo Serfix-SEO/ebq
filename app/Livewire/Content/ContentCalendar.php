@@ -795,16 +795,29 @@ class ContentCalendar extends Component
         try {
             $day = Carbon::parse($date)->startOfDay();
         } catch (\Throwable) {
+            session()->flash('content-error', __('That date could not be read — please pick a valid date.'));
+
             return;
         }
         // Allow TODAY (its start-of-day is technically "past"); reject only days
         // before today so a drop onto the current date works.
         if ($day->lt(now()->startOfDay())) {
+            session()->flash('content-error', __('Pick today or a future date.'));
+
             return;
+        }
+        $from = $topic->scheduled_for?->translatedFormat('M j, Y') ?? __('unscheduled');
+        if ($topic->scheduled_for !== null && $topic->scheduled_for->isSameDay($day)) {
+            return; // no change
         }
         // The planner fills one per day, but the user may stack a second article
         // on a day manually — so no one-per-day guard here.
         $topic->update(['scheduled_for' => $day]);
+        session()->flash('content-status', __('Moved “:title” from :from to :to.', [
+            'title' => \Illuminate\Support\Str::limit((string) $topic->title, 40),
+            'from' => $from,
+            'to' => $day->translatedFormat('M j, Y'),
+        ]));
     }
 
     /**

@@ -396,7 +396,7 @@
                                     $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true);
                                     $overCap = in_array($topic->id, $overCapIds ?? [], true);
                                 @endphp
-                                <div wire:key="cell-{{ $topic->id }}" x-data="{ pick: false }"
+                                <div wire:key="cell-{{ $topic->id }}" x-data="{ pick: false, newDate: '{{ $topic->scheduled_for?->toDateString() }}' }"
                                      @if($canDrag) draggable="true"
                                         x-on:dragstart="drag.id = '{{ $topic->id }}'; $event.dataTransfer.setData('text/plain', '{{ $topic->id }}'); $event.dataTransfer.effectAllowed = 'move'"
                                         x-on:dragend="drag.id = null" @endif
@@ -434,9 +434,15 @@
                                         </span>
                                     </div>
                                     @if ($canDrag)
-                                        <input x-show="pick" x-cloak type="date" draggable="false" value="{{ $topic->scheduled_for?->toDateString() }}" min="{{ now()->toDateString() }}"
-                                               wire:change="reschedule('{{ $topic->id }}', $event.target.value)" wire:key="gpick-{{ $topic->id }}"
-                                               class="mt-1 w-full rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" />
+                                        <div x-show="pick" x-cloak class="mt-1 flex items-center gap-1">
+                                            <input type="date" draggable="false" x-model="newDate" min="{{ now()->toDateString() }}"
+                                                   class="w-full rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" />
+                                            <button type="button" draggable="false" wire:key="gsave-{{ $topic->id }}"
+                                                    x-on:click="$wire.reschedule('{{ $topic->id }}', newDate); pick = false"
+                                                    class="inline-flex shrink-0 items-center justify-center rounded-md bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-orange-700" title="{{ __('Save date') }}">
+                                                {{ __('Save') }}
+                                            </button>
+                                        </div>
                                     @endif
                                     @if ($overCap)
                                         <p class="mt-1 text-[10px] font-semibold text-error">{{ __('Over monthly limit') }}</p>
@@ -465,13 +471,17 @@
                         @endphp
                         <div class="flex flex-wrap items-center gap-3 px-4 py-3 {{ $overCap ? 'bg-error/5' : '' }}">
                             @php $canMove = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true); @endphp
-                            <div class="w-28 shrink-0">
+                            <div class="w-40 shrink-0">
                                 @if ($canMove)
-                                    {{-- Reschedule to ANY date (drag on the grid is same-month only). --}}
-                                    <input type="date" value="{{ $topic->scheduled_for?->toDateString() }}" min="{{ now()->toDateString() }}"
-                                        wire:change="reschedule('{{ $topic->id }}', $event.target.value)" wire:key="resched-{{ $topic->id }}"
-                                        title="{{ __('Move to another day or month') }}"
-                                        class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" />
+                                    {{-- Pick a date, then Save to move it (any day/month). --}}
+                                    <div class="flex items-center gap-1" x-data="{ d: '{{ $topic->scheduled_for?->toDateString() }}' }" wire:key="resched-{{ $topic->id }}">
+                                        <input type="date" x-model="d" min="{{ now()->toDateString() }}"
+                                            title="{{ __('Move to another day or month') }}"
+                                            class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" />
+                                        <button type="button" x-show="d && d !== '{{ $topic->scheduled_for?->toDateString() }}'"
+                                                x-on:click="$wire.reschedule('{{ $topic->id }}', d)"
+                                                class="inline-flex shrink-0 items-center rounded-lg bg-orange-600 px-2 py-1 text-xs font-bold text-white hover:bg-orange-700">{{ __('Save') }}</button>
+                                    </div>
                                 @else
                                     <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $topic->scheduled_for?->translatedFormat('M j') }}</span>
                                 @endif
