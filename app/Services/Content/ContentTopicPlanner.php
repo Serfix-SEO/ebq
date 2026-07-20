@@ -71,6 +71,16 @@ class ContentTopicPlanner
             return [];
         }
 
+        // Relevance gate: never plan an off-topic article. Ideation is anchored to
+        // the business, but a stray GSC query the site accidentally ranks for (or an
+        // LLM drift) can slip in — vet the candidates against the offerings and drop
+        // anything off-topic. Fails open if the check is unavailable, and never wipes
+        // the whole set (the calendar must still fill).
+        $candidates = $this->filterRelevant($candidates, $plan);
+        if ($candidates === []) {
+            return [];
+        }
+
         // Cannibalization + internal dedupe (deterministic, after the LLM).
         $taken = array_merge($existingTitles, $plannedTitles);
         $created = [];
@@ -179,6 +189,84 @@ class ContentTopicPlanner
                 ->all();
         } catch (\Throwable) {
             return [];
+        }
+    }
+
+    // ── relevance gate ──────────────────────────────────────────────────
+
+    /**
+     * Drop ideated candidates whose target keyword isn't genuinely about the
+     * client's offerings — so a stray GSC query or LLM drift never becomes a
+     * published article. Authoritative when the LLM runs; fails open (keeps all)
+     * when unavailable, and never returns empty (the calendar must still fill).
+     *
+     * @param  list<array<string,mixed>>  $candidates
+     * @return list<array<string,mixed>>
+     */
+    private function filterRelevant(array $candidates, ContentPlan $plan): array
+    {
+        if (count($candidates) < 2) {
+            return $candidates;
+        }
+        $keywords = array_values(array_unique(array_filter(array_map(
+            static fn ($c) => mb_strtolower(trim((string) ($c['target_keyword'] ?? ''))), $candidates
+        ))));
+        if (count($keywords) < 2) {
+            return $candidates;
+        }
+        $offer = implode(', ', array_slice((array) (($plan->offerings ?? [])['sell'] ?? []), 0, 10));
+        $desc = mb_substr((string) $plan->business_description, 0, 400);
+
+        $keep = $this->llmRelevant($keywords, $offer, $desc);
+        if ($keep === null) {
+            return $candidates; // LLM unavailable → fail open
+        }
+        $keepSet = array_flip($keep);
+        $filtered = array_values(array_filter(
+            $candidates,
+            static fn ($c) => isset($keepSet[mb_strtolower(trim((string) ($c['target_keyword'] ?? '')))])
+        ));
+
+        // If the vetting rejected everything, the ideation was already anchored —
+        // treat it as an LLM glitch and keep the candidates rather than an empty plan.
+        return $filtered === [] ? $candidates : $filtered;
+    }
+
+    /**
+     * @param  list<string>  $keywords
+     * @return list<string>|null  lowercased on-topic keywords; null on LLM unavailable/error
+     */
+    private function llmRelevant(array $keywords, string $offer, string $desc): ?array
+    {
+        try {
+            if (! $this->llm->isAvailable()) {
+                return null;
+            }
+            $list = implode("\n", array_slice($keywords, 0, 80));
+            $response = $this->llm->completeJson([
+                ['role' => 'system', 'content' => 'You filter SEO topic keywords for topical relevance. Respond with valid JSON only.'],
+                ['role' => 'user', 'content' => <<<PROMPT
+                Business offerings: {$offer}
+                About: {$desc}
+
+                From the topic keywords below, return ONLY those genuinely relevant to
+                THIS business — topics its articles should actually cover. DROP anything
+                off-topic: unrelated tools, industries, or languages, even when they
+                share a common word. Keep the exact original text.
+
+                {$list}
+
+                Return JSON: {"relevant": ["...", "..."]}
+                PROMPT],
+            ], ['temperature' => 0.1, 'max_tokens' => 1500, 'timeout' => 40, '__source' => 'content_autopilot.topic_relevance']);
+
+            $rel = is_array($response['relevant'] ?? null) ? $response['relevant'] : [];
+
+            return array_values(array_filter(array_map(
+                static fn ($s) => mb_strtolower(trim((string) $s)), $rel
+            )));
+        } catch (\Throwable) {
+            return null;
         }
     }
 
