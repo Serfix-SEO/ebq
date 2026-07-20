@@ -259,6 +259,12 @@ return [
     // (estimated from token usage × provider $/token config) separately from
     // interactive AI usage, so a runaway calendar can't drain the LLM budget.
     // {@see \App\Services\Content\ContentLlmSpendMeter}. Null/0 = disabled.
+    // Per-user AI token quota (UsageMeter). enforce=false disables all caps —
+    // used on staging so QA generation isn't throttled. Defaults to enforced.
+    'usage' => [
+        'enforce' => filter_var(env('USAGE_METER_ENFORCE', true), FILTER_VALIDATE_BOOLEAN),
+    ],
+
     'content_autopilot' => [
         'llm_monthly_cap_usd' => env('CONTENT_LLM_MONTHLY_CAP_USD') !== null
             ? (float) env('CONTENT_LLM_MONTHLY_CAP_USD')

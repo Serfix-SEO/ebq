@@ -142,6 +142,12 @@ class UsageMeter
      */
     public function assertCanSpend(User $user, string $provider, int $units = 1): void
     {
+        // Global kill-switch (staging QA): USAGE_METER_ENFORCE=false disables all
+        // per-user token caps so testing isn't throttled.
+        if (! config('services.usage.enforce', true)) {
+            return;
+        }
+
         $limit = $this->limit($user, $provider);
         if ($limit === null) {
             return;

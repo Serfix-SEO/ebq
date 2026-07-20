@@ -696,6 +696,14 @@ class ContentCalendar extends Component
             return;
         }
         if (($reason = app(ContentEntitlements::class)->blockReason($topic)) !== null) {
+            // Trial used up (or no active plan) → send them straight to the
+            // purchase page with a clear prompt, not just a toast.
+            if (in_array($reason, ['trial_limit', 'no_access', 'not_covered'], true)) {
+                session()->flash('content-status', self::generationBlockMessage($reason));
+                $this->redirect(route('content.get-started'), navigate: true);
+
+                return;
+            }
             session()->flash('content-error', self::generationBlockMessage($reason));
 
             return;
@@ -740,6 +748,14 @@ class ContentCalendar extends Component
         // Entitlement/limit pre-check (same rule the job enforces) — never
         // dispatch a generation that would just be blocked; show why instead.
         if (($reason = app(ContentEntitlements::class)->blockReason($topic)) !== null) {
+            // Trial used up (or no active plan) → send them straight to the
+            // purchase page with a clear prompt, not just a toast.
+            if (in_array($reason, ['trial_limit', 'no_access', 'not_covered'], true)) {
+                session()->flash('content-status', self::generationBlockMessage($reason));
+                $this->redirect(route('content.get-started'), navigate: true);
+
+                return;
+            }
             session()->flash('content-error', self::generationBlockMessage($reason));
 
             return;
@@ -1244,7 +1260,10 @@ class ContentCalendar extends Component
             'days' => $days,
             'monthStart' => $monthStart,
             'hasWebsite' => true,
-            'stats' => $this->overviewStats($all),
+            // Count the KPI cards from the SAME set the calendar renders ($topics,
+            // the visible month) so the four cards always sum to the dots on the
+            // grid — using $all (every month) made "Planned" not match the month.
+            'stats' => $this->overviewStats($topics),
             'audience' => $this->audienceSearches($all),
             'clusters' => $this->strategyClusters($all),
             'publishConnected' => $this->hasPublishDestination(),
