@@ -71,14 +71,15 @@ class ContentTopicPlanner
             return [];
         }
 
-        // Relevance gate: never plan an off-topic article. Ideation is anchored to
-        // the business, but a stray GSC query the site accidentally ranks for (or an
-        // LLM drift) can slip in — vet the candidates against the offerings and drop
-        // anything off-topic. Fails open if the check is unavailable, and never wipes
-        // the whole set (the calendar must still fill).
-        $candidates = $this->filterRelevant($candidates, $plan);
-        if ($candidates === []) {
-            return [];
+        // Relevance gate: never plan an off-topic article. When the plan's keywords
+        // have already been bulk-classified (own/gap) we trust that vetting and skip
+        // the re-filter — ideation was seeded with the vetted gap keywords. Otherwise
+        // vet the candidates now (fails open; never wipes the whole set).
+        if ($plan->keywords_classified_at === null) {
+            $candidates = $this->filterRelevant($candidates, $plan);
+            if ($candidates === []) {
+                return [];
+            }
         }
 
         // Cannibalization + internal dedupe (deterministic, after the LLM).
@@ -112,7 +113,7 @@ class ContentTopicPlanner
                 ))), 0, 8),
                 'intent' => in_array($candidate['intent'] ?? null, ['informational', 'commercial', 'transactional', 'navigational'], true)
                     ? $candidate['intent'] : 'informational',
-                'source' => in_array($candidate['source'] ?? null, ['gsc_gap', 'keywords', 'competitor', 'llm'], true)
+                'source' => in_array($candidate['source'] ?? null, ['gsc_gap', 'gap', 'keywords', 'competitor', 'llm'], true)
                     ? $candidate['source'] : 'llm',
                 'status' => ContentTopic::STATUS_APPROVED,
                 'scheduled_for' => $dates[count($created)] ?? null,
@@ -290,6 +291,15 @@ class ContentTopicPlanner
             array_slice($existingTitles, 0, 80)
         ));
 
+        // Pre-vetted GAP keywords (competitors rank, the client doesn't; already
+        // classified as topically relevant) — strong, on-topic target candidates.
+        $gapKeywords = \App\Models\ContentPlanKeyword::query()
+            ->where('plan_id', $plan->id)->where('type', \App\Models\ContentPlanKeyword::TYPE_GAP)
+            ->orderByDesc('search_volume')->limit(40)->pluck('keyword')->all();
+        $gapBlock = $gapKeywords === [] ? '(none yet)' : implode("\n", array_map(
+            static fn ($k) => '- '.$k, $gapKeywords
+        ));
+
         $language = $plan->language ?: 'en';
         $domain = (string) $website->domain;
         $today = now()->toFormattedDateString();
@@ -307,18 +317,21 @@ class ContentTopicPlanner
         REAL SEARCH QUERIES the site already appears for (impressions = demand, position 8-30 = a dedicated article can win the ranking):
         {$gscBlock}
 
+        KEYWORD GAP — competitors rank for these and the site does NOT yet (already vetted as on-topic; prime article targets, use source "gap"):
+        {$gapBlock}
+
         EXISTING PAGES (do NOT duplicate these topics):
         {$titlesBlock}
 
         Rules:
-        - Prefer topics targeting the real queries above (source "gsc_gap"); fill remaining slots with adjacent topics a customer would search (source "llm").
+        - Prefer topics targeting the real queries above (source "gsc_gap") and the vetted keyword gap (source "gap"); fill remaining slots with adjacent topics a customer would search (source "llm").
         - One clear target keyword per topic, natural article title (not clickbait, no year numbers unless essential).
         - TODAY'S DATE is {$today}. If a title genuinely needs a year, it MUST be {$currentYear} — never an earlier year.
         - 3-6 secondary keywords per topic.
         - Write titles in language "{$language}".
         - Never invent topics about things they do not offer.
 
-        Return JSON: {"topics": [{"title": "...", "target_keyword": "...", "secondary_keywords": ["..."], "intent": "informational|commercial|transactional|navigational", "source": "gsc_gap|llm"}]}
+        Return JSON: {"topics": [{"title": "...", "target_keyword": "...", "secondary_keywords": ["..."], "intent": "informational|commercial|transactional|navigational", "source": "gsc_gap|gap|llm"}]}
         PROMPT;
 
         $options = [

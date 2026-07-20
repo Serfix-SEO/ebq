@@ -38,6 +38,7 @@ class ContentPlan extends Model
             'internal_urls' => 'array',
             'auto_publish' => 'boolean',
             'images_enabled' => 'boolean',
+            'keywords_classified_at' => 'datetime',
         ];
     }
 

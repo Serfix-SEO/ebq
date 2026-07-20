@@ -2,8 +2,10 @@
 
 namespace App\Services\Content;
 
+use App\Jobs\Content\ClassifyPlanKeywordsJob;
 use App\Jobs\Content\HarvestDomainKeywordsJob;
 use App\Models\ContentPlan;
+use App\Models\ContentPlanKeyword;
 use App\Models\DomainKeywordHarvest;
 use App\Models\DomainKeywordRanking;
 use App\Models\DomainMetric;
@@ -95,9 +97,40 @@ class ContentKeywordInsights
 
         // Competitor keyword gap now comes from DataForSEO Labs (fast, 3 rivals) —
         // NOT the concurrency-1 keyword server. Dispatch the shared per-domain
-        // harvest for the client + top-3 competitors; the gap step reads the
-        // domain_keyword_rankings they populate. See DATAFORSEO_KEYWORD_GAP_PLAN.md.
+        // harvest for the client + top-3 competitors; then classify the harvested
+        // keywords once (own vs relevant gap) for the gap card + planner to reuse.
+        // See DATAFORSEO_KEYWORD_GAP_PLAN.md.
         $this->ensureHarvest($plan);
+        $this->ensureClassify($plan);
+    }
+
+    /**
+     * Once the harvest has produced competitor rankings, classify this plan's
+     * keywords (own vs relevant gap) in bulk — guarded so it runs once per plan
+     * per calendar month. {@see ClassifyPlanKeywordsJob} does the LLM vetting.
+     */
+    private function ensureClassify(ContentPlan $plan): void
+    {
+        $website = $plan->website;
+        if ($website === null) {
+            return;
+        }
+        $month = now()->format('Y-m');
+        if ($plan->keywords_classified_at !== null && $plan->keywords_classified_at->format('Y-m') === $month) {
+            return; // already classified this month
+        }
+        $country = $this->planCountry($plan);
+        $competitors = $this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS);
+        if ($competitors === []) {
+            return; // competitors not discovered yet
+        }
+        if (! DomainKeywordRanking::query()->whereIn('domain', $competitors)->where('country', $country)->exists()) {
+            return; // harvest hasn't landed yet
+        }
+        if (! Cache::add('content:kw-classify:'.$plan->id.':'.$month, 1, now()->addHours(6))) {
+            return;
+        }
+        ClassifyPlanKeywordsJob::dispatch($plan->id);
     }
 
     /**
@@ -430,70 +463,26 @@ class ContentKeywordInsights
         if ($website === null) {
             return $empty;
         }
-        $country = $this->planCountry($plan);
         $competitors = $this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS);
+        $active = count($competitors);
         if ($competitors === []) {
             // Competitor discovery may still be running → show a pending state.
-            $discovering = app(ContentSetupInsights::class)->isGenerating($website);
-
-            return array_merge($empty, ['pending' => $discovering]);
-        }
-        $ownDomain = strtolower(preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
-
-        // Which competitors already have harvested rankings (for the pending state).
-        $ready = 0;
-        foreach ($competitors as $d) {
-            if (DomainKeywordRanking::query()->where('domain', $d)->where('country', $country)->exists()) {
-                $ready++;
-            }
-        }
-        $active = count($competitors);
-        $pending = $ready < $active;
-
-        // Keywords the client already ranks for → excluded from the gap.
-        $clientHashes = $ownDomain === '' ? [] : DomainKeywordRanking::query()
-            ->where('domain', $ownDomain)->where('country', $country)
-            ->pluck('keyword_hash')->all();
-
-        $base = DomainKeywordRanking::query()
-            ->whereIn('domain', $competitors)->where('country', $country)
-            ->when($clientHashes !== [], fn ($q) => $q->whereNotIn('keyword_hash', $clientHashes))
-            ->where('search_volume', '>', 0);
-
-        $total = (clone $base)->distinct()->count('keyword_hash');
-        if ($total === 0) {
-            return array_merge($empty, ['pending' => $pending, 'ready' => $ready, 'active' => $active]);
+            return array_merge($empty, ['pending' => app(ContentSetupInsights::class)->isGenerating($website)]);
         }
 
-        // Candidate pool: top keywords PER competitor, not globally by volume — a
-        // single high-traffic rival (e.g. a translation tool) would otherwise swamp
-        // the pool with off-topic terms and bury the on-topic competitors. Sampling
-        // each competitor guarantees every rival is represented before the LLM pass.
-        $seen = [];
-        $candidates = [];
-        foreach ($competitors as $cd) {
-            foreach (DomainKeywordRanking::query()
-                ->where('domain', $cd)->where('country', $country)
-                ->when($clientHashes !== [], fn ($q) => $q->whereNotIn('keyword_hash', $clientHashes))
-                ->where('search_volume', '>', 0)
-                ->orderByDesc('search_volume')->limit(80)
-                ->get(['keyword', 'keyword_hash', 'search_volume']) as $r) {
-                $vol = (int) $r->search_volume;
-                if (isset($seen[$r->keyword_hash]) && $seen[$r->keyword_hash] >= $vol) {
-                    continue;
-                }
-                $seen[$r->keyword_hash] = $vol;
-                $candidates[$r->keyword_hash] = ['keyword' => $r->keyword, 'hash' => $r->keyword_hash, 'volume' => $vol];
-            }
+        // Show the FINAL gap only — while the harvest + bulk classification are still
+        // running (keywords_classified_at not yet stamped), report pending so the UI
+        // holds a loader instead of a partial/raw list.
+        if ($plan->keywords_classified_at === null) {
+            return array_merge($empty, ['pending' => true, 'active' => $active]);
         }
-        $candidates = array_values($candidates);
-        usort($candidates, static fn ($a, $b) => $b['volume'] <=> $a['volume']);
 
-        // Competition levels from keyword_metrics (shared facts).
-        $comp = KeywordMetric::query()
-            ->where('country', $country)->where('data_source', 'dfs_labs')
-            ->whereIn('keyword_hash', array_column($candidates, 'hash'))
-            ->pluck('competition', 'keyword_hash')->all();
+        // Read the pre-classified, relevance-vetted gap keywords for this plan
+        // (written once by ClassifyPlanKeywordsJob) — no LLM at render time.
+        $gapQuery = ContentPlanKeyword::query()
+            ->where('plan_id', $plan->id)->where('type', ContentPlanKeyword::TYPE_GAP);
+        $total = (clone $gapQuery)->count();
+
         $level = static function ($c): string {
             if (! is_numeric($c)) {
                 return 'unknown';
@@ -501,27 +490,14 @@ class ContentKeywordInsights
 
             return $c < 0.34 ? 'low' : ($c < 0.67 ? 'medium' : 'high');
         };
+        $rows = (clone $gapQuery)->orderByDesc('search_volume')->limit(8)->get()
+            ->map(static fn ($k) => [
+                'keyword' => $k->keyword,
+                'volume' => $k->search_volume,
+                'competition' => $level($k->competition),
+            ])->all();
 
-        // LLM relevance pass — AUTHORITATIVE: when the LLM runs we keep only what it
-        // vetts (even if that's nothing), so an off-topic competitor's high-volume
-        // keywords are NEVER shown. Only when the LLM is unavailable (keep === null)
-        // do we fall back to the raw volume ranking.
-        $keep = $this->relevanceKeep(array_column($candidates, 'keyword'), $plan, 'search keywords', 'grel');
-        if (is_array($keep)) {
-            $keepSet = array_flip($keep);
-            $candidates = array_values(array_filter(
-                $candidates,
-                static fn ($r) => isset($keepSet[mb_strtolower(trim((string) $r['keyword']))])
-            ));
-        }
-
-        $rows = array_map(static fn ($r) => [
-            'keyword' => $r['keyword'],
-            'volume' => $r['volume'],
-            'competition' => $level($comp[$r['hash']] ?? null),
-        ], array_slice($candidates, 0, 8));
-
-        return ['rows' => $rows, 'total' => $total, 'pending' => $pending, 'ready' => $ready, 'active' => $active];
+        return ['rows' => $rows, 'total' => $total, 'pending' => false, 'ready' => $active, 'active' => $active];
     }
 
     /**
