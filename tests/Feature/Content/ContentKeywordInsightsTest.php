@@ -149,6 +149,47 @@ class ContentKeywordInsightsTest extends TestCase
         $this->assertSame(310, $row['keywords']);
     }
 
+    public function test_dfs_gap_from_competitor_rankings(): void
+    {
+        [, $website, $plan] = $this->userWithPlan(); // country null → 'global'
+
+        \Illuminate\Support\Facades\Cache::put('content:setup-insights:v1:'.$website->id, [
+            'my_referring_domains' => 0, 'my_authority' => null,
+            'competitors' => [[
+                'domain' => 'rival.com', 'referring_domains' => null, 'backlinks' => null,
+                'authority' => null, 'da' => null, 'pa' => null,
+            ]],
+            'median' => null, 'gap' => null, 'behind' => false,
+        ], now()->addDay());
+
+        foreach ([['pubg stylish name', 9000, 0.2], ['bgmi name generator', 4000, 0.5]] as [$kw, $vol, $comp]) {
+            \App\Models\DomainKeywordRanking::query()->create([
+                'domain' => 'rival.com', 'keyword' => $kw, 'country' => 'us',
+                'keyword_hash' => \App\Models\KeywordMetric::hashKeyword($kw),
+                'search_volume' => $vol, 'rank_absolute' => 4,
+            ]);
+            \App\Models\KeywordMetric::query()->create([
+                'keyword' => $kw, 'keyword_hash' => \App\Models\KeywordMetric::hashKeyword($kw),
+                'country' => 'us', 'data_source' => 'dfs_labs', 'search_volume' => $vol,
+                'competition' => $comp, 'fetched_at' => now(), 'expires_at' => now()->addDays(30),
+            ]);
+        }
+
+        $this->storeCompletedRequest($plan, [
+            ['keyword' => 'name maker', 'avgMonthlySearches' => 100, 'competitionIndex' => 10],
+        ]);
+
+        $insights = app(ContentKeywordInsights::class)->get($plan);
+
+        $this->assertNotNull($insights);
+        $this->assertSame(2, $insights['gap_total']);
+        $keywords = array_column($insights['gap'], 'keyword');
+        $this->assertContains('pubg stylish name', $keywords);
+        $this->assertSame('pubg stylish name', $insights['gap'][0]['keyword']); // highest volume first
+        $this->assertSame('low', $insights['gap'][0]['competition']);           // 0.2 → low
+        $this->assertFalse($insights['competitors_pending']);                   // rival has rankings
+    }
+
     public function test_insights_classify_intent_questions_and_opportunities(): void
     {
         [, , $plan] = $this->userWithPlan();

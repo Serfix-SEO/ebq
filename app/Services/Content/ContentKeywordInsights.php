@@ -2,7 +2,10 @@
 
 namespace App\Services\Content;
 
+use App\Jobs\Content\HarvestDomainKeywordsJob;
 use App\Models\ContentPlan;
+use App\Models\DomainKeywordHarvest;
+use App\Models\DomainKeywordRanking;
 use App\Models\DomainMetric;
 use App\Models\KeywordApiRequest;
 use App\Models\KeywordMetric;
@@ -57,11 +60,12 @@ class ContentKeywordInsights
     /** Keyword-server hard cap per ideas request (infra/keywords). */
     private const MAX_SEEDS = 20;
 
-    /** Competitor domains we mine keywords from for the gap analysis. Kept at 1
-     *  in the wizard so the concurrency-1 keyword server isn't choked (seed +
-     *  own domain + 1 competitor); deeper competitor research runs in the
-     *  background per-article after onboarding. */
-    private const MAX_COMPETITORS = 1;
+    /** Competitor domains for the keyword gap. The gap now comes from DataForSEO
+     *  Labs (fast, one call/domain), so we analyze the top 3 competitors — the
+     *  self-hosted keyword server (concurrency-1) is NOT used for competitor gap
+     *  mining anymore (it still serves client seeds + the other product). See
+     *  DATAFORSEO_KEYWORD_GAP_PLAN.md. */
+    private const MAX_COMPETITORS = 3;
 
     /** Give the (concurrency-1, minutes-per-job) server this long before falling back. */
     private const PENDING_GRACE_MINUTES = 15;
@@ -89,14 +93,57 @@ class ContentKeywordInsights
         $this->ensureOwnRequest($plan);
         $this->ensureSiteRequest($plan, $this->ownDomainKey($plan), fn () => $plan->website?->normalized_domain ?: $plan->website?->domain);
 
-        // Up to MAX_COMPETITORS competitor domains, one keyword request each, so
-        // the gap analysis is triangulated across several rivals (not one). Late
-        // dispatch is fine — the wizard poll re-runs ensureStarted once the
-        // competitors step has discovered them.
-        $competitors = $this->topCompetitorDomains($plan, $plan->website, self::MAX_COMPETITORS);
-        foreach ($competitors as $i => $domain) {
-            $this->ensureSiteRequest($plan, $this->competitorRequestKey($plan, $i), fn () => $domain);
+        // Competitor keyword gap now comes from DataForSEO Labs (fast, 3 rivals) —
+        // NOT the concurrency-1 keyword server. Dispatch the shared per-domain
+        // harvest for the client + top-3 competitors; the gap step reads the
+        // domain_keyword_rankings they populate. See DATAFORSEO_KEYWORD_GAP_PLAN.md.
+        $this->ensureHarvest($plan);
+    }
+
+    /**
+     * Dispatch the shared DataForSEO keyword harvest for the client domain + the
+     * top-3 competitors, at most once per domain per calendar month (shared across
+     * plans). Admin-owned sites sandbox (never billed / persisted).
+     */
+    private function ensureHarvest(ContentPlan $plan): void
+    {
+        $website = $plan->website;
+        if ($website === null) {
+            return;
         }
+        $country = $this->planCountry($plan);
+        $sandbox = (bool) $website->user?->is_admin;
+
+        $domains = [];
+        $own = strtolower(preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
+        if ($own !== '') {
+            $domains[$own] = true;
+        }
+        foreach ($this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS) as $d) {
+            $domains[$d] = true;
+        }
+
+        $month = now()->format('Y-m');
+        foreach (array_keys($domains) as $domain) {
+            // once-per-domain-per-month (shared) — cache guard first, then the
+            // durable last_run_at check so a restart doesn't re-bill.
+            if (! Cache::add('content:kw-harvest:'.$domain.':'.$country.':'.$month, 1, now()->addDays(31))) {
+                continue;
+            }
+            $h = DomainKeywordHarvest::query()->where('domain', $domain)->where('country', $country)->first();
+            if ($h !== null && $h->exhausted) {
+                continue; // nothing left to fetch for this domain
+            }
+            if ($h !== null && $h->last_run_at !== null && $h->last_run_at->format('Y-m') === $month) {
+                continue; // already harvested this month
+            }
+            HarvestDomainKeywordsJob::dispatch($domain, $country, 1000, $sandbox);
+        }
+    }
+
+    private function planCountry(ContentPlan $plan): string
+    {
+        return strtolower(trim((string) $plan->country)) ?: 'global';
     }
 
     /**
@@ -291,87 +338,43 @@ class ContentKeywordInsights
 
         $completed = fn (?KeywordApiRequest $r) => $r !== null && $r->status === KeywordApiRequest::STATUS_COMPLETED;
 
-        // Competitor requests — one per discovered rival, up to MAX_COMPETITORS.
-        $competitorDomains = $this->topCompetitorDomains($plan, $plan->website, self::MAX_COMPETITORS);
-        $expected = count($competitorDomains);
-        $compReqs = [];
-        foreach (array_keys($competitorDomains) as $i) {
-            $compReqs[$i] = $this->siteRequest($this->competitorRequestKey($plan, $i));
-        }
-
-        // Competitor DISCOVERY (SERP/backlinks) may still be running — no domains
-        // found YET, not necessarily none. Don't treat competitors as "done"
-        // while discovery is live; the wizard poll re-dispatches once they land.
-        $discoveryPending = $plan->website !== null
-            && $competitorDomains === []
-            && app(ContentSetupInsights::class)->isGenerating($plan->website);
-
-        // Show the FULL digest in one shot — never a smaller number that grows.
-        // A keyword count that jumps (517 → 1,000+) as sources land reads as
-        // "we found less than we did"; a few extra seconds of the loader is fine,
-        // seeing a partial count is not. So we wait for the client's own keyword
-        // set (offering seeds + own-domain crawl) AND every competitor before
-        // building. The loader's per-source status shows progress meanwhile.
+        // The digest (clusters / top searches / questions / intents) is built from
+        // the CLIENT's own research (offering seeds + own-domain crawl) via the
+        // self-hosted keyword server. The competitor GAP is now a DataForSEO Labs
+        // overlay ({@see withCompetitorData}) that fills in asynchronously — so we
+        // no longer gate the digest on any competitor keyword-server request.
         $clientComplete = $completed($seed) && ($ownSite === null || $completed($ownSite));
+        $allSettled = $this->settled($seed) && $this->settled($ownSite);
 
-        $compCompleted = count(array_filter($compReqs, $completed));
-        $competitorsComplete = ! $discoveryPending && $compCompleted >= $expected;
-
-        $allComplete = $clientComplete && $competitorsComplete;
-
-        // Backstop: give up (build from whatever landed) only once EVERYTHING has
-        // settled — client requests plus every dispatched competitor request — so
-        // a dead keyword server can't hang the step forever.
-        $compDispatched = count(array_filter($compReqs, static fn ($r) => $r !== null));
-        $competitorsSettled = ! $discoveryPending
-            && $compDispatched >= $expected
-            && count(array_filter($compReqs, fn ($r) => $this->settled($r))) === count($compReqs);
-        $allSettled = $this->settled($seed) && $this->settled($ownSite) && $competitorsSettled;
-
-        if (! $allComplete && ! $allSettled) {
-            return null; // keep the loader up — show complete results only
+        if (! $clientComplete && ! $allSettled) {
+            return null; // keep the loader up — show complete client results only
         }
 
         // CLIENT keywords = offering seeds + their own crawled domain (scrap-
         // filtered — the site-scope set includes login / cart / account junk).
-        $clientRows = $this->mergeRows(
+        $rows = $this->mergeRows(
             $this->completedRows($seed),
             $this->filterScrap($this->completedRows($ownSite), $plan),
         );
-        // COMPETITOR keywords, merged across every completed rival, scrap-filtered.
-        $competitorRows = [];
-        foreach ($compReqs as $req) {
-            $competitorRows = $this->mergeRows($competitorRows, $this->filterScrap($this->completedRows($req), $plan));
-        }
-
-        $rows = $this->mergeRows($clientRows, $competitorRows);
 
         if ($rows === []) {
-            // All settled but the server(s) returned nothing → topic fallback.
+            // Server returned nothing → topic fallback.
             $rows = $this->fallbackRows($plan);
             if ($rows === []) {
                 return null;
             }
             $partial = true;
         } else {
-            $partial = ! $allComplete; // only true on the settled-backstop path
+            $partial = ! $clientComplete;
         }
-
-        // Keyword gap: what competitors rank for that the client does NOT,
-        // ranked by relevance to what the client sells.
-        $gap = $this->computeGap($clientRows, $competitorRows, $plan);
 
         // "People also ask" / "People also search for" straight from Google's
         // SERP for the client's top query (one cached Serper call).
         $peopleAlso = $this->peopleAlsoSearch($plan, $rows);
 
-        $insights = $this->build($rows, $plan, partial: $partial, gap: $gap['rows'], gapTotal: $gap['total'],
-            competitorsPending: ! $competitorsComplete,
-            competitorsDone: $compCompleted,
-            competitorsTotal: max($expected, $compDispatched, $discoveryPending ? self::MAX_COMPETITORS : 0),
-            peopleAlso: $peopleAlso);
-        // Partial results are cached briefly so the next poll upgrades them as the
-        // remaining requests complete; the final digest is cached 30 days.
+        $insights = $this->build($rows, $plan, partial: $partial, peopleAlso: $peopleAlso);
+        // Partial results are cached briefly so the next poll upgrades them; the
+        // final digest is cached 30 days. The gap overlay refreshes on every read.
         Cache::put($this->insightsKey($plan), $insights,
             $partial ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
@@ -399,7 +402,114 @@ class ContentKeywordInsights
         $insights['traffic'] = ['estimated' => $data['traffic_total'], 'competitors' => $data['traffic_count']];
         $insights['competitor_metrics'] = $data['rows'];
 
+        // Keyword gap from DataForSEO Labs (domain_keyword_rankings), overlaid
+        // fresh — the harvest fills in asynchronously and grows month over month.
+        $gap = $this->dfsGap($plan);
+        $insights['gap'] = $gap['rows'];
+        $insights['gap_total'] = $gap['total'];
+        $insights['competitors_pending'] = $gap['pending'];
+        $insights['competitors_done'] = $gap['ready'];
+        $insights['competitors_total'] = $gap['active'];
+
         return $insights;
+    }
+
+    /**
+     * Keyword gap from DataForSEO Labs: keywords the top-3 competitors rank for
+     * that the CLIENT does not, read from the shared domain_keyword_rankings asset
+     * (grows as {@see HarvestDomainKeywordsJob} accumulates ~1,000/competitor/mo).
+     * Ranked by volume, then LLM-vetted for topical relevance.
+     *
+     * @return array{rows: list<array{keyword:string, volume:?int, competition:string}>,
+     *               total:int, pending:bool, ready:int, active:int}
+     */
+    private function dfsGap(ContentPlan $plan): array
+    {
+        $empty = ['rows' => [], 'total' => 0, 'pending' => false, 'ready' => 0, 'active' => 0];
+        $website = $plan->website;
+        if ($website === null) {
+            return $empty;
+        }
+        $country = $this->planCountry($plan);
+        $competitors = $this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS);
+        if ($competitors === []) {
+            // Competitor discovery may still be running → show a pending state.
+            $discovering = app(ContentSetupInsights::class)->isGenerating($website);
+
+            return array_merge($empty, ['pending' => $discovering]);
+        }
+        $ownDomain = strtolower(preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
+
+        // Which competitors already have harvested rankings (for the pending state).
+        $ready = 0;
+        foreach ($competitors as $d) {
+            if (DomainKeywordRanking::query()->where('domain', $d)->where('country', $country)->exists()) {
+                $ready++;
+            }
+        }
+        $active = count($competitors);
+        $pending = $ready < $active;
+
+        // Keywords the client already ranks for → excluded from the gap.
+        $clientHashes = $ownDomain === '' ? [] : DomainKeywordRanking::query()
+            ->where('domain', $ownDomain)->where('country', $country)
+            ->pluck('keyword_hash')->all();
+
+        $base = DomainKeywordRanking::query()
+            ->whereIn('domain', $competitors)->where('country', $country)
+            ->when($clientHashes !== [], fn ($q) => $q->whereNotIn('keyword_hash', $clientHashes))
+            ->where('search_volume', '>', 0);
+
+        $total = (clone $base)->distinct()->count('keyword_hash');
+        if ($total === 0) {
+            return array_merge($empty, ['pending' => $pending, 'ready' => $ready, 'active' => $active]);
+        }
+
+        // Top candidates by volume, one row per keyword (highest-volume ranking wins).
+        $seen = [];
+        $candidates = [];
+        foreach ((clone $base)->orderByDesc('search_volume')->limit(400)->get(['keyword', 'keyword_hash', 'search_volume']) as $r) {
+            if (isset($seen[$r->keyword_hash])) {
+                continue;
+            }
+            $seen[$r->keyword_hash] = true;
+            $candidates[] = ['keyword' => $r->keyword, 'hash' => $r->keyword_hash, 'volume' => (int) $r->search_volume];
+        }
+
+        // Competition levels from keyword_metrics (shared facts).
+        $comp = KeywordMetric::query()
+            ->where('country', $country)->where('data_source', 'dfs_labs')
+            ->whereIn('keyword_hash', array_column($candidates, 'hash'))
+            ->pluck('competition', 'keyword_hash')->all();
+        $level = static function ($c): string {
+            if (! is_numeric($c)) {
+                return 'unknown';
+            }
+
+            return $c < 0.34 ? 'low' : ($c < 0.67 ? 'medium' : 'high');
+        };
+
+        // LLM relevance pass over the top candidates (same filter as questions).
+        $topKeywords = array_slice(array_column($candidates, 'keyword'), 0, 60);
+        $keep = $this->relevanceKeep($topKeywords, $plan, 'search keywords', 'grel');
+        if (is_array($keep)) {
+            $keepSet = array_flip($keep);
+            $vetted = array_values(array_filter(
+                $candidates,
+                static fn ($r) => isset($keepSet[mb_strtolower(trim((string) $r['keyword']))])
+            ));
+            if ($vetted !== []) {
+                $candidates = $vetted;
+            }
+        }
+
+        $rows = array_map(static fn ($r) => [
+            'keyword' => $r['keyword'],
+            'volume' => $r['volume'],
+            'competition' => $level($comp[$r['hash']] ?? null),
+        ], array_slice($candidates, 0, 8));
+
+        return ['rows' => $rows, 'total' => $total, 'pending' => $pending, 'ready' => $ready, 'active' => $active];
     }
 
     /**

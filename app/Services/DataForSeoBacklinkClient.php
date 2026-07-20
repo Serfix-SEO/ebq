@@ -249,6 +249,66 @@ class DataForSeoBacklinkClient
     }
 
     /**
+     * DataForSEO Labs "ranked keywords" — the organic keywords a domain ranks for,
+     * with per-keyword volume/cpc/competition/difficulty/intent AND this domain's
+     * ranking (position, URL, ETV). One page of ≤1,000 rows, ordered by search
+     * volume desc. Pass `volume_cursor` to fetch only keywords BELOW a volume you
+     * already harvested (dupe-free incremental accumulation — the gap harvest).
+     *
+     * @param  array{limit?:int, volume_cursor?:?int, language_name?:string, location_code?:int}  $opts
+     * @return list<array<string, mixed>>  normalized rows
+     */
+    public function rankedKeywords(string $domain, array $opts = []): array
+    {
+        $limit = max(1, min(1000, (int) ($opts['limit'] ?? 1000)));
+        $task = [
+            'target' => $this->target($domain),
+            'language_name' => $opts['language_name'] ?? 'English',
+            'location_code' => (int) ($opts['location_code'] ?? 2840),
+            'limit' => $limit,
+            'order_by' => ['keyword_data.keyword_info.search_volume,desc'],
+            'item_types' => ['organic'],
+            'ignore_synonyms' => true,
+        ];
+        $cursor = $opts['volume_cursor'] ?? null;
+        if (is_numeric($cursor)) {
+            // Only keywords below the last-harvested volume → the next tier down.
+            $task['filters'] = [['keyword_data.keyword_info.search_volume', '<', (int) $cursor]];
+        }
+
+        $out = [];
+        foreach ($this->items('/dataforseo_labs/google/ranked_keywords/live', $task) as $it) {
+            if (! is_array($it)) {
+                continue;
+            }
+            $kw = trim((string) data_get($it, 'keyword_data.keyword'));
+            if ($kw === '') {
+                continue;
+            }
+            $serp = data_get($it, 'ranked_serp_element.serp_item', []);
+            $num = static fn ($v) => is_numeric($v) ? $v : null;
+            $out[] = [
+                'keyword' => mb_strtolower($kw),
+                'search_volume' => ($v = $num(data_get($it, 'keyword_data.keyword_info.search_volume'))) !== null ? (int) $v : null,
+                'cpc' => ($v = $num(data_get($it, 'keyword_data.keyword_info.cpc'))) !== null ? (float) $v : null,
+                'competition' => ($v = $num(data_get($it, 'keyword_data.keyword_info.competition'))) !== null ? (float) $v : null,
+                'keyword_difficulty' => ($v = $num(data_get($it, 'keyword_data.keyword_properties.keyword_difficulty'))) !== null ? (int) $v : null,
+                'search_intent' => ($si = data_get($it, 'keyword_data.search_intent_info.main_intent')) ? (string) $si : null,
+                'rank_absolute' => ($v = $num(data_get($serp, 'rank_absolute'))) !== null ? (int) $v : null,
+                'se_type' => ($t = data_get($serp, 'type')) ? (string) $t : null,
+                'page_url' => ($u = data_get($serp, 'url')) ? (string) $u : null,
+                'etv' => ($v = $num(data_get($serp, 'etv'))) !== null ? (float) $v : null,
+                'previous_rank' => ($v = $num(data_get($serp, 'rank_changes.previous_rank_absolute'))) !== null ? (int) $v : null,
+                'is_new' => (bool) data_get($serp, 'rank_changes.is_new', false),
+                'is_up' => (bool) data_get($serp, 'rank_changes.is_up', false),
+                'is_down' => (bool) data_get($serp, 'rank_changes.is_down', false),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * A bounded sample of individual backlinks (one per referring domain) for
      * the "example links" feed. Capped at row_limit.
      *

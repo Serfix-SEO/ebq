@@ -50,6 +50,10 @@ Schedule::command('ebq:failed-jobs-alert')->everyFifteenMinutes()->withoutOverla
 // dispatch due article productions (writes 48h ahead of each publish slot).
 Schedule::command('ebq:content-autopilot')->everyFifteenMinutes()->withoutOverlapping();
 
+// Monthly DataForSEO keyword-gap accumulation: +1,000 keywords/competitor for
+// every active content plan (shared per-domain). See DATAFORSEO_KEYWORD_GAP_PLAN.md.
+Schedule::command('ebq:content-keyword-harvest')->monthlyOn(2, '03:10')->withoutOverlapping();
+
 // Content-hash re-audit gate (2026-07-06): independently re-fetches a bounded
 // batch of the oldest completed audits and queues a re-audit only if the
 // page's actual content changed — catches WordPress not bumping `modified`
