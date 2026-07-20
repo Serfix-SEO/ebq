@@ -295,6 +295,32 @@
             </div>
         @endunless
 
+        {{-- Trial generation limit reached → prompt to subscribe. --}}
+        @if (($trialActive ?? false) && ($trialUsed ?? 0) >= ($trialCap ?? 0) && ($trialCap ?? 0) > 0)
+            <div class="flex flex-col gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-4 sm:flex-row sm:items-center dark:border-orange-900 dark:bg-orange-950">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('You\'ve used all :n free trial articles', ['n' => $trialCap]) }}</p>
+                    <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{{ __('Subscribe to keep generating new articles — your planned topics stay ready and resume the moment you upgrade.') }}</p>
+                </div>
+                <a href="{{ route('content.get-started') }}" wire:navigate
+                   class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                    {{ __('Subscribe') }}
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                </a>
+            </div>
+        @endif
+
+        {{-- Monthly article cap reached for this month. --}}
+        @if (! empty($overCapIds))
+            <div class="flex items-start gap-3 rounded-2xl border border-error/30 bg-error/5 p-4 text-sm dark:border-error/40">
+                <svg class="mt-0.5 h-5 w-5 flex-none text-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 8v4m0 4h.01"/></svg>
+                <p class="text-slate-700 dark:text-slate-200">{{ __('You can publish up to :cap articles a month on your plan. Articles past that (marked in red) won\'t be generated until next month or a higher plan.', ['cap' => $monthlyCap ?? 30]) }}</p>
+            </div>
+        @endif
+
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
                 <button wire:click="previousMonth" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="{{ __('Previous month') }}">&larr;</button>
@@ -368,12 +394,13 @@
                                     $cellInFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true) || $imgPending;
                                     $canWrite = ! $cellInFlight && in_array($topic->status, ['suggested', 'approved', 'failed'], true);
                                     $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true);
+                                    $overCap = in_array($topic->id, $overCapIds ?? [], true);
                                 @endphp
-                                <div wire:key="cell-{{ $topic->id }}"
+                                <div wire:key="cell-{{ $topic->id }}" x-data="{ pick: false }"
                                      @if($canDrag) draggable="true"
                                         x-on:dragstart="drag.id = '{{ $topic->id }}'; $event.dataTransfer.setData('text/plain', '{{ $topic->id }}'); $event.dataTransfer.effectAllowed = 'move'"
                                         x-on:dragend="drag.id = null" @endif
-                                     class="mb-1 rounded-lg border p-1.5 {{ $cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800' }} {{ $canDrag ? 'cursor-grab active:cursor-grabbing' : '' }}">
+                                     class="mb-1 rounded-lg border p-1.5 {{ $overCap ? 'border-error/60 bg-error/5 dark:border-error/50' : ($cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800') }} {{ $canDrag ? 'cursor-grab active:cursor-grabbing' : '' }}">
                                     @if ($topic->currentArticle || $cellInFlight)
                                         <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80">
                                             <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
@@ -389,14 +416,31 @@
                                             @endif
                                             {{ $imgPending ? __('Finalizing images…') : $p['label'] }}
                                         </span>
-                                        @if ($canWrite)
-                                            <button wire:click="writeNow('{{ $topic->id }}')" wire:loading.attr="disabled" wire:target="writeNow('{{ $topic->id }}')"
-                                                    class="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-orange-700" title="{{ __('Write now') }}">
-                                                <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
-                                                {{ __('Write') }}
-                                            </button>
-                                        @endif
+                                        <span class="flex items-center gap-1">
+                                            @if ($canDrag)
+                                                {{-- Calendar icon → inline date picker (move to any day, incl. a 2nd on one day). --}}
+                                                <button type="button" draggable="false" x-on:click="pick = !pick" title="{{ __('Change date') }}"
+                                                        class="inline-flex shrink-0 items-center justify-center rounded-md p-0.5 text-slate-400 hover:text-orange-600">
+                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path stroke-linecap="round" d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>
+                                                </button>
+                                            @endif
+                                            @if ($canWrite)
+                                                <button wire:click="writeNow('{{ $topic->id }}')" wire:loading.attr="disabled" wire:target="writeNow('{{ $topic->id }}')"
+                                                        class="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-orange-700" title="{{ __('Write now') }}">
+                                                    <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+                                                    {{ __('Write') }}
+                                                </button>
+                                            @endif
+                                        </span>
                                     </div>
+                                    @if ($canDrag)
+                                        <input x-show="pick" x-cloak type="date" draggable="false" value="{{ $topic->scheduled_for?->toDateString() }}" min="{{ now()->toDateString() }}"
+                                               wire:change="reschedule('{{ $topic->id }}', $event.target.value)" wire:key="gpick-{{ $topic->id }}"
+                                               class="mt-1 w-full rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" />
+                                    @endif
+                                    @if ($overCap)
+                                        <p class="mt-1 text-[10px] font-semibold text-error">{{ __('Over monthly limit') }}</p>
+                                    @endif
                                     @if ($publishConnected && ! $imgPending && \App\Livewire\Content\ContentCalendar::publishableNow($topic))
                                         <button wire:click="publishNow('{{ $topic->id }}')" wire:confirm="{{ __('Publish this article to your site now?') }}" draggable="false"
                                                 class="mt-1 inline-flex w-full items-center justify-center gap-0.5 rounded-md bg-success px-1.5 py-0.5 text-[10px] font-bold text-white hover:brightness-110">
@@ -417,8 +461,9 @@
                         @php
                             $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status);
                             $imgPending = \App\Livewire\Content\ContentCalendar::imagesPending($topic);
+                            $overCap = in_array($topic->id, $overCapIds ?? [], true);
                         @endphp
-                        <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                        <div class="flex flex-wrap items-center gap-3 px-4 py-3 {{ $overCap ? 'bg-error/5' : '' }}">
                             @php $canMove = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true); @endphp
                             <div class="w-28 shrink-0">
                                 @if ($canMove)
@@ -449,6 +494,9 @@
                             </div>
                             @php $chipColor = $imgPending ? 'amber' : $p['color']; @endphp
                             <span class="rounded-full bg-{{ $chipColor }}-100 px-2 py-0.5 text-xs font-semibold text-{{ $chipColor }}-700">{{ $imgPending ? __('Finalizing images…') : $p['label'] }}</span>
+                            @if ($overCap)
+                                <span class="rounded-full bg-error/10 px-2 py-0.5 text-xs font-bold text-error">{{ __('Over monthly limit') }}</span>
+                            @endif
                             @if ($inFlight)
                                 <a href="{{ route('content.review', $topic->id) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700">
                                     <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>

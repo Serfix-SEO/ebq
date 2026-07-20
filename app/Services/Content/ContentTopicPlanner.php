@@ -45,6 +45,19 @@ class ContentTopicPlanner
             return [];
         }
 
+        // Keep at most the monthly cap (default 30) planned ahead — never create
+        // more future topics than the plan allows per month, so top-up tops up
+        // TO the cap rather than piling on past it.
+        $cap = \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $existingFuture = $plan->topics()
+            ->whereIn('status', [ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED])
+            ->where('scheduled_for', '>=', now()->toDateString())
+            ->count();
+        $count = max(0, min($count, $cap) - $existingFuture);
+        if ($count === 0) {
+            return [];
+        }
+
         $existingTitles = $this->existingPageTitles($website);
         $plannedTitles = $plan->topics()
             ->whereNotIn('status', [ContentTopic::STATUS_FAILED, ContentTopic::STATUS_SKIPPED])

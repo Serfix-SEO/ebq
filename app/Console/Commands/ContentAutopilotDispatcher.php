@@ -51,7 +51,8 @@ class ContentAutopilotDispatcher extends Command
      *  throttle is bypassed so an imminent slot is never missed. */
     private const CATCH_UP_HOURS = 24;
 
-    private const THIN_CALENDAR_TOPICS = 7;
+    /** Keep the calendar filled this many topics ahead (matches the monthly cap). */
+    private const THIN_CALENDAR_TOPICS = 30;
 
     /** Topic ids already dispatched this tick, so the catch-up pass never double-fires. */
     private array $claimedTopicIds = [];

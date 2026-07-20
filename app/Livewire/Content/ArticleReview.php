@@ -541,11 +541,23 @@ class ArticleReview extends Component
             ->unique()
             ->values();
 
+        // Featured image is generated even when the "in article" toggle is off
+        // (it's the WP thumbnail). Surface it here with a note so the reviewer
+        // still sees it — but only when it isn't already embedded in the body.
+        $featuredImage = null;
+        if ($article !== null && $topic?->plan !== null && ! $topic->plan->toggle('featured_image')) {
+            $featuredImage = $article->images()
+                ->where('role', \App\Models\ContentImage::ROLE_FEATURED)
+                ->where('status', \App\Models\ContentImage::STATUS_GENERATED)
+                ->latest()->first();
+        }
+
         return view('livewire.content.article-review', [
             'topic' => $topic,
             'article' => $article,
             'generating' => $generating,
             'progress' => $progress,
+            'featuredImage' => $featuredImage,
             'previewHtml' => $this->sanitize((string) ($article?->html ?? '')),
             'issueLabels' => $issueLabels,
             'traffic' => $topic ? self::trafficWorth($topic) : null,

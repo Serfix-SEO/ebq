@@ -802,17 +802,8 @@ class ContentCalendar extends Component
         if ($day->lt(now()->startOfDay())) {
             return;
         }
-        // Strict one-article-per-day: refuse a day that already has another topic.
-        $taken = ContentTopic::query()
-            ->where('website_id', $topic->website_id)
-            ->where('id', '!=', $topic->id)
-            ->whereDate('scheduled_for', $day->toDateString())
-            ->exists();
-        if ($taken) {
-            session()->flash('content-error', __('There is already an article scheduled for that day — pick another.'));
-
-            return;
-        }
+        // The planner fills one per day, but the user may stack a second article
+        // on a day manually — so no one-per-day guard here.
         $topic->update(['scheduled_for' => $day]);
     }
 
@@ -1238,7 +1229,41 @@ class ContentCalendar extends Component
             'publishConnected' => $this->hasPublishDestination(),
             'hasInFlight' => $topics->contains(fn ($t) => in_array($t->status, ContentTopic::IN_FLIGHT, true)),
             'hasImagesPending' => $topics->contains(fn ($t) => self::imagesPending($t)),
-        ]);
+        ] + $this->capAndTrialBindings($topics, $monthStart));
+    }
+
+    /**
+     * Monthly-cap (mark the cap-th article + beyond) and trial-limit view data.
+     * The cap comes from plan/admin settings (default 30).
+     */
+    private function capAndTrialBindings($topics, Carbon $monthStart): array
+    {
+        $cap = \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $monthKey = $monthStart->format('Y-m');
+        $rank = 0;
+        $overCapIds = [];
+        foreach ($topics->sortBy('scheduled_for') as $t) {
+            if ($t->scheduled_for?->format('Y-m') !== $monthKey) {
+                continue;
+            }
+            $rank++;
+            if ($rank >= $cap) { // the cap-th (your last) and anything beyond
+                $overCapIds[] = $t->id;
+            }
+        }
+
+        $user = Auth::user();
+        $ent = app(ContentEntitlements::class);
+        $trialActive = $user !== null && $ent->onContentTrial($user) && ! $ent->hasContentSubscription($user);
+
+        return [
+            'monthlyCap' => $cap,
+            'overCapIds' => $overCapIds,
+            'monthOverCap' => $rank > $cap,
+            'trialActive' => $trialActive,
+            'trialUsed' => $trialActive ? $ent->trialUsage($user) : 0,
+            'trialCap' => \App\Support\ContentAutopilotConfig::trialArticles(),
+        ];
     }
 
     /** Bindings the calendar branch needs so the wizard branch can omit them. */

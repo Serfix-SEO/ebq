@@ -182,7 +182,7 @@ class ContentAutopilotConfig
 
     public static function monthlyArticlesPerWebsite(): int
     {
-        return max(1, (int) self::setting('content.limits.monthly_articles_per_website', 60));
+        return max(1, (int) self::setting('content.limits.monthly_articles_per_website', 30));
     }
 
     /** Crawl page cap for content-only users (feeds the pipeline, not the dashboard). */
