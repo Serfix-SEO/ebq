@@ -149,63 +149,41 @@ class ContentKeywordInsightsTest extends TestCase
         $this->assertSame(310, $row['keywords']);
     }
 
-    public function test_dfs_gap_reads_classified_plan_keywords(): void
+    public function test_gap_comes_from_the_single_competitor_keyword_request(): void
     {
         [, $website, $plan] = $this->userWithPlan();
 
-        \Illuminate\Support\Facades\Cache::put('content:setup-insights:v1:'.$website->id, [
+        // One discovered competitor (MAX_COMPETITORS = 1).
+        Cache::put('content:setup-insights:v1:'.$website->id, [
             'my_referring_domains' => 0, 'my_authority' => null,
             'competitors' => [['domain' => 'rival.com']],
             'median' => null, 'gap' => null, 'behind' => false,
         ], now()->addDay());
 
-        // Competitor must have harvested rankings so the gap is considered final.
-        \App\Models\DomainKeywordRanking::query()->create([
-            'domain' => 'rival.com', 'keyword' => 'x', 'country' => 'us',
-            'keyword_hash' => \App\Models\KeywordMetric::hashKeyword('x'), 'search_volume' => 100,
-        ]);
-
-        // Classification already done → gap reads the tagged plan keywords.
-        foreach ([['pubg stylish name', 9000, 0.2], ['bgmi name generator', 4000, 0.5]] as [$kw, $vol, $comp]) {
-            \App\Models\ContentPlanKeyword::query()->create([
-                'plan_id' => $plan->id, 'keyword' => $kw, 'type' => 'gap', 'country' => 'us',
-                'keyword_hash' => \App\Models\KeywordMetric::hashKeyword($kw),
-                'search_volume' => $vol, 'competition' => $comp,
-            ]);
-        }
-        $plan->forceFill(['keywords_classified_at' => now()])->save();
-
+        // Client's own keywords.
         $this->storeCompletedRequest($plan, [
-            ['keyword' => 'name maker', 'avgMonthlySearches' => 100, 'competitionIndex' => 10],
+            ['keyword' => 'pubg name generator', 'avgMonthlySearches' => 5000, 'competitionIndex' => 20],
         ]);
+        // Competitor's keywords: one the client already targets, one they don't.
+        $comp = KeywordApiRequest::query()->create([
+            'request_id' => (string) \Illuminate\Support\Str::uuid(),
+            'type' => KeywordApiRequest::TYPE_IDEAS, 'mode' => 'keywords',
+            'payload' => [], 'status' => KeywordApiRequest::STATUS_COMPLETED,
+            'result' => ['results' => [
+                ['keyword' => 'pubg name generator', 'avgMonthlySearches' => 5000, 'competitionIndex' => 20],
+                ['keyword' => 'best pubg names', 'avgMonthlySearches' => 12000, 'competitionIndex' => 30],
+            ]],
+            'website_id' => $plan->website_id,
+        ]);
+        Cache::put('content:kw-insights:comp-req:'.$plan->id.':0', $comp->id, now()->addHours(2));
 
         $insights = app(ContentKeywordInsights::class)->get($plan);
 
         $this->assertNotNull($insights);
-        $this->assertSame(2, $insights['gap_total']);
-        $this->assertSame('pubg stylish name', $insights['gap'][0]['keyword']); // highest volume first
-        $this->assertSame('low', $insights['gap'][0]['competition']);           // 0.2 → low
+        $keywords = array_column($insights['gap'], 'keyword');
+        $this->assertContains('best pubg names', $keywords);        // competitor-only → gap
+        $this->assertNotContains('pubg name generator', $keywords); // client already targets it
         $this->assertFalse($insights['competitors_pending']);
-    }
-
-    public function test_dfs_gap_pending_until_classified(): void
-    {
-        [, $website, $plan] = $this->userWithPlan();
-        \Illuminate\Support\Facades\Cache::put('content:setup-insights:v1:'.$website->id, [
-            'my_referring_domains' => 0, 'my_authority' => null,
-            'competitors' => [['domain' => 'rival.com']],
-            'median' => null, 'gap' => null, 'behind' => false,
-        ], now()->addDay());
-        $this->storeCompletedRequest($plan, [
-            ['keyword' => 'name maker', 'avgMonthlySearches' => 100, 'competitionIndex' => 10],
-        ]);
-
-        $insights = app(ContentKeywordInsights::class)->get($plan);
-
-        // keywords_classified_at is null → gap holds a pending state, shows nothing partial.
-        $this->assertSame([], $insights['gap']);
-        $this->assertSame(0, $insights['gap_total']);
-        $this->assertTrue($insights['competitors_pending']);
     }
 
     public function test_insights_classify_intent_questions_and_opportunities(): void

@@ -50,9 +50,11 @@ Schedule::command('ebq:failed-jobs-alert')->everyFifteenMinutes()->withoutOverla
 // dispatch due article productions (writes 48h ahead of each publish slot).
 Schedule::command('ebq:content-autopilot')->everyFifteenMinutes()->withoutOverlapping();
 
-// Monthly DataForSEO keyword-gap accumulation: +1,000 keywords/competitor for
-// every active content plan (shared per-domain). See DATAFORSEO_KEYWORD_GAP_PLAN.md.
-Schedule::command('ebq:content-keyword-harvest')->monthlyOn(2, '03:10')->withoutOverlapping();
+// DataForSEO keyword-gap accumulation — DISABLED 2026-07-20. The keyword gap went
+// back to the self-hosted keyword server (1 competitor, see ContentKeywordInsights
+// MAX_COMPETITORS), so harvesting ranked_keywords would be pure spend for data
+// nothing reads. The command + tables stay in place if we revisit it.
+// Schedule::command('ebq:content-keyword-harvest')->monthlyOn(2, '03:10')->withoutOverlapping();
 
 // Content-hash re-audit gate (2026-07-06): independently re-fetches a bounded
 // batch of the oldest completed audits and queues a re-audit only if the

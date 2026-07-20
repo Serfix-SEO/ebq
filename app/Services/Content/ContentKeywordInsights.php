@@ -62,12 +62,12 @@ class ContentKeywordInsights
     /** Keyword-server hard cap per ideas request (infra/keywords). */
     private const MAX_SEEDS = 20;
 
-    /** Competitor domains for the keyword gap. The gap now comes from DataForSEO
-     *  Labs (fast, one call/domain), so we analyze the top 3 competitors — the
-     *  self-hosted keyword server (concurrency-1) is NOT used for competitor gap
-     *  mining anymore (it still serves client seeds + the other product). See
-     *  DATAFORSEO_KEYWORD_GAP_PLAN.md. */
-    private const MAX_COMPETITORS = 3;
+    /** Competitor domains we mine keywords from for the gap analysis. Kept at 1:
+     *  the self-hosted keyword server is concurrency-1 and minutes-per-job, so
+     *  each extra rival stalls the whole step (seed + own domain + 1 competitor).
+     *  The wizard says so plainly — deeper competitor research continues in the
+     *  background per-article after onboarding. */
+    private const MAX_COMPETITORS = 1;
 
     /** Give the (concurrency-1, minutes-per-job) server this long before falling back. */
     private const PENDING_GRACE_MINUTES = 15;
@@ -99,13 +99,14 @@ class ContentKeywordInsights
         $this->ensureOwnRequest($plan);
         $this->ensureSiteRequest($plan, $this->ownDomainKey($plan), fn () => $plan->website?->normalized_domain ?: $plan->website?->domain);
 
-        // Competitor keyword gap now comes from DataForSEO Labs (fast, 3 rivals) —
-        // NOT the concurrency-1 keyword server. Dispatch the shared per-domain
-        // harvest for the client + top-3 competitors; then classify the harvested
-        // keywords once (own vs relevant gap) for the gap card + planner to reuse.
-        // See DATAFORSEO_KEYWORD_GAP_PLAN.md.
-        $this->ensureHarvest($plan);
-        $this->ensureClassify($plan);
+        // ONE competitor only (see MAX_COMPETITORS): the keyword server is
+        // concurrency-1, so each extra rival adds minutes to the step. The wizard
+        // tells the client we analyze their top competitor now and keep studying
+        // the rest in the background. Late dispatch is fine — the poll re-runs
+        // ensureStarted once the competitors step has discovered them.
+        foreach ($this->topCompetitorDomains($plan, $plan->website, self::MAX_COMPETITORS) as $i => $domain) {
+            $this->ensureSiteRequest($plan, $this->competitorRequestKey($plan, $i), fn () => $domain);
+        }
     }
 
     /**
@@ -379,24 +380,52 @@ class ContentKeywordInsights
 
         $completed = fn (?KeywordApiRequest $r) => $r !== null && $r->status === KeywordApiRequest::STATUS_COMPLETED;
 
-        // The digest (clusters / top searches / questions / intents) is built from
-        // the CLIENT's own research (offering seeds + own-domain crawl) via the
-        // self-hosted keyword server. The competitor GAP is now a DataForSEO Labs
-        // overlay ({@see withCompetitorData}) that fills in asynchronously — so we
-        // no longer gate the digest on any competitor keyword-server request.
-        $clientComplete = $completed($seed) && ($ownSite === null || $completed($ownSite));
-        $allSettled = $this->settled($seed) && $this->settled($ownSite);
+        // Competitor requests — ONE rival (MAX_COMPETITORS) so the concurrency-1
+        // keyword server isn't choked; the wizard tells the client the rest are
+        // studied in the background.
+        $competitorDomains = $this->topCompetitorDomains($plan, $plan->website, self::MAX_COMPETITORS);
+        $expected = count($competitorDomains);
+        $compReqs = [];
+        foreach (array_keys($competitorDomains) as $i) {
+            $compReqs[$i] = $this->siteRequest($this->competitorRequestKey($plan, $i));
+        }
 
-        if (! $clientComplete && ! $allSettled) {
-            return null; // keep the loader up — show complete client results only
+        // Competitor DISCOVERY may still be running — no domains found YET, not
+        // necessarily none. Don't call competitors "done" while discovery is live.
+        $discoveryPending = $plan->website !== null
+            && $competitorDomains === []
+            && app(ContentSetupInsights::class)->isGenerating($plan->website);
+
+        // Show the FULL digest in one shot — never a smaller number that grows.
+        $clientComplete = $completed($seed) && ($ownSite === null || $completed($ownSite));
+        $compCompleted = count(array_filter($compReqs, $completed));
+        $competitorsComplete = ! $discoveryPending && $compCompleted >= $expected;
+        $allComplete = $clientComplete && $competitorsComplete;
+
+        // Backstop: build from whatever landed once EVERYTHING has settled, so a
+        // dead keyword server can't hang the step forever.
+        $compDispatched = count(array_filter($compReqs, static fn ($r) => $r !== null));
+        $competitorsSettled = ! $discoveryPending
+            && $compDispatched >= $expected
+            && count(array_filter($compReqs, fn ($r) => $this->settled($r))) === count($compReqs);
+        $allSettled = $this->settled($seed) && $this->settled($ownSite) && $competitorsSettled;
+
+        if (! $allComplete && ! $allSettled) {
+            return null; // keep the loader up — show complete results only
         }
 
         // CLIENT keywords = offering seeds + their own crawled domain (scrap-
         // filtered — the site-scope set includes login / cart / account junk).
-        $rows = $this->mergeRows(
+        $clientRows = $this->mergeRows(
             $this->completedRows($seed),
             $this->filterScrap($this->completedRows($ownSite), $plan),
         );
+        // COMPETITOR keywords from the rival's site-scope crawl, scrap-filtered.
+        $competitorRows = [];
+        foreach ($compReqs as $req) {
+            $competitorRows = $this->mergeRows($competitorRows, $this->filterScrap($this->completedRows($req), $plan));
+        }
+        $rows = $this->mergeRows($clientRows, $competitorRows);
 
         if ($rows === []) {
             // Server returned nothing → topic fallback.
@@ -406,16 +435,24 @@ class ContentKeywordInsights
             }
             $partial = true;
         } else {
-            $partial = ! $clientComplete;
+            $partial = ! $allComplete;
         }
+
+        // Keyword gap: what the competitor ranks for that the client does NOT,
+        // ranked by relevance to what the client sells (LLM-vetted).
+        $gap = $this->computeGap($clientRows, $competitorRows, $plan);
 
         // "People also ask" / "People also search for" straight from Google's
         // SERP for the client's top query (one cached Serper call).
         $peopleAlso = $this->peopleAlsoSearch($plan, $rows);
 
-        $insights = $this->build($rows, $plan, partial: $partial, peopleAlso: $peopleAlso);
+        $insights = $this->build($rows, $plan, partial: $partial, gap: $gap['rows'], gapTotal: $gap['total'],
+            competitorsPending: ! $competitorsComplete,
+            competitorsDone: $compCompleted,
+            competitorsTotal: max($expected, $compDispatched, $discoveryPending ? self::MAX_COMPETITORS : 0),
+            peopleAlso: $peopleAlso);
         // Partial results are cached briefly so the next poll upgrades them; the
-        // final digest is cached 30 days. The gap overlay refreshes on every read.
+        // final digest is cached 30 days.
         Cache::put($this->insightsKey($plan), $insights,
             $partial ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
@@ -443,15 +480,10 @@ class ContentKeywordInsights
         $insights['traffic'] = ['estimated' => $data['traffic_total'], 'competitors' => $data['traffic_count']];
         $insights['competitor_metrics'] = $data['rows'];
 
-        // Keyword gap from DataForSEO Labs (domain_keyword_rankings), overlaid
-        // fresh — the harvest fills in asynchronously and grows month over month.
-        $gap = $this->dfsGap($plan);
-        $insights['gap'] = $gap['rows'];
-        $insights['gap_total'] = $gap['total'];
-        $insights['competitors_pending'] = $gap['pending'];
-        $insights['competitors_done'] = $gap['ready'];
-        $insights['competitors_total'] = $gap['active'];
-
+        // NOTE: the keyword GAP is NOT overlaid here — it comes from the keyword
+        // server via computeGap() in get() and is baked into the cached digest.
+        // Only the DataForSEO competitor METRICS (authority + traffic) are overlaid,
+        // because that enrichment lands asynchronously after the digest is cached.
         return $insights;
     }
 
