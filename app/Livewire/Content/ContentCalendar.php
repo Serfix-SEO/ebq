@@ -699,7 +699,9 @@ class ContentCalendar extends Component
             // Trial used up (or no active plan) → send them straight to the
             // purchase page with a clear prompt, not just a toast.
             if (in_array($reason, ['trial_limit', 'no_access', 'not_covered'], true)) {
-                session()->flash('content-status', self::generationBlockMessage($reason));
+                // 'error' is the key the Get started page renders — so the reason
+                // (e.g. "You've used all 3 free trial articles") shows there.
+                session()->flash('error', self::generationBlockMessage($reason));
                 $this->redirect(route('content.get-started'), navigate: true);
 
                 return;
@@ -716,7 +718,7 @@ class ContentCalendar extends Component
     public static function generationBlockMessage(string $reason): string
     {
         return match ($reason) {
-            'trial_limit' => __('Your free trial includes :n article generations, and you\'ve used them all. Choose a plan to keep generating.', ['n' => \App\Support\ContentAutopilotConfig::trialArticles()]),
+            'trial_limit' => __('You\'ve used all :n free trial articles. Choose a plan to keep generating.', ['n' => \App\Support\ContentAutopilotConfig::trialArticles()]),
             'monthly_limit' => __('You\'ve reached your plan\'s limit of :n articles this month for this website. It resets next month, or upgrade for more.', ['n' => \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite()]),
             'not_covered' => __('This website is not on your content plan yet. Add it from Get started.'),
             default => __('Content Autopilot is not active for this website. Start it from Get started.'),
@@ -751,7 +753,9 @@ class ContentCalendar extends Component
             // Trial used up (or no active plan) → send them straight to the
             // purchase page with a clear prompt, not just a toast.
             if (in_array($reason, ['trial_limit', 'no_access', 'not_covered'], true)) {
-                session()->flash('content-status', self::generationBlockMessage($reason));
+                // 'error' is the key the Get started page renders — so the reason
+                // (e.g. "You've used all 3 free trial articles") shows there.
+                session()->flash('error', self::generationBlockMessage($reason));
                 $this->redirect(route('content.get-started'), navigate: true);
 
                 return;
