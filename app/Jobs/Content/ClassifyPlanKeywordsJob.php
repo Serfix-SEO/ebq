@@ -77,22 +77,50 @@ class ClassifyPlanKeywordsJob implements ShouldQueue
             }
         }
         if ($competitors === []) {
-            return; // nothing harvested to classify yet
+            return; // competitors not discovered yet
         }
 
-        // ── OWN: everything the client already ranks for (inherently theirs).
-        $ownRows = $ownDomain === '' ? collect() : DomainKeywordRanking::query()
-            ->where('domain', $ownDomain)->where('country', $country)
-            ->get(['keyword', 'keyword_hash', 'search_volume']);
-        $ownHashes = $ownRows->pluck('keyword_hash')->all();
+        // FINAL gate — classify only once EVERY competitor has harvested rankings,
+        // so the gap the client sees is complete (not a mid-harvest partial set).
+        foreach ($competitors as $d) {
+            if (! DomainKeywordRanking::query()->where('domain', $d)->where('country', $country)->exists()) {
+                return;
+            }
+        }
 
-        // ── GAP candidates: competitor keywords the client doesn't rank for,
-        // deduped (highest-volume ranking wins), capped, highest-volume first.
+        $now = now();
+
+        // ── OWN: append the client's ranked keywords not yet stored (no LLM).
+        $ownHashes = [];
+        if ($ownDomain !== '') {
+            $existingOwn = ContentPlanKeyword::query()
+                ->where('plan_id', $plan->id)->where('type', ContentPlanKeyword::TYPE_OWN)
+                ->pluck('keyword_hash')->flip();
+            $ownInsert = [];
+            foreach (DomainKeywordRanking::query()
+                ->where('domain', $ownDomain)->where('country', $country)
+                ->get(['keyword', 'keyword_hash', 'search_volume']) as $r) {
+                $ownHashes[$r->keyword_hash] = true;
+                if (! $existingOwn->has($r->keyword_hash)) {
+                    $ownInsert[] = $this->row($plan->id, $r->keyword_hash, $r->keyword, ContentPlanKeyword::TYPE_OWN, (int) $r->search_volume, $country, null, $now);
+                }
+            }
+            foreach (array_chunk($ownInsert, 500) as $chunk) {
+                ContentPlanKeyword::query()->insertOrIgnore($chunk);
+            }
+        }
+
+        // ── GAP band (INCREMENTAL): the next lower-volume slice below the plan's
+        // classify cursor — competitor keywords the client doesn't rank for. Each
+        // run advances the cursor downward and APPENDS, so the gap accumulates and
+        // already-processed (incl. rejected) keywords are never re-charged.
+        $cursor = $plan->keywords_classify_cursor;
         $seen = [];
         foreach (DomainKeywordRanking::query()
             ->whereIn('domain', $competitors)->where('country', $country)
-            ->when($ownHashes !== [], fn ($q) => $q->whereNotIn('keyword_hash', $ownHashes))
             ->where('search_volume', '>', 0)
+            ->when($ownHashes !== [], fn ($q) => $q->whereNotIn('keyword_hash', array_keys($ownHashes)))
+            ->when($cursor !== null, fn ($q) => $q->where('search_volume', '<', $cursor))
             ->orderByDesc('search_volume')
             ->limit(self::CANDIDATE_CAP * 2)
             ->get(['keyword', 'keyword_hash', 'search_volume']) as $r) {
@@ -104,40 +132,41 @@ class ClassifyPlanKeywordsJob implements ShouldQueue
                 break;
             }
         }
-        if ($seen === [] && $ownRows->isEmpty()) {
+
+        if ($seen === []) {
+            // No new band to classify — just mark that a run happened.
+            $plan->forceFill(['keywords_classified_at' => $now])->saveQuietly();
+
             return;
         }
 
+        $minVolume = min(array_map(static fn ($c) => $c['volume'], $seen));
         $relevantHashes = $this->bulkRelevant($seen, $plan);
 
-        // Facts (competition/difficulty/intent) from the shared keyword_metrics.
-        $allHashes = array_merge($ownHashes, array_keys($seen));
         $facts = KeywordMetric::query()
             ->where('country', $country)->where('data_source', 'dfs_labs')
-            ->whereIn('keyword_hash', $allHashes)
+            ->whereIn('keyword_hash', array_keys($seen))
             ->get(['keyword_hash', 'competition', 'keyword_difficulty', 'search_intent'])
             ->keyBy('keyword_hash');
 
-        $now = now();
-        $rows = [];
-        foreach ($ownRows as $r) {
-            $f = $facts->get($r->keyword_hash);
-            $rows[] = $this->row($plan->id, $r->keyword_hash, $r->keyword, ContentPlanKeyword::TYPE_OWN, (int) $r->search_volume, $country, $f, $now);
-        }
+        $gapInsert = [];
         foreach ($seen as $hash => $c) {
             if (! isset($relevantHashes[$hash])) {
-                continue; // off-topic gap keyword → dropped
+                continue; // off-topic → dropped (cursor keeps it from returning)
             }
-            $f = $facts->get($hash);
-            $rows[] = $this->row($plan->id, $hash, $c['keyword'], ContentPlanKeyword::TYPE_GAP, $c['volume'], $country, $f, $now);
+            $gapInsert[] = $this->row($plan->id, $hash, $c['keyword'], ContentPlanKeyword::TYPE_GAP, $c['volume'], $country, $facts->get($hash), $now);
         }
 
-        DB::transaction(function () use ($plan, $rows, $now) {
-            ContentPlanKeyword::query()->where('plan_id', $plan->id)->delete();
-            foreach (array_chunk($rows, 500) as $chunk) {
-                ContentPlanKeyword::query()->insert($chunk);
+        DB::transaction(function () use ($plan, $gapInsert, $minVolume, $now) {
+            foreach (array_chunk($gapInsert, 500) as $chunk) {
+                ContentPlanKeyword::query()->insertOrIgnore($chunk);
             }
-            $plan->forceFill(['keywords_classified_at' => $now])->saveQuietly();
+            // Advance the cursor to the lowest volume we processed this run so the
+            // next run continues strictly below it.
+            $plan->forceFill([
+                'keywords_classified_at' => $now,
+                'keywords_classify_cursor' => $minVolume,
+            ])->saveQuietly();
         });
     }
 

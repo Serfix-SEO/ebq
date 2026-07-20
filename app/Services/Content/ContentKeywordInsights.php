@@ -112,22 +112,23 @@ class ContentKeywordInsights
     private function ensureClassify(ContentPlan $plan): void
     {
         $website = $plan->website;
-        if ($website === null) {
-            return;
-        }
-        $month = now()->format('Y-m');
-        if ($plan->keywords_classified_at !== null && $plan->keywords_classified_at->format('Y-m') === $month) {
-            return; // already classified this month
+        if ($website === null || $plan->keywords_classified_at !== null) {
+            return; // onboarding fires the FIRST classification only; monthly growth
+            //         is driven by ebq:content-keyword-harvest.
         }
         $country = $this->planCountry($plan);
         $competitors = $this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS);
         if ($competitors === []) {
             return; // competitors not discovered yet
         }
-        if (! DomainKeywordRanking::query()->whereIn('domain', $competitors)->where('country', $country)->exists()) {
-            return; // harvest hasn't landed yet
+        // Wait until EVERY competitor is harvested → the first gap the client sees
+        // is complete (mirrors the job's final gate).
+        foreach ($competitors as $d) {
+            if (! DomainKeywordRanking::query()->where('domain', $d)->where('country', $country)->exists()) {
+                return;
+            }
         }
-        if (! Cache::add('content:kw-classify:'.$plan->id.':'.$month, 1, now()->addHours(6))) {
+        if (! Cache::add('content:kw-classify:'.$plan->id, 1, now()->addMinutes(30))) {
             return;
         }
         ClassifyPlanKeywordsJob::dispatch($plan->id);
@@ -463,6 +464,7 @@ class ContentKeywordInsights
         if ($website === null) {
             return $empty;
         }
+        $country = $this->planCountry($plan);
         $competitors = $this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS);
         $active = count($competitors);
         if ($competitors === []) {
@@ -470,11 +472,17 @@ class ContentKeywordInsights
             return array_merge($empty, ['pending' => app(ContentSetupInsights::class)->isGenerating($website)]);
         }
 
-        // Show the FINAL gap only — while the harvest + bulk classification are still
-        // running (keywords_classified_at not yet stamped), report pending so the UI
-        // holds a loader instead of a partial/raw list.
-        if ($plan->keywords_classified_at === null) {
-            return array_merge($empty, ['pending' => true, 'active' => $active]);
+        // Show the FINAL gap only — hold a loader while the harvest is still landing
+        // or the first bulk classification hasn't finished (keywords_classified_at
+        // null), rather than a partial/raw list.
+        $ready = 0;
+        foreach ($competitors as $d) {
+            if (DomainKeywordRanking::query()->where('domain', $d)->where('country', $country)->exists()) {
+                $ready++;
+            }
+        }
+        if ($ready < $active || $plan->keywords_classified_at === null) {
+            return array_merge($empty, ['pending' => true, 'ready' => $ready, 'active' => $active]);
         }
 
         // Read the pre-classified, relevance-vetted gap keywords for this plan

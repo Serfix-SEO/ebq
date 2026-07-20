@@ -57,6 +57,36 @@ class ClassifyPlanKeywordsJobTest extends TestCase
         $this->assertNotNull($plan->fresh()->keywords_classified_at);
     }
 
+    public function test_second_run_appends_new_lower_volume_band(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $website = Website::factory()->for($user)->create();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id, 'country' => 'US', 'status' => ContentPlan::STATUS_DRAFT,
+            'offerings' => ['sell' => ['name generator']], 'business_description' => 'Name generator.',
+        ]);
+        Cache::put('content:setup-insights:v1:'.$website->id, [
+            'my_referring_domains' => 10, 'my_authority' => null,
+            'competitors' => [['domain' => 'rival.com']], 'median' => null, 'gap' => null, 'behind' => false,
+        ], now()->addDay());
+
+        $this->ranking('rival.com', 'high volume name', 5000);
+        (new ClassifyPlanKeywordsJob($plan->id))->handle(app(ContentSetupInsights::class));
+
+        $this->assertSame(1, ContentPlanKeyword::where('plan_id', $plan->id)->where('type', 'gap')->count());
+        $this->assertSame(5000, $plan->fresh()->keywords_classify_cursor);
+
+        // A new, lower-volume keyword arrives next month (below the cursor).
+        $this->ranking('rival.com', 'low volume name', 500);
+        (new ClassifyPlanKeywordsJob($plan->id))->handle(app(ContentSetupInsights::class));
+
+        $gap = ContentPlanKeyword::where('plan_id', $plan->id)->where('type', 'gap')->pluck('keyword')->all();
+        $this->assertCount(2, $gap);                              // appended, not replaced
+        $this->assertContains('low volume name', $gap);
+        $this->assertContains('high volume name', $gap);
+        $this->assertSame(500, $plan->fresh()->keywords_classify_cursor); // cursor advanced down
+    }
+
     private function ranking(string $domain, string $keyword, int $volume): void
     {
         DomainKeywordRanking::query()->create([

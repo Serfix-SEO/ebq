@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\Content\ClassifyPlanKeywordsJob;
 use App\Jobs\Content\HarvestDomainKeywordsJob;
 use App\Models\ContentPlan;
 use App\Models\DomainKeywordHarvest;
@@ -86,6 +87,10 @@ class ContentKeywordHarvest extends Command
                         HarvestDomainKeywordsJob::dispatch($domain, $country, $limit, $sandbox);
                         $dispatched++;
                     }
+
+                    // Re-classify the plan's new keyword band AFTER the harvests land
+                    // (incremental append; delayed so the fetch completes first).
+                    ClassifyPlanKeywordsJob::dispatch($plan->id)->delay(now()->addMinutes(10));
                 }
             });
 

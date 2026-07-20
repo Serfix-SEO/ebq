@@ -159,6 +159,12 @@ class ContentKeywordInsightsTest extends TestCase
             'median' => null, 'gap' => null, 'behind' => false,
         ], now()->addDay());
 
+        // Competitor must have harvested rankings so the gap is considered final.
+        \App\Models\DomainKeywordRanking::query()->create([
+            'domain' => 'rival.com', 'keyword' => 'x', 'country' => 'us',
+            'keyword_hash' => \App\Models\KeywordMetric::hashKeyword('x'), 'search_volume' => 100,
+        ]);
+
         // Classification already done → gap reads the tagged plan keywords.
         foreach ([['pubg stylish name', 9000, 0.2], ['bgmi name generator', 4000, 0.5]] as [$kw, $vol, $comp]) {
             \App\Models\ContentPlanKeyword::query()->create([
