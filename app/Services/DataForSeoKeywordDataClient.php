@@ -124,8 +124,29 @@ class DataForSeoKeywordDataClient
                 return [];
             }
             $result = $t['result'] ?? null;
+            if (! is_array($result)) {
+                return [];
+            }
+            // Clickstream endpoints wrap keyword rows in result[0].items; the
+            // google_ads/search_volume endpoint returns result[] as the rows
+            // directly. Handle both so we don't silently get zero rows.
+            $rows = [];
+            foreach ($result as $r) {
+                if (! is_array($r)) {
+                    continue;
+                }
+                if (isset($r['items']) && is_array($r['items'])) {
+                    foreach ($r['items'] as $it) {
+                        if (is_array($it)) {
+                            $rows[] = $it;
+                        }
+                    }
+                } elseif (array_key_exists('keyword', $r)) {
+                    $rows[] = $r;
+                }
+            }
 
-            return is_array($result) ? array_values(array_filter($result, 'is_array')) : [];
+            return $rows;
         } catch (\Throwable $e) {
             Log::warning('DataForSEO keyword-data threw', ['message' => $e->getMessage()]);
 
