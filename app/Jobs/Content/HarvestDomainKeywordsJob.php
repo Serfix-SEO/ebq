@@ -79,13 +79,14 @@ class HarvestDomainKeywordsJob implements ShouldQueue
             $spend->add($dfs->totalCost());
         }
 
-        // Even an empty page must record progress so we don't hammer the same
-        // cursor forever — empty = exhausted.
+        // An EMPTY response is ambiguous: it can mean "no more keywords" OR a
+        // transient API blip (rate limit / hiccup). Never mark the domain
+        // exhausted on it — doing so permanently stopped harvesting a live
+        // domain after one bad response (broke prod 2026-07-20). Record the run
+        // only; the next cycle retries. `exhausted` is set solely on the success
+        // path below, where we actually received rows but fewer than the limit.
         if ($rows === [] || $this->sandbox) {
-            $harvest->fill([
-                'exhausted' => $rows === [] ? true : $harvest->exhausted,
-                'last_run_at' => now(),
-            ])->save();
+            $harvest->fill(['last_run_at' => now()])->save();
 
             return; // sandbox mock data is never persisted to the shared asset
         }

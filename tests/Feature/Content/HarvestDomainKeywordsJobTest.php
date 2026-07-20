@@ -83,6 +83,21 @@ class HarvestDomainKeywordsJobTest extends TestCase
         $this->assertTrue($h->exhausted);                // 2 < limit(1000) → no more
     }
 
+    public function test_empty_response_does_not_mark_exhausted(): void
+    {
+        // A transient API blip returns no rows — the domain must stay harvestable
+        // (marking it exhausted permanently killed a live domain on prod).
+        $this->configureDfs();
+        $this->fakeRanked([]);
+
+        $this->harvest('rival.com');
+
+        $h = DomainKeywordHarvest::where('domain', 'rival.com')->where('country', 'us')->first();
+        $this->assertNotNull($h);
+        $this->assertFalse($h->exhausted);
+        $this->assertNotNull($h->last_run_at);
+    }
+
     public function test_second_run_skips_when_exhausted(): void
     {
         $this->configureDfs();

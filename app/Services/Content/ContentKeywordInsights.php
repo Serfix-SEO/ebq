@@ -159,17 +159,20 @@ class ContentKeywordInsights
 
         $month = now()->format('Y-m');
         foreach (array_keys($domains) as $domain) {
-            // once-per-domain-per-month (shared) — cache guard first, then the
-            // durable last_run_at check so a restart doesn't re-bill.
-            if (! Cache::add('content:kw-harvest:'.$domain.':'.$country.':'.$month, 1, now()->addDays(31))) {
-                continue;
-            }
+            // DURABLE monthly state lives in domain_keyword_harvest (last_run_at),
+            // set by the job only on a real run. Check it FIRST.
             $h = DomainKeywordHarvest::query()->where('domain', $domain)->where('country', $country)->first();
             if ($h !== null && $h->exhausted) {
                 continue; // nothing left to fetch for this domain
             }
             if ($h !== null && $h->last_run_at !== null && $h->last_run_at->format('Y-m') === $month) {
                 continue; // already harvested this month
+            }
+            // Transient dedupe guard LAST — only when we're actually dispatching, and
+            // short-lived. (A 31-day guard set BEFORE the work meant one failed run
+            // blocked the domain for a whole month — that broke prod 2026-07-20.)
+            if (! Cache::add('content:kw-harvest:'.$domain.':'.$country, 1, now()->addMinutes(30))) {
+                continue;
             }
             HarvestDomainKeywordsJob::dispatch($domain, $country, 1000, $sandbox);
         }
