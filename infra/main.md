@@ -281,6 +281,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-20 (content images: 3 stacked silent failures, prod)** — Ideogram
+  key 401 + worker box B's ~1 Mbit inbound cap (6 MB downloads timing out) +
+  `content_s3` writing into the void because `CONTENT_S3_ENDPOINT`/`_URL` were
+  never set and the disk had `throw => false`. Fixes: new key on both boxes;
+  **`content` queue moved from box B to box A** (`config/horizon.php`
+  `local`/`production` gain `worker-content`, `worker` loses it); S3 endpoint +
+  public URL added to both `.env`s; disk flipped to `throw => true`
+  (`config/filesystems.php`) so paid-artifact storage can never fail silently.
+  Full post-mortem incl. the box-B network evidence and the missing
+  `league/flysystem-aws-s3-v3` on box B:
+  [content-autopilot/README.md](./content-autopilot/README.md).
 - **2026-07-19 (Email verification grace window)** — Verification is no longer
   enforced at signup. `User` still implements `MustVerifyEmail` (mail still sent),
   but the `verified` middleware alias is overridden in `bootstrap/app.php` to

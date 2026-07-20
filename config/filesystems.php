@@ -74,7 +74,14 @@ return [
             'endpoint' => env('CONTENT_S3_ENDPOINT'),
             'use_path_style_endpoint' => env('CONTENT_S3_PATH_STYLE', true),
             'visibility' => 'public',
-            'throw' => false,
+            // throw=true since 2026-07-20: with throw=false a missing
+            // CONTENT_S3_ENDPOINT made every put() a silent no-op — Ideogram
+            // images were paid for, ContentImage rows were written, and the
+            // article HTML got <img> tags pointing at a host that does not
+            // resolve. GenerateContentImagesJob is async (tries=1) and never
+            // blocks publishing, so a throw here surfaces in failed_jobs +
+            // the ops digest instead of corrupting the article.
+            'throw' => true,
             'report' => false,
         ],
 

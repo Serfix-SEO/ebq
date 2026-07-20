@@ -353,8 +353,10 @@ businesses, illustration for digital/gaming/abstract; featured may carry a
 title-text overlay, inline stays text-free; no logos/watermarks/brands). Falls
 back to a deterministic prompt per item when the LLM is unavailable. Capped at
 `maxInlineImages` inline. For each: `IdeogramClient::generate`
-(num_images=1) → `download()` the short-lived URL → `Storage::disk('public')
-->put('content/images/{ulid}.png')` → `ContentImage` row (status generated)
+(num_images=1) → `download()` the short-lived URL → `Storage::disk(
+ContentImage::disk())->put('content/images/{ulid}.png')` (prod disk is
+`content_s3` = Hetzner Object Storage, see the incident below) → `ContentImage`
+row (status generated)
 → `IdeogramSpendMeter::add(cost)`. Then inject `<figure class="content-image">`
 into `$article->html`: featured after any leading TOC nav, each inline right
 after its section's `<h2 id>` (the anchor the scorer already stamps).
@@ -376,6 +378,52 @@ Config (`ContentAutopilotConfig`, live-flippable via `settings`):
 `.rendering_speed` (TURBO) / `.style_type` (AUTO); cap
 `services.ideogram.monthly_cap_usd`. Review preview renders the figures
 (`.ca-preview figure.content-image` styling in article-review.blade).
+
+### 🔥 Image-storage + worker-box incident (prod, 2026-07-20)
+
+Prod articles had **zero images** for two days. Three independent faults,
+each silent on its own — worth knowing all three, they stack:
+
+1. **Ideogram key 401.** The token stopped being accepted (401 "Access denied").
+   `IdeogramClient::generate` returns `['ok'=>false]` and the job's per-image
+   `continue` swallows it → article ships imageless, no failed job, no alert.
+   Fix: new key in `.env` on **both** boxes.
+2. **Worker box B ingress ~1 Mbit.** After the key fix, generation succeeded
+   (and **billed**) but `download()` of the ~6 MB PNG hit its 60s timeout at
+   ~600 KB. Measured: box A 50 MB/s vs box B **14 KB/s** download (8 parallel
+   streams still totalled ~113 KB/s → aggregate cap, and it applies to the
+   private network too). Box B **egress** is fine (2.3 MB/s). Ruled out: `tc`
+   shaper, iptables limits, MTU (clean at 1472), packet loss (0%, 5.7 ms RTT),
+   conntrack, NIC counters, CPU (99% idle). Hetzner API: `locked=false`, no
+   abuse action, 5.6 GB of 22 TB traffic used, and its own metrics show inbound
+   never above ~180 KB/s for ≥4 days — so this is **not new**, it was just
+   barely inside the 60s timeout until the images grew. Cause looks like a
+   degraded host/virtio receive path (`rx_kicks` 2320 vs `tx_kicks` 29.7 M).
+   Fix: **moved the `content` queue to box A** — `worker-content` added to the
+   `local`/`production` Horizon envs and removed from `worker`
+   (`config/horizon.php`). Move it back once B's receive path is rebuilt.
+3. **`content_s3` silently discarded every upload.** `CONTENT_S3_ENDPOINT` and
+   `CONTENT_S3_URL` were **never set** on either box, so the S3 disk fell back
+   to AWS defaults and addressed `s3.nbg1.amazonaws.com` (does not resolve).
+   With `'throw' => false` the `put()` was a **silent no-op**: images were paid
+   for, `ContentImage` rows written, and `<img>` tags injected pointing at a
+   dead host — strictly worse than no images. Fixed by adding both vars on both
+   boxes (bucket `serfix` @ `https://nbg1.your-objectstorage.com`, creds were
+   always valid) and flipping the disk to **`'throw' => true`**
+   (`config/filesystems.php`) so a storage failure lands in `failed_jobs` +
+   the ops digest instead of corrupting the article. The 9 bogus rows were
+   deleted, their `<figure>` blocks stripped from the article HTML, and the
+   images regenerated (9/9 now public, HTTP 200).
+
+**Also found:** box B's `vendor/` is missing `league/flysystem-aws-s3-v3`
+(`PortableVisibilityConverter not found`), so it could never have written to
+`content_s3` even with the endpoint set — a second reason content belongs on
+box A. And box B's IP is not whitelisted with DataForSEO (`40207`), so
+competitor traffic metrics fail from there.
+
+**Rule:** any job that spends money before storing a result must fail loudly.
+`throw => false` on a paid artifact's disk turns a config gap into silent
+financial loss.
 
 ## Config & admin
 

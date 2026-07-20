@@ -290,19 +290,26 @@ return [
     // they never share: crawl (redis, ≤300s) vs crawl-finalize/sync (redis-long, ≤3600s;
     // retry_after=3900 stays above).
     'environments' => [
-        // Web box (APP_ENV=local): user-facing + notification queues ONLY.
+        // Web box (APP_ENV=local): user-facing + notification queues, PLUS the
+        // content pool (2026-07-20). Content jobs moved here off worker box B:
+        // B's inbound throughput is stuck at ~1 Mbit (Hetzner metrics confirm it,
+        // no quota/abuse flag, guest clean), so Ideogram's ~6 MB PNG downloads
+        // timed out at 60s after paying for the generation. Box A pulls 50 MB/s.
+        // Move back to 'worker' once B's receive path is fixed/rebuilt.
         'local' => [
             'web' => $webPool,
+            'worker-content' => $contentPool,
         ],
         // If the web box is ever flipped to APP_ENV=production, same role, more procs.
         'production' => [
             'web' => array_replace($webPool, ['maxProcesses' => 6]),
+            'worker-content' => $contentPool,
         ],
         // Pinned worker box B (10.0.0.3) — APP_ENV=worker: crawl + sync + finalize.
+        // NOT content — see the note on 'local' above.
         'worker' => [
             'worker-crawl' => $crawlPool,
             'worker-heavy' => $heavyPool,
-            'worker-content' => $contentPool,
         ],
         // Autoscaled ephemeral boxes — APP_ENV=worker-ephemeral: crawl ONLY (never
         // finalize/sync, so a scale-down drain can't interrupt a long job).

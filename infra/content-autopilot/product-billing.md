@@ -126,7 +126,9 @@ Go-live steps executed (repeat pattern for future content deploys):
    unchanged-config container, so the long-lived Horizon keeps OLD classes.
 4. Flip prod `.env` `CONTENT_AUTOPILOT_UI=true`.
 5. Verify: `/content-autopilot` 200, landing renders correct prices,
-   `horizon:supervisors` shows `worker-content` running on box B.
+   `horizon:supervisors` shows `worker-content` running — on **box A** since
+   2026-07-20 (moved off box B, see the image-storage incident in
+   [README.md](./README.md)).
 
 **Setting-cache landmine**: settings reads use `Cache::rememberForever`; write via
 `Setting::set()` (busts cache), NOT raw `updateOrCreate` (leaves stale reads).
