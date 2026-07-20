@@ -861,7 +861,7 @@
                                     </div>
                                 </div>
                                 <div class="overflow-x-auto">
-                                    <table class="w-full text-sm">
+                                    <table class="min-w-full text-sm whitespace-nowrap">
                                         <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
                                             <tr>
                                                 <th class="px-4 py-2.5 text-start font-bold">{{ __('Competitor') }}</th>
