@@ -551,20 +551,9 @@ class ContentKeywordInsights
         if (count($questions) < 2) {
             return $questions;
         }
-        $keywords = array_map(static fn ($q) => (string) $q['keyword'], $questions);
-        $offer = implode(', ', array_slice((array) (($plan->offerings ?? [])['sell'] ?? []), 0, 10));
-        $desc = mb_substr((string) $plan->business_description, 0, 400);
-
-        $cacheKey = 'content:kw-qrel:'.md5($offer.'|'.implode('|', $keywords));
-        $keep = Cache::get($cacheKey);
-        if (! is_array($keep)) {
-            // null (unavailable/errored) → fail OPEN (keep all, don't cache).
-            // array (even empty) → authoritative: the LLM judged relevance.
-            $keep = $this->llmRelevantQuestions($keywords, $offer, $desc);
-            if ($keep === null) {
-                return $questions;
-            }
-            Cache::put($cacheKey, $keep, now()->addDays(self::CACHE_TTL_DAYS));
+        $keep = $this->relevanceKeep(array_map(static fn ($q) => (string) $q['keyword'], $questions), $plan, 'questions', 'qrel');
+        if ($keep === null) {
+            return $questions; // LLM unavailable → fail open
         }
         $keepSet = array_flip($keep);
 
@@ -578,10 +567,44 @@ class ContentKeywordInsights
     }
 
     /**
-     * @return list<string>|null  lowercased on-topic questions; null when the LLM
-     *                            is unavailable/errored (caller fails open)
+     * Shared LLM topical-relevance filter (questions + keyword gap). Returns the
+     * lowercased subset of $items the LLM judged genuinely relevant to the plan's
+     * offerings — or null when the LLM is unavailable/errored (caller fails open).
+     * Cached 30d per (offerings, item-set). Off-topic competitor/seed keywords that
+     * merely share a generic word ("generator", "name") are dropped.
+     *
+     * @param  list<string>  $items
+     * @return list<string>|null
      */
-    private function llmRelevantQuestions(array $keywords, string $offer, string $desc): ?array
+    private function relevanceKeep(array $items, ContentPlan $plan, string $noun, string $tag): ?array
+    {
+        $items = array_values(array_unique(array_filter(array_map(static fn ($s) => trim((string) $s), $items))));
+        if (count($items) < 2) {
+            return array_map(static fn ($s) => mb_strtolower($s), $items); // trivially keep
+        }
+        $offer = implode(', ', array_slice((array) (($plan->offerings ?? [])['sell'] ?? []), 0, 10));
+        $desc = mb_substr((string) $plan->business_description, 0, 400);
+
+        $cacheKey = 'content:kw-'.$tag.':'.md5($offer.'|'.implode('|', $items));
+        $keep = Cache::get($cacheKey);
+        if (! is_array($keep)) {
+            // null (unavailable/errored) → caller fails open. array (even empty) →
+            // authoritative relevance judgement.
+            $keep = $this->llmRelevantItems($items, $offer, $desc, $noun);
+            if ($keep === null) {
+                return null;
+            }
+            Cache::put($cacheKey, $keep, now()->addDays(self::CACHE_TTL_DAYS));
+        }
+
+        return $keep;
+    }
+
+    /**
+     * @param  list<string>  $items
+     * @return list<string>|null  lowercased on-topic items; null on LLM unavailable/error
+     */
+    private function llmRelevantItems(array $items, string $offer, string $desc, string $noun): ?array
     {
         try {
             $model = ContentAutopilotConfig::modelFor('ideate');
@@ -589,23 +612,24 @@ class ContentKeywordInsights
             if (! $llm->isAvailable()) {
                 return null;
             }
-            $list = implode("\n", array_slice($keywords, 0, 60));
+            $list = implode("\n", array_slice($items, 0, 80));
             $response = $llm->completeJson([
-                ['role' => 'system', 'content' => 'You filter SEO question lists for topical relevance. Respond with valid JSON only.'],
+                ['role' => 'system', 'content' => "You filter SEO {$noun} lists for topical relevance. Respond with valid JSON only."],
                 ['role' => 'user', 'content' => <<<PROMPT
                 Business offerings: {$offer}
                 About: {$desc}
 
-                From the questions below, return ONLY those genuinely relevant to THIS
-                business's topic and audience. DROP off-topic questions — e.g. generic
-                company/business naming, permits, or unrelated industries — even when
-                they share a common word (like "name"). Keep the exact original text.
+                From the {$noun} below, return ONLY those genuinely relevant to THIS
+                business's topic and audience — the ones its articles would actually
+                target. DROP off-topic entries: unrelated tools, industries, languages
+                or generic terms that merely share a common word (like "generator" or
+                "name"). Keep the exact original text.
 
                 {$list}
 
                 Return JSON: {"relevant": ["...", "..."]}
                 PROMPT],
-            ], ['temperature' => 0.1, 'max_tokens' => 800, 'timeout' => 30, '__source' => 'content_autopilot.kw_qrel']);
+            ], ['temperature' => 0.1, 'max_tokens' => 900, 'timeout' => 30, '__source' => 'content_autopilot.kw_relevance']);
 
             $rel = is_array($response['relevant'] ?? null) ? $response['relevant'] : [];
 
@@ -652,11 +676,29 @@ class ContentKeywordInsights
         usort($pool, static fn ($a, $b) => ($b['_rel'] <=> $a['_rel'])
             ?: ((int) ($b['volume'] ?? 0) <=> (int) ($a['volume'] ?? 0)));
 
+        // LLM relevance pass over the top candidates — token overlap alone can't
+        // tell a gaming-name gap from a competitor's "robotic voice generator" (both
+        // share "generator"). Keep the LLM-vetted ones; fall back to the token-ranked
+        // pool when the LLM is unavailable or would leave the gap empty.
+        $candidates = array_slice($pool, 0, 50);
+        $display = $candidates;
+        $keep = $this->relevanceKeep(array_column($candidates, 'keyword'), $plan, 'search keywords', 'grel');
+        if (is_array($keep)) {
+            $keepSet = array_flip($keep);
+            $vetted = array_values(array_filter(
+                $candidates,
+                static fn ($r) => isset($keepSet[mb_strtolower(trim((string) $r['keyword']))])
+            ));
+            if ($vetted !== []) {
+                $display = $vetted;
+            }
+        }
+
         $rows = array_map(static fn ($r) => [
             'keyword' => $r['keyword'],
             'volume' => $r['volume'],
             'competition' => $r['competition'],
-        ], array_slice($pool, 0, 8));
+        ], array_slice($display, 0, 8));
 
         // total = every competitor keyword the client isn't targeting (the full
         // gap they'll unlock after onboarding), not just the shown sample.
