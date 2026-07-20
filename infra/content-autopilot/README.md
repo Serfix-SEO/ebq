@@ -62,8 +62,11 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   skips any day the plan already has a topic on. The USER may stack a 2nd article
   on a day via the calendar-icon date picker (grid) / date input (list) — manual
   reschedule is unrestricted (any non-past date). `ContentTopicPlanner::plan()`
-  keeps **at most the monthly cap** planned ahead (never creates past it); the
-  dispatcher tops up to `THIN_CALENDAR_TOPICS = 30`.
+  keeps a **fixed pool of `cap` (30) UNPUBLISHED topics** — both the planner cap
+  and the dispatcher top-up count every topic not published/skipped (planned +
+  in-flight + ready), so it never piles past 30 while articles are being written.
+  Publishing one drops the pool; the next tick adds exactly the shortfall (one
+  in, one out). `THIN_CALENDAR_TOPICS = 30`.
 - **Monthly cap = `content.limits.monthly_articles_per_website` (default 30, was 60).**
   Calendar marks the cap-th article + beyond red (grid border, list badge) with an
   info banner; generation past the cap is blocked by `ContentEntitlements::blockReason`
