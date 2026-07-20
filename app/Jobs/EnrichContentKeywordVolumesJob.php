@@ -58,17 +58,27 @@ class EnrichContentKeywordVolumesJob implements ShouldQueue
     public function handle(DataForSeoKeywordDataClient $dfs, DataForSeoSpendMeter $meter, ContentKeywordInsights $insights): void
     {
         // Belt-and-suspenders: this paid fetch is a Content AI feature only.
+        // Always clear the "refining volumes" flag when we exit, so the wizard
+        // stops polling whether we enriched, skipped, or bailed.
+        $clearPending = fn () => \Illuminate\Support\Facades\Cache::forget('content:kw-dfs-pending:'.$this->planId);
+
         if (! config('services.content_autopilot.enrich_volume', true)) {
+            $clearPending();
+
             return;
         }
         $plan = ContentPlan::query()->with('website.user')->find($this->planId);
         if ($plan === null || ! $dfs->isConfigured() || $meter->exhausted()) {
+            $clearPending();
+
             return;
         }
 
         $country = $insights->metricCountry($plan);
         $keywords = $insights->allKeywords($plan);
         if ($keywords === []) {
+            $clearPending();
+
             return;
         }
 
@@ -90,6 +100,7 @@ class EnrichContentKeywordVolumesJob implements ShouldQueue
             }
         }
         if ($missing === []) {
+            $clearPending();
             $insights->forget($plan); // already fully cached → just re-render with it
             $this->backfillTopics($plan, $country);
 
@@ -126,6 +137,7 @@ class EnrichContentKeywordVolumesJob implements ShouldQueue
         ]);
 
         // Re-render the digest with accurate volumes + push them onto the topics.
+        $clearPending();
         $insights->forget($plan);
         $this->backfillTopics($plan, $country);
     }

@@ -576,10 +576,17 @@
                             @endif
                         </div>
                     @else
-                        {{-- Own keywords are in; competitors/gap still upgrading → keep polling so
-                             the digest refreshes in place (the loader's poll is gone once $kw is set). --}}
-                        @if (! empty($kw['competitors_pending']))
+                        {{-- Own keywords are in; competitors/gap or real search volumes still
+                             upgrading → keep polling so the digest refreshes in place (the loader's
+                             poll is gone once $kw is set). --}}
+                        @if (! empty($kw['competitors_pending']) || ! empty($kw['volume_enriching']))
                             <div wire:poll.6s="refreshKeywordInsights" class="hidden"></div>
+                        @endif
+                        @if (! empty($kw['volume_enriching']))
+                            <div class="mt-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
+                                <svg class="h-3.5 w-3.5 flex-none animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                {{ __('Refining with real search-volume data…') }}
+                            </div>
                         @endif
                         {{-- "This is a live sample, not the whole picture" callout --}}
                         <div class="mt-6 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">

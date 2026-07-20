@@ -365,15 +365,20 @@ class ContentKeywordInsights
         // SERP for the client's top query (one cached Serper call).
         $peopleAlso = $this->peopleAlsoSearch($plan, $rows);
 
+        // DataForSEO clickstream volumes still landing → keep the digest "live"
+        // (short cache + poll) so gap / top-searches re-render with real volumes
+        // once the job saves them, instead of freezing on the server estimates.
+        $volumeEnriching = Cache::has($this->volumeEnrichingKey($plan));
+
         $insights = $this->build($rows, $plan, partial: $partial, gap: $gap['rows'], gapTotal: $gap['total'],
             competitorsPending: ! $competitorsComplete,
             competitorsDone: $compCompleted,
             competitorsTotal: max($expected, $compDispatched, $discoveryPending ? self::MAX_COMPETITORS : 0),
-            peopleAlso: $peopleAlso);
-        // Partial results are cached briefly so the next poll upgrades them as the
-        // remaining requests complete; the final digest is cached 30 days.
+            peopleAlso: $peopleAlso, volumeEnriching: $volumeEnriching);
+        // Partial (or volume-enriching) results are cached briefly so the next poll
+        // upgrades them; the final digest is cached 30 days.
         Cache::put($this->insightsKey($plan), $insights,
-            $partial ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
+            ($partial || $volumeEnriching) ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
 
         return $insights;
@@ -705,8 +710,17 @@ class ContentKeywordInsights
             return;
         }
         if (Cache::add('content:kw-dfs:'.$plan->id, 1, now()->addDays(7))) {
+            // Mark enrichment in-flight so the step keeps polling + short-caches
+            // until the clickstream volumes land (cleared by the job). Bounded TTL
+            // so a dead job can't pin the "refining" state forever.
+            Cache::put($this->volumeEnrichingKey($plan), 1, now()->addMinutes(10));
             \App\Jobs\EnrichContentKeywordVolumesJob::dispatch($plan->id);
         }
+    }
+
+    public function volumeEnrichingKey(ContentPlan $plan): string
+    {
+        return 'content:kw-dfs-pending:'.$plan->id;
     }
 
     /**
@@ -969,7 +983,7 @@ class ContentKeywordInsights
      */
     private function build(array $rows, ContentPlan $plan, bool $partial, array $gap = [], int $gapTotal = 0,
         bool $competitorsPending = false, int $competitorsDone = 0, int $competitorsTotal = 0,
-        array $peopleAlso = []): array
+        array $peopleAlso = [], bool $volumeEnriching = false): array
     {
         $plannedKeywords = $plan->topics()->pluck('target_keyword')
             ->map(fn ($k) => mb_strtolower(trim((string) $k)))->filter()->flip()->all();
@@ -1098,6 +1112,7 @@ class ContentKeywordInsights
             'competitors_pending' => $competitorsPending,
             'competitors_done' => $competitorsDone,
             'competitors_total' => $competitorsTotal,
+            'volume_enriching' => $volumeEnriching,
         ];
     }
 
