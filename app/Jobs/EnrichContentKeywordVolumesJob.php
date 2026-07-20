@@ -16,8 +16,8 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Enrich a content plan's keyword volumes with REAL Google Ads figures from
- * DataForSEO, in ONE batched task (≤1000 keywords ≈ a flat ~$0.05 — never per
+ * Enrich a content plan's keyword volumes with real CLICKSTREAM-based figures
+ * from DataForSEO, in ONE batched task (≤1000 keywords, flat per-task cost — never per
  * keyword). Results are written to the shared {@see KeywordMetric} cache so
  * every future onboarding/plan reuses them for free (90-day TTL). Only keywords
  * not already fresh in the cache are sent, and the whole thing is gated by the
@@ -100,7 +100,7 @@ class EnrichContentKeywordVolumesJob implements ShouldQueue
                 ['keyword_hash' => KeywordMetric::hashKeyword($kw), 'country' => $country],
                 [
                     'keyword' => mb_substr($kw, 0, 255),
-                    'data_source' => 'dataforseo',
+                    'data_source' => 'dataforseo_clickstream',
                     'search_volume' => $d['search_volume'],
                     'cpc' => $d['cpc'],
                     'low_top_of_page_bid' => $d['low_top_of_page_bid'],

@@ -6,13 +6,14 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * DataForSEO "Keywords Data → Google Ads → Search Volume (live)" client.
+ * DataForSEO "Keywords Data → Clickstream → DataForSEO Search Volume (live)".
  *
- * Batched by design: one task carries up to 1000 keywords and DataForSEO bills
- * roughly a flat ~$0.05 per task (NOT per keyword), so callers MUST pass the
- * whole keyword set at once — never one call per keyword. Results are the real
- * Google Ads averages (search_volume, CPC, competition, 12-month trend) used to
- * enrich {@see \App\Models\KeywordMetric} for reuse across clients.
+ * Uses the CLICKSTREAM-based volume (real user-clickstream data blended with
+ * Google Ads) rather than the raw Google Ads averages — more authentic per-
+ * keyword numbers. Batched by design: one task carries up to 1000 keywords and
+ * DataForSEO bills a flat cost per task (NOT per keyword), so callers MUST pass
+ * the whole keyword set at once. Results (search_volume, CPC, competition,
+ * 12-month trend) enrich {@see \App\Models\KeywordMetric} for reuse across clients.
  */
 class DataForSeoKeywordDataClient
 {
@@ -61,7 +62,8 @@ class DataForSeoKeywordDataClient
 
         $out = [];
         foreach (array_chunk($keywords, 1000) as $chunk) {
-            foreach ($this->postTask('/keywords_data/google_ads/search_volume/live', [
+            // Clickstream-based volume (real click data blended with Google Ads).
+            foreach ($this->postTask('/keywords_data/clickstream_data/dataforseo_search_volume/live', [
                 'keywords' => array_values($chunk),
                 'location_code' => $locationCode,
                 'language_code' => $languageCode,
