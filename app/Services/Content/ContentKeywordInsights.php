@@ -268,6 +268,11 @@ class ContentKeywordInsights
             ];
         }
 
+        // Real search-volume enrichment (only surfaced once it's actually running).
+        if (Cache::has($this->volumeEnrichingKey($plan))) {
+            $status[] = ['label' => __('Real search-volume data'), 'done' => false];
+        }
+
         return $status;
     }
 
@@ -336,13 +341,18 @@ class ContentKeywordInsights
             $competitorRows = $this->mergeRows($competitorRows, $this->filterScrap($this->completedRows($req), $plan));
         }
 
-        // Override volumes with real Google Ads numbers (DataForSEO) wherever we
-        // have them cached in keyword_metrics — so stats, opportunities, gap and
-        // the topic "searches/mo" pills all reflect the accurate figure. The
-        // batched fetch that fills that cache is dispatched once below.
+        // Override volumes with real clickstream numbers (DataForSEO) from the
+        // keyword_metrics cache, and kick off the one-time batched fetch that
+        // fills it. We NEVER show estimate volumes first: while that enrichment
+        // is in flight, hold the loader (return null) and only render once the
+        // real volumes have landed — showing incomplete/changing numbers erodes
+        // trust; a few extra seconds does not.
         $clientRows = $this->applyCachedVolumes($clientRows, $plan);
         $competitorRows = $this->applyCachedVolumes($competitorRows, $plan);
         $this->ensureVolumeEnrichment($plan);
+        if (Cache::has($this->volumeEnrichingKey($plan))) {
+            return null; // real search volumes still landing — keep the loader up
+        }
 
         $rows = $this->mergeRows($clientRows, $competitorRows);
 
@@ -707,6 +717,13 @@ class ContentKeywordInsights
         // Content-feature-only paid enrichment (owner kill switch). Normal SEO
         // never reaches here; this is the sole dispatch point.
         if (! config('services.content_autopilot.enrich_volume', true)) {
+            return;
+        }
+        // Only hold the loader for enrichment we can actually perform — if
+        // DataForSEO isn't configured or the monthly breaker tripped, skip the
+        // wait entirely and let the digest render on the server volumes.
+        if (! app(\App\Services\DataForSeoKeywordDataClient::class)->isConfigured()
+            || app(\App\Services\Reports\DataForSeoSpendMeter::class)->exhausted()) {
             return;
         }
         if (Cache::add('content:kw-dfs:'.$plan->id, 1, now()->addDays(7))) {
