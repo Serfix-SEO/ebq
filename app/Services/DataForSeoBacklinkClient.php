@@ -186,6 +186,69 @@ class DataForSeoBacklinkClient
     }
 
     /**
+     * DataForSEO Labs "bulk traffic estimation" — ONE flat-priced task estimates
+     * organic/paid traffic (ETV), keyword counts, ranking distribution, etc. for
+     * up to 1,000 targets at once. This is how we get every competitor's monthly
+     * search/traffic footprint in a single billed call instead of one per domain.
+     *
+     * Returns a map keyed by the bare domain we asked for → the raw `metrics`
+     * blob DataForSEO returned for it (we store "whatever is provided"). Domains
+     * DataForSEO has no data for are simply absent from the map.
+     *
+     * @param  list<string>  $domains
+     * @return array<string, array<string, mixed>>
+     */
+    public function bulkTrafficEstimation(array $domains): array
+    {
+        // Normalize + de-dupe to bare domains; keep the mapping so we can key the
+        // response back to what the caller asked for.
+        $targets = [];
+        foreach ($domains as $domain) {
+            if (! is_string($domain) || trim($domain) === '') {
+                continue;
+            }
+            $bare = $this->target($domain);
+            if ($bare !== '') {
+                $targets[$bare] = true;
+            }
+        }
+        $targets = array_slice(array_keys($targets), 0, 1000);
+        if ($targets === []) {
+            return [];
+        }
+
+        $result = $this->firstResult('/dataforseo_labs/google/bulk_traffic_estimation/live', [
+            'targets' => $targets,
+            'language_name' => 'English',
+            'location_code' => 2840,
+            'item_types' => ['organic', 'paid'],
+        ]);
+
+        $items = $result['items'] ?? null;
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $target = $item['target'] ?? null;
+            if (! is_string($target) || $target === '') {
+                continue;
+            }
+            // Store the whole item minus the redundant target echo — that's the
+            // "metrics" blob plus any extra fields DataForSEO chooses to return.
+            $blob = $item;
+            unset($blob['target']);
+            $out[$this->target($target)] = $blob;
+        }
+
+        return $out;
+    }
+
+    /**
      * A bounded sample of individual backlinks (one per referring domain) for
      * the "example links" feed. Capped at row_limit.
      *

@@ -213,6 +213,20 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
      month. Owner's call: intentional — QA (non-admin) accounts should see
      real data on staging; only admin accounts need sandboxing, which is
      exactly what this app-level fix implements (no staging env change made).
+   - **Batched competitor traffic estimation** (2026-07-20, owner request):
+     once `build()` resolves a plan's competitor list it dispatches
+     `App\Jobs\Content\EnrichCompetitorDomainMetricsJob(websiteId, domains)`,
+     which makes ONE flat-priced DataForSEO Labs
+     `/dataforseo_labs/google/bulk_traffic_estimation/live` call for ALL
+     competitor domains at once (`DataForSeoBacklinkClient::bulkTrafficEstimation()`,
+     ≤1000 targets/task) and stores "whatever is provided" per domain on the
+     shared asset (`domain_metrics.dfs_metrics` JSON + `dfs_metrics_refreshed_at`,
+     30-day freshness). Backs the keyword-step "monthly searches" teaser +
+     future reuse. Idempotent (fresh domains skipped → repeat dispatch is
+     free), async (`content` queue), spend-metered (`DataForSeoSpendMeter`),
+     admin-sandboxed (mock data never persisted). Dispatch sits inside
+     `build()` (30-day cache miss) so it fires at most once per freshness
+     window — no per-poll re-billing.
 5. **Keyword research** (2026-07-18) — `ContentKeywordInsights`: the client-
    facing digest of the research behind their plan. Background flow:
    `PrepareContentKeywordInsightsJob` fires at the end of step 2 (alongside

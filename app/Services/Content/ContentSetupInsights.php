@@ -418,6 +418,18 @@ class ContentSetupInsights
             ];
         }
 
+        // Fire a ONE-TIME batched DataForSEO Labs traffic-estimation for all of
+        // this plan's competitor domains → stored on the shared domain_metrics
+        // asset (dfs_metrics) for the "monthly searches" teaser + future reuse.
+        // build() only runs on a 30-day cache miss, so this dispatches at most
+        // once per freshness window — no per-poll re-billing.
+        $competitorDomains = array_values(array_filter(array_map(
+            static fn ($c) => (string) ($c['domain'] ?? ''), $competitors
+        )));
+        if ($competitorDomains !== []) {
+            \App\Jobs\Content\EnrichCompetitorDomainMetricsJob::dispatch($website->id, $competitorDomains);
+        }
+
         // Rank strongest referring-domains first for the table.
         usort($competitors, fn ($a, $b) => ($b['referring_domains'] ?? -1) <=> ($a['referring_domains'] ?? -1));
 
