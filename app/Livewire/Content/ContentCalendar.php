@@ -1013,7 +1013,14 @@ class ContentCalendar extends Component
             ContentTopic::STATUS_SCORING, ContentTopic::STATUS_REVISING, ContentTopic::STATUS_PUBLISHING];
 
         return [
-            'planned' => $topics->whereIn('status', [ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED])->count(),
+            // "Planned" = everything queued but not yet writing/ready/published:
+            // SUGGESTED + APPROVED + SCHEDULED (shown as "Approved") + FAILED
+            // (awaiting retry). Without SCHEDULED/FAILED the cards under-count vs
+            // the calendar total.
+            'planned' => $topics->whereIn('status', [
+                ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED,
+                ContentTopic::STATUS_SCHEDULED, ContentTopic::STATUS_FAILED,
+            ])->count(),
             'in_progress' => $topics->whereIn('status', $inProgress)->count(),
             'ready' => $topics->where('status', ContentTopic::STATUS_READY)->count(),
             'published' => $topics->where('status', ContentTopic::STATUS_PUBLISHED)->count(),
@@ -1210,6 +1217,7 @@ class ContentCalendar extends Component
         // ── Calendar data ──
         $monthStart = Carbon::createFromFormat('Y-m', $this->month)->startOfMonth();
         $topics = $plan->topics()
+            ->whereNotIn('status', [ContentTopic::STATUS_SKIPPED]) // skipped ones aren't planned articles
             ->with('currentArticle:id,topic_id,seo_score,word_count,version')
             ->whereBetween('scheduled_for', [$monthStart->copy()->startOfWeek(), $monthStart->copy()->endOfMonth()->endOfWeek()])
             ->orderBy('scheduled_for')->orderBy('position')->get();
