@@ -79,6 +79,11 @@ class ContentKeywordInsights
      *  term grouper — a thin/coarse LLM pass must not shrink "content pillars". */
     private const MIN_CLUSTERS = 4;
 
+    /** How many (highest-volume) keywords we send to the cluster labeller. Kept
+     *  small so its per-keyword JSON reply never truncates; the rest of the set
+     *  inherits those labels via {@see extendClusterMap()}. */
+    private const CLUSTER_SAMPLE = 150;
+
     public function __construct(
         private readonly KeywordFinderPool $pool,
         private readonly AiKeywordClusterService $clusters,
@@ -1229,6 +1234,123 @@ class ContentKeywordInsights
     }
 
     /**
+     * Deterministic pillars for when the LLM labeller is unavailable or comes back
+     * too coarse (its label count swings run to run).
+     *
+     * The naive version grouped by each frequent term independently, which nested
+     * and double-counted: "Name" (365), "Stylish" (66) and "Stylish Name" (41) all
+     * claimed the same keywords, and one generic bucket swallowed most of the set.
+     * Here every keyword is claimed by exactly ONE pillar — its MOST SPECIFIC
+     * matching phrase (most words, then longest) — so pillars are disjoint and
+     * meaningful, and the generic term only keeps what nothing better matched.
+     *
+     * @param  list<array{keyword:string, volume:?int}>  $rows
+     * @return list<array{label:string, count:int, volume:int, top:list<string>}>
+     */
+    private function phraseClusters(array $rows): array
+    {
+        $terms = array_values(array_filter(array_column(KeywordTermGrouper::groups($rows, 12), 'term')));
+        if ($terms === []) {
+            return [];
+        }
+        // Most specific first, so "free fire stylish name" beats "name".
+        usort($terms, static fn ($a, $b) => [substr_count($b, ' '), mb_strlen($b)]
+            <=> [substr_count($a, ' '), mb_strlen($a)]);
+
+        $groups = [];
+        foreach ($rows as $r) {
+            $kw = (string) ($r['keyword'] ?? '');
+            if ($kw === '') {
+                continue;
+            }
+            foreach ($terms as $term) {
+                if (! str_contains($kw, $term)) {
+                    continue;
+                }
+                $groups[$term] ??= ['label' => (string) \Illuminate\Support\Str::title($term), 'count' => 0, 'volume' => 0, 'top' => []];
+                $groups[$term]['count']++;
+                $groups[$term]['volume'] += (int) ($r['volume'] ?? 0);
+                $groups[$term]['top'][] = $r;
+                break; // one pillar per keyword — no overlap
+            }
+        }
+
+        $groups = array_filter($groups, static fn ($g) => $g['count'] >= 3); // drop noise
+        uasort($groups, static fn ($a, $b) => $b['volume'] <=> $a['volume']);
+
+        $out = [];
+        foreach (array_slice($groups, 0, 6) as $g) {
+            usort($g['top'], static fn ($a, $b) => ($b['volume'] ?? 0) <=> ($a['volume'] ?? 0));
+            $g['top'] = array_column(array_slice($g['top'], 0, 3), 'keyword');
+            $out[] = $g;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Assign keywords the LLM labeller never saw (it caps at 300 by volume) to its
+     * OWN cluster labels, by counting how many of a label's significant tokens the
+     * keyword contains (singular/plural tolerant). Best-scoring label wins, so each
+     * keyword lands in exactly ONE pillar — unlike the stem-based term grouper,
+     * whose groups overlap ("Stylish" vs "Stylish Name"). Unmatched keywords stay
+     * unlabelled and are skipped, as before.
+     *
+     * @param  array<string,string>  $map  keyword => label
+     * @param  list<array{keyword:string, volume:?int}>  $rows
+     * @return array<string,string>
+     */
+    private function extendClusterMap(array $map, array $rows): array
+    {
+        $other = (string) __('Other');
+
+        $labelTokens = [];
+        foreach (array_unique(array_values($map)) as $label) {
+            $label = (string) $label;
+            if ($label === '' || strcasecmp($label, $other) === 0) {
+                continue;
+            }
+            $tokens = array_values(array_filter(
+                preg_split('/[^a-z0-9]+/', mb_strtolower($label), -1, PREG_SPLIT_NO_EMPTY) ?: [],
+                static fn ($t) => mb_strlen($t) >= 3
+            ));
+            if ($tokens !== []) {
+                $labelTokens[$label] = $tokens;
+            }
+        }
+        if ($labelTokens === []) {
+            return $map;
+        }
+
+        foreach ($rows as $r) {
+            $kw = (string) ($r['keyword'] ?? '');
+            if ($kw === '' || isset($map[$kw])) {
+                continue;
+            }
+            $best = null;
+            $bestScore = 0;
+            foreach ($labelTokens as $label => $tokens) {
+                $score = 0;
+                foreach ($tokens as $t) {
+                    $stem = rtrim($t, 's');
+                    if (str_contains($kw, $t) || ($stem !== '' && str_contains($kw, $stem))) {
+                        $score++;
+                    }
+                }
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $best = $label;
+                }
+            }
+            if ($best !== null) {
+                $map[$kw] = $best;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * Digest normalized rows into the client-facing payload.
      *
      * @param  list<array{keyword:string, volume:?int, competition:string, intent:string, is_question:bool}>  $rows
@@ -1244,15 +1366,33 @@ class ContentKeywordInsights
         $clusterMap = null;
         try {
             if ($this->clusters->isAvailable()) {
-                $keywordsSorted = array_column($rows, 'keyword');
+                // Cluster a SAMPLE, not the whole set. The labeller returns one
+                // JSON entry per keyword, and ~300 of them overflow its max_tokens
+                // → truncated JSON → null → we'd fall back to ugly stem groups
+                // ("Name", "Free"). A top-by-volume sample answers reliably with
+                // good names; extendClusterMap() then covers everything else.
+                $sample = $rows;
+                usort($sample, static fn ($a, $b) => (int) ($b['volume'] ?? 0) <=> (int) ($a['volume'] ?? 0));
+                $sample = array_slice($sample, 0, self::CLUSTER_SAMPLE);
+
+                $keywordsSorted = array_column($sample, 'keyword');
                 sort($keywordsSorted);
                 $clusterMap = $this->clusters->cluster(
-                    array_map(fn ($r) => ['keyword' => $r['keyword'], 'volume' => $r['volume']], $rows),
+                    array_map(fn ($r) => ['keyword' => $r['keyword'], 'volume' => $r['volume']], $sample),
                     'content-wizard:'.md5(implode('|', $keywordsSorted)),
                 );
             }
         } catch (\Throwable) {
             $clusterMap = null;
+        }
+
+        // The labeller only sees the top AiKeywordClusterService::MAX_KEYWORDS (300)
+        // by volume, so on a 500+ keyword set the remainder arrive UNLABELLED and
+        // silently vanish from the pillars. Fold them into the LLM's OWN labels by
+        // token overlap: keeps the readable names, covers the whole set, and gives
+        // exactly one label per keyword.
+        if (is_array($clusterMap) && $clusterMap !== []) {
+            $clusterMap = $this->extendClusterMap($clusterMap, $rows);
         }
 
         $clusters = [];
@@ -1263,7 +1403,13 @@ class ContentKeywordInsights
                 if ($label === null || strcasecmp($label, 'Other') === 0) {
                     continue;
                 }
-                $grouped[$label] ??= ['label' => $label, 'count' => 0, 'volume' => 0, 'top' => []];
+                // The labeller's casing is inconsistent ("stylish names" vs
+                // "PUBG Names") — title-case the all-lowercase ones only, so
+                // acronyms survive.
+                $display = $label === mb_strtolower($label)
+                    ? (string) \Illuminate\Support\Str::title($label)
+                    : $label;
+                $grouped[$label] ??= ['label' => $display, 'count' => 0, 'volume' => 0, 'top' => []];
                 $grouped[$label]['count']++;
                 $grouped[$label]['volume'] += (int) ($r['volume'] ?? 0);
                 $grouped[$label]['top'][] = $r;
@@ -1281,17 +1427,7 @@ class ContentKeywordInsights
         // set that can collapse the pillars to 2. The deterministic term grouper
         // always yields ~6, so use it whenever the LLM pass came back thin.
         if (count($clusters) < self::MIN_CLUSTERS) {
-            $clusters = [];
-            foreach (KeywordTermGrouper::groups($rows, 6) as $g) {
-                $members = array_values(array_filter($rows, fn ($r) => str_contains($r['keyword'], $g['term'])));
-                usort($members, fn ($a, $b) => ($b['volume'] ?? 0) <=> ($a['volume'] ?? 0));
-                $clusters[] = [
-                    'label' => \Illuminate\Support\Str::title($g['term']),
-                    'count' => $g['count'],
-                    'volume' => $g['volume'],
-                    'top' => array_column(array_slice($members, 0, 3), 'keyword'),
-                ];
-            }
+            $clusters = $this->phraseClusters($rows);
         }
 
         // ── What people are searching for: the highest-volume real search terms,
