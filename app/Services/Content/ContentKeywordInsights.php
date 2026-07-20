@@ -699,6 +699,11 @@ class ContentKeywordInsights
     /** Fire the batched DataForSEO volume enrichment once per plan (7-day guard). */
     private function ensureVolumeEnrichment(ContentPlan $plan): void
     {
+        // Content-feature-only paid enrichment (owner kill switch). Normal SEO
+        // never reaches here; this is the sole dispatch point.
+        if (! config('services.content_autopilot.enrich_volume', true)) {
+            return;
+        }
         if (Cache::add('content:kw-dfs:'.$plan->id, 1, now()->addDays(7))) {
             \App\Jobs\EnrichContentKeywordVolumesJob::dispatch($plan->id);
         }

@@ -57,6 +57,10 @@ class EnrichContentKeywordVolumesJob implements ShouldQueue
 
     public function handle(DataForSeoKeywordDataClient $dfs, DataForSeoSpendMeter $meter, ContentKeywordInsights $insights): void
     {
+        // Belt-and-suspenders: this paid fetch is a Content AI feature only.
+        if (! config('services.content_autopilot.enrich_volume', true)) {
+            return;
+        }
         $plan = ContentPlan::query()->with('website.user')->find($this->planId);
         if ($plan === null || ! $dfs->isConfigured() || $meter->exhausted()) {
             return;

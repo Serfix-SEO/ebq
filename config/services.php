@@ -269,6 +269,12 @@ return [
         'llm_monthly_cap_usd' => env('CONTENT_LLM_MONTHLY_CAP_USD') !== null
             ? (float) env('CONTENT_LLM_MONTHLY_CAP_USD')
             : null,
+        // Content-ONLY DataForSEO clickstream keyword-volume enrichment. The paid
+        // fetch is triggered solely by the Content AI wizard (never the normal SEO
+        // package); results land in the shared keyword_metrics cache so any feature
+        // can READ them for free, but no non-content path ever pays for a fetch.
+        // Set false to disable the paid enrichment (falls back to server volumes).
+        'enrich_volume' => filter_var(env('CONTENT_ENRICH_VOLUME_DFS', true), FILTER_VALIDATE_BOOLEAN),
         // Client-UI kill switch. Box A's working tree IS prod's docroot, so
         // new code activates on prod before any deploy decision — this env
         // gate (not code presence) decides where the feature is visible.
