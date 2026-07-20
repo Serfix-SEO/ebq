@@ -226,7 +226,20 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
      free), async (`content` queue), spend-metered (`DataForSeoSpendMeter`),
      admin-sandboxed (mock data never persisted). Dispatch sits inside
      `build()` (30-day cache miss) so it fires at most once per freshness
-     window — no per-poll re-billing. Surfaced as the step-6 **"Est. monthly
+     window — no per-poll re-billing.
+   - **Keyword GAP via DataForSEO Labs — 3 competitors, monthly accumulation**
+     (2026-07-20, `DATAFORSEO_KEYWORD_GAP_PLAN.md`): the competitor gap no longer
+     uses the concurrency-1 keyword server. `HarvestDomainKeywordsJob` pulls a
+     domain's `ranked_keywords/live` (≤1,000/run, volume-cursor for dupe-free
+     month-over-month growth) into the SHARED assets `keyword_metrics` (facts) +
+     `domain_keyword_rankings` (domain↔keyword link) with a per-domain
+     `domain_keyword_harvest` cursor. `ContentKeywordInsights::ensureHarvest()`
+     dispatches the client + top-3 competitors once/domain/month (shared);
+     `dfsGap()` overlays the gap fresh each read (competitor rankings MINUS the
+     client's, LLM-relevance-vetted). `ebq:content-keyword-harvest` (monthly)
+     accumulates +1,000/competitor and rolls to the next competitor when one is
+     exhausted. Self-hosted keyword server UNTOUCHED (client seeds + other product).
+   - Surfaced as the step-6 **"Est. monthly
      traffic"** stat card (`ContentKeywordInsights::estimatedMonthlyTraffic()`
      → `$kw['traffic']['estimated']`): the SUM of competitors' organic ETV
      from `domain_metrics.dfs_metrics` (`metrics.organic.etv`). Overlaid
