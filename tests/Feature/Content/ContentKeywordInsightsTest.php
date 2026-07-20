@@ -140,6 +140,13 @@ class ContentKeywordInsightsTest extends TestCase
         $this->assertNotNull($insights);
         $this->assertSame(4200, $insights['traffic']['estimated']);
         $this->assertSame(1, $insights['traffic']['competitors']);
+
+        // Per-competitor metrics row backs the "how your competitors stack up" table.
+        $this->assertNotEmpty($insights['competitor_metrics']);
+        $row = $insights['competitor_metrics'][0];
+        $this->assertSame('rival.com', $row['domain']);
+        $this->assertSame(4200, $row['traffic']);
+        $this->assertSame(310, $row['keywords']);
     }
 
     public function test_insights_classify_intent_questions_and_opportunities(): void

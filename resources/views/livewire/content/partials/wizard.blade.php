@@ -557,15 +557,18 @@
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('What your audience searches for, grouped and prioritized — this is what your articles are built on.') }}</p>
                     </div>
 
-                    {{-- Reassure the client we analyze one competitor now (fast) and keep going in the background. --}}
-                    <div class="mt-5 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    {{-- ONE consolidated notice (replaces the three separate banners): the
+                         research is a live, ongoing sample; deeper analysis never stops; and
+                         — on public onboarding only — the exact metrics unlock after signup. --}}
+                    <div class="mt-5 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white px-4 py-3.5 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-sm shadow-orange-600/25">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                         </span>
-                        <div class="min-w-0">
-                            <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('We keep analyzing more competitors in the background') }}</p>
-                            <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __('To get you started fast, we analyze your top competitor now. Your content engine then keeps studying more competitors on its own — every article gets a fresh, deeper round of research, so your plan only gets stronger over time.') }}</p>
-                        </div>
+                        <p class="text-sm leading-snug text-slate-600 dark:text-slate-400">
+                            <span class="font-bold text-slate-900 dark:text-slate-100">{{ __('A live sample — your research engine never stops.') }}</span>
+                            {{ __('We analyze your top competitor now and keep studying more in the background; every article gets its own fresh, deeper round of research.') }}
+                            @unless ($showVolumes)<span class="font-semibold text-orange-700 dark:text-orange-300">{{ __('Exact search volumes and your full keyword gap unlock the moment you get started.') }}</span>@endunless
+                        </p>
                     </div>
 
                     @if ($kw === null)
@@ -597,16 +600,6 @@
                         @if (! empty($kw['competitors_pending']))
                             <div wire:poll.6s="refreshKeywordInsights" class="hidden"></div>
                         @endif
-                        {{-- "This is a live sample, not the whole picture" callout --}}
-                        <div class="mt-6 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __("A live glimpse of your research engine — not the whole picture") }}</p>
-                                <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __("What you see here is a real-time sample of how we research your market. The deeper analysis never stops: every single article gets its own fresh round of research — search trends, competing pages, and related questions — the moment it's written.") }}</p>
-                            </div>
-                        </div>
 
                         {{-- Headline stats (volume + traffic cards hidden until that data exists) --}}
                         @php
@@ -647,19 +640,6 @@
                                 <div class="mt-0.5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Questions asked') }}</div>
                             </div>
                         </div>
-
-                        @unless ($showVolumes)
-                            {{-- Public onboarding: tease the full metrics, unlock after signup. --}}
-                            <div class="mt-4 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
-                                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
-                                </span>
-                                <div class="min-w-0">
-                                    <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Once you get started, you\'ll unlock the full picture') }}</p>
-                                    <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __('Exact monthly search volumes, competition and traffic potential for every keyword — plus your full keyword gap — appear the moment you finish setting up.') }}</p>
-                                </div>
-                            </div>
-                        @endunless
 
                         <div class="mt-4 grid gap-4 lg:grid-cols-2">
                             {{-- Topic clusters --}}
@@ -867,6 +847,56 @@
                                 </div>
                             @endif
                         </div>
+
+                        {{-- Competitor domain metrics — the authority + organic traffic we pulled
+                             for the rivals we analyzed (DataForSEO). Sits below the keyword gap. --}}
+                        @if (! empty($kw['competitor_metrics']))
+                            <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
+                                <div class="flex items-start gap-3 bg-gradient-to-r from-orange-50 to-white px-4 py-3 dark:from-orange-950 dark:to-slate-900">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+                                    </span>
+                                    <div class="min-w-0">
+                                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('How your competitors stack up') }}</h3>
+                                        <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('The authority and organic traffic of the rivals we analyzed — the benchmark your content is built to close in on.') }}</p>
+                                    </div>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                                            <tr>
+                                                <th class="px-4 py-2.5 text-start font-bold">{{ __('Competitor') }}</th>
+                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('Est. traffic/mo') }}</th>
+                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('Organic keywords') }}</th>
+                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('Referring domains') }}</th>
+                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('Backlinks') }}</th>
+                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('DA / PA') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                            @foreach ($kw['competitor_metrics'] as $c)
+                                                <tr class="bg-white dark:bg-slate-900" wire:key="kwcm-{{ $loop->index }}">
+                                                    <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
+                                                        <div class="flex items-center gap-2">
+                                                            <img src="https://www.google.com/s2/favicons?domain={{ urlencode($c['domain']) }}&sz=32"
+                                                                 alt="" width="16" height="16" loading="lazy"
+                                                                 class="h-4 w-4 flex-none rounded-sm bg-slate-100 dark:bg-slate-800"
+                                                                 onerror="this.style.visibility='hidden'">
+                                                            <span class="truncate">{{ $c['domain'] }}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $c['traffic'] !== null ? number_format($c['traffic']) : '—' }}</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['keywords'] !== null ? number_format($c['keywords']) : '—' }}</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['referring_domains'] !== null ? number_format($c['referring_domains']) : '—' }}</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['backlinks'] !== null ? number_format($c['backlinks']) : '—' }}</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] !== null ? $c['da'] : '—' }} / {{ $c['pa'] !== null ? $c['pa'] : '—' }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
 
                     @endif
 

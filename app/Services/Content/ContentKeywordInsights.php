@@ -279,11 +279,11 @@ class ContentKeywordInsights
     {
         $cached = Cache::get($this->insightsKey($plan));
         if ($cached !== null) {
-            // Overlay the competitor traffic estimate fresh — the batched
-            // DataForSEO enrichment is async and may land AFTER this digest was
-            // first cached, so we don't want a stale (missing) traffic figure
-            // baked in for the whole 30-day TTL.
-            return $this->withEstimatedTraffic($cached, $plan);
+            // Overlay competitor traffic/metrics fresh — the batched DataForSEO
+            // enrichment is async and may land AFTER this digest was first
+            // cached, so we don't want a stale (missing) figure baked in for the
+            // whole 30-day TTL.
+            return $this->withCompetitorData($cached, $plan);
         }
 
         $seed = $this->request($plan);                        // offering seeds
@@ -376,30 +376,40 @@ class ContentKeywordInsights
             $partial ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
 
-        return $this->withEstimatedTraffic($insights, $plan);
+        return $this->withCompetitorData($insights, $plan);
     }
 
     /**
-     * Overlay the "total estimated monthly traffic" figure onto the digest:
-     * the combined organic monthly traffic (DataForSEO Labs ETV) of this plan's
-     * competitors, read from the shared domain_metrics asset that
-     * {@see EnrichCompetitorDomainMetricsJob} batch-populates. Shows the size of
-     * the organic opportunity in this market. Zero/absent (enrichment not landed
-     * yet, or DataForSEO had no data) → the card just hides.
+     * Overlay competitor-derived data onto the digest, read FRESH each call
+     * (the batched DataForSEO enrichment is async and may land after the digest
+     * was first cached):
+     *   - `traffic`  — {estimated, competitors}: the combined organic monthly
+     *     traffic (DataForSEO Labs ETV) of this plan's competitors → the
+     *     step-6 "Est. monthly traffic" card.
+     *   - `competitor_metrics` — per-competitor authority + traffic rows for the
+     *     "how your competitors stack up" table below the keyword gap.
+     * Both come from {@see ContentSetupInsights::competitorAuthority()} (referring
+     * domains / backlinks / DA / PA) merged with `domain_metrics.dfs_metrics`
+     * (organic traffic + keyword count) that {@see EnrichCompetitorDomainMetricsJob}
+     * batch-populates.
      */
-    private function withEstimatedTraffic(array $insights, ContentPlan $plan): array
+    private function withCompetitorData(array $insights, ContentPlan $plan): array
     {
-        $insights['traffic'] = $this->estimatedMonthlyTraffic($plan);
+        $data = $this->competitorData($plan);
+        $insights['traffic'] = ['estimated' => $data['traffic_total'], 'competitors' => $data['traffic_count']];
+        $insights['competitor_metrics'] = $data['rows'];
 
         return $insights;
     }
 
     /**
-     * @return array{estimated:int, competitors:int}
+     * @return array{traffic_total:int, traffic_count:int, rows:list<array{
+     *   domain:string, traffic:?int, keywords:?int, referring_domains:?int,
+     *   backlinks:?int, da:?int, pa:?int, authority:?int}>}
      */
-    private function estimatedMonthlyTraffic(ContentPlan $plan): array
+    private function competitorData(ContentPlan $plan): array
     {
-        $empty = ['estimated' => 0, 'competitors' => 0];
+        $empty = ['traffic_total' => 0, 'traffic_count' => 0, 'rows' => []];
         $website = $plan->website;
         if ($website === null) {
             return $empty;
@@ -410,40 +420,64 @@ class ContentKeywordInsights
         } catch (\Throwable) {
             return $empty;
         }
+        $competitors = array_values(array_filter((array) ($insights['competitors'] ?? []), 'is_array'));
+        if ($competitors === []) {
+            return $empty;
+        }
+
         $domains = [];
-        foreach ((array) ($insights['competitors'] ?? []) as $c) {
+        foreach ($competitors as $c) {
             $d = strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))));
             if ($d !== '') {
                 $domains[$d] = true;
             }
         }
-        if ($domains === []) {
-            return $empty;
-        }
 
+        // Organic traffic + keyword count from the shared domain_metrics asset.
+        $dfs = [];
         try {
-            $rows = DomainMetric::query()
+            foreach (DomainMetric::query()
                 ->whereIn('domain', array_keys($domains))
                 ->whereNotNull('dfs_metrics')
-                ->get(['domain', 'dfs_metrics']);
+                ->get(['domain', 'dfs_metrics']) as $m) {
+                $dfs[$m->domain] = $m->dfs_metrics;
+            }
         } catch (\Throwable) {
-            return $empty;
+            // no DFS rows — traffic columns just show "—"
         }
 
+        $rows = [];
         $total = 0.0;
         $count = 0;
-        foreach ($rows as $m) {
-            // bulk_traffic_estimation stores {metrics:{organic:{etv,...},paid:{...}}}.
-            $etv = data_get($m->dfs_metrics, 'metrics.organic.etv');
-            if (is_numeric($etv) && (float) $etv > 0) {
+        foreach ($competitors as $c) {
+            $d = strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))));
+            if ($d === '') {
+                continue;
+            }
+            // bulk_traffic_estimation stores {metrics:{organic:{etv,count,...},paid:{...}}}.
+            $etv = data_get($dfs[$d] ?? null, 'metrics.organic.etv');
+            $kwCount = data_get($dfs[$d] ?? null, 'metrics.organic.count');
+            $traffic = is_numeric($etv) && (float) $etv > 0 ? (int) round((float) $etv) : null;
+            if ($traffic !== null) {
                 $total += (float) $etv;
                 $count++;
             }
+            $rows[] = [
+                'domain' => $d,
+                'traffic' => $traffic,
+                'keywords' => is_numeric($kwCount) ? (int) $kwCount : null,
+                'referring_domains' => isset($c['referring_domains']) ? (int) $c['referring_domains'] : null,
+                'backlinks' => isset($c['backlinks']) ? (int) $c['backlinks'] : null,
+                'da' => isset($c['da']) ? (int) $c['da'] : null,
+                'pa' => isset($c['pa']) ? (int) $c['pa'] : null,
+                'authority' => isset($c['authority']) ? (int) $c['authority'] : null,
+            ];
         }
 
-        return $count === 0
-            ? $empty
-            : ['estimated' => (int) round($total), 'competitors' => $count];
+        // Strongest organic traffic first.
+        usort($rows, fn ($a, $b) => ($b['traffic'] ?? -1) <=> ($a['traffic'] ?? -1));
+
+        return ['traffic_total' => (int) round($total), 'traffic_count' => $count, 'rows' => $rows];
     }
 
     /** LLM removes website UI / account / navigation junk keywords (login, cart…). */
