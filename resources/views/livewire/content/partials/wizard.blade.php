@@ -552,6 +552,17 @@
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('What your audience searches for, grouped and prioritized — this is what your articles are built on.') }}</p>
                     </div>
 
+                    {{-- Reassure the client we analyze one competitor now (fast) and keep going in the background. --}}
+                    <div class="mt-5 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('We keep analyzing more competitors in the background') }}</p>
+                            <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __('To get you started fast, we analyze your top competitor now. Your content engine then keeps studying more competitors on its own — every article gets a fresh, deeper round of research, so your plan only gets stronger over time.') }}</p>
+                        </div>
+                    </div>
+
                     @if ($kw === null)
                         <div wire:poll.5s="refreshKeywordInsights" class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
                             <svg class="mx-auto h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>

@@ -56,8 +56,11 @@ class ContentKeywordInsights
     /** Keyword-server hard cap per ideas request (infra/keywords). */
     private const MAX_SEEDS = 20;
 
-    /** Competitor domains we mine keywords from for the gap analysis. */
-    private const MAX_COMPETITORS = 3;
+    /** Competitor domains we mine keywords from for the gap analysis. Kept at 1
+     *  in the wizard so the concurrency-1 keyword server isn't choked (seed +
+     *  own domain + 1 competitor); deeper competitor research runs in the
+     *  background per-article after onboarding. */
+    private const MAX_COMPETITORS = 1;
 
     /** Give the (concurrency-1, minutes-per-job) server this long before falling back. */
     private const PENDING_GRACE_MINUTES = 15;
@@ -268,11 +271,6 @@ class ContentKeywordInsights
             ];
         }
 
-        // Real search-volume enrichment (only surfaced once it's actually running).
-        if (Cache::has($this->volumeEnrichingKey($plan))) {
-            $status[] = ['label' => __('Real search-volume data'), 'done' => false];
-        }
-
         return $status;
     }
 
@@ -341,19 +339,6 @@ class ContentKeywordInsights
             $competitorRows = $this->mergeRows($competitorRows, $this->filterScrap($this->completedRows($req), $plan));
         }
 
-        // Override volumes with real clickstream numbers (DataForSEO) from the
-        // keyword_metrics cache, and kick off the one-time batched fetch that
-        // fills it. We NEVER show estimate volumes first: while that enrichment
-        // is in flight, hold the loader (return null) and only render once the
-        // real volumes have landed — showing incomplete/changing numbers erodes
-        // trust; a few extra seconds does not.
-        $clientRows = $this->applyCachedVolumes($clientRows, $plan);
-        $competitorRows = $this->applyCachedVolumes($competitorRows, $plan);
-        $this->ensureVolumeEnrichment($plan);
-        if (Cache::has($this->volumeEnrichingKey($plan))) {
-            return null; // real search volumes still landing — keep the loader up
-        }
-
         $rows = $this->mergeRows($clientRows, $competitorRows);
 
         if ($rows === []) {
@@ -375,20 +360,15 @@ class ContentKeywordInsights
         // SERP for the client's top query (one cached Serper call).
         $peopleAlso = $this->peopleAlsoSearch($plan, $rows);
 
-        // DataForSEO clickstream volumes still landing → keep the digest "live"
-        // (short cache + poll) so gap / top-searches re-render with real volumes
-        // once the job saves them, instead of freezing on the server estimates.
-        $volumeEnriching = Cache::has($this->volumeEnrichingKey($plan));
-
         $insights = $this->build($rows, $plan, partial: $partial, gap: $gap['rows'], gapTotal: $gap['total'],
             competitorsPending: ! $competitorsComplete,
             competitorsDone: $compCompleted,
             competitorsTotal: max($expected, $compDispatched, $discoveryPending ? self::MAX_COMPETITORS : 0),
-            peopleAlso: $peopleAlso, volumeEnriching: $volumeEnriching);
-        // Partial (or volume-enriching) results are cached briefly so the next poll
-        // upgrades them; the final digest is cached 30 days.
+            peopleAlso: $peopleAlso);
+        // Partial results are cached briefly so the next poll upgrades them as the
+        // remaining requests complete; the final digest is cached 30 days.
         Cache::put($this->insightsKey($plan), $insights,
-            ($partial || $volumeEnriching) ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
+            $partial ? now()->addSeconds(self::PARTIAL_TTL_SECONDS) : now()->addDays(self::CACHE_TTL_DAYS));
         $this->backfillTopicVolumes($plan, $rows);
 
         return $insights;
@@ -655,125 +635,6 @@ class ContentKeywordInsights
         return $out;
     }
 
-    /** keyword_metrics country key for a plan ('global' when unset). */
-    public function metricCountry(ContentPlan $plan): string
-    {
-        return mb_strtolower(trim((string) ($plan->country ?: 'global'))) ?: 'global';
-    }
-
-    /**
-     * Override row volumes/competition with real Google Ads figures cached in
-     * keyword_metrics (DataForSEO). Server volumes are bucketed estimates; these
-     * are accurate. Everything downstream (stats, gap, opportunities, topic
-     * "searches/mo" pills, the visits estimate) then recomputes off the new numbers.
-     */
-    private function applyCachedVolumes(array $rows, ContentPlan $plan): array
-    {
-        if ($rows === []) {
-            return $rows;
-        }
-        $hashes = [];
-        foreach ($rows as $r) {
-            $kw = (string) ($r['keyword'] ?? '');
-            if ($kw !== '') {
-                $hashes[KeywordMetric::hashKeyword($kw)] = true;
-            }
-        }
-        try {
-            $byHash = KeywordMetric::query()
-                ->whereIn('keyword_hash', array_keys($hashes))
-                ->where('country', $this->metricCountry($plan))
-                ->where('data_source', \App\Jobs\EnrichContentKeywordVolumesJob::SOURCE) // clickstream only
-                ->where('expires_at', '>', now())
-                ->get(['keyword_hash', 'search_volume', 'competition'])
-                ->keyBy('keyword_hash');
-        } catch (\Throwable) {
-            return $rows;
-        }
-        if ($byHash->isEmpty()) {
-            return $rows;
-        }
-        foreach ($rows as &$r) {
-            $m = $byHash->get(KeywordMetric::hashKeyword((string) ($r['keyword'] ?? '')));
-            if ($m === null) {
-                continue;
-            }
-            if ($m->search_volume !== null) {
-                $r['volume'] = (int) $m->search_volume;
-            }
-            if ($m->competition !== null) {
-                $c = (float) $m->competition; // DFS 0..1
-                $r['competition'] = $c < 0.34 ? 'low' : ($c < 0.67 ? 'medium' : 'high');
-            }
-        }
-        unset($r);
-
-        return $rows;
-    }
-
-    /** Fire the batched DataForSEO volume enrichment once per plan (7-day guard). */
-    private function ensureVolumeEnrichment(ContentPlan $plan): void
-    {
-        // Content-feature-only paid enrichment (owner kill switch). Normal SEO
-        // never reaches here; this is the sole dispatch point.
-        if (! config('services.content_autopilot.enrich_volume', true)) {
-            return;
-        }
-        // Only hold the loader for enrichment we can actually perform — if
-        // DataForSEO isn't configured or the monthly breaker tripped, skip the
-        // wait entirely and let the digest render on the server volumes.
-        if (! app(\App\Services\DataForSeoKeywordDataClient::class)->isConfigured()
-            || app(\App\Services\Reports\DataForSeoSpendMeter::class)->exhausted()) {
-            return;
-        }
-        if (Cache::add('content:kw-dfs:'.$plan->id, 1, now()->addDays(7))) {
-            // Mark enrichment in-flight so the step keeps polling + short-caches
-            // until the clickstream volumes land (cleared by the job). Bounded TTL
-            // so a dead job can't pin the "refining" state forever.
-            Cache::put($this->volumeEnrichingKey($plan), 1, now()->addMinutes(10));
-            \App\Jobs\EnrichContentKeywordVolumesJob::dispatch($plan->id);
-        }
-    }
-
-    public function volumeEnrichingKey(ContentPlan $plan): string
-    {
-        return 'content:kw-dfs-pending:'.$plan->id;
-    }
-
-    /**
-     * Every keyword worth pricing for a plan: the completed keyword-server sets
-     * (offering seeds + own domain + competitors) plus the plan's topic keywords.
-     * Deduped and capped so the enrichment runs as ONE batched DataForSEO task.
-     *
-     * @return list<string>
-     */
-    public function allKeywords(ContentPlan $plan): array
-    {
-        $kws = [];
-        foreach ([$this->request($plan), $this->siteRequest($this->ownDomainKey($plan))] as $r) {
-            foreach ($this->completedRows($r) as $row) {
-                $kws[] = (string) ($row['keyword'] ?? '');
-            }
-        }
-        for ($i = 0; $i < self::MAX_COMPETITORS; $i++) {
-            foreach ($this->completedRows($this->siteRequest($this->competitorRequestKey($plan, $i))) as $row) {
-                $kws[] = (string) ($row['keyword'] ?? '');
-            }
-        }
-        foreach ($plan->topics()->get(['target_keyword', 'secondary_keywords']) as $t) {
-            $kws[] = (string) $t->target_keyword;
-            foreach ((array) ($t->secondary_keywords ?? []) as $s) {
-                $kws[] = (string) $s;
-            }
-        }
-        $kws = array_values(array_unique(array_filter(
-            array_map(static fn ($k) => mb_strtolower(trim((string) $k)), $kws),
-            static fn ($k) => $k !== '' && mb_strlen($k) <= 80,
-        )));
-
-        return array_slice($kws, 0, 1000); // one batched DFS task (≤1000 keywords)
-    }
-
     /** Clear cached insights + both request pointers so a refetch redispatches. */
     public function forget(ContentPlan $plan): void
     {
@@ -1000,7 +861,7 @@ class ContentKeywordInsights
      */
     private function build(array $rows, ContentPlan $plan, bool $partial, array $gap = [], int $gapTotal = 0,
         bool $competitorsPending = false, int $competitorsDone = 0, int $competitorsTotal = 0,
-        array $peopleAlso = [], bool $volumeEnriching = false): array
+        array $peopleAlso = []): array
     {
         $plannedKeywords = $plan->topics()->pluck('target_keyword')
             ->map(fn ($k) => mb_strtolower(trim((string) $k)))->filter()->flip()->all();
@@ -1129,7 +990,6 @@ class ContentKeywordInsights
             'competitors_pending' => $competitorsPending,
             'competitors_done' => $competitorsDone,
             'competitors_total' => $competitorsTotal,
-            'volume_enriching' => $volumeEnriching,
         ];
     }
 
