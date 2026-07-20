@@ -58,10 +58,20 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   `ProduceContentArticleJob`, cleared on every `GenerateContentImagesJob` exit).
   If no plan exists yet, shows a lightweight empty state ("No content plan yet").
 
-- **Scheduling is strict one-article-per-day.** `ContentTopicPlanner::scheduleDates()`
-  skips any day the plan already has a topic on (each top-up batch restarts at
-  "tomorrow", so without this dates collided and stacked); manual reschedule
-  refuses an already-taken day.
+- **Scheduling: planner fills one-article-per-day** — `ContentTopicPlanner::scheduleDates()`
+  skips any day the plan already has a topic on. The USER may stack a 2nd article
+  on a day via the calendar-icon date picker (grid) / date input (list) — manual
+  reschedule is unrestricted (any non-past date). `ContentTopicPlanner::plan()`
+  keeps **at most the monthly cap** planned ahead (never creates past it); the
+  dispatcher tops up to `THIN_CALENDAR_TOPICS = 30`.
+- **Monthly cap = `content.limits.monthly_articles_per_website` (default 30, was 60).**
+  Calendar marks the cap-th article + beyond red (grid border, list badge) with an
+  info banner; generation past the cap is blocked by `ContentEntitlements::blockReason`
+  (`monthly_limit`). Trial cap (`trial_articles`, default 3) shows a "Subscribe"
+  banner on the calendar once hit (CTA → `content.get-started`).
+- **Featured image on the review page:** generated even when the "in article"
+  toggle is off (it's the WP thumbnail); `ArticleReview` surfaces it above the
+  preview with a note when it isn't embedded in the body.
   **Grid interactions (2026-07-19):** every generatable topic card carries a
   small "Write" button (`writeNow()` → dispatch + redirect to the detail page
   where live progress renders); topic cards are `draggable` and each day cell is
