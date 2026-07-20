@@ -8,6 +8,7 @@
     $wbBannerShow = $wbBannerCode !== ''
         && auth()->check()
         && ! request()->routeIs('billing.*')
+        && ! request()->routeIs('content.*') // dashboard-plan promo, not for Content AI
         && \App\Support\TrialStatus::isWinbackEligible(auth()->user());
 @endphp
 @if ($wbBannerShow)
