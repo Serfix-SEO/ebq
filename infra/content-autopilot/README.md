@@ -72,18 +72,13 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   info banner; generation past the cap is blocked by `ContentEntitlements::blockReason`
   (`monthly_limit`). Trial cap (`trial_articles`, default 3) shows a "Subscribe"
   banner on the calendar once hit (CTA → `content.get-started`).
-- **Keyword volume enrichment (DataForSEO):** `EnrichContentKeywordVolumesJob`
-  (dispatched once/plan from `ContentKeywordInsights::get()`, 7-day guard) pulls
-  REAL Google Ads volumes/CPC/competition/12-mo trend via
-  `DataForSeoKeywordDataClient` (`keywords_data/google_ads/search_volume/live`,
-  **≤1000 keywords in ONE batched task** ≈ flat ~$0.05 — never per keyword). Only
-  keywords not already fresh in the shared `keyword_metrics` cache are fetched;
-  results are saved there (90-day TTL) so every future plan reuses them free.
-  Metered by `DataForSeoSpendMeter` (monthly breaker); admins/`force_sandbox` use
-  the free sandbox. `ContentKeywordInsights::applyCachedVolumes()` overrides row
-  volumes from that cache, so stats / opportunities / keyword gap / topic
-  "searches/mo" pills / the traffic estimate all recompute off the accurate
-  numbers; the job clears the digest cache on completion to re-render.
+- **Wizard analyzes ONE competitor** (`ContentKeywordInsights::MAX_COMPETITORS = 1`,
+  2026-07-20). The keyword server is concurrency-1, so seed + own domain + 3
+  competitors = 5 serialized requests choked the step ("stuck on competitor
+  analysis"). Now just seed + own + top competitor; a prominent step-6 note tells
+  the client deeper competitor research continues in the background per-article.
+  (The earlier DataForSEO clickstream volume-enrichment path was removed — it
+  billed per batch and stalled the step.)
 - **Featured image on the review page:** generated even when the "in article"
   toggle is off (it's the WP thumbnail); `ArticleReview` surfaces it above the
   preview with a note when it isn't embedded in the body.
