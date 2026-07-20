@@ -542,7 +542,12 @@
 
                 {{-- ── Step 5: keyword research ─────────────────────── --}}
                 @elseif ($wizardStep === 6)
-                    @php $kw = $wizard['keywords'] ?? null; @endphp
+                    @php
+                        $kw = $wizard['keywords'] ?? null;
+                        // During public onboarding we tease the research but hold the exact
+                        // keyword volumes / metrics back until the client gets started.
+                        $showVolumes = ! ($publicOnboarding ?? false);
+                    @endphp
                     <div class="text-center">
                         <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg>
@@ -604,7 +609,7 @@
                         </div>
 
                         {{-- Headline stats (volume card hidden until real volume data exists) --}}
-                        @php $kwHasVolume = ($kw['stats']['volume'] ?? 0) > 0; @endphp
+                        @php $kwHasVolume = ($kw['stats']['volume'] ?? 0) > 0 && $showVolumes; @endphp
                         <div class="mt-4 grid grid-cols-2 gap-3 {{ $kwHasVolume ? 'sm:grid-cols-4' : 'sm:grid-cols-3' }}">
                             <div class="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-center dark:border-orange-900 dark:bg-orange-950">
                                 <div class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kw['stats']['keywords']) }}</div>
@@ -626,6 +631,19 @@
                             </div>
                         </div>
 
+                        @unless ($showVolumes)
+                            {{-- Public onboarding: tease the full metrics, unlock after signup. --}}
+                            <div class="mt-4 flex items-start gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 dark:border-orange-900 dark:from-orange-950 dark:to-slate-900">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
+                                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Once you get started, you\'ll unlock the full picture') }}</p>
+                                    <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __('Exact monthly search volumes, competition and traffic potential for every keyword — plus your full keyword gap — appear the moment you finish setting up.') }}</p>
+                                </div>
+                            </div>
+                        @endunless
+
                         <div class="mt-4 grid gap-4 lg:grid-cols-2">
                             {{-- Topic clusters --}}
                             @if (! empty($kw['clusters']))
@@ -642,7 +660,7 @@
                                             <div class="rounded-xl border border-slate-100 bg-slate-50/60 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-800/40" wire:key="kwc-{{ $loop->index }}">
                                                 <div class="flex items-center justify-between gap-2">
                                                     <span class="truncate text-sm font-bold text-slate-800 dark:text-slate-100">{{ $cluster['label'] }}</span>
-                                                    <span class="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ $cluster['count'] }} {{ __('keywords') }}@if($cluster['volume'] > 0) · {{ number_format($cluster['volume']) }}/mo @endif</span>
+                                                    <span class="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ $cluster['count'] }} {{ __('keywords') }}@if($cluster['volume'] > 0 && $showVolumes) · {{ number_format($cluster['volume']) }}/mo @endif</span>
                                                 </div>
                                                 @if (! empty($cluster['top']))
                                                     <div class="mt-1.5 flex flex-wrap gap-1.5">
@@ -721,7 +739,7 @@
                                             @foreach ($kw['questions'] as $q)
                                                 <li class="flex items-center justify-between gap-2 text-sm" wire:key="kwq-{{ $loop->index }}">
                                                     <span class="truncate text-slate-700 dark:text-slate-300">{{ $q['keyword'] }}</span>
-                                                    @if ($q['volume'])
+                                                    @if ($q['volume'] && $showVolumes)
                                                         <span class="shrink-0 text-xs font-semibold text-orange-600 dark:text-orange-400">{{ number_format($q['volume']) }}/mo</span>
                                                     @endif
                                                 </li>
@@ -756,7 +774,7 @@
                                         <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
                                             <tr>
                                                 <th class="px-4 py-2.5 text-start font-bold">{{ __('Keyword') }}</th>
-                                                <th class="px-4 py-2.5 text-end font-bold">{{ __('Monthly searches') }}</th>
+                                                @if ($showVolumes)<th class="px-4 py-2.5 text-end font-bold">{{ __('Monthly searches') }}</th>@endif
                                                 <th class="px-4 py-2.5 text-end font-bold">{{ __('Competition') }}</th>
                                             </tr>
                                         </thead>
@@ -764,7 +782,7 @@
                                             @foreach ($kw['gap'] as $g)
                                                 <tr class="bg-white dark:bg-slate-900" wire:key="kwg-{{ $loop->index }}">
                                                     <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{{ $g['keyword'] }}</td>
-                                                    <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $g['volume'] !== null ? number_format($g['volume']) : '—' }}</td>
+                                                    @if ($showVolumes)<td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $g['volume'] !== null ? number_format($g['volume']) : '—' }}</td>@endif
                                                     <td class="px-4 py-3 text-end">
                                                         @php $gc = ['low' => 'bg-success/10 text-success', 'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300', 'high' => 'bg-error/10 text-error', 'unknown' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'][$g['competition']] ?? 'bg-slate-100 text-slate-500'; @endphp
                                                         <span class="rounded-full px-2 py-0.5 text-xs font-bold {{ $gc }}">{{ ['low' => __('Low'), 'medium' => __('Medium'), 'high' => __('High'), 'unknown' => '—'][$g['competition']] ?? '—' }}</span>
@@ -796,8 +814,8 @@
                                 </div>
                             @endif
 
-                            {{-- Top searches by demand --}}
-                            @if (! empty($kw['top_searches']))
+                            {{-- Top searches by demand (keyword + volume detail — hidden during public onboarding) --}}
+                            @if (! empty($kw['top_searches']) && $showVolumes)
                                 <div class="overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
                                     <div class="flex items-start gap-3 bg-gradient-to-r from-orange-50 to-white px-4 py-3 dark:from-orange-950 dark:to-slate-900">
                                         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
