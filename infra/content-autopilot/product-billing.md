@@ -1,16 +1,16 @@
 # Content Autopilot — separately-billed product (entitlement + billing)
 
 Content Autopilot is sold as its own product, decoupled from the dashboard
-plans. Built 2026-07-19 (Phases 1–6a). Prod rollout is GATED (see bottom).
+plans. Built 2026-07-19 (Phases 1–6a). **PROD LIVE 2026-07-20** (`CONTENT_AUTOPILOT_UI=true`).
 
 ## Pricing (admin-configurable via /admin/settings → "Content product")
 
 | Item | Price | Stripe (LIVE) |
 |---|---|---|
-| Base monthly | $39/mo | price `serfix_content_monthly` |
-| Base annual | $29/mo billed yearly ($348) | `serfix_content_annual` |
-| Extra website monthly | $15/mo | `serfix_content_addon_monthly` |
-| Extra website annual | $10/mo billed yearly | `serfix_content_addon_annual` |
+| Base monthly | $39/mo | `price_1TulILETsnSIf8R58ENQp0Q5` |
+| Base annual | $29/mo billed yearly ($348) | `price_1TulIMETsnSIf8R5Pw5SEYQi` |
+| Extra website monthly | **$20/mo** (raised 2026-07-20 from $15) | `price_1Tv7uHETsnSIf8R5RCzzYTz5` (prod `prod_UuaTi4OFxtHcBU`, 2000/mo) |
+| Extra website annual | **$15/mo billed yearly ($180)** (raised from $10) | `price_1Tv7uHETsnSIf8R5Bjg4Fcsg` (18000/yr) |
 | First month | $1 (monthly only) | coupon `serfix_content_first_month` ($38 off once) |
 | Trial | 5 days, 3 articles, no card | app-managed |
 | Cap | 60 articles/mo/website | admin key |
@@ -113,13 +113,20 @@ gate); `PublicOnboarding::dehydrate()` persists `wizardStep` for reload-resume.
 `ebq:content-onboarding-gc` (hourly) deletes abandoned unconverted sessions
 >7 days + their provisional sites.
 
-## Rollout (PROD — gated, NOT done)
+## Rollout (PROD — DONE 2026-07-20)
 
-Prod runs on LIVE Stripe; staging has NO Stripe keys (billing testable on prod
-or via test keys only). Prod DB migrations are DEFERRED (additive/safe; the
-webhook + effectiveFeatureFlags are try/catch-guarded so prod is safe until then).
-To launch on prod:
-1. `php artisan migrate --force` (5 pending additive content migrations).
-2. `php artisan db:seed --class=PlanSeeder` (flips content_autopilot off).
-3. Confirm `CONTENT_AUTOPILOT_UI=true` + restart FPM.
-4. Price ids already in prod settings; verify checkout with a real card.
+Prod runs on LIVE Stripe; staging has NO live Stripe keys (test-mode only).
+Go-live steps executed (repeat pattern for future content deploys):
+1. Merge `staging`→`main` (ff), push.
+2. Box A: `migrate --force` (additive) + `db:seed --class=PlanSeeder` (idempotent)
+   + `config/route/view:clear` (NEVER `optimize` — cached-config landmine) +
+   `systemctl restart php8.3-fpm` + `horizon:terminate`.
+3. Box B worker (10.0.0.3): rsync (NO `--delete`) + **`docker restart` the
+   ebq-horizon container** — a plain `compose up -d` won't recreate an
+   unchanged-config container, so the long-lived Horizon keeps OLD classes.
+4. Flip prod `.env` `CONTENT_AUTOPILOT_UI=true`.
+5. Verify: `/content-autopilot` 200, landing renders correct prices,
+   `horizon:supervisors` shows `worker-content` running on box B.
+
+**Setting-cache landmine**: settings reads use `Cache::rememberForever`; write via
+`Setting::set()` (busts cache), NOT raw `updateOrCreate` (leaves stale reads).
