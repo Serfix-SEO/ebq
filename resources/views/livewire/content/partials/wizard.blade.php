@@ -612,9 +612,10 @@
                         @php
                             $kwHasVolume = ($kw['stats']['volume'] ?? 0) > 0 && $showVolumes;
                             // Estimated monthly traffic = combined organic traffic of the
-                            // competitors we analyzed (DataForSEO). Gated with volumes so
-                            // public onboarding keeps it behind the teaser.
-                            $kwHasTraffic = ($kw['traffic']['estimated'] ?? 0) > 0 && $showVolumes;
+                            // competitors we analyzed (DataForSEO). Shown on public
+                            // onboarding TOO — it's competitors' traffic (an opportunity
+                            // teaser), not the client's own hidden keyword volumes.
+                            $kwHasTraffic = ($kw['traffic']['estimated'] ?? 0) > 0;
                             $kwStatCount = 3 + ($kwHasVolume ? 1 : 0) + ($kwHasTraffic ? 1 : 0);
                             // Only grid-cols-3/4 are in the prebuilt Tailwind bundle; a 5-card
                             // row uses cols-3 (3 + 2 wrap) rather than an uncompiled cols-5.
