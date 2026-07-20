@@ -121,8 +121,11 @@ abstract class OpenAiCompatibleClient implements LlmClient
         // a request the Auth user is the implicit fallback. Estimate the
         // pre-flight ceiling as prompt-chars / 4 + max_tokens (~4 chars
         // per token for English).
+        // `__unmetered`: skip the per-user dashboard token CAP (the caller
+        // enforces its own limits, e.g. Content Autopilot's spend/article caps).
+        // The user is still resolved so actual spend is logged/attributed below.
         $billedUser = $this->resolveBilledUser($options);
-        if ($billedUser !== null) {
+        if ($billedUser !== null && ! ($options['__unmetered'] ?? false)) {
             $estimated = $this->estimateTokens($messages, (int) ($body['max_tokens'] ?? 2048));
             app(UsageMeter::class)->assertCanSpend($billedUser, $provider, $estimated);
         }

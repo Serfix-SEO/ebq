@@ -287,6 +287,12 @@ class AiWriterService
                 $llmOptions[$hint] = (string) $input[$hint];
             }
         }
+        // Content Autopilot generation carries its own caps (ContentLlmSpendMeter
+        // + trial/monthly article limits), so it opts out of the per-user dashboard
+        // token quota — still attributed for logging via __user_id/__source.
+        if (! empty($input['__unmetered'])) {
+            $llmOptions['__unmetered'] = true;
+        }
         $response = $this->llm->completeJson($messages, $llmOptions);
 
         if (! is_array($response) || ! isset($response['sections']) || ! is_array($response['sections'])) {

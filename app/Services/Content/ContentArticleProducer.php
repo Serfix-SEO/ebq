@@ -86,6 +86,8 @@ class ContentArticleProducer
                 .(($urls = array_slice((array) ($context['site_urls'] ?? []), 0, 15)) === [] ? ''
                     : "\nInternal pages you may link to (2-3, exact URLs only):\n".implode("\n", $urls)),
             '__user_id' => $website->user_id,
+            '__source' => 'content_autopilot.write',
+            '__unmetered' => true, // capped by ContentLlmSpendMeter + entitlements, not the dashboard token cap
         ];
         if (! empty($writeModel['model'])) {
             $draftInput['model'] = $writeModel['model'];
@@ -429,6 +431,7 @@ class ContentArticleProducer
             'timeout' => 240,
             '__user_id' => $topic->website?->user_id,
             '__source' => 'content_autopilot.de_ai',
+            '__unmetered' => true,
         ];
         if (! empty($reviseModel['model'])) {
             $options['model'] = $reviseModel['model'];
@@ -601,6 +604,7 @@ class ContentArticleProducer
             'timeout' => 240,
             '__user_id' => $topic->website?->user_id,
             '__source' => 'content_autopilot.revise',
+            '__unmetered' => true,
         ];
         if (! empty($reviseModel['model'])) {
             $options['model'] = $reviseModel['model'];
