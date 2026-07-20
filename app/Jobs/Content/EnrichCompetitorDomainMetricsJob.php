@@ -46,6 +46,10 @@ class EnrichCompetitorDomainMetricsJob implements ShouldQueue
     public function __construct(public string $websiteId, public array $domains)
     {
         $this->onQueue('content');
+        // Match the worker-content Horizon supervisor (redis-long connection) —
+        // without this the job lands on the default connection and the content
+        // worker never picks it up.
+        $this->onConnection('redis-long');
     }
 
     public function handle(DataForSeoBacklinkClient $dfs, DataForSeoSpendMeter $spend): void

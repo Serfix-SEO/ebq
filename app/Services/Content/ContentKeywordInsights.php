@@ -537,6 +537,87 @@ class ContentKeywordInsights
     }
 
     /**
+     * LLM relevance filter for the "Questions your audience is asking" list.
+     * Competitor/seed keyword mining can inject off-topic question keywords
+     * (business naming for a gaming-name site). Keeps only questions genuinely
+     * about the client's offerings/description. Cached 30d; fails OPEN (keeps
+     * all) when the LLM is unavailable or would leave the list empty.
+     *
+     * @param  list<array{keyword:string, volume:?int}>  $questions
+     * @return list<array{keyword:string, volume:?int}>
+     */
+    private function filterRelevantQuestions(array $questions, ContentPlan $plan): array
+    {
+        if (count($questions) < 2) {
+            return $questions;
+        }
+        $keywords = array_map(static fn ($q) => (string) $q['keyword'], $questions);
+        $offer = implode(', ', array_slice((array) (($plan->offerings ?? [])['sell'] ?? []), 0, 10));
+        $desc = mb_substr((string) $plan->business_description, 0, 400);
+
+        $cacheKey = 'content:kw-qrel:'.md5($offer.'|'.implode('|', $keywords));
+        $keep = Cache::get($cacheKey);
+        if (! is_array($keep)) {
+            // null (unavailable/errored) → fail OPEN (keep all, don't cache).
+            // array (even empty) → authoritative: the LLM judged relevance.
+            $keep = $this->llmRelevantQuestions($keywords, $offer, $desc);
+            if ($keep === null) {
+                return $questions;
+            }
+            Cache::put($cacheKey, $keep, now()->addDays(self::CACHE_TTL_DAYS));
+        }
+        $keepSet = array_flip($keep);
+
+        // Keep only questions the LLM judged on-topic. If it kept NONE, the list
+        // is genuinely all off-topic noise (competitor/seed mining) → show none
+        // rather than misleading questions.
+        return array_values(array_filter(
+            $questions,
+            static fn ($q) => isset($keepSet[mb_strtolower(trim((string) $q['keyword']))])
+        ));
+    }
+
+    /**
+     * @return list<string>|null  lowercased on-topic questions; null when the LLM
+     *                            is unavailable/errored (caller fails open)
+     */
+    private function llmRelevantQuestions(array $keywords, string $offer, string $desc): ?array
+    {
+        try {
+            $model = ContentAutopilotConfig::modelFor('ideate');
+            $llm = LlmClientFactory::make($model['provider']);
+            if (! $llm->isAvailable()) {
+                return null;
+            }
+            $list = implode("\n", array_slice($keywords, 0, 60));
+            $response = $llm->completeJson([
+                ['role' => 'system', 'content' => 'You filter SEO question lists for topical relevance. Respond with valid JSON only.'],
+                ['role' => 'user', 'content' => <<<PROMPT
+                Business offerings: {$offer}
+                About: {$desc}
+
+                From the questions below, return ONLY those genuinely relevant to THIS
+                business's topic and audience. DROP off-topic questions — e.g. generic
+                company/business naming, permits, or unrelated industries — even when
+                they share a common word (like "name"). Keep the exact original text.
+
+                {$list}
+
+                Return JSON: {"relevant": ["...", "..."]}
+                PROMPT],
+            ], ['temperature' => 0.1, 'max_tokens' => 800, 'timeout' => 30, '__source' => 'content_autopilot.kw_qrel']);
+
+            $rel = is_array($response['relevant'] ?? null) ? $response['relevant'] : [];
+
+            return array_values(array_filter(array_map(
+                static fn ($s) => mb_strtolower(trim((string) $s)), $rel
+            )));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * Keyword gap: competitor keywords (with volume) the client isn't targeting,
      * ranked by RELEVANCE to what the client actually sells (offering overlap)
      * first, then volume — so a gold buyer sees "sell gold coins", not a
@@ -1063,6 +1144,10 @@ class ContentKeywordInsights
             $seenQuestion[$key] = true;
             $questionList[] = ['keyword' => $q, 'volume' => null];
         }
+        // Drop questions that aren't about THIS business — competitor/seed keyword
+        // mining can pull in off-topic question keywords (e.g. "how to name your
+        // company" for a gaming-name generator). LLM relevance pass; fails open.
+        $questionList = $this->filterRelevantQuestions($questionList, $plan);
         $questionsTotal = count($questionList);
         $questions = array_slice($questionList, 0, 8);
 
