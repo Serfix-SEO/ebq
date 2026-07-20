@@ -98,9 +98,11 @@ class ContentAutopilotDispatcher extends Command
 
         ContentPlan::query()
             ->where('status', ContentPlan::STATUS_ACTIVE)
+            // The pool = every UNPUBLISHED, non-skipped topic (planned + in-flight
+            // + ready). Keep exactly THIN_CALENDAR_TOPICS of these: publishing one
+            // drops the pool and the planner adds just the shortfall back.
             ->withCount(['topics as future_topics_count' => function ($q) {
-                $q->whereIn('status', [ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED])
-                    ->where('scheduled_for', '>=', now()->toDateString());
+                $q->whereNotIn('status', [ContentTopic::STATUS_PUBLISHED, ContentTopic::STATUS_SKIPPED]);
             }])
             ->get()
             ->filter(fn (ContentPlan $plan) => $plan->future_topics_count < self::THIN_CALENDAR_TOPICS)

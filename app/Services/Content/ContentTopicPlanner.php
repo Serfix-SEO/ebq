@@ -45,15 +45,17 @@ class ContentTopicPlanner
             return [];
         }
 
-        // Keep at most the monthly cap (default 30) planned ahead — never create
-        // more future topics than the plan allows per month, so top-up tops up
-        // TO the cap rather than piling on past it.
+        // Maintain a fixed pool of at most `cap` (default 30) UNPUBLISHED topics
+        // ahead — count the whole active pipeline (planned + in-flight + ready),
+        // not just future-dated ones, so we don't pile past 30 while articles are
+        // being written. Replenishment happens only as topics leave the pool
+        // (published): each publish drops the pool below cap and the dispatcher's
+        // top-up adds exactly the shortfall back.
         $cap = \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite();
-        $existingFuture = $plan->topics()
-            ->whereIn('status', [ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED])
-            ->where('scheduled_for', '>=', now()->toDateString())
+        $existingActive = $plan->topics()
+            ->whereNotIn('status', [ContentTopic::STATUS_PUBLISHED, ContentTopic::STATUS_SKIPPED])
             ->count();
-        $count = max(0, min($count, $cap) - $existingFuture);
+        $count = max(0, min($count, $cap) - $existingActive);
         if ($count === 0) {
             return [];
         }
