@@ -465,16 +465,29 @@ class ContentKeywordInsights
             return array_merge($empty, ['pending' => $pending, 'ready' => $ready, 'active' => $active]);
         }
 
-        // Top candidates by volume, one row per keyword (highest-volume ranking wins).
+        // Candidate pool: top keywords PER competitor, not globally by volume — a
+        // single high-traffic rival (e.g. a translation tool) would otherwise swamp
+        // the pool with off-topic terms and bury the on-topic competitors. Sampling
+        // each competitor guarantees every rival is represented before the LLM pass.
         $seen = [];
         $candidates = [];
-        foreach ((clone $base)->orderByDesc('search_volume')->limit(400)->get(['keyword', 'keyword_hash', 'search_volume']) as $r) {
-            if (isset($seen[$r->keyword_hash])) {
-                continue;
+        foreach ($competitors as $cd) {
+            foreach (DomainKeywordRanking::query()
+                ->where('domain', $cd)->where('country', $country)
+                ->when($clientHashes !== [], fn ($q) => $q->whereNotIn('keyword_hash', $clientHashes))
+                ->where('search_volume', '>', 0)
+                ->orderByDesc('search_volume')->limit(80)
+                ->get(['keyword', 'keyword_hash', 'search_volume']) as $r) {
+                $vol = (int) $r->search_volume;
+                if (isset($seen[$r->keyword_hash]) && $seen[$r->keyword_hash] >= $vol) {
+                    continue;
+                }
+                $seen[$r->keyword_hash] = $vol;
+                $candidates[$r->keyword_hash] = ['keyword' => $r->keyword, 'hash' => $r->keyword_hash, 'volume' => $vol];
             }
-            $seen[$r->keyword_hash] = true;
-            $candidates[] = ['keyword' => $r->keyword, 'hash' => $r->keyword_hash, 'volume' => (int) $r->search_volume];
         }
+        $candidates = array_values($candidates);
+        usort($candidates, static fn ($a, $b) => $b['volume'] <=> $a['volume']);
 
         // Competition levels from keyword_metrics (shared facts).
         $comp = KeywordMetric::query()
@@ -489,18 +502,17 @@ class ContentKeywordInsights
             return $c < 0.34 ? 'low' : ($c < 0.67 ? 'medium' : 'high');
         };
 
-        // LLM relevance pass over the top candidates (same filter as questions).
-        $topKeywords = array_slice(array_column($candidates, 'keyword'), 0, 60);
-        $keep = $this->relevanceKeep($topKeywords, $plan, 'search keywords', 'grel');
+        // LLM relevance pass — AUTHORITATIVE: when the LLM runs we keep only what it
+        // vetts (even if that's nothing), so an off-topic competitor's high-volume
+        // keywords are NEVER shown. Only when the LLM is unavailable (keep === null)
+        // do we fall back to the raw volume ranking.
+        $keep = $this->relevanceKeep(array_column($candidates, 'keyword'), $plan, 'search keywords', 'grel');
         if (is_array($keep)) {
             $keepSet = array_flip($keep);
-            $vetted = array_values(array_filter(
+            $candidates = array_values(array_filter(
                 $candidates,
                 static fn ($r) => isset($keepSet[mb_strtolower(trim((string) $r['keyword']))])
             ));
-            if ($vetted !== []) {
-                $candidates = $vetted;
-            }
         }
 
         $rows = array_map(static fn ($r) => [
@@ -722,7 +734,7 @@ class ContentKeywordInsights
             if (! $llm->isAvailable()) {
                 return null;
             }
-            $list = implode("\n", array_slice($items, 0, 80));
+            $list = implode("\n", array_slice($items, 0, 150));
             $response = $llm->completeJson([
                 ['role' => 'system', 'content' => "You filter SEO {$noun} lists for topical relevance. Respond with valid JSON only."],
                 ['role' => 'user', 'content' => <<<PROMPT
@@ -739,7 +751,7 @@ class ContentKeywordInsights
 
                 Return JSON: {"relevant": ["...", "..."]}
                 PROMPT],
-            ], ['temperature' => 0.1, 'max_tokens' => 900, 'timeout' => 30, '__source' => 'content_autopilot.kw_relevance']);
+            ], ['temperature' => 0.1, 'max_tokens' => 2000, 'timeout' => 40, '__source' => 'content_autopilot.kw_relevance']);
 
             $rel = is_array($response['relevant'] ?? null) ? $response['relevant'] : [];
 
