@@ -336,6 +336,14 @@ class ContentKeywordInsights
             $competitorRows = $this->mergeRows($competitorRows, $this->filterScrap($this->completedRows($req), $plan));
         }
 
+        // Override volumes with real Google Ads numbers (DataForSEO) wherever we
+        // have them cached in keyword_metrics — so stats, opportunities, gap and
+        // the topic "searches/mo" pills all reflect the accurate figure. The
+        // batched fetch that fills that cache is dispatched once below.
+        $clientRows = $this->applyCachedVolumes($clientRows, $plan);
+        $competitorRows = $this->applyCachedVolumes($competitorRows, $plan);
+        $this->ensureVolumeEnrichment($plan);
+
         $rows = $this->mergeRows($clientRows, $competitorRows);
 
         if ($rows === []) {
@@ -630,6 +638,103 @@ class ContentKeywordInsights
         }
 
         return $out;
+    }
+
+    /** keyword_metrics country key for a plan ('global' when unset). */
+    public function metricCountry(ContentPlan $plan): string
+    {
+        return mb_strtolower(trim((string) ($plan->country ?: 'global'))) ?: 'global';
+    }
+
+    /**
+     * Override row volumes/competition with real Google Ads figures cached in
+     * keyword_metrics (DataForSEO). Server volumes are bucketed estimates; these
+     * are accurate. Everything downstream (stats, gap, opportunities, topic
+     * "searches/mo" pills, the visits estimate) then recomputes off the new numbers.
+     */
+    private function applyCachedVolumes(array $rows, ContentPlan $plan): array
+    {
+        if ($rows === []) {
+            return $rows;
+        }
+        $hashes = [];
+        foreach ($rows as $r) {
+            $kw = (string) ($r['keyword'] ?? '');
+            if ($kw !== '') {
+                $hashes[KeywordMetric::hashKeyword($kw)] = true;
+            }
+        }
+        try {
+            $byHash = KeywordMetric::query()
+                ->whereIn('keyword_hash', array_keys($hashes))
+                ->where('country', $this->metricCountry($plan))
+                ->where('expires_at', '>', now())
+                ->get(['keyword_hash', 'search_volume', 'competition'])
+                ->keyBy('keyword_hash');
+        } catch (\Throwable) {
+            return $rows;
+        }
+        if ($byHash->isEmpty()) {
+            return $rows;
+        }
+        foreach ($rows as &$r) {
+            $m = $byHash->get(KeywordMetric::hashKeyword((string) ($r['keyword'] ?? '')));
+            if ($m === null) {
+                continue;
+            }
+            if ($m->search_volume !== null) {
+                $r['volume'] = (int) $m->search_volume;
+            }
+            if ($m->competition !== null) {
+                $c = (float) $m->competition; // DFS 0..1
+                $r['competition'] = $c < 0.34 ? 'low' : ($c < 0.67 ? 'medium' : 'high');
+            }
+        }
+        unset($r);
+
+        return $rows;
+    }
+
+    /** Fire the batched DataForSEO volume enrichment once per plan (7-day guard). */
+    private function ensureVolumeEnrichment(ContentPlan $plan): void
+    {
+        if (Cache::add('content:kw-dfs:'.$plan->id, 1, now()->addDays(7))) {
+            \App\Jobs\EnrichContentKeywordVolumesJob::dispatch($plan->id);
+        }
+    }
+
+    /**
+     * Every keyword worth pricing for a plan: the completed keyword-server sets
+     * (offering seeds + own domain + competitors) plus the plan's topic keywords.
+     * Deduped and capped so the enrichment runs as ONE batched DataForSEO task.
+     *
+     * @return list<string>
+     */
+    public function allKeywords(ContentPlan $plan): array
+    {
+        $kws = [];
+        foreach ([$this->request($plan), $this->siteRequest($this->ownDomainKey($plan))] as $r) {
+            foreach ($this->completedRows($r) as $row) {
+                $kws[] = (string) ($row['keyword'] ?? '');
+            }
+        }
+        for ($i = 0; $i < self::MAX_COMPETITORS; $i++) {
+            foreach ($this->completedRows($this->siteRequest($this->competitorRequestKey($plan, $i))) as $row) {
+                $kws[] = (string) ($row['keyword'] ?? '');
+            }
+        }
+        foreach ($plan->topics()->get(['target_keyword', 'secondary_keywords']) as $t) {
+            $kws[] = (string) $t->target_keyword;
+            foreach ((array) ($t->secondary_keywords ?? []) as $s) {
+                $kws[] = (string) $s;
+            }
+        }
+        $kws = array_values(array_unique(array_filter(
+            array_map(static fn ($k) => mb_strtolower(trim((string) $k)), $kws),
+            static fn ($k) => $k !== '' && mb_strlen($k) <= 80,
+        )));
+
+        return array_slice($kws, 0, 1000); // one batched DFS task (≤1000 keywords)
     }
 
     /** Clear cached insights + both request pointers so a refetch redispatches. */

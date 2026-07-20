@@ -96,9 +96,33 @@ class ContentKeywordInsightsTest extends TestCase
             ->assertSee(__('Keywords analyzed'))
             ->assertSee('pubg name generator')
             ->assertSee('50,000')
-            ->assertSee(__('In your calendar'))
+            ->assertSee(__('Top searches by demand'))
             ->assertSee(__('Questions your audience is asking'))
             ->assertSee('how to change pubg name');
+    }
+
+    public function test_dataforseo_cached_volume_overrides_server_estimate(): void
+    {
+        [$user, $website, $plan] = $this->userWithPlan();
+        $this->storeCompletedRequest($plan, [
+            ['keyword' => 'pubg name generator', 'avgMonthlySearches' => 50000, 'competitionIndex' => 20],
+        ]);
+        // Real Google Ads figure cached in the shared metric table (DataForSEO).
+        \App\Models\KeywordMetric::query()->create([
+            'keyword' => 'pubg name generator',
+            'keyword_hash' => \App\Models\KeywordMetric::hashKeyword('pubg name generator'),
+            'country' => app(\App\Services\Content\ContentKeywordInsights::class)->metricCountry($plan),
+            'data_source' => 'dataforseo',
+            'search_volume' => 123456,
+            'fetched_at' => now(),
+            'expires_at' => now()->addDays(90),
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 6)
+            ->assertSee('123,456')      // DFS volume wins
+            ->assertDontSee('50,000');  // server estimate overridden
     }
 
     public function test_insights_classify_intent_questions_and_opportunities(): void
