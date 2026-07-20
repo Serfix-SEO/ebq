@@ -38,6 +38,9 @@ class EnrichContentKeywordVolumesJob implements ShouldQueue
 
     public int $timeout = 120;
 
+    /** keyword_metrics.data_source for content clickstream volumes (≤16 chars). */
+    public const SOURCE = 'clickstream';
+
     /** KeywordFinder country key → DataForSEO location_code (Google Ads). */
     private const LOCATION = [
         'us' => 2840, 'gb' => 2826, 'uk' => 2826, 'ca' => 2124, 'au' => 2036,
@@ -73,6 +76,7 @@ class EnrichContentKeywordVolumesJob implements ShouldQueue
         $haveHashes = KeywordMetric::query()
             ->whereIn('keyword_hash', array_keys($hashes))
             ->where('country', $country)
+            ->where('data_source', self::SOURCE) // only a fresh CLICKSTREAM row counts as "have"
             ->where('expires_at', '>', now())
             ->pluck('keyword_hash')->all();
         $missing = [];
@@ -97,10 +101,9 @@ class EnrichContentKeywordVolumesJob implements ShouldQueue
 
         foreach ($data as $kw => $d) {
             KeywordMetric::query()->updateOrCreate(
-                ['keyword_hash' => KeywordMetric::hashKeyword($kw), 'country' => $country],
+                ['keyword_hash' => KeywordMetric::hashKeyword($kw), 'country' => $country, 'data_source' => self::SOURCE],
                 [
                     'keyword' => mb_substr($kw, 0, 255),
-                    'data_source' => 'dataforseo_clickstream',
                     'search_volume' => $d['search_volume'],
                     'cpc' => $d['cpc'],
                     'low_top_of_page_bid' => $d['low_top_of_page_bid'],
@@ -135,6 +138,7 @@ class EnrichContentKeywordVolumesJob implements ShouldQueue
                 $m = KeywordMetric::query()
                     ->where('keyword_hash', KeywordMetric::hashKeyword($kw))
                     ->where('country', $country)
+                    ->where('data_source', self::SOURCE)
                     ->where('expires_at', '>', now())
                     ->first(['search_volume']);
                 if ($m?->search_volume !== null) {

@@ -668,6 +668,7 @@ class ContentKeywordInsights
             $byHash = KeywordMetric::query()
                 ->whereIn('keyword_hash', array_keys($hashes))
                 ->where('country', $this->metricCountry($plan))
+                ->where('data_source', \App\Jobs\EnrichContentKeywordVolumesJob::SOURCE) // clickstream only
                 ->where('expires_at', '>', now())
                 ->get(['keyword_hash', 'search_volume', 'competition'])
                 ->keyBy('keyword_hash');

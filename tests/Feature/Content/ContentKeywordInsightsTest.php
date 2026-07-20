@@ -112,7 +112,7 @@ class ContentKeywordInsightsTest extends TestCase
             'keyword' => 'pubg name generator',
             'keyword_hash' => \App\Models\KeywordMetric::hashKeyword('pubg name generator'),
             'country' => app(\App\Services\Content\ContentKeywordInsights::class)->metricCountry($plan),
-            'data_source' => 'dataforseo',
+            'data_source' => \App\Jobs\EnrichContentKeywordVolumesJob::SOURCE,
             'search_volume' => 123456,
             'fetched_at' => now(),
             'expires_at' => now()->addDays(90),
