@@ -860,7 +860,7 @@
                                         <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{{ __('The authority and organic traffic of the rivals we analyzed — the benchmark your content is built to close in on.') }}</p>
                                     </div>
                                 </div>
-                                <div class="overflow-x-auto">
+                                <div class="overflow-x-auto pb-2">
                                     <table class="min-w-full text-sm whitespace-nowrap">
                                         <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
                                             <tr>
