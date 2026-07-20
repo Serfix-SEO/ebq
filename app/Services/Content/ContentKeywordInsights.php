@@ -75,6 +75,10 @@ class ContentKeywordInsights
     /** Partial (competitors/gap still pending) results re-check this often. */
     private const PARTIAL_TTL_SECONDS = 15;
 
+    /** Below this many LLM-labelled pillars we fall back to the deterministic
+     *  term grouper — a thin/coarse LLM pass must not shrink "content pillars". */
+    private const MIN_CLUSTERS = 4;
+
     public function __construct(
         private readonly KeywordFinderPool $pool,
         private readonly AiKeywordClusterService $clusters,
@@ -1238,7 +1242,14 @@ class ContentKeywordInsights
                 $g['top'] = array_column(array_slice($g['top'], 0, 3), 'keyword');
                 $clusters[] = $g;
             }
-        } else {
+        }
+
+        // The LLM labeller caps its input (~300 keywords) and dumps a big slice into
+        // "Other", and its label granularity swings run to run — on a 500+ keyword
+        // set that can collapse the pillars to 2. The deterministic term grouper
+        // always yields ~6, so use it whenever the LLM pass came back thin.
+        if (count($clusters) < self::MIN_CLUSTERS) {
+            $clusters = [];
             foreach (KeywordTermGrouper::groups($rows, 6) as $g) {
                 $members = array_values(array_filter($rows, fn ($r) => str_contains($r['keyword'], $g['term'])));
                 usort($members, fn ($a, $b) => ($b['volume'] ?? 0) <=> ($a['volume'] ?? 0));
