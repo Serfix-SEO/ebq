@@ -322,16 +322,22 @@
         @endif
 
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <button wire:click="previousMonth" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="{{ __('Previous month') }}">&larr;</button>
-                <h2 style="min-width:10rem" class="text-center text-base font-bold text-slate-900 dark:text-slate-100">{{ $monthStart->translatedFormat('F Y') }}</h2>
-                <button wire:click="nextMonth" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="{{ __('Next month') }}">&rarr;</button>
-            </div>
-            <div class="flex items-center gap-2">
-                <button wire:click="$set('view', '{{ $view === 'grid' ? 'list' : 'grid' }}')"
-                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                    {{ $view === 'grid' ? __('List view') : __('Calendar view') }}
+            <div class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button wire:click="previousMonth" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100" aria-label="{{ __('Previous month') }}">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                 </button>
+                <h2 class="min-w-[9rem] px-1 text-center text-sm font-bold text-slate-900 dark:text-slate-100">{{ $monthStart->translatedFormat('F Y') }}</h2>
+                <button wire:click="nextMonth" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100" aria-label="{{ __('Next month') }}">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                </button>
+            </div>
+            <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                @foreach (['grid' => __('Calendar'), 'list' => __('List')] as $mode => $modeLabel)
+                    <button wire:click="$set('view', '{{ $mode }}')"
+                        class="rounded-lg px-4 py-1.5 text-sm font-semibold transition {{ $view === $mode ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}">
+                        {{ $modeLabel }}
+                    </button>
+                @endforeach
             </div>
         </div>
 
@@ -346,14 +352,19 @@
         {{-- ── Overview KPIs ────────────────────────────────────────── --}}
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             @foreach ([
-                ['label' => __('Planned'), 'value' => $stats['planned'], 'color' => 'sky'],
-                ['label' => __('In progress'), 'value' => $stats['in_progress'], 'color' => 'amber'],
-                ['label' => __('Ready for review'), 'value' => $stats['ready'], 'color' => 'emerald'],
-                ['label' => __('Published'), 'value' => $stats['published'], 'color' => 'orange'],
+                ['label' => __('Planned'), 'value' => $stats['planned'], 'color' => 'sky', 'icon' => 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5'],
+                ['label' => __('In progress'), 'value' => $stats['in_progress'], 'color' => 'amber', 'icon' => 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'],
+                ['label' => __('Ready for review'), 'value' => $stats['ready'], 'color' => 'emerald', 'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                ['label' => __('Published'), 'value' => $stats['published'], 'color' => 'orange', 'icon' => 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5'],
             ] as $kpi)
-                <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <div class="text-2xl font-bold text-{{ $kpi['color'] }}-600">{{ number_format($kpi['value']) }}</div>
-                    <div class="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">{{ $kpi['label'] }}</div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kpi['value']) }}</span>
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-{{ $kpi['color'] }}-100 text-{{ $kpi['color'] }}-600">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $kpi['icon'] }}"/></svg>
+                        </span>
+                    </div>
+                    <div class="mt-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ $kpi['label'] }}</div>
                 </div>
             @endforeach
         </div>
@@ -365,10 +376,10 @@
         @endif
 
         @if ($view === 'grid')
-            <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-                <div class="grid grid-cols-7 border-b border-slate-200 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400" style="min-width:56rem">
+            <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400" style="min-width:56rem">
                     @foreach ([__('Mon'), __('Tue'), __('Wed'), __('Thu'), __('Fri'), __('Sat'), __('Sun')] as $dow)
-                        <div class="px-2 py-2">{{ $dow }}</div>
+                        <div class="px-2 py-2.5">{{ $dow }}</div>
                     @endforeach
                 </div>
                 {{-- drag.id holds the topic being dragged. It MUST be a shared
@@ -385,8 +396,14 @@
                              x-on:dragleave="over = false"
                              x-on:drop="over = false; if (drag.id) { $wire.reschedule(drag.id, '{{ $day->toDateString() }}') }; drag.id = null"
                              :class="over && drag.id ? 'ring-2 ring-inset ring-orange-400' : ''"
-                             class="border-b border-e border-slate-100 p-1.5 align-top dark:border-slate-800 {{ $day->format('Y-m') !== $month ? 'bg-slate-50 dark:bg-slate-950' : '' }}" style="min-height:6.5rem">
-                            <div class="mb-1 text-end text-xs {{ $day->isToday() ? 'font-bold text-orange-600' : 'text-slate-400' }}">{{ $day->day }}</div>
+                             class="border-b border-e border-slate-100 p-1.5 align-top transition-colors dark:border-slate-800 {{ $day->format('Y-m') !== $month ? 'bg-slate-50/60 dark:bg-slate-950/40' : '' }}" style="min-height:7.25rem">
+                            <div class="mb-1.5 flex justify-end">
+                                @if ($day->isToday())
+                                    <span class="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-orange-600 px-1 text-xs font-bold text-white">{{ $day->day }}</span>
+                                @else
+                                    <span class="text-xs font-medium text-slate-400 dark:text-slate-500">{{ $day->day }}</span>
+                                @endif
+                            </div>
                             @foreach ($dayTopics as $topic)
                                 @php
                                     $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status);
@@ -461,7 +478,12 @@
                 </div>
             </div>
         @else
-            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="hidden items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 sm:flex dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+                    <span class="w-40 shrink-0">{{ __('Date') }}</span>
+                    <span class="min-w-0 flex-1">{{ __('Article') }}</span>
+                    <span>{{ __('Status & actions') }}</span>
+                </div>
                 <div class="divide-y divide-slate-100 dark:divide-slate-800">
                     @forelse ($topics as $topic)
                         @php
@@ -469,7 +491,7 @@
                             $imgPending = \App\Livewire\Content\ContentCalendar::imagesPending($topic);
                             $overCap = in_array($topic->id, $overCapIds ?? [], true);
                         @endphp
-                        <div class="flex flex-wrap items-center gap-3 px-4 py-3 {{ $overCap ? 'bg-error/5' : '' }}">
+                        <div class="flex flex-wrap items-center gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/30 {{ $overCap ? 'bg-error/5' : '' }}">
                             @php $canMove = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true); @endphp
                             <div class="w-40 shrink-0">
                                 @if ($canMove)
@@ -577,57 +599,43 @@
 
         {{-- ── Content strategy map (topic clusters) ────────────────── --}}
         @if (! empty($clusters))
-            <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Content strategy map') }}</h3>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('How your articles group into content pillars around your site.') }}</p>
-
-                @php
-                    $cx = 470; $cy = 330; $rings = 185;
-                    $n = count($clusters);
-                    $palette = ['#F26419', '#0EA5E9', '#10B981', '#8B5CF6', '#EF4444', '#F59E0B', '#64748B'];
-                    $statusColor = ['ready' => '#10B981', 'scheduled' => '#10B981', 'published' => '#059669',
-                        'writing' => '#F59E0B', 'researching' => '#F59E0B', 'scoring' => '#F59E0B', 'revising' => '#F59E0B',
-                        'failed' => '#EF4444', 'approved' => '#0EA5E9', 'suggested' => '#94A3B8'];
-                    $siteLabel = \Illuminate\Support\Str::of((string) ($plan->website?->domain ?? 'Site'))
-                        ->before('.')->limit(10, '…')->value();
-                @endphp
-                <div class="mt-3 overflow-x-auto">
-                    <svg viewBox="0 0 940 660" class="w-full" style="min-width:660px" role="img" aria-label="{{ __('Content strategy map') }}">
-                        @foreach ($clusters as $ci => $cluster)
-                            @php
-                                $ang = $n <= 1 ? -M_PI/2 : (2*M_PI*$ci/$n) - M_PI/2;
-                                $px = $cx + $rings * cos($ang); $py = $cy + $rings * sin($ang);
-                                $color = $palette[$ci % count($palette)];
-                                // Point labels outward (away from center) on the correct side.
-                                $rightSide = $px >= $cx;
-                                $shown = array_slice($cluster['topics'], 0, 5);
-                                $m = count($shown);
-                                $extra = count($cluster['topics']) - $m;
-                            @endphp
-                            <line x1="{{ round($cx,1) }}" y1="{{ round($cy,1) }}" x2="{{ round($px,1) }}" y2="{{ round($py,1) }}" stroke="{{ $color }}" stroke-width="2" opacity="0.45"/>
-                            @foreach ($shown as $li => $topic)
-                                @php
-                                    // Fan leaves along a vertical-ish comb on the outward side.
-                                    $step = 26; $ly = $py + ($li - ($m-1)/2) * $step;
-                                    $lx = $px + ($rightSide ? 46 : -46);
-                                    $sc = $statusColor[$topic['status']] ?? '#94A3B8';
-                                    $anchor = $rightSide ? 'start' : 'end';
-                                    $tx = $lx + ($rightSide ? 9 : -9);
-                                @endphp
-                                <path d="M {{ round($px,1) }} {{ round($py,1) }} C {{ round(($px+$lx)/2,1) }} {{ round($py,1) }}, {{ round(($px+$lx)/2,1) }} {{ round($ly,1) }}, {{ round($lx,1) }} {{ round($ly,1) }}" fill="none" stroke="{{ $color }}" stroke-width="1.2" opacity="0.35"/>
-                                <circle cx="{{ round($lx,1) }}" cy="{{ round($ly,1) }}" r="5" fill="{{ $sc }}"/>
-                                <text x="{{ round($tx,1) }}" y="{{ round($ly+3.5,1) }}" font-size="11" fill="#64748b" text-anchor="{{ $anchor }}">{{ \Illuminate\Support\Str::limit($topic['title'], 30) }}</text>
-                            @endforeach
-                            @if ($extra > 0)
-                                <text x="{{ round($px + ($rightSide ? 55 : -55),1) }}" y="{{ round($py + ($m/2)*26 + 12,1) }}" font-size="10" fill="#94a3b8" text-anchor="{{ $rightSide ? 'start' : 'end' }}">+{{ $extra }} {{ __('more') }}</text>
-                            @endif
-                            <circle cx="{{ round($px,1) }}" cy="{{ round($py,1) }}" r="9" fill="{{ $color }}"/>
-                            <text x="{{ round($px,1) }}" y="{{ round($py - 15,1) }}" font-size="13" font-weight="700" fill="{{ $color }}" text-anchor="middle">{{ $cluster['theme'] }}</text>
-                        @endforeach
-                        <circle cx="{{ $cx }}" cy="{{ $cy }}" r="42" fill="#F26419"/>
-                        <text x="{{ $cx }}" y="{{ $cy - 1 }}" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">{{ $siteLabel }}</text>
-                        <text x="{{ $cx }}" y="{{ $cy + 14 }}" font-size="9" fill="#fff" text-anchor="middle" opacity="0.85">{{ __('your content') }}</text>
-                    </svg>
+            @php
+                $palette = ['#F26419', '#0EA5E9', '#10B981', '#8B5CF6', '#EF4444', '#F59E0B', '#64748B'];
+                $statusColor = ['ready' => '#10B981', 'scheduled' => '#10B981', 'published' => '#059669',
+                    'writing' => '#F59E0B', 'researching' => '#F59E0B', 'scoring' => '#F59E0B', 'revising' => '#F59E0B',
+                    'failed' => '#EF4444', 'approved' => '#0EA5E9', 'suggested' => '#94A3B8'];
+            @endphp
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center gap-2.5">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-2.25-2.25v-2.25z"/></svg>
+                    </span>
+                    <div class="min-w-0">
+                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Content strategy map') }}</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('How your articles group into content pillars around your site.') }}</p>
+                    </div>
+                </div>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    @foreach ($clusters as $ci => $cluster)
+                        @php $accent = $palette[$ci % count($palette)]; $topics = $cluster['topics']; $extra = count($topics) - 6; @endphp
+                        <div class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40 dark:border-slate-800 dark:bg-slate-800/20" wire:key="pillar-{{ $ci }}">
+                            <div class="flex items-center justify-between gap-2 border-s-4 bg-white px-3.5 py-2.5 dark:bg-slate-900" style="border-inline-start-color: {{ $accent }}">
+                                <span class="truncate text-sm font-bold text-slate-800 dark:text-slate-100">{{ $cluster['theme'] }}</span>
+                                <span class="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ count($topics) }}</span>
+                            </div>
+                            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                                @foreach (array_slice($topics, 0, 6) as $topic)
+                                    <li class="flex items-center gap-2 px-3.5 py-2">
+                                        <span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background: {{ $statusColor[$topic['status']] ?? '#94A3B8' }}"></span>
+                                        <span class="truncate text-xs text-slate-600 dark:text-slate-300">{{ \Illuminate\Support\Str::limit($topic['title'], 46) }}</span>
+                                    </li>
+                                @endforeach
+                                @if ($extra > 0)
+                                    <li class="px-3.5 py-1.5 text-[11px] font-medium text-slate-400 dark:text-slate-500">+{{ $extra }} {{ __('more') }}</li>
+                                @endif
+                            </ul>
+                        </div>
+                    @endforeach
                 </div>
             </div>
         @endif
