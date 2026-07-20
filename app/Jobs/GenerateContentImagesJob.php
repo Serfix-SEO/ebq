@@ -49,6 +49,7 @@ class GenerateContentImagesJob implements ShouldQueue
     public function __construct(public string $articleId)
     {
         $this->onQueue(Queues::CONTENT);
+        $this->onConnection('redis-long');
     }
 
     public function uniqueId(): string

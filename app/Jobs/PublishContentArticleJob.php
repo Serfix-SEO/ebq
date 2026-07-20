@@ -52,6 +52,7 @@ class PublishContentArticleJob implements ShouldQueue
     public function __construct(public string $topicId)
     {
         $this->onQueue(Queues::CONTENT);
+        $this->onConnection('redis-long');
     }
 
     public function uniqueId(): string

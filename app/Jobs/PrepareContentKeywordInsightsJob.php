@@ -34,6 +34,7 @@ class PrepareContentKeywordInsightsJob implements ShouldQueue
     public function __construct(public string $planId)
     {
         $this->onQueue(Queues::CONTENT);
+        $this->onConnection('redis-long');
     }
 
     public function handle(ContentKeywordInsights $insights): void

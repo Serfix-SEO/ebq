@@ -49,7 +49,7 @@ $heavyPool = [
     // redis-long: retry_after 3900 > the 3600 finalize timeout below, so a long
     // AnalyzeSiteJob is never re-reserved mid-run (see config/queue.php).
     'connection' => 'redis-long',
-    'queue' => ['sync', 'crawl-finalize', 'content'],
+    'queue' => ['sync', 'crawl-finalize'],
     'balance' => 'auto',
     'autoScalingStrategy' => 'size',
     'maxProcesses' => 4,
@@ -60,6 +60,25 @@ $heavyPool = [
     'memory' => 1536,    // finalize ini_set ceiling is 1024M; headroom so no post-job restart churn
     'tries' => 3,
     'timeout' => 3600,   // a ~168k-page / ~1.5M-edge finalize runs many minutes
+    'nice' => 0,
+];
+// Content Autopilot generation (writer/images/plan/publish) gets its OWN process
+// pool so a long `sync`/`crawl-finalize` job can never starve article generation
+// (symptom: articles stuck showing "Researching your topic"). Same redis-long
+// connection heavyPool used to serve `content` on, so dispatched jobs still match.
+$contentPool = [
+    'connection' => 'redis-long',
+    'queue' => ['content'],
+    'balance' => 'auto',
+    'autoScalingStrategy' => 'size',
+    'maxProcesses' => 2,
+    'balanceMaxShift' => 1,
+    'balanceCooldown' => 5,
+    'maxTime' => 4200,
+    'maxJobs' => 0,
+    'memory' => 512,
+    'tries' => 3,        // billable jobs (writer/images) set tries=1 themselves
+    'timeout' => 900,    // writer set_time_limit ~360 + image downloads; < redis-long retry_after 3900
     'nice' => 0,
 ];
 
@@ -283,6 +302,7 @@ return [
         'worker' => [
             'worker-crawl' => $crawlPool,
             'worker-heavy' => $heavyPool,
+            'worker-content' => $contentPool,
         ],
         // Autoscaled ephemeral boxes — APP_ENV=worker-ephemeral: crawl ONLY (never
         // finalize/sync, so a scale-down drain can't interrupt a long job).
@@ -296,6 +316,7 @@ return [
             'web' => array_replace($webPool, ['maxProcesses' => 2]),
             'worker-crawl' => array_replace($crawlPool, ['maxProcesses' => 2]),
             'worker-heavy' => array_replace($heavyPool, ['maxProcesses' => 1]),
+            'worker-content' => array_replace($contentPool, ['maxProcesses' => 1]),
         ],
     ],
 
