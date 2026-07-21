@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d2b071173658b01ec292552d4b0ac31b",
+    "content-hash": "61f956d0d88daef435bedb1d119f4372",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -5639,6 +5639,76 @@
                 }
             ],
             "time": "2026-05-05T09:22:46+00:00"
+        },
+        {
+            "name": "serfix/content-ai-laravel",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "./packages/content-ai-laravel",
+                "reference": "8a7cc86e1b6d30fddbefe06115590b863bb4b2c9"
+            },
+            "require": {
+                "illuminate/contracts": "^11.0|^12.0",
+                "illuminate/database": "^11.0|^12.0",
+                "illuminate/http": "^11.0|^12.0",
+                "illuminate/support": "^11.0|^12.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "orchestra/testbench": "^9.0|^10.0",
+                "phpunit/phpunit": "^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Serfix\\ContentAi\\ContentAiServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Serfix\\ContentAi\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Serfix\\ContentAi\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "vendor/bin/phpunit"
+                ],
+                "lint": [
+                    "vendor/bin/pint"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Serfix",
+                    "homepage": "https://serfix.io"
+                }
+            ],
+            "description": "Receive, store and publish Serfix Content AI articles in a Laravel app — SEO metas, BlogPosting schema, self-hosted images.",
+            "homepage": "https://serfix.io",
+            "keywords": [
+                "blog",
+                "content",
+                "content-ai",
+                "laravel",
+                "seo",
+                "serfix"
+            ],
+            "transport-options": {
+                "symlink": false,
+                "relative": true
+            }
         },
         {
             "name": "socialiteproviders/manager",

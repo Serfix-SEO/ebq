@@ -3,7 +3,10 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.2",
@@ -21,7 +24,8 @@
         "patrickschur/language-detection": "^5.3",
         "resend/resend-laravel": "^0.21",
         "sentry/sentry-laravel": "^4.10",
-        "socialiteproviders/microsoft": "^4.6"
+        "socialiteproviders/microsoft": "^4.6",
+        "serfix/content-ai-laravel": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -96,5 +100,14 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./packages/content-ai-laravel",
+            "options": {
+                "symlink": false
+            }
+        }
+    ]
 }

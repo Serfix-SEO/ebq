@@ -1,0 +1,59 @@
+{
+    "name": "serfix/content-ai-laravel",
+    "description": "Receive, store and publish Serfix Content AI articles in a Laravel app \u2014 SEO metas, BlogPosting schema, self-hosted images.",
+    "keywords": [
+        "laravel",
+        "seo",
+        "content",
+        "blog",
+        "serfix",
+        "content-ai"
+    ],
+    "homepage": "https://serfix.io",
+    "license": "MIT",
+    "version": "0.1.0",
+    "authors": [
+        {
+            "name": "Serfix",
+            "homepage": "https://serfix.io"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/contracts": "^11.0|^12.0",
+        "illuminate/database": "^11.0|^12.0",
+        "illuminate/http": "^11.0|^12.0",
+        "illuminate/support": "^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0",
+        "phpunit/phpunit": "^11.0",
+        "laravel/pint": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Serfix\\ContentAi\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Serfix\\ContentAi\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "lint": "vendor/bin/pint"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Serfix\\ContentAi\\ContentAiServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
