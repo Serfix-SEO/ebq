@@ -3576,5 +3576,21 @@
     "⚠ This page is an orphan — no internal links point to it.": "⚠ هذه الصفحة يتيمة — لا توجد روابط داخلية تشير إليها.",
     "⚠ This page returns :status.": "⚠ تقوم هذه الصفحة بإرجاع :status.",
     "✓ No open issues for this page.": "✓ لا توجد قضايا مفتوحة لهذه الصفحة.",
-    "🏠 This is the homepage — depth 0, the root of the tree.": "🏠 هذه هي الصفحة الرئيسية — العمق 0، جذر الشجرة."
+    "🏠 This is the homepage — depth 0, the root of the tree.": "🏠 هذه هي الصفحة الرئيسية — العمق 0، جذر الشجرة.",
+    "Laravel": "Laravel",
+    "Install the Serfix package on your Laravel site": "ثبّت حزمة Serfix على موقع Laravel الخاص بك",
+    "It receives each article, stores it, copies the images onto your own disk, and serves them at a URL you choose — with SEO tags and article schema included.": "تستقبل كل مقال وتحفظه وتنسخ الصور إلى مساحة التخزين لديك وتعرضها على رابط تختاره — مع وسوم السيو ومخطط المقال.",
+    "1. Install it": "١. التثبيت",
+    "2. Add the signing secret to your .env": "٢. أضف مفتاح التوقيع إلى ملف .env",
+    "Copy the secret generated below — it is what proves an article really came from us.": "انسخ المفتاح المُولَّد بالأسفل — فهو ما يثبت أن المقال صادر منّا فعلاً.",
+    "The prefix sets your article URLs — \"blog\" gives /blog/your-article-link.": "البادئة تحدد روابط مقالاتك — \"blog\" تعطي ‎/blog/your-article-link‎.",
+    "3. Check it before you connect": "٣. تحقق قبل الربط",
+    "This sends a signed test delivery to your own site, so a wrong secret or a blocked route shows up now rather than on your first article.": "يرسل هذا طلب اختبار موقَّعاً إلى موقعك، ليظهر أي خطأ في المفتاح أو حجب في المسار الآن بدل أن يظهر مع أول مقال.",
+    "4. Design it your way (optional)": "٤. صمّمها بطريقتك (اختياري)",
+    "Drop these into your own layout to keep your existing design:": "ضع هذه في القالب الخاص بك للحفاظ على تصميمك الحالي:",
+    "Then fill in the two fields below and connect. Your endpoint must be reachable over https.": "ثم املأ الحقلين بالأسفل واضغط ربط. يجب أن يكون الرابط متاحاً عبر https.",
+    "Signing secret": "مفتاح التوقيع",
+    "Copy this into your site as CONTENT_AI_WEBHOOK_SECRET. It is the only thing proving an article really came from us — keep it secret, and never reuse it across sites.": "انسخ هذا إلى موقعك باسم CONTENT_AI_WEBHOOK_SECRET. هو الشيء الوحيد الذي يثبت أن المقال صادر منّا — احتفظ به سرّاً ولا تستخدمه لأكثر من موقع.",
+    "The endpoint URL must use https:// — articles are sent over the public internet.": "يجب أن يبدأ رابط الاستقبال بـ https:// — تُرسل المقالات عبر الإنترنت العام.",
+    "The signing secret must be at least 32 characters. Use the generated one.": "يجب ألا يقل مفتاح التوقيع عن ٣٢ حرفاً. استخدم المفتاح المُولَّد."
 }

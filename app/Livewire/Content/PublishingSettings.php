@@ -23,6 +23,19 @@ use Livewire\Component;
  */
 class PublishingSettings extends Component
 {
+    /**
+     * UI-only selector value. A Laravel site is a WEBHOOK integration — same
+     * driver, same signed payload — but it gets its own tab, its own install
+     * guide and a pre-filled endpoint, because "paste a webhook URL" is not an
+     * instruction a Laravel developer should have to translate themselves.
+     * The chosen flavour is recorded in ContentIntegration.config so the
+     * connected-platforms list can name it correctly.
+     */
+    public const FLAVOR_LARAVEL = 'laravel';
+
+    /** Where serfix/content-ai-laravel mounts its receiver by default. */
+    public const LARAVEL_WEBHOOK_PATH = '/serfix/content-ai/webhook';
+
     public ?string $websiteId = null;
 
     // Connect form state
@@ -60,6 +73,30 @@ class PublishingSettings extends Component
     private function generatedSecret(): string
     {
         return Str::random(48);
+    }
+
+    /**
+     * Switch the connect tab. Selecting Laravel pre-fills the endpoint from the
+     * site's own domain, because the package mounts at a known path — the
+     * customer should be copying a secret, not assembling a URL.
+     */
+    public function selectPlatform(string $platform): void
+    {
+        $this->platform = $platform;
+        $this->resetErrorBag();
+
+        if ($platform === self::FLAVOR_LARAVEL && trim($this->whEndpoint) === '') {
+            $this->whEndpoint = $this->suggestedLaravelEndpoint();
+        }
+    }
+
+    public function suggestedLaravelEndpoint(): string
+    {
+        $domain = trim((string) ($this->website()?->normalized_domain ?? ''));
+
+        return $domain === ''
+            ? 'https://your-site.com'.self::LARAVEL_WEBHOOK_PATH
+            : 'https://'.$domain.self::LARAVEL_WEBHOOK_PATH;
     }
 
     #[On('website-changed')]
@@ -104,6 +141,10 @@ class PublishingSettings extends Component
                 'whEndpoint.starts_with' => __('The endpoint URL must use https:// — articles are sent over the public internet.'),
                 'whSecret.min' => __('The signing secret must be at least 32 characters. Use the generated one.'),
             ], ['whEndpoint' => __('endpoint URL'), 'whSecret' => __('signing secret')]);
+            // Laravel IS a webhook integration — same driver, same signed
+            // payload. Only the setup instructions differ, so remember which
+            // tab was used and store it as a plain webhook.
+            $flavor = $this->platform === self::FLAVOR_LARAVEL ? self::FLAVOR_LARAVEL : null;
             $this->platform = ContentIntegration::PLATFORM_WEBHOOK;
             $credentials = [
                 'endpoint_url' => trim($this->whEndpoint),
@@ -111,9 +152,14 @@ class PublishingSettings extends Component
             ];
         }
 
+        $attributes = ['credentials' => $credentials, 'status' => ContentIntegration::STATUS_PENDING, 'last_error' => null];
+        if (isset($flavor) && $flavor !== null) {
+            $attributes['config'] = ['flavor' => $flavor];
+        }
+
         $integration = ContentIntegration::query()->updateOrCreate(
             ['website_id' => $website->id, 'platform' => $this->platform],
-            ['credentials' => $credentials, 'status' => ContentIntegration::STATUS_PENDING, 'last_error' => null],
+            $attributes,
         );
 
         $driver = app(PublishDriverFactory::class)->for($integration);

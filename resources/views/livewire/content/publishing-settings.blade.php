@@ -48,7 +48,15 @@
                             </span>
                             <div class="min-w-0 flex-1">
                                 <div class="text-sm font-bold text-slate-900 dark:text-slate-100">
-                                    {{ $integration->platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK ? __('Custom (webhook)') : __('WordPress') }}
+                                    @if ($integration->platform !== \App\Models\ContentIntegration::PLATFORM_WEBHOOK)
+                                        {{ __('WordPress') }}
+                                    {{-- Laravel is a webhook under the hood; the flavour recorded at
+                                         connect time is what lets us name it properly here. --}}
+                                    @elseif (($integration->config['flavor'] ?? null) === \App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL)
+                                        {{ __('Laravel') }}
+                                    @else
+                                        {{ __('Custom (webhook)') }}
+                                    @endif
                                 </div>
                                 <div class="truncate text-xs text-slate-500 dark:text-slate-400">
                                     @if ($integration->isConnected())
@@ -89,20 +97,31 @@
                 </button>
             @else
                 <div class="mt-5 rounded-2xl border border-slate-200 p-5 dark:border-slate-700">
-                    <div class="flex gap-2">
-                        <button type="button" wire:click="$set('platform', '{{ \App\Models\ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD }}')"
-                            class="rounded-xl px-4 py-2 text-sm font-bold {{ $platform !== \App\Models\ContentIntegration::PLATFORM_WEBHOOK ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800' }}">
+                    @php
+                        $isLaravel = $platform === \App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL;
+                        $isWebhook = $platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK;
+                        $isWordPress = ! $isLaravel && ! $isWebhook;
+                        $tabOn = 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300';
+                        $tabOff = 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800';
+                    @endphp
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" wire:click="selectPlatform('{{ \App\Models\ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD }}')"
+                            class="rounded-xl px-4 py-2 text-sm font-bold {{ $isWordPress ? $tabOn : $tabOff }}">
                             {{ __('WordPress') }}
                         </button>
-                        <button type="button" wire:click="$set('platform', '{{ \App\Models\ContentIntegration::PLATFORM_WEBHOOK }}')"
-                            class="rounded-xl px-4 py-2 text-sm font-bold {{ $platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800' }}">
+                        <button type="button" wire:click="selectPlatform('{{ \App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL }}')"
+                            class="rounded-xl px-4 py-2 text-sm font-bold {{ $isLaravel ? $tabOn : $tabOff }}">
+                            {{ __('Laravel') }}
+                        </button>
+                        <button type="button" wire:click="selectPlatform('{{ \App\Models\ContentIntegration::PLATFORM_WEBHOOK }}')"
+                            class="rounded-xl px-4 py-2 text-sm font-bold {{ $isWebhook ? $tabOn : $tabOff }}">
                             {{ __('Custom (webhook)') }}
                         </button>
                     </div>
 
                     @error('connect') <p class="mt-3 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">{{ $message }}</p> @enderror
 
-                    @if ($platform !== \App\Models\ContentIntegration::PLATFORM_WEBHOOK)
+                    @if ($isWordPress)
                         <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ __('In WordPress go to Users → Profile → Application Passwords, create one named "Serfix", and paste it here. The account needs to be an Author or above.') }}</p>
                         <div class="mt-3 grid gap-3 sm:grid-cols-3">
                             <div>
@@ -125,11 +144,61 @@
                             </div>
                         </div>
                     @else
-                        <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ __("We'll POST each article as JSON to your endpoint, signed with your secret (X-Serfix-Signature, HMAC-SHA256). Reply 2xx to accept; optionally return {\"url\": \"...\"} so we can link the live page.") }}</p>
+                        @if ($isLaravel)
+                            {{-- Laravel integration guide. The customer installs a package that
+                                 already speaks our signed-webhook format, so the only thing they
+                                 have to carry across is the secret below. --}}
+                            <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+                                <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Install the Serfix package on your Laravel site') }}</p>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    {{ __('It receives each article, stores it, copies the images onto your own disk, and serves them at a URL you choose — with SEO tags and article schema included.') }}
+                                </p>
+
+                                <ol class="mt-4 space-y-3 text-xs text-slate-600 dark:text-slate-300">
+                                    <li>
+                                        <span class="font-bold text-slate-900 dark:text-slate-100">{{ __('1. Install it') }}</span>
+                                        <pre class="mt-1 overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 font-mono text-[11px] leading-5 text-slate-100">composer require serfix/content-ai-laravel
+php artisan content-ai:install
+php artisan migrate
+php artisan storage:link</pre>
+                                    </li>
+                                    <li>
+                                        <span class="font-bold text-slate-900 dark:text-slate-100">{{ __('2. Add the signing secret to your .env') }}</span>
+                                        <p class="mt-1">{{ __('Copy the secret generated below — it is what proves an article really came from us.') }}</p>
+                                        <pre class="mt-1 overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 font-mono text-[11px] leading-5 text-slate-100">CONTENT_AI_WEBHOOK_SECRET={{ $whSecret !== '' ? $whSecret : 'paste-the-secret-below' }}
+CONTENT_AI_ROUTE_PREFIX=blog</pre>
+                                        <p class="mt-1">{{ __('The prefix sets your article URLs — "blog" gives /blog/your-article-link.') }}</p>
+                                    </li>
+                                    <li>
+                                        <span class="font-bold text-slate-900 dark:text-slate-100">{{ __('3. Check it before you connect') }}</span>
+                                        <pre class="mt-1 overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 font-mono text-[11px] leading-5 text-slate-100">php artisan content-ai:verify</pre>
+                                        <p class="mt-1">{{ __('This sends a signed test delivery to your own site, so a wrong secret or a blocked route shows up now rather than on your first article.') }}</p>
+                                    </li>
+                                    <li>
+                                        <span class="font-bold text-slate-900 dark:text-slate-100">{{ __('4. Design it your way (optional)') }}</span>
+                                        <p class="mt-1">{{ __('Drop these into your own layout to keep your existing design:') }}</p>
+                                        {{-- Verbatim below: these braces are EXAMPLE Blade for the
+                                             customer's own template. Without the guard the compiler
+                                             would evaluate them here instead of printing them. --}}
+                                        @verbatim
+                                        <pre class="mt-1 overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 font-mono text-[11px] leading-5 text-slate-100">&lt;head&gt; {!! $serfix_head !!} &lt;/head&gt;
+&lt;body&gt; {!! $serfix_body !!}
+       {!! $serfix_body_below !!} &lt;/body&gt;</pre>
+                                        @endverbatim
+                                    </li>
+                                </ol>
+
+                                <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                                    {{ __('Then fill in the two fields below and connect. Your endpoint must be reachable over https.') }}
+                                </p>
+                            </div>
+                        @else
+                            <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ __("We'll POST each article as JSON to your endpoint, signed with your secret (X-Serfix-Signature, HMAC-SHA256). Reply 2xx to accept; optionally return {\"url\": \"...\"} so we can link the live page.") }}</p>
+                        @endif
                         <div class="mt-3 grid gap-3 sm:grid-cols-2">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Endpoint URL') }}</label>
-                                <input wire:model="whEndpoint" type="text" placeholder="https://your-site.com/serfix-content"
+                                <input wire:model="whEndpoint" type="text" placeholder="{{ $isLaravel ? $this->suggestedLaravelEndpoint() : 'https://your-site.com/serfix-content' }}"
                                     class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
                                 @error('whEndpoint') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
                             </div>
