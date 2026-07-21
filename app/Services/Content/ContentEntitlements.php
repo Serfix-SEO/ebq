@@ -108,6 +108,27 @@ class ContentEntitlements
     }
 
     /**
+     * The website Content Autopilot should act on when the session pins none.
+     *
+     * Prefers a COVERED site over "whichever row is first". Picking the first
+     * accessible website put users into a redirect loop (prod 2026-07-21): the
+     * account's oldest site was uncovered, so EnsureContentAccess bounced every
+     * request — including Livewire's POST /livewire/update — to Get started,
+     * which sends you back to the wizard, which re-fires wire:init, which
+     * bounces again. The page appeared to "keep refreshing on step 1".
+     */
+    public function preferredWebsite(User $user): ?Website
+    {
+        $covered = $user->accessibleWebsitesQuery()
+            ->whereIn('id', ContentPlan::query()
+                ->whereNotNull('billing_covered_at')
+                ->select('website_id'))
+            ->first();
+
+        return $covered ?? $user->accessibleWebsitesQuery()->first();
+    }
+
+    /**
      * Mark a website as covered. A brand-new stub plan is created as DRAFT so
      * the onboarding wizard shows (an existing plan keeps its status).
      */

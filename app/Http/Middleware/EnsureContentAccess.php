@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Services\Content\ContentEntitlements;
 use Closure;
@@ -29,18 +30,53 @@ class EnsureContentAccess
             return $next($request);
         }
 
+        $ent = app(ContentEntitlements::class);
+
         $websiteId = (string) $request->session()->get('current_website_id', '');
         $website = $websiteId !== ''
             ? $user->accessibleWebsitesQuery()->whereKey($websiteId)->first()
-            : $user->accessibleWebsitesQuery()->first();
+            : $ent->preferredWebsite($user);
 
         if ($website === null) {
             return $next($request); // onboarding/no-site handled elsewhere
         }
 
-        $ent = app(ContentEntitlements::class);
         if ($ent->hasContentAccessFor($user, $website)) {
             return $next($request);
+        }
+
+        // The pinned site is NOT the one this user runs content on. That pin is
+        // rarely a deliberate choice: `feature:content` (EnsureFeatureAccess)
+        // runs first and, with nothing in the session, pins
+        // `orderBy('domain')->first()` — purely alphabetical. An account whose
+        // alphabetically-first domain happens to be uncovered was therefore
+        // bounced to Get started, which redirects back here, which re-fires the
+        // wizard's wire:init, which bounces again: a redirect loop that reads as
+        // "the wizard keeps refreshing on step 1" (prod 2026-07-21, an account
+        // holding pubgnamegenerator.net + serfix.io where only the latter was
+        // covered).
+        //
+        // Re-pin to a site the user IS entitled to and carry on, rather than
+        // redirecting — silently correcting an alphabetical accident beats
+        // gating someone out of a product they pay for.
+        //
+        // Only when the pinned site has NO content plan at all, i.e. it was
+        // never a content site and cannot be what the user meant. A site whose
+        // plan merely lapsed is a deliberate choice (they may want to resubscribe
+        // for it), so that still shows Get started for THAT site.
+        $pinnedIsNotAContentSite = ! ContentPlan::query()
+            ->where('website_id', $website->id)
+            ->exists();
+
+        if ($pinnedIsNotAContentSite) {
+            $preferred = $ent->preferredWebsite($user);
+            if ($preferred !== null
+                && $preferred->id !== $website->id
+                && $ent->hasContentAccessFor($user, $preferred)) {
+                $request->session()->put('current_website_id', (string) $preferred->id);
+
+                return $next($request);
+            }
         }
 
         // Lapsed but has GENERATED ARTICLES on this site → allow (publish-only).

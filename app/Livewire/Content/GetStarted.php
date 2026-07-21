@@ -34,7 +34,10 @@ class GetStarted extends Component
             }
         }
 
-        return $user->accessibleWebsitesQuery()->first();
+        // Same preference as EnsureContentAccess: without it this screen judges
+        // a DIFFERENT site than the middleware does, and the two bounce the user
+        // back and forth. See ContentEntitlements::preferredWebsite().
+        return $this->entitlements()->preferredWebsite($user);
     }
 
     public function startTrial(): void
