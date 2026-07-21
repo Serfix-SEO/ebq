@@ -139,14 +139,17 @@ return [
     |--------------------------------------------------------------------------
     |
     | rewrite_internal_links points cross-article links at YOUR blog prefix.
-    | sanitize_html is off by default (the HTML is ours and already clean); turn
-    | it on if you would rather not trust inbound markup implicitly.
+    |
+    | sanitize_html strips anything executable from the article HTML before it
+    | is stored (allow-list: no <script>, no on* handlers, no javascript: URLs).
+    | ON by default — the signature is the only barrier between an attacker and
+    | markup on YOUR page, so a leaked signing secret must not become stored XSS.
     |
     */
 
     'content' => [
         'rewrite_internal_links' => true,
-        'sanitize_html' => false,
+        'sanitize_html' => env('CONTENT_AI_SANITIZE_HTML', true),
         'reading_words_per_minute' => 220,
     ],
 
