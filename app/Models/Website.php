@@ -25,7 +25,6 @@ class Website extends Model
     // now lives on App\Models\User. Tier and freeze state are derived
     // from the owning user's plan (see effectiveTier / isFrozen below).
     use HasApiTokens, HasFactory;
-
     use HasUlids;
 
     protected static function booted(): void
@@ -472,8 +471,12 @@ class Website extends Model
      * Guarded because it runs on every nav render and every plugin API hit, and
      * must never 500 — e.g. before the content migrations have run on an
      * environment. Fails to "off".
+     *
+     * PUBLIC because the two products must stay independent: anything that a
+     * DASHBOARD plan limit would switch off has to ask this before switching it
+     * off for a site the customer buys Content Autopilot for.
      */
-    protected function contentAutopilotEntitled(): bool
+    public function contentAutopilotEntitled(): bool
     {
         $owner = $this->user;
         if ($owner === null) {

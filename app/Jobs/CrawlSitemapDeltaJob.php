@@ -5,10 +5,15 @@ namespace App\Jobs;
 use App\Models\CrawlRun;
 use App\Models\Website;
 use App\Models\WebsitePage;
+use App\Support\Crawler\FrontierUrl;
 use App\Support\Crawler\SitemapUrlExtractor;
+use App\Support\Queues;
+use App\Support\ShardContext;
+use App\Support\ShardLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -19,16 +24,17 @@ use Illuminate\Support\Facades\Log;
  * waiting for the weekly full recrawl. URLs already crawled or already queued
  * (present in website_pages) are skipped.
  */
-class CrawlSitemapDeltaJob implements ShouldQueue, ShouldBeUnique
+class CrawlSitemapDeltaJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
     public int $timeout = 180;
+
     public int $tries = 2;
 
     public function __construct(public string $websiteId)
     {
-        $this->onQueue(\App\Support\Queues::CRAWL);
+        $this->onQueue(Queues::CRAWL);
     }
 
     public function uniqueId(): string
@@ -45,14 +51,20 @@ class CrawlSitemapDeltaJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(SitemapUrlExtractor $extractor): void
     {
-        if (\App\Support\ShardLock::websiteLocked((string) $this->websiteId)) {
+        if (ShardLock::websiteLocked((string) $this->websiteId)) {
             $this->release(30);
 
             return;
         }
-        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
+        app(ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::find($this->websiteId);
-        if (! $website || $website->isFrozen() || ! $website->crawl_site_id) {
+        // Freeze is a DASHBOARD limit; a Content Autopilot site keeps crawling
+        // (see CrawlWebsitePagesJob) so its content stays anchored to the real
+        // site rather than a stale snapshot.
+        if (! $website || ! $website->crawl_site_id) {
+            return;
+        }
+        if ($website->isFrozen() && ! $website->contentAutopilotEntitled()) {
             return;
         }
         $crawlSite = $website->crawlSite;
@@ -72,7 +84,7 @@ class CrawlSitemapDeltaJob implements ShouldQueue, ShouldBeUnique
             if ($url === '' || ! preg_match('#^https?://#i', $url)) {
                 continue;
             }
-            $url = \App\Support\Crawler\FrontierUrl::collapse($url);
+            $url = FrontierUrl::collapse($url);
             $candidates[WebsitePage::hashUrl($url)] = [
                 'url' => $url,
                 'lastmod' => $this->parseLastmod($entry['lastmod'] ?? null),
@@ -150,14 +162,14 @@ class CrawlSitemapDeltaJob implements ShouldQueue, ShouldBeUnique
         CrawlWebsitePagesJob::dispatch($website->id, CrawlRun::TRIGGER_SITEMAP_DELTA);
     }
 
-    private function parseLastmod(?string $value): ?\Illuminate\Support\Carbon
+    private function parseLastmod(?string $value): ?Carbon
     {
         $value = $value !== null ? trim($value) : '';
         if ($value === '') {
             return null;
         }
         try {
-            return \Illuminate\Support\Carbon::parse($value);
+            return Carbon::parse($value);
         } catch (\Throwable) {
             return null;
         }

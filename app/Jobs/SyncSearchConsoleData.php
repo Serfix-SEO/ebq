@@ -7,11 +7,15 @@ use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Google\SearchConsoleService;
 use App\Services\ReportCache;
+use App\Support\Queues;
+use App\Support\ShardContext;
+use App\Support\ShardLock;
 use App\Support\UrlNormalizer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -25,6 +29,7 @@ class SyncSearchConsoleData implements ShouldQueue
     // (3900s, config/queue.php) stays above it so a still-running sync is never
     // re-reserved mid-run.
     public int $timeout = 3600;
+
     public int $tries = 2;
 
     // Wait between attempts so a contended DB or a transient Google API hiccup has
@@ -35,7 +40,7 @@ class SyncSearchConsoleData implements ShouldQueue
         public string $websiteId,
         public int $days = 30,
     ) {
-        $this->onQueue(\App\Support\Queues::SYNC);
+        $this->onQueue(Queues::SYNC);
         // ...on the redis-long connection (NOT a $connection property — that clashes
         // with the Queueable trait's typed property). See config/queue.php +
         // AnalyzeSiteJob for the same pattern.
@@ -67,18 +72,23 @@ class SyncSearchConsoleData implements ShouldQueue
         // Same pattern as CrawlPageBatchJob/AnalyzeSiteJob (config/crawler.php).
         ini_set('memory_limit', '1024M');
 
-        if (\App\Support\ShardLock::websiteLocked((string) $this->websiteId)) {
+        if (ShardLock::websiteLocked((string) $this->websiteId)) {
             $this->release(30);
 
             return;
         }
-        app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
+        app(ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::findOrFail($this->websiteId);
         // Plan-limit freeze: when the website is past the owning user's
         // plan limit, skip the GSC fetch. Avoids burning Google quota
         // on sites the user can't actually see in EBQ until they upgrade.
-        if ($website->isFrozen()) {
+        // …unless Content Autopilot is bought for this site: GSC gap data is the
+        // topic planner's PRIMARY ideation signal (ContentTopicPlanner), so a
+        // dashboard-limit freeze would quietly gut a separately-billed product.
+        // Analytics stays frozen — content never reads GA.
+        if ($website->isFrozen() && ! $website->contentAutopilotEntitled()) {
             Log::info("SyncSearchConsoleData: skipping frozen website {$this->websiteId}");
+
             return;
         }
         // No GSC source configured (GA-only or PageSpeed-only site): nothing to sync.
@@ -89,6 +99,7 @@ class SyncSearchConsoleData implements ShouldQueue
 
         if (! $account) {
             Log::warning("SyncSearchConsoleData: No Google account for website {$this->websiteId}");
+
             return;
         }
 
@@ -101,7 +112,7 @@ class SyncSearchConsoleData implements ShouldQueue
         // for the whole sync (observed 2026-07-07: 3 warms stacked mid-sync).
         // The single end-of-run warm below is the one that matters. TTL is a
         // safety net so a killed sync can't suppress warming forever.
-        \Illuminate\Support\Facades\Cache::put('gsc-sync-inflight:'.$this->websiteId, true, 7200);
+        Cache::put('gsc-sync-inflight:'.$this->websiteId, true, 7200);
 
         Log::info("SyncSearchConsoleData: starting website {$this->websiteId} ({$this->days}d window)");
 
@@ -133,7 +144,7 @@ class SyncSearchConsoleData implements ShouldQueue
 
         Log::info("SyncSearchConsoleData: completed website {$this->websiteId}");
 
-        \Illuminate\Support\Facades\Cache::forget('gsc-sync-inflight:'.$this->websiteId);
+        Cache::forget('gsc-sync-inflight:'.$this->websiteId);
 
         $this->queueKeywordMetricsRefresh();
 
@@ -141,13 +152,13 @@ class SyncSearchConsoleData implements ShouldQueue
         // them now so the first dashboard/statistics visit is instant instead
         // of paying the cold aggregate (~2min on the largest accounts).
         // ShouldBeUnique collapses this with the GA sync's dispatch.
-        \App\Jobs\WarmDashboardCaches::dispatch((string) $this->websiteId);
+        WarmDashboardCaches::dispatch((string) $this->websiteId);
     }
 
     /** Clear the in-flight flag if the sync dies — otherwise warms stay suppressed for the TTL. */
     public function failed(?\Throwable $e): void
     {
-        \Illuminate\Support\Facades\Cache::forget('gsc-sync-inflight:'.$this->websiteId);
+        Cache::forget('gsc-sync-inflight:'.$this->websiteId);
     }
 
     /**
@@ -218,6 +229,7 @@ class SyncSearchConsoleData implements ShouldQueue
                 // let one outlier row fail the whole 500-row upsert chunk.
                 $row['query'] = mb_substr((string) $row['query'], 0, 255);
                 $row['page'] = mb_substr((string) $row['page'], 0, 255);
+
                 return $row;
             }, $chunk);
 

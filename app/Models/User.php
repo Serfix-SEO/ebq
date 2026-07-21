@@ -2,18 +2,21 @@
 
 namespace App\Models;
 
+use App\Services\Content\ContentEntitlements;
+use App\Support\TeamPermissions;
+use App\Support\TrialStatus;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Support\TeamPermissions;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Cashier\Billable;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Laravel\Cashier\Subscription;
 
 // Email verification uses a GRACE WINDOW, not immediate enforcement. User
 // implements MustVerifyEmail so the Registered event still sends a verification
@@ -23,9 +26,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 // are forced to verify. See RegisteredUserController::store().
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasUlids;
     /** @use HasFactory<UserFactory> */
     use Billable, HasFactory, Notifiable;
+
+    use HasUlids;
 
     /**
      * Tag any matching marketing lead as converted on signup — covers both
@@ -61,11 +65,16 @@ class User extends Authenticatable implements MustVerifyEmail
      * Legacy constant TIER_FREE kept as an alias for TIER_TRIAL so any
      * call site that hasn't been updated yet still compiles correctly.
      */
-    public const TIER_TRIAL      = 'trial';
-    public const TIER_FREE       = self::TIER_TRIAL; // backward-compat alias
-    public const TIER_SOLO       = 'solo';
-    public const TIER_PRO        = 'pro';
-    public const TIER_AGENCY     = 'agency';
+    public const TIER_TRIAL = 'trial';
+
+    public const TIER_FREE = self::TIER_TRIAL; // backward-compat alias
+
+    public const TIER_SOLO = 'solo';
+
+    public const TIER_PRO = 'pro';
+
+    public const TIER_AGENCY = 'agency';
+
     public const TIER_ENTERPRISE = 'enterprise';
 
     /**
@@ -74,10 +83,10 @@ class User extends Authenticatable implements MustVerifyEmail
      * hardcoding the full slug list.
      */
     public const TIER_ORDER = [
-        self::TIER_TRIAL      => 0,
-        self::TIER_SOLO       => 1,
-        self::TIER_PRO        => 2,
-        self::TIER_AGENCY     => 3,
+        self::TIER_TRIAL => 0,
+        self::TIER_SOLO => 1,
+        self::TIER_PRO => 2,
+        self::TIER_AGENCY => 3,
         self::TIER_ENTERPRISE => 4,
     ];
 
@@ -142,12 +151,12 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function hasContentAccess(): bool
     {
-        return app(\App\Services\Content\ContentEntitlements::class)->hasContentAccess($this);
+        return app(ContentEntitlements::class)->hasContentAccess($this);
     }
 
-    public function contentSubscription(): ?\Laravel\Cashier\Subscription
+    public function contentSubscription(): ?Subscription
     {
-        return $this->subscription(\App\Services\Content\ContentEntitlements::SUBSCRIPTION);
+        return $this->subscription(ContentEntitlements::SUBSCRIPTION);
     }
 
     /**
@@ -156,7 +165,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isContentOnly(): bool
     {
-        return $this->hasContentAccess() && \App\Support\TrialStatus::isExpired($this);
+        return $this->hasContentAccess() && TrialStatus::isExpired($this);
     }
 
     public function googleAccounts(): HasMany
@@ -403,6 +412,7 @@ class User extends Authenticatable implements MustVerifyEmail
                 return $plan;
             }
         }
+
         return Plan::where('slug', self::TIER_TRIAL)->first();
     }
 
@@ -424,6 +434,7 @@ class User extends Authenticatable implements MustVerifyEmail
         if ($plan === null) {
             return self::TIER_TRIAL;
         }
+
         return (string) $plan->slug;
     }
 
@@ -454,6 +465,7 @@ class User extends Authenticatable implements MustVerifyEmail
             return false;
         }
         $current = self::TIER_ORDER[$this->effectiveTier()] ?? 0;
+
         return $current >= $required;
     }
 
@@ -470,6 +482,7 @@ class User extends Authenticatable implements MustVerifyEmail
         if ($plan === null) {
             return array_fill_keys(Plan::FEATURE_KEYS, false);
         }
+
         return $plan->featureMap();
     }
 
@@ -490,6 +503,7 @@ class User extends Authenticatable implements MustVerifyEmail
         if ($plan === null) {
             return 1;
         }
+
         return $plan->max_websites;
     }
 
@@ -526,6 +540,7 @@ class User extends Authenticatable implements MustVerifyEmail
         if (count($owned) <= $limit) {
             return [];
         }
+
         return array_slice($owned, $limit);
     }
 
@@ -540,6 +555,28 @@ class User extends Authenticatable implements MustVerifyEmail
         if ($limit === null) {
             return true;
         }
-        return Website::where('user_id', $this->id)->count() < $limit;
+        if (Website::where('user_id', $this->id)->count() < $limit) {
+            return true;
+        }
+
+        // Out of DASHBOARD slots — but Content Autopilot is a separate product
+        // with its own per-site billing (base site + the paid per-extra-site
+        // addon). A customer who bought a slot for another content site must be
+        // able to add it, or they are charged for something they cannot use.
+        // The new site is still frozen for dashboard features; only its content
+        // entitlement is honoured (see Website::effectiveFeatureFlags).
+        return $this->hasFreeContentSlot();
+    }
+
+    /** An unused Content Autopilot website slot (base + addon quantity). */
+    public function hasFreeContentSlot(): bool
+    {
+        try {
+            $ent = app(ContentEntitlements::class);
+
+            return $ent->hasContentAccess($this) && $ent->sitesCovered($this) < $ent->sitesAllowed($this);
+        } catch (\Throwable) {
+            return false; // content tables absent / Stripe offline → never widen
+        }
     }
 }
