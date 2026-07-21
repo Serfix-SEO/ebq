@@ -387,7 +387,12 @@ class CompetitorMentionGuard
         }
 
         return [
-            'harmful' => (bool) ($decoded['harmful'] ?? $blocked !== []),
+            // Derived from the per-domain verdicts, NOT the model's separate
+            // boolean: on staging the classifier correctly marked every domain
+            // a reference yet still said harmful=true from abstract reasoning
+            // about hypothetical rivals — which would auto-enable the guard
+            // with ZERO blocked brands (a banner with no chips).
+            'harmful' => $blocked !== [],
             'reason' => mb_substr(trim((string) ($decoded['reason'] ?? '')), 0, 300),
             'blocked' => $blocked,
             'references' => array_values(array_unique($references)),

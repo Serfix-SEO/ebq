@@ -235,6 +235,30 @@ class CompetitorMentionGuardTest extends TestCase
         $this->assertSame(['semrush', 'ahrefs'], $guard->terms($plan));
     }
 
+    /**
+     * Caught live on staging: the classifier marked every domain a reference
+     * yet still said harmful=true from abstract reasoning about hypothetical
+     * rivals — auto-enabling the guard with ZERO blocked brands (a banner with
+     * no chips). harmful must derive from the actual block list.
+     */
+    public function test_harmful_without_any_blocked_domain_does_not_auto_enable(): void
+    {
+        [, , $plan] = $this->planWithGuard();
+        $plan->update(['competitor_overrides' => ['added' => ['semrush.com']]]);
+
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $this->fakeLlm([
+            'harmful' => true,   // the model's boolean lies
+            'reason' => 'Hypothetical rivals might exist.',
+            'domains' => [['domain' => 'semrush.com', 'verdict' => 'reference', 'brand' => 'Semrush', 'why' => 'not a rival here']],
+        ]));
+
+        $plan->refresh();
+        $guard = app(CompetitorMentionGuard::class);
+        $this->assertFalse($guard->enabled($plan), 'no blocked brand, nothing to enable');
+        $this->assertFalse((bool) $plan->competitor_guard['harmful']);
+        $this->assertSame([], $guard->terms($plan));
+    }
+
     /** The model must not be able to invent domains we never gave it. */
     public function test_assess_drops_hallucinated_domains(): void
     {
