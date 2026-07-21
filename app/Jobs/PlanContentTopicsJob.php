@@ -53,6 +53,25 @@ class PlanContentTopicsJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
+        // No business profile → do NOT ideate. Both of the planner's guardrails
+        // are profile-derived: the ideation prompt interpolates description /
+        // sell / don't-sell (so an empty profile leaves "They do NOT offer: "
+        // forbidding nothing), and filterRelevant() vets against the same empty
+        // strings and fails open. Planning here yields a full, plausible calendar
+        // for a business the system knows nothing about — prod 2026-07-20 built
+        // 31 such topics off GSC data alone and nobody noticed the profile was
+        // missing. An empty calendar until onboarding completes is the honest
+        // state; the dispatcher re-runs this every 15 min, so it self-heals the
+        // moment the wizard is saved.
+        if (blank($plan->business_description)) {
+            Log::info('content_autopilot.topics_skipped_no_profile', [
+                'plan_id' => $plan->id,
+                'website_id' => $plan->website_id,
+            ]);
+
+            return;
+        }
+
         $created = app(ContentTopicPlanner::class, [
             'llm' => LlmClientFactory::make(),
         ])->plan($plan, $this->count);

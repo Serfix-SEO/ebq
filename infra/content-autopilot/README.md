@@ -405,6 +405,16 @@ now wrong. Two bugs from exactly this, both user-visible:
 **Rule:** to ask "has this user onboarded?", check `filled($plan->
 business_description)` (or `$plan->topics()->exists()`), never `$plan !== null`.
 
+**Both fixed 2026-07-21.** `PlanContentTopicsJob::handle()` now returns early
+(logging `content_autopilot.topics_skipped_no_profile`) when
+`business_description` is blank — an empty calendar is the honest state, and the
+15-min dispatcher re-runs the job so it self-heals the moment the wizard saves.
+The don't-sell list also now reaches `filterRelevant()` (it previously fed the
+ideation prompt ONLY, so a candidate drifting onto an explicit exclusion had no
+second net); the exclusion sentence is omitted entirely when the list is empty,
+since a constraint naming nothing is exactly the hollow-guardrail failure above.
+Tests: `ContentTopicPlannerGuardrailsTest`.
+
 ### 🔥 Image-storage + worker-box incident (prod, 2026-07-20)
 
 Prod articles had **zero images** for two days. Three independent faults,

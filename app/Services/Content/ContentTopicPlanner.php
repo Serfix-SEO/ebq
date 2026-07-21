@@ -217,8 +217,11 @@ class ContentTopicPlanner
         }
         $offer = implode(', ', array_slice((array) (($plan->offerings ?? [])['sell'] ?? []), 0, 10));
         $desc = mb_substr((string) $plan->business_description, 0, 400);
+        // The don't-sell list used to reach the ideation prompt ONLY, so a
+        // candidate that drifted onto an explicit exclusion had no second net.
+        $exclude = implode(', ', array_slice((array) (($plan->offerings ?? [])['dont_sell'] ?? []), 0, 10));
 
-        $keep = $this->llmRelevant($keywords, $offer, $desc);
+        $keep = $this->llmRelevant($keywords, $offer, $desc, $exclude);
         if ($keep === null) {
             return $candidates; // LLM unavailable → fail open
         }
@@ -237,23 +240,30 @@ class ContentTopicPlanner
      * @param  list<string>  $keywords
      * @return list<string>|null  lowercased on-topic keywords; null on LLM unavailable/error
      */
-    private function llmRelevant(array $keywords, string $offer, string $desc): ?array
+    private function llmRelevant(array $keywords, string $offer, string $desc, string $exclude = ''): ?array
     {
         try {
             if (! $this->llm->isAvailable()) {
                 return null;
             }
             $list = implode("\n", array_slice($keywords, 0, 80));
+            // Only state the exclusion rule when there IS a list — an empty
+            // "never covers:" line reads as a constraint while forbidding
+            // nothing, which is the failure mode this whole change is about.
+            $excludeBlock = $exclude === ''
+                ? ''
+                : "\nThis business explicitly does NOT offer, and must never publish about: {$exclude}\n";
             $response = $this->llm->completeJson([
                 ['role' => 'system', 'content' => 'You filter SEO topic keywords for topical relevance. Respond with valid JSON only.'],
                 ['role' => 'user', 'content' => <<<PROMPT
                 Business offerings: {$offer}
                 About: {$desc}
-
+                {$excludeBlock}
                 From the topic keywords below, return ONLY those genuinely relevant to
                 THIS business — topics its articles should actually cover. DROP anything
                 off-topic: unrelated tools, industries, or languages, even when they
-                share a common word. Keep the exact original text.
+                share a common word. DROP anything covering what the business does not
+                offer. Keep the exact original text.
 
                 {$list}
 
