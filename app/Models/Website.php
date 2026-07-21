@@ -5,7 +5,11 @@ namespace App\Models;
 use App\Jobs\ReprocessCompetitiveData;
 use App\Jobs\SyncAnalyticsData;
 use App\Jobs\SyncSearchConsoleData;
+use App\Services\Content\ContentEntitlements;
+use App\Services\Sharding\ShardCleanup;
+use App\Support\ContentAutopilotConfig;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,16 +18,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
-use App\Models\Setting;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 class Website extends Model
 {
-    use HasUlids;
     // Billing has moved to the User model — Cashier's Billable trait
     // now lives on App\Models\User. Tier and freeze state are derived
     // from the owning user's plan (see effectiveTier / isFrozen below).
     use HasApiTokens, HasFactory;
+
+    use HasUlids;
 
     protected static function booted(): void
     {
@@ -62,10 +65,10 @@ class Website extends Model
             // no central tables to cascade from), so delete this website's tenant
             // rows explicitly on its node. Resolved from the row's own anchors
             // (the websites row is already gone). Idempotent w.r.t. any DB cascade.
-            $cleanup = app(\App\Services\Sharding\ShardCleanup::class);
+            $cleanup = app(ShardCleanup::class);
             $cleanup->purgeWebsiteTenantData(
                 (string) $website->id,
-                \App\Services\Sharding\ShardCleanup::connectionFor($website->db_node_id),
+                ShardCleanup::connectionFor($website->db_node_id),
             );
 
             if (! $website->crawl_site_id) {
@@ -80,7 +83,7 @@ class Website extends Model
                 // (also clears website_finding_states, which the old loop missed).
                 $cleanup->purgeCrawlSiteData(
                     (string) $site->id,
-                    \App\Services\Sharding\ShardCleanup::connectionFor($site->crawl_node_id),
+                    ShardCleanup::connectionFor($site->crawl_node_id),
                 );
                 $site->delete();
             } else {
@@ -126,7 +129,8 @@ class Website extends Model
 
     /** Subscription tier constants — kept for API-response back-compat */
     public const TIER_FREE = 'free';
-    public const TIER_PRO  = 'pro';
+
+    public const TIER_PRO = 'pro';
 
     protected $fillable = [
         'user_id',
@@ -183,18 +187,18 @@ class Website extends Model
      * @var array<string, bool>
      */
     public const FEATURE_DEFAULTS = [
-        'chatbot'          => false,
-        'ai_writer'        => false,
+        'chatbot' => false,
+        'ai_writer' => false,
         // Globally ON — the per-plan matrix is the real gate; this map is
         // also the global kill-switch default (false here would AND the
         // feature off platform-wide until an admin flips it).
         'content_autopilot' => true,
-        'ai_inline'        => true,
-        'live_audit'       => true,
-        'hq'               => true,
-        'redirects'        => true,
+        'ai_inline' => true,
+        'live_audit' => true,
+        'hq' => true,
+        'redirects' => true,
         'dashboard_widget' => true,
-        'post_column'      => true,
+        'post_column' => true,
     ];
 
     /**
@@ -222,8 +226,20 @@ class Website extends Model
     {
         // 1. Freeze short-circuits everything — over-plan-limit sites
         //    behave like locked free trials regardless of upstream state.
+        //
+        //    EXCEPT Content Autopilot. Freeze is a DASHBOARD plan-limit concept
+        //    (websiteLimit()), while content is separately billed with explicit
+        //    per-site coverage. A content customer with no dashboard plan has a
+        //    limit of 1, so their SECOND site froze and the wizard told them
+        //    "Content Autopilot is not included in your plan" — for a site they
+        //    were actively paying for (prod 2026-07-21). The global kill switch
+        //    below still applies to it.
         if ($this->isFrozen()) {
-            return array_fill_keys(self::FEATURE_KEYS, false);
+            $frozen = array_fill_keys(self::FEATURE_KEYS, false);
+            $frozen['content_autopilot'] = $this->contentAutopilotEntitled()
+                && (self::globalFeatureFlags()['content_autopilot'] ?? true);
+
+            return $frozen;
         }
 
         // 2. Start from the owning user's plan map. Orphan rows fall
@@ -242,12 +258,7 @@ class Website extends Model
         //     every plugin API hit, and must never 500 (e.g. before the content
         //     migrations have run on an environment) — fail to "off".
         if (array_key_exists('content_autopilot', $effective)) {
-            try {
-                $effective['content_autopilot'] = $owner !== null
-                    && app(\App\Services\Content\ContentEntitlements::class)->hasContentAccessFor($owner, $this);
-            } catch (\Throwable) {
-                $effective['content_autopilot'] = false;
-            }
+            $effective['content_autopilot'] = $this->contentAutopilotEntitled();
         }
 
         // 3. Per-site override — can NARROW (turn off a plan-allowed
@@ -299,6 +310,7 @@ class Website extends Model
         if (($effective[$key] ?? false) === true) {
             return null;
         }
+
         return Plan::requiredPlanFor($key);
     }
 
@@ -386,6 +398,7 @@ class Website extends Model
                 $defaults[$key] = (bool) $value;
             }
         }
+
         return $defaults;
     }
 
@@ -407,6 +420,7 @@ class Website extends Model
             return false;
         }
         $owner = $this->user;
+
         return $owner !== null && $owner->isPro();
     }
 
@@ -426,6 +440,7 @@ class Website extends Model
             return self::TIER_FREE;
         }
         $owner = $this->user;
+
         return $owner !== null ? $owner->effectiveTier() : self::TIER_FREE;
     }
 
@@ -440,6 +455,7 @@ class Website extends Model
             return $slug === self::TIER_FREE;
         }
         $owner = $this->user;
+
         return $owner !== null && $owner->isAtLeast($slug);
     }
 
@@ -449,6 +465,29 @@ class Website extends Model
      * the next read with no migration drift. The user's frozen list
      * is ordered by created_at so the oldest sites stay active.
      */
+    /**
+     * The real Content Autopilot entitlement for THIS website: an active content
+     * subscription/trial plus per-website coverage (billing_covered_at).
+     *
+     * Guarded because it runs on every nav render and every plugin API hit, and
+     * must never 500 — e.g. before the content migrations have run on an
+     * environment. Fails to "off".
+     */
+    protected function contentAutopilotEntitled(): bool
+    {
+        $owner = $this->user;
+        if ($owner === null) {
+            return false;
+        }
+
+        try {
+            return app(ContentEntitlements::class)
+                ->hasContentAccessFor($owner, $this);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function isFrozen(): bool
     {
         if (! $this->user_id) {
@@ -458,6 +497,7 @@ class Website extends Model
         if ($owner === null) {
             return false;
         }
+
         return in_array($this->id, $owner->frozenWebsiteIds(), true);
     }
 
@@ -721,6 +761,7 @@ class Website extends Model
         if ($this->isCrawling()) {
             return true;
         }
+
         // Queued window: the first crawl has been dispatched (on subscribe /
         // autostart) but its CrawlRun row doesn't exist yet — the chain is still
         // queued, syncing sitemaps, or waiting on a free worker. The RUNNING run is
@@ -751,7 +792,7 @@ class Website extends Model
         // (site profile, internal-link validation, cannibalization, keyword
         // seeds) — while their dashboard reports/crawl UI are teasered.
         if ($this->owner?->isContentOnly()) {
-            return max(1, min($hardCap, \App\Support\ContentAutopilotConfig::contentOnlyCrawlCap()));
+            return max(1, min($hardCap, ContentAutopilotConfig::contentOnlyCrawlCap()));
         }
 
         $quota = $this->owner?->crawlPageLimit(); // account-wide pool; null = unlimited
