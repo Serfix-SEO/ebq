@@ -281,6 +281,15 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-21 (business-profile auto-detect dead on every billed site)** — Since
+  billing, `coverWebsite()` creates a covered DRAFT **stub** plan before the user
+  enters anything, so `ContentCalendar::analyzeSite()`'s `plan() !== null` guard
+  (and `mount()`'s hard `analyzing = false`) killed auto-detect for every paid /
+  trial site: the description generated once on the first visit, then the field
+  was empty forever with no way to regenerate. Both now gate on the **profile**,
+  not on the plan row. **"A plan row exists" no longer means "onboarding ran"** —
+  see [content-autopilot/README.md](./content-autopilot/README.md) for the rule
+  and the second bug it caused (ideation on profile-less stubs).
 - **2026-07-21 (public onboarding lost the wizard profile + a 3rd phpunit
   prod-leak)** — A registrant who ALREADY owned the onboarded domain ended up on
   a bare stub plan: `ContentOnboardingConverter::convert` folds into the existing

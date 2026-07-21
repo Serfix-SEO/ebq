@@ -189,7 +189,11 @@ class ContentCalendar extends Component
                 && (filled($existing->business_description) || $existing->topics()->exists())) {
                 $this->wizardStep = max($this->wizardStep, 3);
             }
-            $this->analyzing = false;
+            // A plan row no longer means "the wizard already ran": since billing,
+            // coverWebsite() creates a covered STUB before the user has entered
+            // anything. Auto-detect must still run for a stub, or the profile
+            // step sits permanently empty with no way to regenerate it.
+            $this->analyzing = blank($this->businessDescription);
 
             return;
         }
@@ -203,7 +207,13 @@ class ContentCalendar extends Component
         $this->analyzing = false;
 
         $website = $this->website();
-        if ($website === null || $this->plan() !== null) {
+        // Gate on the PROFILE, not on the existence of a plan row: a covered
+        // stub (created by coverWebsite() at activation / trial start) has no
+        // profile yet, and the old `plan() !== null` guard made auto-detect
+        // dead on arrival for every billed site — the user saw the description
+        // generate on their first visit, then an empty field ever after.
+        if ($website === null || filled($this->businessDescription)
+            || filled($this->plan()?->business_description)) {
             return;
         }
 

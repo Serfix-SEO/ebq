@@ -379,6 +379,32 @@ Config (`ContentAutopilotConfig`, live-flippable via `settings`):
 `services.ideogram.monthly_cap_usd`. Review preview renders the figures
 (`.ca-preview figure.content-image` styling in article-review.blade).
 
+### ⚠️ "A plan row exists" ≠ "the wizard has run" (prod, 2026-07-21)
+
+Since the billing phase, `ContentEntitlements::coverWebsite()`
+(`ContentEntitlements.php:114`) creates a **covered DRAFT stub plan** the moment
+a site is activated or a trial starts — long before the user enters anything.
+Any code still treating "a ContentPlan row exists" as "onboarding is done" is
+now wrong. Two bugs from exactly this, both user-visible:
+
+1. **Auto-detect went dead for every billed site.** `ContentCalendar::analyzeSite()`
+   bailed on `plan() !== null`, so the business profile generated on the user's
+   FIRST visit (before the stub) and never again — an empty field on every later
+   visit with no way to regenerate. `mount()` also hard-set `analyzing = false`
+   whenever a plan existed. Both now gate on the **profile** (`blank(
+   $this->businessDescription)` / `filled($plan?->business_description)`), not on
+   the row. Tests: `ContentPagesTest::test_auto_detect_still_runs_for_a_covered_
+   stub_plan` + the skip-once-filled counterpart.
+2. **Topic ideation ran on profile-less stubs.** `ContentAutopilotDispatcher::
+   topUpThinCalendars()` selects purely on `status = ACTIVE` + topic count, and
+   `ContentTopicPlanner` treats `business_description` as optional (`:219` casts
+   null to `''`, relevance filter fails open). A stub flipped ACTIVE therefore
+   produced a full, plausible GSC-gap calendar for a business it knew nothing
+   about — which is why the missing profile went unnoticed for a day.
+
+**Rule:** to ask "has this user onboarded?", check `filled($plan->
+business_description)` (or `$plan->topics()->exists()`), never `$plan !== null`.
+
 ### 🔥 Image-storage + worker-box incident (prod, 2026-07-20)
 
 Prod articles had **zero images** for two days. Three independent faults,

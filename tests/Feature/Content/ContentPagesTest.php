@@ -4,14 +4,20 @@ namespace Tests\Feature\Content;
 
 use App\Jobs\PlanContentTopicsJob;
 use App\Jobs\ProduceContentArticleJob;
+use App\Jobs\PublishContentArticleJob;
 use App\Livewire\Content\ArticleReview;
 use App\Livewire\Content\ContentCalendar;
 use App\Models\ContentArticle;
+use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Content\ContentEntitlements;
+use App\Services\Content\SiteProfileExtractor;
+use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -23,7 +29,7 @@ class ContentPagesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\PlanSeeder::class);
+        $this->seed(PlanSeeder::class);
     }
 
     private function userWithWebsite(): array
@@ -46,10 +52,77 @@ class ContentPagesTest extends TestCase
         $this->get('/content')->assertRedirect();
     }
 
+    /**
+     * Regression (prod 2026-07-21): the business-profile auto-detect was dead
+     * for every BILLED site. `analyzeSite()` bailed on `plan() !== null`, a
+     * guard written when a plan row only existed once the wizard had run —
+     * but since billing, `coverWebsite()` creates a covered STUB at activation
+     * / trial start. So the user saw the description generate once (before the
+     * stub existed), then an empty field on every later visit, with no way to
+     * regenerate it. The gate must be the PROFILE, not the plan row.
+     */
+    public function test_auto_detect_still_runs_for_a_covered_stub_plan(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithWebsite();
+        // Coverage stub: a plan row with NO business profile yet.
+        app(ContentEntitlements::class)->coverWebsite($website);
+        $plan = ContentPlan::query()->where('website_id', $website->id)->first();
+        $this->assertNotNull($plan);
+        $this->assertTrue(blank($plan->business_description), 'precondition: stub carries no profile');
+
+        $this->instance(
+            SiteProfileExtractor::class,
+            new class extends SiteProfileExtractor
+            {
+                public function __construct() {}
+
+                public function extract($website): array
+                {
+                    return [
+                        'description' => 'Auto-detected: sells handmade wooden furniture.',
+                        'sell' => ['Tables'],
+                        'dont_sell' => ['Repairs'],
+                    ];
+                }
+            }
+        );
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            // mount() must ARM the auto-detect for a profile-less stub…
+            ->assertSet('analyzing', true)
+            // …and running it must fill the field instead of returning early.
+            ->call('analyzeSite')
+            ->assertSet('businessDescription', 'Auto-detected: sells handmade wooden furniture.')
+            ->assertSet('sellItems', ['Tables'])
+            ->assertSet('dontSellItems', ['Repairs']);
+    }
+
+    /** A plan that already carries a profile must NOT be re-analyzed (or overwritten). */
+    public function test_auto_detect_is_skipped_once_the_profile_exists(): void
+    {
+        Queue::fake();
+        [$user, $website] = $this->userWithWebsite();
+        ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'billing_covered_at' => now(),
+            'business_description' => 'The description the user already wrote themselves.',
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->assertSet('analyzing', false)
+            ->call('analyzeSite')
+            ->assertSet('businessDescription', 'The description the user already wrote themselves.');
+    }
+
     public function test_content_page_shows_empty_state_without_plan(): void
     {
         [$user, $website] = $this->userWithWebsite();
-        app(\App\Services\Content\ContentEntitlements::class)->coverWebsite($website);
+        app(ContentEntitlements::class)->coverWebsite($website);
 
         $this->actingAs($user)
             ->withSession(['current_website_id' => $website->id])
@@ -62,7 +135,7 @@ class ContentPagesTest extends TestCase
     public function test_settings_page_renders_wizard_without_plan(): void
     {
         [$user, $website] = $this->userWithWebsite();
-        app(\App\Services\Content\ContentEntitlements::class)->coverWebsite($website);
+        app(ContentEntitlements::class)->coverWebsite($website);
 
         $this->actingAs($user)
             ->withSession(['current_website_id' => $website->id])
@@ -205,7 +278,7 @@ class ContentPagesTest extends TestCase
     {
         Queue::fake();
         [$user, $website] = $this->userWithWebsite();
-        app(\App\Services\Content\ContentEntitlements::class)->coverWebsite($website);
+        app(ContentEntitlements::class)->coverWebsite($website);
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
@@ -443,15 +516,15 @@ class ContentPagesTest extends TestCase
             'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
             'html' => '<p>x</p>', 'word_count' => 100, 'seo_score' => 90, 'seo_issues' => [],
         ]);
-        \App\Models\ContentIntegration::create([
+        ContentIntegration::create([
             'website_id' => $website->id, 'platform' => 'webhook',
-            'status' => \App\Models\ContentIntegration::STATUS_CONNECTED,
+            'status' => ContentIntegration::STATUS_CONNECTED,
         ]);
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
         Livewire::test(ContentCalendar::class)->call('publishNow', $topic->id);
 
-        Queue::assertPushed(\App\Jobs\PublishContentArticleJob::class);
+        Queue::assertPushed(PublishContentArticleJob::class);
         // Flips to PUBLISHING immediately so the calendar shows in-progress.
         $this->assertSame(ContentTopic::STATUS_PUBLISHING, $topic->fresh()->status);
     }
@@ -469,15 +542,15 @@ class ContentPagesTest extends TestCase
             'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
             'html' => '<p>x</p>', 'word_count' => 100, 'seo_score' => 90, 'seo_issues' => [],
         ]);
-        \App\Models\ContentIntegration::create([
+        ContentIntegration::create([
             'website_id' => $website->id, 'platform' => 'webhook',
-            'status' => \App\Models\ContentIntegration::STATUS_CONNECTED,
+            'status' => ContentIntegration::STATUS_CONNECTED,
         ]);
 
         Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])
             ->call('publishNow');
 
-        Queue::assertPushed(\App\Jobs\PublishContentArticleJob::class);
+        Queue::assertPushed(PublishContentArticleJob::class);
         $this->assertSame(ContentTopic::STATUS_PUBLISHING, $topic->fresh()->status);
     }
 
@@ -499,7 +572,7 @@ class ContentPagesTest extends TestCase
         Livewire::test(ContentCalendar::class)->call('publishNow', $topic->id);
 
         // No connected destination → must NOT publish (and the topic stays put).
-        Queue::assertNotPushed(\App\Jobs\PublishContentArticleJob::class);
+        Queue::assertNotPushed(PublishContentArticleJob::class);
         $this->assertSame(ContentTopic::STATUS_SCHEDULED, $topic->fresh()->status);
     }
 
@@ -516,23 +589,23 @@ class ContentPagesTest extends TestCase
             'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
             'html' => '<p>x</p>', 'word_count' => 100, 'seo_score' => 90, 'seo_issues' => [],
         ]);
-        \App\Models\ContentIntegration::create([
+        ContentIntegration::create([
             'website_id' => $website->id, 'platform' => 'webhook',
-            'status' => \App\Models\ContentIntegration::STATUS_CONNECTED,
+            'status' => ContentIntegration::STATUS_CONNECTED,
         ]);
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
         Livewire::test(ContentCalendar::class)->call('publishNow', $topic->id);
 
         // Future-dated → publish now is not allowed even with a destination.
-        Queue::assertNotPushed(\App\Jobs\PublishContentArticleJob::class);
+        Queue::assertNotPushed(PublishContentArticleJob::class);
         $this->assertSame(ContentTopic::STATUS_SCHEDULED, $topic->fresh()->status);
     }
 
     public function test_review_page_is_tenant_scoped(): void
     {
         [$user, $ownWebsite] = $this->userWithWebsite();
-        app(\App\Services\Content\ContentEntitlements::class)->coverWebsite($ownWebsite);
+        app(ContentEntitlements::class)->coverWebsite($ownWebsite);
         [$otherUser, $otherWebsite] = $this->userWithWebsite();
         $otherPlan = ContentPlan::factory()->create(['website_id' => $otherWebsite->id]);
         $otherTopic = ContentTopic::factory()->for($otherPlan, 'plan')->create([
@@ -568,6 +641,7 @@ class ContentPagesTest extends TestCase
             ->assertDontSee('alert(1)', false)
             ->assertDontSee('evil()', false);
     }
+
     public function test_write_now_dispatches_generation_and_opens_progress(): void
     {
         Queue::fake();
@@ -582,8 +656,8 @@ class ContentPagesTest extends TestCase
             ->call('writeNow', $topic->id)
             ->assertRedirect(route('content.review', $topic->id));
 
-        Queue::assertPushed(\App\Jobs\ProduceContentArticleJob::class);
-        $this->assertNotNull(\Illuminate\Support\Facades\Cache::get('content:gen-start:'.$topic->id));
+        Queue::assertPushed(ProduceContentArticleJob::class);
+        $this->assertNotNull(Cache::get('content:gen-start:'.$topic->id));
     }
 
     public function test_fair_monthly_visits_is_a_conservative_band(): void
@@ -596,5 +670,4 @@ class ContentPagesTest extends TestCase
         $this->assertSame(500, $band['high']);  // 5%
         $this->assertNull(ContentCalendar::fairMonthlyVisits(new ContentTopic(['keyword_volume' => 0])));
     }
-
 }
