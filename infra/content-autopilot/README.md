@@ -415,6 +415,23 @@ second net); the exclusion sentence is omitted entirely when the list is empty,
 since a constraint naming nothing is exactly the hollow-guardrail failure above.
 Tests: `ContentTopicPlannerGuardrailsTest`.
 
+### ⚠️ Vendored package: composer will NOT re-mirror on the same version
+
+`serfix/content-ai-laravel` is installed from a **path repository**
+(`packages/content-ai-laravel`, mirrored not symlinked). `composer update
+serfix/content-ai-laravel` reports *"Nothing to install, update or remove"* when
+the package's `version` string is unchanged — even though the source files
+differ. `vendor/` then keeps the OLD code and the change is silently dead
+(caught 2026-07-21: a security fix shipped to `packages/` was absent from
+`vendor/`).
+
+After editing the package, either bump `version` in its `composer.json` or:
+
+    rm -rf vendor/serfix/content-ai-laravel && composer update serfix/content-ai-laravel
+
+Then verify the file you changed actually exists under `vendor/`. Replace the
+path repo with a normal Packagist require once the package is published.
+
 ### ⛔ Product independence: the dashboard plan limit must never gate content
 
 Serfix SEO and Content Autopilot are **separate products with separate billing**.
