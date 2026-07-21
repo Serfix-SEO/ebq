@@ -60,7 +60,67 @@ use Serfix\ContentAi\Models\Article;
 $articles = Article::published()->latest('published_at')->paginate();
 ```
 
+## Keep your own design
+
+Three globals are available in **every** Blade view. Drop them into your existing
+layout and build whatever you like around them:
+
+```blade
+<!DOCTYPE html>
+<html>
+<head>
+    {!! $serfix_head !!}          {{-- title, description, canonical, robots, OG, Twitter, JSON-LD --}}
+</head>
+<body>
+    <x-my-navbar />
+
+    <article class="prose">
+        {!! $serfix_body !!}      {{-- the article HTML, images already on your disk --}}
+    </article>
+
+    {!! $serfix_body_below !!}    {{-- related articles, and anything that belongs after --}}
+
+    <x-my-footer />
+</body>
+</html>
+```
+
+Same thing as directives or helpers, whichever suits your codebase:
+
+```blade
+@serfixHead   @serfixBody   @serfixBodyBelow
+```
+```php
+serfix_head();  serfix_body();  serfix_body_below();  serfix_article();
+```
+
+They render to an empty string on any page that isn't showing an article, so they're
+safe in a layout shared by your whole site — nothing is computed until echoed.
+
+Rendering articles from **your own** controller? Tell the package which one is current
+and the globals work there too:
+
+```php
+use Serfix\ContentAi\Rendering\Renderer;
+
+public function show(string $slug)
+{
+    $article = \Serfix\ContentAi\Models\Article::where('slug', $slug)->firstOrFail();
+
+    app(Renderer::class)->use($article);
+
+    return view('my-own-blog-page');   // your view, your design
+}
+```
+
+`content-ai.render.schema_in` moves the JSON-LD to `body_below` if you prefer it at the
+end of the document; `content-ai.render.related` sets how many related links to show
+(`0` to omit). `render.globals => false` stops sharing the variables entirely — the
+helpers keep working.
+
 ## SEO
+
+The globals already include everything below; these components exist for finer control.
 
 ```blade
 <head>

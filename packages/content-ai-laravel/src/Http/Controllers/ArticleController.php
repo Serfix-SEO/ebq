@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\URL;
 use Serfix\ContentAi\Models\Article;
+use Serfix\ContentAi\Rendering\Renderer;
 use Serfix\ContentAi\Services\MetaBuilder;
 use Serfix\ContentAi\Services\SchemaBuilder;
 
@@ -37,6 +38,12 @@ class ArticleController
         // Unpublished articles are viewable ONLY through a signed preview link,
         // so an unlisted draft cannot be discovered by guessing slugs.
         abort_unless($article->isPublished() || $request->hasValidSignature(), 404);
+
+        // Makes $serfix_head / $serfix_body / $serfix_body_below resolve for this
+        // request — including inside the HOST's own layout, which never sees our
+        // view data. A host rendering articles themselves calls this too:
+        //   app(Renderer::class)->use($article)
+        app(Renderer::class)->use($article);
 
         return view(config('content-ai.views.show', 'content-ai::show'), [
             'article' => $article,

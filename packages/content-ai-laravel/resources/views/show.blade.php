@@ -2,13 +2,19 @@
   Deliberately unstyled and layout-agnostic: publish it
   (`php artisan vendor:publish --tag=content-ai-views`) and restyle freely.
   Set content-ai.views.layout to wrap it in your own layout.
+
+  This view uses the same global chunks the package exposes to YOUR templates,
+  so what you see here is exactly what you get when you build your own design:
+
+      <head> {!! $serfix_head !!}
+      <body> {!! $serfix_body !!}
+             {!! $serfix_body_below !!}
 --}}
 @php($layout = config('content-ai.views.layout'))
 @extends($layout ?? 'content-ai::layout')
 
 @section('head')
-    <x-content-ai::meta :article="$article" />
-    <x-content-ai::schema :article="$article" />
+    {!! $serfix_head !!}
 @endsection
 
 @section('content')
@@ -30,6 +36,8 @@
 
         {{-- Trusted: authored by Content AI, signature-verified in transit, and
              optionally sanitised at import (content.sanitize_html). --}}
-        {!! $article->html !!}
+        {!! $serfix_body !!}
     </article>
+
+    {!! $serfix_body_below !!}
 @endsection

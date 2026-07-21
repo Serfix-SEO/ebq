@@ -5646,7 +5646,7 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/content-ai-laravel",
-                "reference": "8a7cc86e1b6d30fddbefe06115590b863bb4b2c9"
+                "reference": "43d816cbd31cac4547ba9890f739dddb534a327d"
             },
             "require": {
                 "illuminate/contracts": "^11.0|^12.0",
@@ -5671,7 +5671,10 @@
             "autoload": {
                 "psr-4": {
                     "Serfix\\ContentAi\\": "src/"
-                }
+                },
+                "files": [
+                    "src/helpers.php"
+                ]
             },
             "autoload-dev": {
                 "psr-4": {

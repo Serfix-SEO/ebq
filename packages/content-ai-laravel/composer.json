@@ -33,7 +33,10 @@
     "autoload": {
         "psr-4": {
             "Serfix\\ContentAi\\": "src/"
-        }
+        },
+        "files": [
+            "src/helpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

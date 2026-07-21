@@ -152,6 +152,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Rendering — global Blade variables
+    |--------------------------------------------------------------------------
+    |
+    | Keep your own design and drop our output into it:
+    |
+    |   <head> {!! $serfix_head !!}
+    |   <body> {!! $serfix_body !!}
+    |          {!! $serfix_body_below !!}
+    |
+    | Equivalent directives: @serfixHead / @serfixBody / @serfixBodyBelow, and
+    | helpers serfix_head() / serfix_body() / serfix_body_below() / serfix_article().
+    |
+    | They render to '' on any page that is not showing an article, so they are
+    | safe in a layout shared by your whole site. Set `globals => false` to stop
+    | sharing them entirely (the helpers keep working).
+    |
+    | `schema_in` moves the JSON-LD between the head and the end of the body;
+    | `related` is how many related links $serfix_body_below renders (0 = none).
+    |
+    */
+
+    'render' => [
+        'globals' => true,
+        'schema_in' => 'head',
+        'related' => 3,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Models & views — override to take full control
     |--------------------------------------------------------------------------
     */
