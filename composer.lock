@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "61f956d0d88daef435bedb1d119f4372",
+    "content-hash": "579c1caed53484e819bf55e9fde77e85",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -5642,11 +5642,17 @@
         },
         {
             "name": "serfix/content-ai-laravel",
-            "version": "0.1.0",
+            "version": "v0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Serfix-SEO/serfix-laravel.git",
+                "reference": "1e46c6df704610ed620ec7d9aa6205d4bcf31c98"
+            },
             "dist": {
-                "type": "path",
-                "url": "./packages/content-ai-laravel",
-                "reference": "43d816cbd31cac4547ba9890f739dddb534a327d"
+                "type": "zip",
+                "url": "https://api.github.com/repos/Serfix-SEO/serfix-laravel/zipball/1e46c6df704610ed620ec7d9aa6205d4bcf31c98",
+                "reference": "1e46c6df704610ed620ec7d9aa6205d4bcf31c98",
+                "shasum": ""
             },
             "require": {
                 "illuminate/contracts": "^11.0|^12.0",
@@ -5669,26 +5675,14 @@
                 }
             },
             "autoload": {
-                "psr-4": {
-                    "Serfix\\ContentAi\\": "src/"
-                },
                 "files": [
                     "src/helpers.php"
-                ]
-            },
-            "autoload-dev": {
+                ],
                 "psr-4": {
-                    "Serfix\\ContentAi\\Tests\\": "tests/"
+                    "Serfix\\ContentAi\\": "src/"
                 }
             },
-            "scripts": {
-                "test": [
-                    "vendor/bin/phpunit"
-                ],
-                "lint": [
-                    "vendor/bin/pint"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -5708,10 +5702,11 @@
                 "seo",
                 "serfix"
             ],
-            "transport-options": {
-                "symlink": false,
-                "relative": true
-            }
+            "support": {
+                "issues": "https://github.com/Serfix-SEO/serfix-laravel/issues",
+                "source": "https://github.com/Serfix-SEO/serfix-laravel/tree/v0.1.0"
+            },
+            "time": "2026-07-21T10:51:42+00:00"
         },
         {
             "name": "socialiteproviders/manager",

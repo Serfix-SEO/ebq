@@ -415,22 +415,23 @@ second net); the exclusion sentence is omitted entirely when the list is empty,
 since a constraint naming nothing is exactly the hollow-guardrail failure above.
 Tests: `ContentTopicPlannerGuardrailsTest`.
 
-### ⚠️ Vendored package: composer will NOT re-mirror on the same version
+### The Laravel receiver is a published package
 
-`serfix/content-ai-laravel` is installed from a **path repository**
-(`packages/content-ai-laravel`, mirrored not symlinked). `composer update
-serfix/content-ai-laravel` reports *"Nothing to install, update or remove"* when
-the package's `version` string is unchanged — even though the source files
-differ. `vendor/` then keeps the OLD code and the change is silently dead
-(caught 2026-07-21: a security fix shipped to `packages/` was absent from
-`vendor/`).
+`serfix/content-ai-laravel` lives in its own repo
+(github.com/Serfix-SEO/serfix-laravel) and installs from Packagist:
 
-After editing the package, either bump `version` in its `composer.json` or:
+    composer require serfix/content-ai-laravel
 
-    rm -rf vendor/serfix/content-ai-laravel && composer update serfix/content-ai-laravel
+Prod consumes it that way as of 2026-07-21 (v0.1.0). The earlier `packages/`
+path-repo vendoring is gone — with it goes its trap, worth remembering if a path
+repo is ever used again: `composer update` reports *"Nothing to install"* when
+the package's `version` string has not changed, even though the source differs,
+so `vendor/` silently keeps the old code (a security fix shipped to `packages/`
+was absent from `vendor/`). Packagist has no such problem — the git tag is the
+version.
 
-Then verify the file you changed actually exists under `vendor/`. Replace the
-path repo with a normal Packagist require once the package is published.
+Publishing a new package release: tag it in the package repo, then
+`composer update serfix/content-ai-laravel` here.
 
 ### ⛔ Product independence: the dashboard plan limit must never gate content
 

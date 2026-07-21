@@ -25,7 +25,7 @@
         "resend/resend-laravel": "^0.21",
         "sentry/sentry-laravel": "^4.10",
         "socialiteproviders/microsoft": "^4.6",
-        "serfix/content-ai-laravel": "*"
+        "serfix/content-ai-laravel": "^0.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -100,14 +100,5 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true,
-    "repositories": [
-        {
-            "type": "path",
-            "url": "./packages/content-ai-laravel",
-            "options": {
-                "symlink": false
-            }
-        }
-    ]
+    "prefer-stable": true
 }
