@@ -8,6 +8,7 @@ use App\Models\ContentTopic;
 use App\Models\Website;
 use App\Services\Content\Publishing\PublishDriverFactory;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -26,17 +27,39 @@ class PublishingSettings extends Component
 
     // Connect form state
     public string $platform = ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD;
+
     public string $wpSiteUrl = '';
+
     public string $wpUsername = '';
+
     public string $wpAppPassword = '';
+
     public string $whEndpoint = '';
+
     public string $whSecret = '';
+
     public bool $showConnect = false;
 
     public function mount(): void
     {
         $this->websiteId = session('current_website_id');
         $this->wpSiteUrl = (string) ($this->website()?->domain ?? '');
+        $this->whSecret = $this->generatedSecret();
+    }
+
+    /**
+     * A strong signing secret, pre-filled so the customer never has to invent
+     * one. This secret is the ENTIRE authentication boundary for that site — a
+     * guessable phrase means anyone can publish HTML to their pages.
+     */
+    public function regenerateSecret(): void
+    {
+        $this->whSecret = $this->generatedSecret();
+    }
+
+    private function generatedSecret(): string
+    {
+        return Str::random(48);
     }
 
     #[On('website-changed')]
@@ -45,6 +68,7 @@ class PublishingSettings extends Component
         $this->websiteId = $websiteId;
         $this->reset('wpSiteUrl', 'wpUsername', 'wpAppPassword', 'whEndpoint', 'whSecret', 'showConnect');
         $this->wpSiteUrl = (string) ($this->website()?->domain ?? '');
+        $this->whSecret = $this->generatedSecret();
     }
 
     public function connect(): void
@@ -66,10 +90,20 @@ class PublishingSettings extends Component
                 'app_password' => trim($this->wpAppPassword),
             ];
         } else {
+            // https ONLY: the signature stops forgery, not disclosure. Over
+            // plain http every article — and the site's whole content plan —
+            // travels in cleartext across the internet.
             $this->validate([
-                'whEndpoint' => 'required|url|max:600',
-                'whSecret' => 'required|string|min:16|max:200',
-            ], [], ['whEndpoint' => __('endpoint URL'), 'whSecret' => __('signing secret')]);
+                'whEndpoint' => 'required|url|starts_with:https://|max:600',
+                // 32 chars of real entropy. The field is pre-filled with a
+                // generated secret (see mount()); this floor exists to stop
+                // someone replacing it with a memorable phrase, which is the
+                // whole security boundary for that site.
+                'whSecret' => 'required|string|min:32|max:200',
+            ], [
+                'whEndpoint.starts_with' => __('The endpoint URL must use https:// — articles are sent over the public internet.'),
+                'whSecret.min' => __('The signing secret must be at least 32 characters. Use the generated one.'),
+            ], ['whEndpoint' => __('endpoint URL'), 'whSecret' => __('signing secret')]);
             $this->platform = ContentIntegration::PLATFORM_WEBHOOK;
             $credentials = [
                 'endpoint_url' => trim($this->whEndpoint),

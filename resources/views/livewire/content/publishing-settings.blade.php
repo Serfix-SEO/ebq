@@ -134,9 +134,20 @@
                                 @error('whEndpoint') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Signing secret (min 16 characters)') }}</label>
-                                <input wire:model="whSecret" type="password" autocomplete="new-password"
-                                    class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Signing secret') }}</label>
+                                {{-- Generated, and shown in the clear on purpose: it has to be copied
+                                     into the receiving site, and we never display it again after save. --}}
+                                <div class="mt-1 flex items-center gap-2">
+                                    <input wire:model="whSecret" type="text" autocomplete="off" spellcheck="false"
+                                        class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                                    <button type="button" wire:click="regenerateSecret" wire:loading.attr="disabled"
+                                        class="shrink-0 rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                                        {{ __('Regenerate') }}
+                                    </button>
+                                </div>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    {{ __('Copy this into your site as CONTENT_AI_WEBHOOK_SECRET. It is the only thing proving an article really came from us — keep it secret, and never reuse it across sites.') }}
+                                </p>
                                 @error('whSecret') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
                             </div>
                         </div>

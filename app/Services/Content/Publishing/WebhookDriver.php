@@ -135,6 +135,15 @@ class WebhookDriver implements PublishDriver
         if ($endpoint === '' || $secret === '') {
             return ['', '', 'The webhook connection is missing its endpoint URL or signing secret.'];
         }
+        // Enforced HERE as well as in the connect form: the HMAC prevents
+        // forgery, not disclosure, so plain http would ship every article in
+        // cleartext. SafeHttpGuard permits http (it guards against SSRF, not
+        // eavesdropping), and rows can be created outside the form — admin
+        // tooling, a seeder, a future API — so the transport rule belongs on
+        // the path that actually sends.
+        if (! str_starts_with(strtolower($endpoint), 'https://')) {
+            return ['', '', 'The webhook endpoint must use https:// — articles are sent over the public internet.'];
+        }
         $check = $this->guard->check($endpoint);
         if (! ($check['ok'] ?? false)) {
             return ['', '', 'The webhook URL is not reachable from our servers.'];

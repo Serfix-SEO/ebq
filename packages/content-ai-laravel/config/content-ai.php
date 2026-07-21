@@ -146,7 +146,7 @@ return [
 
     'content' => [
         'rewrite_internal_links' => true,
-        'sanitize_html' => false,
+        'sanitize_html' => env('CONTENT_AI_SANITIZE_HTML', true),
         'reading_words_per_minute' => 220,
     ],
 

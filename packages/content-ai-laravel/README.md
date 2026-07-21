@@ -216,6 +216,20 @@ We answer `{"ok":true,"id":"…","url":"…","status":"published"}`. **The `url`
 Serfix stores it as the published location, so without it there is no record of where your
 article actually went.
 
+### Security
+
+- **Sanitised by default.** Article HTML is run through an allow-list sanitizer
+  before it is stored — no `<script>`, no `on*` handlers, no `javascript:`/`data:`
+  URLs, no `<iframe>`/`<form>`/`style=`. The signature is the only barrier between
+  an attacker and markup on your page, so a leaked signing secret must not become
+  stored XSS. Dependency-free (`DOMDocument`). Disable with
+  `CONTENT_AI_SANITIZE_HTML=false` only if you fully trust the publisher.
+- **https only.** Serfix refuses to send to an `http://` endpoint: the HMAC stops
+  forgery, not eavesdropping.
+- **Strong secrets.** Serfix generates a 48-character secret for you; anything
+  under 32 characters is rejected. Never reuse one across sites — one secret is
+  one site's entire identity.
+
 Three properties this receiver guarantees:
 
 - **Authenticity** — HMAC over the *raw* body (re-encoding JSON does not round-trip

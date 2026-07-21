@@ -23,7 +23,10 @@ use Serfix\ContentAi\Models\Article;
  */
 class ArticleImporter
 {
-    public function __construct(private readonly ImageLocalizer $images) {}
+    public function __construct(
+        private readonly ImageLocalizer $images,
+        private readonly HtmlSanitizer $sanitizer,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $payload
@@ -98,6 +101,13 @@ class ArticleImporter
 
         if (config('content-ai.content.rewrite_internal_links', true)) {
             $html = $this->rewriteInternalLinks($html);
+        }
+
+        // Last, so nothing added above can smuggle markup back in. The signature
+        // check is the only barrier between an attacker and HTML on the host's
+        // page, so a leaked signing secret must not become stored XSS.
+        if (config('content-ai.content.sanitize_html', true)) {
+            $html = $this->sanitizer->sanitize($html);
         }
 
         $article->forceFill(['html' => $html])->save();
