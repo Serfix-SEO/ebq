@@ -5642,16 +5642,16 @@
         },
         {
             "name": "serfix/content-ai-laravel",
-            "version": "v0.1.0",
+            "version": "v0.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Serfix-SEO/serfix-laravel.git",
-                "reference": "1e46c6df704610ed620ec7d9aa6205d4bcf31c98"
+                "reference": "d42145138bb3f35216b3f7a66022d6c380e5096e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Serfix-SEO/serfix-laravel/zipball/1e46c6df704610ed620ec7d9aa6205d4bcf31c98",
-                "reference": "1e46c6df704610ed620ec7d9aa6205d4bcf31c98",
+                "url": "https://api.github.com/repos/Serfix-SEO/serfix-laravel/zipball/d42145138bb3f35216b3f7a66022d6c380e5096e",
+                "reference": "d42145138bb3f35216b3f7a66022d6c380e5096e",
                 "shasum": ""
             },
             "require": {
@@ -5704,9 +5704,9 @@
             ],
             "support": {
                 "issues": "https://github.com/Serfix-SEO/serfix-laravel/issues",
-                "source": "https://github.com/Serfix-SEO/serfix-laravel/tree/v0.1.0"
+                "source": "https://github.com/Serfix-SEO/serfix-laravel/tree/v0.1.1"
             },
-            "time": "2026-07-21T10:51:42+00:00"
+            "time": "2026-07-21T11:11:51+00:00"
         },
         {
             "name": "socialiteproviders/manager",
