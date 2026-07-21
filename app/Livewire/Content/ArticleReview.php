@@ -2,12 +2,20 @@
 
 namespace App\Livewire\Content;
 
+use App\Jobs\ProduceContentArticleJob;
+use App\Jobs\PublishContentArticleJob;
 use App\Models\ContentArticle;
+use App\Models\ContentImage;
+use App\Models\ContentIntegration;
 use App\Models\ContentTopic;
 use App\Services\AiToolRunner;
+use App\Services\Content\CompetitorMentionGuard;
+use App\Services\Content\ContentEntitlements;
 use App\Services\Content\ContentSeoScorer;
 use App\Services\Content\HumanizerService;
+use App\Support\ContentAutopilotConfig;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -33,13 +41,18 @@ class ArticleReview extends Component
 
     // ── Editable state ──
     public bool $editing = false;
+
     public string $bodyHtml = '';
+
     public string $editH1 = '';
+
     public string $editMetaTitle = '';
+
     public string $editMetaDescription = '';
 
     /** @var list<array{code:string, passed:bool, label:string}> */
     public array $liveChecks = [];
+
     public int $liveScore = 0;
 
     /** Cached once per request-cycle: site_urls/existing_titles are DB reads. */
@@ -198,7 +211,7 @@ class ArticleReview extends Component
         }
         $connected = (bool) $topic->plan?->website
             ?->contentIntegrations()
-            ->where('status', \App\Models\ContentIntegration::STATUS_CONNECTED)
+            ->where('status', ContentIntegration::STATUS_CONNECTED)
             ->exists();
         if (! $connected) {
             session()->flash('review-status', __('Connect a site in Settings → Integrations before publishing.'));
@@ -206,7 +219,7 @@ class ArticleReview extends Component
             return;
         }
         $topic->enterStage(ContentTopic::STATUS_PUBLISHING);
-        \App\Jobs\PublishContentArticleJob::dispatch($topic->id);
+        PublishContentArticleJob::dispatch($topic->id);
         session()->flash('review-status', __('Publishing now — it can take a moment to appear on your site.'));
     }
 
@@ -217,16 +230,15 @@ class ArticleReview extends Component
         if ($topic === null || in_array($topic->status, ContentTopic::IN_FLIGHT, true)) {
             return;
         }
-        if (($reason = app(\App\Services\Content\ContentEntitlements::class)->blockReason($topic)) !== null) {
+        if (($reason = app(ContentEntitlements::class)->blockReason($topic)) !== null) {
             session()->flash('review-status', ContentCalendar::generationBlockMessage($reason));
 
             return;
         }
         $topic->forceFill(['status' => ContentTopic::STATUS_APPROVED, 'last_error' => null, 'stage_started_at' => now()])->save();
-        \Illuminate\Support\Facades\Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
-        \App\Jobs\ProduceContentArticleJob::dispatch($topic->id);
+        Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
+        ProduceContentArticleJob::dispatch($topic->id);
     }
-
 
     // ── live scoring ────────────────────────────────────────────────────
 
@@ -251,7 +263,16 @@ class ArticleReview extends Component
         }
 
         $context = $this->scorerContext ??= $this->buildScorerContext($topic);
-        $styleIssues = app(HumanizerService::class)->lint(html_entity_decode(strip_tags($html)));
+        // Same competitor-mention rules the producer enforced, so the live
+        // checks and the pipeline can never disagree about an edit.
+        $guard = app(CompetitorMentionGuard::class);
+        $guardPlan = $topic->plan;
+        $styleIssues = app(HumanizerService::class)->lint(
+            html_entity_decode(strip_tags($html)),
+            $guardPlan !== null ? $guard->termsForTopic($guardPlan, $topic) : [],
+            // strip_tags removes hrefs, so link-lint the RAW html separately is
+            // pointless here; mentions are the editable risk in the editor.
+        );
         $context['style_issues'] = $styleIssues;
 
         $result = app(ContentSeoScorer::class)->score(
@@ -423,17 +444,17 @@ class ArticleReview extends Component
         }
         $plan = $topic->plan;
         if ($plan === null || $plan->images_enabled === false
-            || ! \App\Support\ContentAutopilotConfig::imagesEnabled()) {
+            || ! ContentAutopilotConfig::imagesEnabled()) {
             return false;
         }
         // The images job is actively running (it sets this flag for its whole
         // lifetime, so we keep the overlay up until ALL images are done, not
         // just until the first one lands).
-        if (\Illuminate\Support\Facades\Cache::has('content:images:running:'.$topic->id)) {
+        if (Cache::has('content:images:running:'.$topic->id)) {
             return true;
         }
         // Job finished and produced at least one image → done.
-        if ($article->images()->where('status', \App\Models\ContentImage::STATUS_GENERATED)->exists()) {
+        if ($article->images()->where('status', ContentImage::STATUS_GENERATED)->exists()) {
             return false;
         }
         // Just became READY inside an ACTIVE generation (gen-start cached by
@@ -517,7 +538,7 @@ class ArticleReview extends Component
         $progress = null;
         $imagesPending = false;
         if ($topic !== null) {
-            $genStart = (int) \Illuminate\Support\Facades\Cache::get('content:gen-start:'.$topic->id, 0);
+            $genStart = (int) Cache::get('content:gen-start:'.$topic->id, 0);
             // GENERATION stages only — PUBLISHING is in-flight too but must NOT
             // trigger the "writing" overlay; it keeps the article view + a
             // Publishing badge.
@@ -547,8 +568,8 @@ class ArticleReview extends Component
         $featuredImage = null;
         if ($article !== null && $topic?->plan !== null && ! $topic->plan->toggle('featured_image')) {
             $featuredImage = $article->images()
-                ->where('role', \App\Models\ContentImage::ROLE_FEATURED)
-                ->where('status', \App\Models\ContentImage::STATUS_GENERATED)
+                ->where('role', ContentImage::ROLE_FEATURED)
+                ->where('status', ContentImage::STATUS_GENERATED)
                 ->latest()->first();
         }
 
@@ -562,7 +583,7 @@ class ArticleReview extends Component
             'issueLabels' => $issueLabels,
             'traffic' => $topic ? self::trafficWorth($topic) : null,
             'publishConnected' => (bool) $topic?->plan?->website
-                ?->contentIntegrations()->where('status', \App\Models\ContentIntegration::STATUS_CONNECTED)->exists(),
+                ?->contentIntegrations()->where('status', ContentIntegration::STATUS_CONNECTED)->exists(),
             'presentation' => $topic ? ContentCalendar::statusPresentation($topic->status) : null,
         ]);
     }

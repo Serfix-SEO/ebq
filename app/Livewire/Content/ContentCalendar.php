@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Content;
 
+use App\Jobs\AssessCompetitorGuardJob;
 use App\Jobs\PlanContentTopicsJob;
 use App\Jobs\PrepareContentKeywordInsightsJob;
 use App\Jobs\ProduceContentArticleJob;
@@ -10,12 +11,16 @@ use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\Website;
+use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentEntitlements;
 use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentSetupInsights;
 use App\Services\Content\SiteProfileExtractor;
+use App\Support\ContentAutopilotConfig;
+use App\Support\ContentImageStyles;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -58,16 +63,22 @@ class ContentCalendar extends Component
 
     // Calendar state
     public string $month = '';
+
     public string $view = 'grid';
 
     // ── Wizard state ──
     public int $wizardStep = 1;
+
     public ?string $draftPlanId = null;
+
     public bool $analyzing = false;
 
     public string $brandName = '';
+
     public string $language = 'en';
+
     public string $country = '';
+
     public string $businessDescription = '';
 
     /** @var list<string> */
@@ -75,32 +86,45 @@ class ContentCalendar extends Component
 
     /** @var list<string> */
     public array $dontSellItems = [];
+
     public string $newSell = '';
+
     public string $newDont = '';
+
     public string $newCompetitorDomain = '';
+
+    /** Competitor-mention guard: add-a-blocked-term input. */
+    public string $newBlockedTerm = '';
 
     // Inline add-topic form (calendar)
     public bool $showAddTopic = false;
-    public string $newTitle = '';
-    public string $newKeyword = '';
 
+    public string $newTitle = '';
+
+    public string $newKeyword = '';
 
     /** Article-structure toggles surfaced in the wizard (step 3). */
     public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true, 'featured_image' => true];
 
     /** Image setup (onboarding step + settings). */
     public bool $imagesEnabled = true;
+
     public string $imageStyle = 'photographic';
 
     /** Publishing cadence — editable from the post-onboarding Settings view. */
     public int $articlesPerWeek = self::DEFAULT_PER_WEEK;
+
     public int $articleLength = self::DEFAULT_LENGTH;
+
     public bool $autoPublish = false;
+
     public int $reviewHours = 24;
 
     /** Publish window (auto-publish only fires inside it), in $publishTimezone. */
     public int $publishHourStart = 9;
+
     public int $publishHourEnd = 11;
+
     public string $publishTimezone = 'UTC';
 
     public function mount(string $mode = 'calendar'): void
@@ -167,9 +191,9 @@ class ContentCalendar extends Component
                 'featured_image' => $existing->toggle('featured_image'),
             ];
             $this->imagesEnabled = $existing->images_enabled === null ? true : (bool) $existing->images_enabled;
-            $this->imageStyle = \App\Support\ContentImageStyles::isValid($existing->image_style)
+            $this->imageStyle = ContentImageStyles::isValid($existing->image_style)
                 ? (string) $existing->image_style
-                : \App\Support\ContentImageStyles::default();
+                : ContentImageStyles::default();
             $this->articlesPerWeek = (int) ($existing->articles_per_week ?: self::DEFAULT_PER_WEEK);
             $this->articleLength = (int) ($existing->article_length ?: self::DEFAULT_LENGTH);
             $this->autoPublish = (bool) $existing->auto_publish;
@@ -334,7 +358,7 @@ class ContentCalendar extends Component
                 'auto_publish' => $existing?->auto_publish ?? false,
                 'review_hours' => $existing?->review_hours ?? 24,
                 'images_enabled' => $existing?->images_enabled ?? true,
-                'image_style' => $existing?->image_style ?? \App\Support\ContentImageStyles::default(),
+                'image_style' => $existing?->image_style ?? ContentImageStyles::default(),
                 // Merge the wizard's structure switches over the plan's stored
                 // toggles (or first-run defaults), preserving toggles the
                 // wizard doesn't surface (external_links, cta_enabled, author_box).
@@ -386,7 +410,7 @@ class ContentCalendar extends Component
 
     public function selectImageStyle(string $key): void
     {
-        if (\App\Support\ContentImageStyles::isValid($key)) {
+        if (ContentImageStyles::isValid($key)) {
             $this->imageStyle = $key;
             $this->imagesEnabled = true; // picking a style implies wanting images
             $this->persistImageSettings();
@@ -397,9 +421,9 @@ class ContentCalendar extends Component
     {
         $this->plan()?->update([
             'images_enabled' => $this->imagesEnabled,
-            'image_style' => \App\Support\ContentImageStyles::isValid($this->imageStyle)
+            'image_style' => ContentImageStyles::isValid($this->imageStyle)
                 ? $this->imageStyle
-                : \App\Support\ContentImageStyles::default(),
+                : ContentImageStyles::default(),
         ]);
     }
 
@@ -454,6 +478,12 @@ class ContentCalendar extends Component
         if ($insights->competitorAuthority($website) === null) {
             $insights->ensureGenerating($website);
         }
+        // Mention-guard classification runs alongside — the step's guard card
+        // polls (wire:poll on this step) and fills in when it lands.
+        if (($plan = $this->plan()) !== null
+            && ! app(CompetitorMentionGuard::class)->assessed($plan)) {
+            AssessCompetitorGuardJob::dispatch($plan->id);
+        }
     }
 
     /**
@@ -477,7 +507,12 @@ class ContentCalendar extends Component
      */
     public function resetCompetitors(): void
     {
-        $this->plan()?->update(['competitor_overrides' => null]);
+        $plan = $this->plan();
+        if ($plan === null) {
+            return;
+        }
+        $plan->update(['competitor_overrides' => null]);
+        $this->reassessGuard($plan);
     }
 
     /** Add a manually-typed competitor domain to the step-4 table. */
@@ -512,6 +547,7 @@ class ContentCalendar extends Component
         }
 
         $plan->update(['competitor_overrides' => ['added' => array_values($added), 'removed' => $removed]]);
+        $this->reassessGuard($plan);
     }
 
     /** Remove a competitor (auto-discovered or manually added) from the step-4 table. */
@@ -531,6 +567,70 @@ class ContentCalendar extends Component
         }
 
         $plan->update(['competitor_overrides' => ['added' => $added, 'removed' => array_values($removed)]]);
+        $this->reassessGuard($plan);
+    }
+
+    /** Guard-card view state for the wizard's competitors step and Settings. */
+    private function guardState(ContentPlan $plan): array
+    {
+        $guard = app(CompetitorMentionGuard::class);
+        $g = (array) ($plan->competitor_guard ?? []);
+
+        return [
+            'assessed' => $guard->assessed($plan),
+            'enabled' => $guard->enabled($plan),
+            // "We turned this on for you" banner: shows until the client
+            // clicks the toggle themselves (setEnabled clears the marker).
+            'autoEnabled' => $guard->autoEnabled($plan),
+            'reason' => (string) ($g['reason'] ?? ''),
+            'terms' => $guard->terms($plan),
+        ];
+    }
+
+    /** The competitor list changed — the guard's classification is stale. */
+    private function reassessGuard(ContentPlan $plan): void
+    {
+        app(CompetitorMentionGuard::class)->invalidate($plan);
+        AssessCompetitorGuardJob::dispatch($plan->id);
+    }
+
+    // ── Competitor-mention guard (wizard card + settings) ───────────────
+
+    public function toggleCompetitorGuard(): void
+    {
+        $plan = $this->plan();
+        if ($plan === null) {
+            return;
+        }
+        $guard = app(CompetitorMentionGuard::class);
+        // An explicit click is a human decision — recorded as such, so a later
+        // re-assessment never flips it back.
+        $guard->setEnabled($plan, ! $guard->enabled($plan));
+    }
+
+    public function addBlockedTerm(): void
+    {
+        $this->resetErrorBag('newBlockedTerm');
+        $term = trim($this->newBlockedTerm);
+        $this->newBlockedTerm = '';
+        $plan = $this->plan();
+        if ($plan === null || $term === '') {
+            return;
+        }
+        if (mb_strlen($term) > 60) {
+            $this->addError('newBlockedTerm', __('Keep blocked terms under 60 characters.'));
+
+            return;
+        }
+        app(CompetitorMentionGuard::class)->addTerm($plan, $term);
+    }
+
+    public function removeBlockedTerm(string $term): void
+    {
+        $plan = $this->plan();
+        if ($plan !== null) {
+            app(CompetitorMentionGuard::class)->removeTerm($plan, $term);
+        }
     }
 
     /** Bare lowercase host, or null if not a plausible domain / is the user's own site. */
@@ -561,6 +661,11 @@ class ContentCalendar extends Component
         // Belt-and-braces: a resumed old draft may predate the research job.
         if (($plan = $this->plan()) !== null) {
             PrepareContentKeywordInsightsJob::dispatch($plan->id);
+            // Competitor list is final once the user leaves the step —
+            // (re)classify it for the mention guard if needed.
+            if (! app(CompetitorMentionGuard::class)->assessed($plan)) {
+                AssessCompetitorGuardJob::dispatch($plan->id);
+            }
         }
     }
 
@@ -571,7 +676,7 @@ class ContentCalendar extends Component
         // (throttled) so a competitor request that wasn't ready at step-6 entry
         // still fires once competitors land.
         if (($plan = $this->plan()) !== null
-            && \Illuminate\Support\Facades\Cache::add('content:kw-redispatch:'.$plan->id, 1, 20)) {
+            && Cache::add('content:kw-redispatch:'.$plan->id, 1, 20)) {
             PrepareContentKeywordInsightsJob::dispatch($plan->id);
         }
     }
@@ -652,9 +757,9 @@ class ContentCalendar extends Component
             'timezone' => in_array($this->publishTimezone, timezone_identifiers_list(), true)
                 ? $this->publishTimezone : 'UTC',
             'images_enabled' => $this->imagesEnabled,
-            'image_style' => \App\Support\ContentImageStyles::isValid($this->imageStyle)
+            'image_style' => ContentImageStyles::isValid($this->imageStyle)
                 ? $this->imageStyle
-                : \App\Support\ContentImageStyles::default(),
+                : ContentImageStyles::default(),
             'toggles' => $toggles,
         ]);
 
@@ -728,8 +833,8 @@ class ContentCalendar extends Component
     public static function generationBlockMessage(string $reason): string
     {
         return match ($reason) {
-            'trial_limit' => __('You\'ve used all :n free trial articles. Choose a plan to keep generating.', ['n' => \App\Support\ContentAutopilotConfig::trialArticles()]),
-            'monthly_limit' => __('You\'ve reached your plan\'s limit of :n articles this month for this website. It resets next month, or upgrade for more.', ['n' => \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite()]),
+            'trial_limit' => __('You\'ve used all :n free trial articles. Choose a plan to keep generating.', ['n' => ContentAutopilotConfig::trialArticles()]),
+            'monthly_limit' => __('You\'ve reached your plan\'s limit of :n articles this month for this website. It resets next month, or upgrade for more.', ['n' => ContentAutopilotConfig::monthlyArticlesPerWebsite()]),
             'not_covered' => __('This website is not on your content plan yet. Add it from Get started.'),
             default => __('Content Autopilot is not active for this website. Start it from Get started.'),
         };
@@ -781,7 +886,7 @@ class ContentCalendar extends Component
         ])->save();
         // Record the overall start so the detail page can show elapsed/ETA
         // without a schema change (1h TTL comfortably covers a produce run).
-        \Illuminate\Support\Facades\Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
+        Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
         ProduceContentArticleJob::dispatch($topic->id);
         // Open the article detail page — the teaser + live progress render there.
         $this->redirect(route('content.review', $topic->id), navigate: true);
@@ -844,7 +949,7 @@ class ContentCalendar extends Component
         // on a day manually — so no one-per-day guard here.
         $topic->update(['scheduled_for' => $day]);
         session()->flash('content-status', __('Moved “:title” from :from to :to.', [
-            'title' => \Illuminate\Support\Str::limit((string) $topic->title, 40),
+            'title' => Str::limit((string) $topic->title, 40),
             'from' => $from,
             'to' => $day->translatedFormat('M j, Y'),
         ]));
@@ -909,7 +1014,7 @@ class ContentCalendar extends Component
         return $topic !== null
             && $topic->status === ContentTopic::STATUS_READY
             && $article !== null
-            && \Illuminate\Support\Facades\Cache::has('content:images:pending:'.$article->id);
+            && Cache::has('content:images:pending:'.$article->id);
     }
 
     public static function publishableNow(?ContentTopic $topic): bool
@@ -981,7 +1086,6 @@ class ContentCalendar extends Component
         $this->reset('newTitle', 'newKeyword', 'showAddTopic');
         $this->writeNow($topic->id);
     }
-
 
     // ── Presentation helpers ────────────────────────────────────────────
 
@@ -1189,6 +1293,7 @@ class ContentCalendar extends Component
                 'settingsView' => true,
                 'wizard' => [],
                 'plan' => $plan,
+                'guard' => $this->guardState($plan),
             ] + $this->emptyCalendarBindings());
         }
 
@@ -1218,7 +1323,13 @@ class ContentCalendar extends Component
                     $keywordStatus = $kwSvc->researchStatus($plan5);
                 }
             }
+            // Competitor-mention guard card state (competitors step).
+            $guardState = $this->wizardStep === 5 && ($plan4g = $this->plan()) !== null
+                ? $this->guardState($plan4g)
+                : null;
+
             $wizard = [
+                'guard' => $guardState,
                 'draftTopics' => $this->wizardStep >= 7 ? $this->draftTopics() : collect(),
                 'insights' => $insights,
                 'generating' => $generating,
@@ -1292,7 +1403,7 @@ class ContentCalendar extends Component
      */
     private function capAndTrialBindings($topics, Carbon $monthStart): array
     {
-        $cap = \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $cap = ContentAutopilotConfig::monthlyArticlesPerWebsite();
         $monthKey = $monthStart->format('Y-m');
         $rank = 0;
         $overCapIds = [];
@@ -1316,7 +1427,7 @@ class ContentCalendar extends Component
             'monthOverCap' => $rank > $cap,
             'trialActive' => $trialActive,
             'trialUsed' => $trialActive ? $ent->trialUsage($user) : 0,
-            'trialCap' => \App\Support\ContentAutopilotConfig::trialArticles(),
+            'trialCap' => ContentAutopilotConfig::trialArticles(),
         ];
     }
 

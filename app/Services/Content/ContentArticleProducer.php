@@ -2,6 +2,7 @@
 
 namespace App\Services\Content;
 
+use App\Exceptions\QuotaExceededException;
 use App\Models\ContentArticle;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
@@ -11,6 +12,7 @@ use App\Services\AiWriterService;
 use App\Services\Llm\LlmClientFactory;
 use App\Support\ContentAutopilotConfig;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -49,6 +51,19 @@ class ContentArticleProducer
             $topic->fail('missing plan or website');
 
             return null;
+        }
+
+        // Competitor-mention guard: classify once per plan (lazy — covers
+        // plans created before the guard existed without a backfill). Errors
+        // never block production; the guard fail-softs internally.
+        $guard = app(CompetitorMentionGuard::class);
+        try {
+            if (! $guard->assessed($plan)) {
+                $guard->assess($plan);
+                $plan->refresh();
+            }
+        } catch (\Throwable $e) {
+            Log::warning('content_autopilot.competitor_guard_assess_failed', ['plan_id' => $plan->id, 'error' => $e->getMessage()]);
         }
 
         // ── Research ────────────────────────────────────────────────────
@@ -102,7 +117,7 @@ class ContentArticleProducer
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             try {
                 $draft = $writer->draft($website, 0, $draftInput);
-            } catch (\App\Exceptions\QuotaExceededException $e) {
+            } catch (QuotaExceededException $e) {
                 // The owner's plan ran out of AI tokens — an EXPECTED operational
                 // state, not a crash. Neutral client copy ("Needs attention").
                 $topic->fail('llm_quota_exhausted');
@@ -166,7 +181,7 @@ class ContentArticleProducer
 
             try {
                 $revised = $this->revise($article, $topic, $plan);
-            } catch (\App\Exceptions\QuotaExceededException) {
+            } catch (QuotaExceededException) {
                 $revised = null; // out of tokens mid-loop: ship the best version
             }
             $this->meter->add(ContentLlmSpendMeter::EST_REVISE_USD);
@@ -201,7 +216,7 @@ class ContentArticleProducer
             $topic->enterStage(ContentTopic::STATUS_REVISING);
             try {
                 $cleaned = $this->deAiCleanup($article, $topic, $plan);
-            } catch (\App\Exceptions\QuotaExceededException) {
+            } catch (QuotaExceededException) {
                 $cleaned = null;
             }
             if ($cleaned !== null) {
@@ -525,7 +540,13 @@ class ContentArticleProducer
             (bool) (($context['toggles'] ?? [])['toc'] ?? false),
         );
         $html = (string) $attributes['html'];
-        $styleIssues = $this->humanizer->lint($html);
+        $guard = app(CompetitorMentionGuard::class);
+        $guardPlan = $topic->plan;
+        $styleIssues = $this->humanizer->lint(
+            $html,
+            $guardPlan !== null ? $guard->termsForTopic($guardPlan, $topic) : [],
+            $guardPlan !== null && $guard->enabled($guardPlan) ? $guard->blockedDomains($guardPlan) : [],
+        );
         $context['style_issues'] = $styleIssues;
 
         $result = $this->scorer->score(
@@ -695,6 +716,14 @@ class ContentArticleProducer
         if (trim((string) $plan->custom_instructions) !== '') {
             $rules[] = trim((string) $plan->custom_instructions);
         }
+        // Competitor-mention guard (prevention layer; the lint is the cure).
+        $guardTerms = app(CompetitorMentionGuard::class)->termsForTopic($plan, $topic);
+        if ($guardTerms !== []) {
+            $rules[] = 'STRICT BRAND RULE: never mention, recommend, compare against, or link to any of these '
+                .'competitors: "'.implode('", "', $guardTerms).'". When an example tool or service is needed, '
+                .'refer to '.$topic->website?->normalized_domain.' or describe the category generically '
+                .'("an SEO audit tool", "a rank tracker") instead of naming a brand.';
+        }
 
         return implode("\n", array_merge($rules, $this->onPageSeoRules($topic)))
             ."\n".$this->humanizer->promptRules();
@@ -724,7 +753,7 @@ class ContentArticleProducer
             "ON-PAGE SEO — focus keyphrase is \"{$kw}\". These are STRICT requirements; hit every one:",
             "- Put the EXACT phrase \"{$kw}\" in the FIRST sentence of the opening paragraph.",
             "- Use the EXACT phrase \"{$kw}\" again in the MIDDLE third and again in the CLOSING third — it must appear in the intro, the middle, AND the end (all three).",
-            "- Keyphrase DENSITY: the exact phrase must be 0.5%-2.5% of the total words — roughly once every 120-160 words (about 8-12 times in a 1,800-word article). Weave each mention into a natural sentence; spread them evenly, never cluster. This density is required for the on-page score.",
+            '- Keyphrase DENSITY: the exact phrase must be 0.5%-2.5% of the total words — roughly once every 120-160 words (about 8-12 times in a 1,800-word article). Weave each mention into a natural sentence; spread them evenly, never cluster. This density is required for the on-page score.',
             "- Use the EXACT phrase \"{$kw}\" (or a very close variant) in at least one H2 or H3 subheading.",
             "- SEO/meta title: 50-60 characters MAX (never exceed 60), LEAD with \"{$kw}\", and include one CTR power word (e.g. Ultimate, Complete, Essential, Proven, Best, Easy, Guide).",
             '- Meta description: 130-155 characters (never exceed 155) and it must contain the exact focus keyphrase.',

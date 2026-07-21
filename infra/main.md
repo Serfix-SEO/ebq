@@ -281,6 +281,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-21 (competitor-mention guard)** — A serfix.io article recommended
+  Semrush. New `CompetitorMentionGuard`: LLM classifies each wizard competitor as
+  product-competitor (blocked brand) vs valid reference (google.com stays
+  linkable), auto-enables blocking with a prominent wizard banner when harmful,
+  client-editable chips in wizard + Settings; enforced via prompt rule + a
+  `competitor_mentions` lint issue through the existing revise hard gate, with a
+  topic-keyword exemption so "X alternatives" posts still work. See
+  [content-autopilot/README.md](./content-autopilot/README.md).
 - **2026-07-21 (product independence: the SEO plan limit was gating Content
   Autopilot)** — Serfix SEO and Content Autopilot bill separately, but the
   dashboard website limit / freeze leaked into content in four places: the

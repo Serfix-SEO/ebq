@@ -1,0 +1,340 @@
+<?php
+
+namespace Tests\Feature\Content;
+
+use App\Livewire\Content\ContentCalendar;
+use App\Models\ContentPlan;
+use App\Models\ContentTopic;
+use App\Models\User;
+use App\Models\Website;
+use App\Services\Content\CompetitorMentionGuard;
+use App\Services\Content\ContentArticleProducer;
+use App\Services\Content\HumanizerService;
+use App\Services\Llm\LlmClient;
+use Database\Seeders\PlanSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+/**
+ * Regression (prod 2026-07-21): a serfix.io article recommended Semrush — a
+ * direct product competitor — because the writer has no idea a brand is a
+ * competitor unless told. The guard classifies the plan's competitors against
+ * what the client sells, auto-enables blocking when it matters, and enforces
+ * it deterministically through the same lint → revise hard gate as the style
+ * contract.
+ */
+class CompetitorMentionGuardTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(PlanSeeder::class);
+    }
+
+    // ── fixtures ────────────────────────────────────────────────────────
+
+    /** @return array{0: User, 1: Website, 2: ContentPlan} */
+    private function planWithGuard(array $guard = [], array $toggles = []): array
+    {
+        $user = User::factory()->create([
+            'content_trial_started_at' => now(),
+            'content_trial_ends_at' => now()->addDays(5),
+        ]);
+        $website = Website::factory()->for($user)->create();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'billing_covered_at' => now(),
+            'business_description' => 'An SEO platform selling audits, rank tracking and content tools.',
+            'offerings' => ['sell' => ['SEO audits', 'Rank tracking'], 'dont_sell' => []],
+            'competitor_guard' => $guard ?: null,
+            'toggles' => $toggles,
+        ]);
+
+        return [$user, $website, $plan];
+    }
+
+    /** A classifier that returns a fixed verdict, tracking whether it was called. */
+    private function fakeLlm(?array $verdict): LlmClient
+    {
+        return new class($verdict) implements LlmClient
+        {
+            public function __construct(private readonly ?array $verdict) {}
+
+            public function isAvailable(): bool
+            {
+                return $this->verdict !== null;
+            }
+
+            public function complete(array $messages, array $options = []): array
+            {
+                return ['ok' => true, 'content' => '', 'model' => 'fake',
+                    'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0]];
+            }
+
+            public function completeJson(array $messages, array $options = []): ?array
+            {
+                return $this->verdict;
+            }
+
+            public function completeWithTools(array $messages, array $tools, callable $dispatcher, array $options = []): array
+            {
+                return ['ok' => true, 'decoded' => null, 'content' => '', 'model' => 'fake',
+                    'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0], 'tool_calls' => []];
+            }
+        };
+    }
+
+    private const ASSESSED_GUARD = [
+        'assessed_at' => '2026-07-21T12:00:00+00:00',
+        'harmful' => true,
+        'reason' => 'Competitors sell the same tooling.',
+        'auto' => [
+            ['brand' => 'semrush', 'domain' => 'semrush.com', 'reason' => 'direct competitor'],
+            ['brand' => 'ahrefs', 'domain' => 'ahrefs.com', 'reason' => 'direct competitor'],
+        ],
+        'references' => ['google.com'],
+        'manual' => ['moz'],
+        'removed' => ['ahrefs'],
+    ];
+
+    // ── the blocked list ────────────────────────────────────────────────
+
+    public function test_terms_merge_auto_and_manual_minus_removed(): void
+    {
+        [, , $plan] = $this->planWithGuard(self::ASSESSED_GUARD);
+
+        $this->assertSame(
+            ['semrush', 'moz'],
+            app(CompetitorMentionGuard::class)->terms($plan)
+        );
+    }
+
+    /** A topic literally ABOUT a competitor may name it — "semrush alternatives" is a real article. */
+    public function test_a_topic_targeting_the_competitor_is_exempt(): void
+    {
+        [, $website, $plan] = $this->planWithGuard(
+            self::ASSESSED_GUARD,
+            [CompetitorMentionGuard::TOGGLE => true],
+        );
+        $topic = ContentTopic::create([
+            'plan_id' => $plan->id, 'website_id' => $website->id,
+            'title' => 'Best Semrush Alternatives', 'target_keyword' => 'semrush alternatives',
+            'status' => 'approved', 'scheduled_for' => now()->toDateString(),
+        ]);
+
+        $this->assertSame(['moz'], app(CompetitorMentionGuard::class)->termsForTopic($plan, $topic));
+    }
+
+    public function test_disabled_guard_blocks_nothing(): void
+    {
+        [, $website, $plan] = $this->planWithGuard(
+            self::ASSESSED_GUARD,
+            [CompetitorMentionGuard::TOGGLE => false],
+        );
+        $topic = ContentTopic::create([
+            'plan_id' => $plan->id, 'website_id' => $website->id,
+            'title' => 'A topic', 'target_keyword' => 'seo basics',
+            'status' => 'approved', 'scheduled_for' => now()->toDateString(),
+        ]);
+
+        $this->assertSame([], app(CompetitorMentionGuard::class)->termsForTopic($plan, $topic));
+    }
+
+    // ── lint enforcement ────────────────────────────────────────────────
+
+    public function test_lint_flags_a_competitor_mention_and_a_link(): void
+    {
+        $issues = app(HumanizerService::class)->lint(
+            '<p>You should use Semrush for a full audit.</p>'
+            .'<p>See <a href="https://www.semrush.com/features">this page</a>.</p>',
+            ['semrush'],
+            ['semrush.com'],
+        );
+
+        $codes = array_column($issues, 'code');
+        $this->assertContains('competitor_mentions', $codes);
+        $issue = collect($issues)->firstWhere('code', 'competitor_mentions');
+        $this->assertSame(2, $issue['count'], 'one text mention + one link');
+        $this->assertStringContainsString('semrush', $issue['message']);
+    }
+
+    /** google.com is a reference for this client — its links must survive. */
+    public function test_lint_ignores_reference_links_and_unlisted_brands(): void
+    {
+        $issues = app(HumanizerService::class)->lint(
+            '<p>According to <a href="https://google.com/article">Google</a>, titles matter. Moz says so too.</p>',
+            ['semrush'],
+            ['semrush.com'],
+        );
+
+        $this->assertNotContains('competitor_mentions', array_column($issues, 'code'));
+    }
+
+    /** Word-boundary: "semrushing" (hypothetical) is not "semrush" — no false positives inside words. */
+    public function test_lint_matches_whole_words_only(): void
+    {
+        $issues = app(HumanizerService::class)->lint('<p>The word unsemrushable is nonsense.</p>', ['semrush'], []);
+
+        $this->assertNotContains('competitor_mentions', array_column($issues, 'code'));
+    }
+
+    // ── assessment ──────────────────────────────────────────────────────
+
+    public function test_assess_classifies_blocks_vs_references_and_auto_enables(): void
+    {
+        [, , $plan] = $this->planWithGuard();
+        $plan->update(['competitor_overrides' => ['added' => ['semrush.com', 'google.com']]]);
+
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $this->fakeLlm([
+            'harmful' => true,
+            'reason' => 'Semrush sells exactly what you sell.',
+            'domains' => [
+                ['domain' => 'semrush.com', 'verdict' => 'block', 'brand' => 'Semrush', 'why' => 'direct competitor'],
+                ['domain' => 'google.com', 'verdict' => 'reference', 'brand' => 'Google', 'why' => 'authority, not a rival'],
+            ],
+        ]));
+
+        $plan->refresh();
+        $guard = app(CompetitorMentionGuard::class);
+        $this->assertTrue($guard->enabled($plan), 'harmful verdict auto-enables');
+        $this->assertTrue($guard->autoEnabled($plan), 'the "we turned this on" banner marker is set');
+        $this->assertSame(['semrush'], $guard->terms($plan));
+        $this->assertSame(['semrush.com'], $guard->blockedDomains($plan));
+        $this->assertSame(['google.com'], $plan->competitor_guard['references']);
+    }
+
+    /** A human's explicit OFF must survive any later re-assessment. */
+    public function test_assess_never_overrides_an_explicit_human_decision(): void
+    {
+        [, , $plan] = $this->planWithGuard([], [CompetitorMentionGuard::TOGGLE => false]);
+        $plan->update(['competitor_overrides' => ['added' => ['semrush.com']]]);
+
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $this->fakeLlm([
+            'harmful' => true, 'reason' => 'x',
+            'domains' => [['domain' => 'semrush.com', 'verdict' => 'block', 'brand' => 'Semrush', 'why' => 'y']],
+        ]));
+
+        $this->assertFalse(app(CompetitorMentionGuard::class)->enabled($plan->fresh()));
+    }
+
+    /** No LLM → over-block by default: every competitor domain, brand derived from the domain. */
+    public function test_assess_fails_soft_to_blocking_when_no_llm_is_available(): void
+    {
+        [, , $plan] = $this->planWithGuard();
+        $plan->update(['competitor_overrides' => ['added' => ['semrush.com', 'www.ahrefs.co.uk']]]);
+
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $this->fakeLlm(null));
+
+        $plan->refresh();
+        $guard = app(CompetitorMentionGuard::class);
+        $this->assertTrue($guard->assessed($plan));
+        $this->assertTrue($guard->enabled($plan));
+        $this->assertSame(['semrush', 'ahrefs'], $guard->terms($plan));
+    }
+
+    /** The model must not be able to invent domains we never gave it. */
+    public function test_assess_drops_hallucinated_domains(): void
+    {
+        [, , $plan] = $this->planWithGuard();
+        $plan->update(['competitor_overrides' => ['added' => ['semrush.com']]]);
+
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $this->fakeLlm([
+            'harmful' => true, 'reason' => 'x',
+            'domains' => [
+                ['domain' => 'semrush.com', 'verdict' => 'block', 'brand' => 'Semrush', 'why' => 'y'],
+                ['domain' => 'made-up-rival.com', 'verdict' => 'block', 'brand' => 'MadeUp', 'why' => 'hallucinated'],
+            ],
+        ]));
+
+        $this->assertSame(['semrush'], app(CompetitorMentionGuard::class)->terms($plan->fresh()));
+    }
+
+    // ── producer wiring ─────────────────────────────────────────────────
+
+    public function test_the_writer_prompt_carries_the_brand_rule(): void
+    {
+        [, $website, $plan] = $this->planWithGuard(
+            self::ASSESSED_GUARD,
+            [CompetitorMentionGuard::TOGGLE => true],
+        );
+        $topic = ContentTopic::create([
+            'plan_id' => $plan->id, 'website_id' => $website->id,
+            'title' => 'How To Audit Your Site', 'target_keyword' => 'site audit guide',
+            'status' => 'approved', 'scheduled_for' => now()->toDateString(),
+        ]);
+
+        $producer = app(ContentArticleProducer::class);
+        $method = (new \ReflectionClass($producer))->getMethod('templateInstructions');
+        $method->setAccessible(true);
+        $rules = $method->invoke($producer, $plan, $topic);
+
+        $this->assertStringContainsString('STRICT BRAND RULE', $rules);
+        $this->assertStringContainsString('semrush', $rules);
+        $this->assertStringContainsString('moz', $rules);
+    }
+
+    // ── UI ──────────────────────────────────────────────────────────────
+
+    public function test_the_settings_card_shows_terms_and_the_auto_enabled_banner(): void
+    {
+        [$user, $website] = $this->planWithGuard(
+            self::ASSESSED_GUARD + ['auto_enabled_at' => '2026-07-21T12:00:00+00:00'],
+            [CompetitorMentionGuard::TOGGLE => true],
+        );
+        ContentPlan::query()->where('website_id', $website->id)->update(['status' => ContentPlan::STATUS_ACTIVE]);
+
+        $this->actingAs($user);
+        session(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->assertSee(__('Competitor mention protection'))
+            ->assertSee('semrush')
+            ->assertSee('moz')
+            ->assertSee(__('You can switch this off or edit the list at any time — also later, in Content Settings.'));
+    }
+
+    public function test_toggling_off_is_recorded_as_a_human_decision(): void
+    {
+        [$user, $website, $plan] = $this->planWithGuard(
+            self::ASSESSED_GUARD + ['auto_enabled_at' => '2026-07-21T12:00:00+00:00'],
+            [CompetitorMentionGuard::TOGGLE => true],
+        );
+        $plan->update(['status' => ContentPlan::STATUS_ACTIVE]);
+
+        $this->actingAs($user);
+        session(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->call('toggleCompetitorGuard');
+
+        $plan->refresh();
+        $guard = app(CompetitorMentionGuard::class);
+        $this->assertFalse($guard->enabled($plan));
+        $this->assertFalse($guard->autoEnabled($plan), 'human click clears the auto marker');
+        $this->assertTrue($guard->decided($plan), 'later re-assessment must not flip it back');
+    }
+
+    public function test_terms_can_be_added_and_removed_from_the_card(): void
+    {
+        [$user, $website, $plan] = $this->planWithGuard(
+            self::ASSESSED_GUARD,
+            [CompetitorMentionGuard::TOGGLE => true],
+        );
+        $plan->update(['status' => ContentPlan::STATUS_ACTIVE]);
+
+        $this->actingAs($user);
+        session(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('newBlockedTerm', 'SE Ranking')
+            ->call('addBlockedTerm')
+            ->call('removeBlockedTerm', 'semrush');
+
+        $terms = app(CompetitorMentionGuard::class)->terms($plan->refresh());
+        $this->assertContains('se ranking', $terms);
+        $this->assertNotContains('semrush', $terms);
+    }
+}

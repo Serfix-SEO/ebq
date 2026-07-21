@@ -529,6 +529,9 @@
                         @error('newCompetitorDomain') <p class="mt-1.5 text-xs text-error">{{ $message }}</p> @enderror
                     </div>
 
+                    {{-- ── Competitor mention protection (guard card) ── --}}
+                    @include('livewire.content.partials.competitor-guard', ['guard' => $wizard['guard'] ?? null])
+
                     <div class="mt-7 flex items-center justify-between">
                         <button wire:click="goToStep(4)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>

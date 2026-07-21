@@ -35,6 +35,7 @@ class ContentPlan extends Model
             'toggles' => 'array',
             'offerings' => 'array',
             'competitor_overrides' => 'array',
+            'competitor_guard' => 'array',
             'internal_urls' => 'array',
             'auto_publish' => 'boolean',
             'images_enabled' => 'boolean',

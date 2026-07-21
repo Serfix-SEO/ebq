@@ -415,6 +415,41 @@ second net); the exclusion sentence is omitted entirely when the list is empty,
 since a constraint naming nothing is exactly the hollow-guardrail failure above.
 Tests: `ContentTopicPlannerGuardrailsTest`.
 
+### Competitor-mention guard (2026-07-21)
+
+A serfix.io article recommended **Semrush** — the writer has no idea a brand is
+a competitor unless told. `CompetitorMentionGuard`
+(`app/Services/Content/CompetitorMentionGuard.php`) fixes the class of bug:
+
+- **Classification** (`assess()`, one flash `completeJson`, spend-metered,
+  triggered by `AssessCompetitorGuardJob` on the wizard's competitors step /
+  competitor edits, and lazily in `ContentArticleProducer::produce()`): given
+  the business profile + the plan's merged competitor list, split domains into
+  **block** (product competitor — brand name recorded) vs **reference**
+  (google.com for an SEO tool — valid citation, links stay allowed). Fail-soft
+  with no LLM: block every competitor domain under its domain-derived brand —
+  over-blocking is the safe default and the list is editable.
+- **Auto-enable**: a harmful verdict turns `toggles['block_competitor_mentions']`
+  on ONLY while the client never decided; `auto_enabled_at` drives the wizard's
+  prominent "we turned this on for you" banner, cleared by any human toggle
+  (`setEnabled`), which is a decision re-assessment never overrides.
+- **Enforcement**, same two layers as the style contract: a STRICT BRAND RULE in
+  the writer/revise prompt (`templateInstructions`), and
+  `HumanizerService::lint($html, $blockedTerms, $blockedDomains)` → issue
+  `competitor_mentions` (text mentions word-boundary + `<a href>` to blocked
+  domains) → `style_issues` → the revise loop's `hasStyleIssue` hard gate. An
+  article cannot ship READY while a mention remains.
+- **Topic exemption**: `termsForTopic()` drops any term contained in the topic's
+  own target/secondary keywords — "semrush alternatives" is a legitimate,
+  high-value article, not a leak.
+- **UI**: `partials/competitor-guard.blade.php` card on the wizard competitors
+  step AND the Settings layout — toggle, removable brand chips, add-input,
+  auto-enabled banner. State in `content_plans.competitor_guard` (json,
+  migration `2026_07_21_150000`); `ArticleReview` passes the same per-topic
+  terms so the editor's live checks agree with the pipeline.
+
+Tests: `CompetitorMentionGuardTest` (14).
+
 ### The Laravel receiver is a published package
 
 `serfix/content-ai-laravel` lives in its own repo

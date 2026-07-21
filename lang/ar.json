@@ -3592,5 +3592,15 @@
     "Signing secret": "مفتاح التوقيع",
     "Copy this into your site as CONTENT_AI_WEBHOOK_SECRET. It is the only thing proving an article really came from us — keep it secret, and never reuse it across sites.": "انسخ هذا إلى موقعك باسم CONTENT_AI_WEBHOOK_SECRET. هو الشيء الوحيد الذي يثبت أن المقال صادر منّا — احتفظ به سرّاً ولا تستخدمه لأكثر من موقع.",
     "The endpoint URL must use https:// — articles are sent over the public internet.": "يجب أن يبدأ رابط الاستقبال بـ https:// — تُرسل المقالات عبر الإنترنت العام.",
-    "The signing secret must be at least 32 characters. Use the generated one.": "يجب ألا يقل مفتاح التوقيع عن ٣٢ حرفاً. استخدم المفتاح المُولَّد."
+    "The signing secret must be at least 32 characters. Use the generated one.": "يجب ألا يقل مفتاح التوقيع عن ٣٢ حرفاً. استخدم المفتاح المُولَّد.",
+    "Competitor mention protection": "حماية من ذكر المنافسين",
+    "Your articles will never name, recommend, or link to the brands below.": "لن تذكر مقالاتك أبداً العلامات أدناه أو توصي بها أو تضع روابط لها.",
+    "Checking which of your competitors could pull readers away…": "نتحقق أي من منافسيك قد يسحب القرّاء بعيداً…",
+    "We turned this on for you: :n of your competitors sells what you sell.|We turned this on for you: :n of your competitors sell what you sell.": "فعّلناها لأجلك: :n من منافسيك يبيع ما تبيعه.|فعّلناها لأجلك: :n من منافسيك يبيعون ما تبيعه.",
+    "You can switch this off or edit the list at any time — also later, in Content Settings.": "يمكنك إيقافها أو تعديل القائمة في أي وقت — وأيضاً لاحقاً من إعدادات المحتوى.",
+    "Allow mentioning :term": "السماح بذكر :term",
+    "No blocked brands yet — add any name your articles must never mention.": "لا علامات محظورة بعد — أضف أي اسم يجب ألا تذكره مقالاتك أبداً.",
+    "brand or product name": "اسم علامة أو منتج",
+    "Protection is off — articles may mention any brand, including competitors.": "الحماية متوقفة — قد تذكر المقالات أي علامة، بما فيها المنافسون.",
+    "Keep blocked terms under 60 characters.": "أبقِ المصطلحات المحظورة أقل من ٦٠ حرفاً."
 }

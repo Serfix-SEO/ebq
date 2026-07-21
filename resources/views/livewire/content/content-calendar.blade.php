@@ -92,6 +92,9 @@
                 </div>
             </div>
 
+            {{-- Competitor mention protection --}}
+            @include('livewire.content.partials.competitor-guard', ['guard' => $guard ?? null])
+
             {{-- Offerings --}}
             <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('What you sell') }}</h2>

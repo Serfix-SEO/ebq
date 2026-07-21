@@ -107,13 +107,49 @@ class HumanizerService
      * {code, message, count?} — messages are written as revision
      * instructions the LLM can act on.
      *
+     * $blockedTerms/$blockedDomains: the plan's competitor-mention guard
+     * (CompetitorMentionGuard::termsForTopic / blockedDomains). A mention or a
+     * link to a blocked competitor becomes a style issue, which the producer's
+     * revise loop hard-gates on exactly like the dash ban — the article cannot
+     * ship READY while one remains.
+     *
+     * @param  list<string>  $blockedTerms
+     * @param  list<string>  $blockedDomains
      * @return list<array{code:string, message:string, count?:int}>
      */
-    public function lint(string $html): array
+    public function lint(string $html, array $blockedTerms = [], array $blockedDomains = []): array
     {
         $issues = [];
         $text = $this->toText($html);
         $lower = mb_strtolower($text);
+
+        // 0. Competitor mentions (per-plan, optional). Word-boundary and
+        //    case-insensitive like the banned phrases below; links are checked
+        //    against the HTML because hrefs do not survive toText().
+        if ($blockedTerms !== [] || $blockedDomains !== []) {
+            $hits = [];
+            foreach ($blockedTerms as $term) {
+                $n = preg_match_all('/\b'.preg_quote(mb_strtolower($term), '/').'\b/u', $lower);
+                if ($n > 0) {
+                    $hits[$term] = $n;
+                }
+            }
+            $linkHits = 0;
+            foreach ($blockedDomains as $domain) {
+                $linkHits += preg_match_all(
+                    '/href\s*=\s*["\'][^"\']*'.preg_quote(mb_strtolower($domain), '/').'/iu',
+                    $html
+                );
+            }
+            if ($hits !== [] || $linkHits > 0) {
+                $list = implode('", "', array_keys($hits));
+                $issues[] = ['code' => 'competitor_mentions',
+                    'count' => array_sum($hits) + $linkHits,
+                    'message' => 'Remove every mention of and link to these competitor brands: "'.$list.'"'
+                        .($linkHits > 0 ? ' (including '.$linkHits.' link(s) to their sites)' : '')
+                        .'. Describe the tool or service generically instead, or refer to this site\'s own offering. Never name or recommend them.'];
+            }
+        }
 
         // 1. Dashes that survived clean() (defense in depth).
         $dashes = mb_substr_count($html, "\u{2014}") + mb_substr_count($html, "\u{2013}") + substr_count($html, ' -- ');
