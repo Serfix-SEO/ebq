@@ -281,6 +281,20 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-21 (product independence: the SEO plan limit was gating Content
+  Autopilot)** — Serfix SEO and Content Autopilot bill separately, but the
+  dashboard website limit / freeze leaked into content in four places: the
+  feature flag (wizard refused a covered site), the crawl jobs (no profile /
+  internal links / keyword seeds), the GSC sync (the topic planner's primary
+  signal), and `canAddWebsite()` (a paid addon site could not be added). All
+  invisible — no error, just a paid product quietly not working. Rule now: any
+  dashboard-limit branch must ask `Website::contentAutopilotEntitled()` first.
+  `isPro()`/`effectiveTier()`/GA sync/backfill stay frozen deliberately. See
+  [content-autopilot/README.md](./content-autopilot/README.md).
+  Same day, two more prod fixes: the wizard bounced in a redirect loop when the
+  alphabetically-first site was uncovered (`EnsureFeatureAccess` pins
+  `orderBy('domain')->first()`, `EnsureContentAccess` then gated it), and a
+  frozen site lost its content flag.
 - **2026-07-21 (business-profile auto-detect dead on every billed site)** — Since
   billing, `coverWebsite()` creates a covered DRAFT **stub** plan before the user
   enters anything, so `ContentCalendar::analyzeSite()`'s `plan() !== null` guard

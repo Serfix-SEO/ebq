@@ -415,6 +415,36 @@ second net); the exclusion sentence is omitted entirely when the list is empty,
 since a constraint naming nothing is exactly the hollow-guardrail failure above.
 Tests: `ContentTopicPlannerGuardrailsTest`.
 
+### ⛔ Product independence: the dashboard plan limit must never gate content
+
+Serfix SEO and Content Autopilot are **separate products with separate billing**.
+The dashboard side has a website limit (`User::websiteLimit()`); sites past it are
+**frozen** (`User::frozenWebsiteIds()` → `Website::isFrozen()`). Content Autopilot
+has its own subscription/trial and its own explicit per-site coverage
+(`content_plans.billing_covered_at`).
+
+Freeze kept leaking across that line. Every case was invisible — no error, just a
+paid product quietly not working (all found 2026-07-21, one prod account):
+
+| Leak | Symptom |
+|---|---|
+| `effectiveFeatureFlags()` froze **all** flags first | wizard step 2: "Content Autopilot is not included in your plan" for a covered site |
+| `CrawlWebsitePagesJob` / `CrawlSitemapDeltaJob` skipped frozen sites | no crawl → no business profile, no internal linking, no keyword seeds → steadily worse articles |
+| `SyncSearchConsoleData` skipped frozen sites | no GSC gap → `ContentTopicPlanner` loses its PRIMARY ideation signal |
+| `canAddWebsite()` counted only the dashboard allowance | a customer who paid the per-extra-site addon could not add that site |
+
+**The rule:** before a dashboard-limit branch disables anything, ask
+`Website::contentAutopilotEntitled()` (public for exactly this). If the site is a
+content site, the dashboard limit has no say.
+
+Deliberately still frozen, because they ARE dashboard concepts: `isPro()`,
+`effectiveTier()`, the WP plugin's upgrade CTA, the GA sync (content never reads
+GA), and the 365-day historical backfill. A frozen content site therefore keeps
+Content Autopilot and nothing else — `array_filter($flags)` on such a site returns
+exactly `['content_autopilot']`.
+
+Tests: `ContentFrozenWebsiteTest`, `ContentProductIndependenceTest`.
+
 ### 🔥 Image-storage + worker-box incident (prod, 2026-07-20)
 
 Prod articles had **zero images** for two days. Three independent faults,
