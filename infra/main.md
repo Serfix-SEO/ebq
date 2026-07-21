@@ -281,6 +281,22 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-21 (public onboarding lost the wizard profile + a 3rd phpunit
+  prod-leak)** — A registrant who ALREADY owned the onboarded domain ended up on
+  a bare stub plan: `ContentOnboardingConverter::convert` folds into the existing
+  site and deletes the provisional one, `content_plans.website_id` is ON DELETE
+  CASCADE, and an empty `$profile` (documented SSO round-trip case) then copied
+  nothing. The calendar still filled because `ContentTopicPlanner` treats
+  `business_description` as optional. Fixed with `carryOverProfile()` + 3
+  regression tests — see
+  [content-autopilot/product-billing.md](./content-autopilot/product-billing.md).
+  Found while testing: **phpunit pinned the content API keys but not
+  `CONTENT_IMAGES_DISK`**, so `GenerateContentImagesJob` wrote test images into
+  the REAL Hetzner bucket (same leak class as the 2026-07-11 KE and 2026-07-14
+  DataForSEO incidents — phpunit only isolates what it overrides). `phpunit.xml`
+  now pins the disk to `public` and blanks every `CONTENT_S3_*` var; this also
+  fixed the 2 long-"known-failing" `ContentImagesTest` cases, which had been
+  asserting against `Storage::fake('public')` while the bytes went to prod.
 - **2026-07-20 (content images: 3 stacked silent failures, prod)** — Ideogram
   key 401 + worker box B's ~1 Mbit inbound cap (6 MB downloads timing out) +
   `content_s3` writing into the void because `CONTENT_S3_ENDPOINT`/`_URL` were

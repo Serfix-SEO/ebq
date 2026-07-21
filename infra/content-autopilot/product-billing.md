@@ -99,6 +99,25 @@ form:
    login → `content.settings`. (Password collected here — the app has NO
    password-reset flow, so no passwordless email.)
 
+   ⚠️ **The fold branch deletes a plan.** When the registrant already owns the
+   domain, convert() keeps their site and deletes the provisional one — and
+   `content_plans.website_id` is **ON DELETE CASCADE**, so the plan the wizard
+   spent the whole funnel writing to is destroyed with it. `convert()` is also
+   documented to accept an EMPTY `$profile` (a Google-SSO round-trip loses the
+   Livewire state), and its "the plan already carries the profile" reasoning only
+   holds in the *re-parent* branch. Both together = the user lands on a bare stub:
+   no business description, no offerings, default cadence (prod 2026-07-20 —
+   the calendar still filled up, because `ContentTopicPlanner` ideates from GSC
+   gap data and treats `business_description` as optional, casting null to `''`
+   at `ContentTopicPlanner.php:219` with a fail-open relevance filter).
+   Fixed by `carryOverProfile()`: snapshot the provisional plan's wizard-authored
+   columns *before* the delete, apply them under `$profile` (explicit input still
+   wins). A brand-new plan takes all of it — the stub's 7/2000 are defaults, not
+   choices; an existing plan only gets its blanks filled, so a site the user
+   configured earlier is never clobbered by a later funnel run. Regression tests:
+   `ContentPublicOnboardingTest::test_folding_into_an_owned_domain_keeps_the_
+   wizard_profile_when_convert_gets_none` (+ the precedence and no-clobber cases).
+
 **Shared-blade architecture** (so dashboard + public stay pixel-identical without
 duplicating markup): the wizard markup lives in
 `resources/views/livewire/content/partials/wizard.blade.php` (+ `wizard-account.

@@ -9,8 +9,11 @@ use App\Models\ContentPlan;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\ContentEntitlements;
+use App\Services\Content\ContentOnboardingConverter;
 use App\Support\Audit\SafeHttpGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -116,7 +119,7 @@ class ContentPublicOnboardingTest extends TestCase
     public function test_duplicate_email_is_rejected(): void
     {
         Queue::fake();
-        User::factory()->create(['email' => 'taken@x.com', 'password' => \Illuminate\Support\Facades\Hash::make('Real-Pass-999')]);
+        User::factory()->create(['email' => 'taken@x.com', 'password' => Hash::make('Real-Pass-999')]);
 
         // Existing account + WRONG password → login fails (error on password).
         $this->beginAndResume('x-site.com')
@@ -138,7 +141,7 @@ class ContentPublicOnboardingTest extends TestCase
         Queue::fake();
         $user = User::factory()->create([
             'email' => 'owner@acct.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('Real-Pass-999'),
+            'password' => Hash::make('Real-Pass-999'),
         ]);
 
         $this->beginAndResume('brandnew.com')
@@ -151,7 +154,7 @@ class ContentPublicOnboardingTest extends TestCase
             ->call('createAccount');
 
         $user->refresh();
-        $this->assertTrue(\Illuminate\Support\Facades\Auth::check());
+        $this->assertTrue(Auth::check());
         $website = $user->websites()->where('domain', 'brandnew.com')->first();
         $this->assertNotNull($website, 'onboarded website attached to the existing account');
         // Never trialed before → trial starts + site is covered.
@@ -164,7 +167,7 @@ class ContentPublicOnboardingTest extends TestCase
         Queue::fake();
         $user = User::factory()->create([
             'email' => 'ontrial@acct.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('Real-Pass-999'),
+            'password' => Hash::make('Real-Pass-999'),
         ]);
         // Already on trial with one covered site (trial allows exactly one).
         $firstSite = Website::factory()->for($user)->create();
@@ -188,6 +191,107 @@ class ContentPublicOnboardingTest extends TestCase
         $this->assertNotNull($newSite, 'second site attached to the account');
         // Trial = 1 site, so the second is attached but NOT covered (needs payment).
         $this->assertFalse(app(ContentEntitlements::class)->hasContentAccessFor($user, $newSite));
+    }
+
+    /**
+     * Regression (prod 2026-07-20): a registrant who ALREADY owned the onboarded
+     * domain lost the whole wizard setup. convert() folds into the existing site
+     * and deletes the provisional one — and content_plans.website_id is ON DELETE
+     * CASCADE, so the plan the wizard had been writing to went with it. When
+     * convert() is then handed an EMPTY $profile (the documented Google-SSO
+     * round-trip case), nothing was copied and the user landed on a bare stub:
+     * no business description, no offerings, default cadence.
+     */
+    public function test_folding_into_an_owned_domain_keeps_the_wizard_profile_when_convert_gets_none(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $owned = Website::factory()->for($user)->create(['domain' => 'owned.com']);
+
+        $converter = app(ContentOnboardingConverter::class);
+        [$session, $provisional] = $converter->begin('owned.com', '127.0.0.1');
+        $this->assertNotSame($owned->id, $provisional->id);
+
+        // What the wizard persisted on the provisional plan before signup.
+        ContentPlan::factory()->create([
+            'website_id' => $provisional->id,
+            'business_description' => 'We restore vintage mechanical watches and sell serviced classics.',
+            'offerings' => ['sell' => ['Watch servicing'], 'dont_sell' => ['Smartwatch repair']],
+            'articles_per_week' => 3,
+            'article_length' => 1500,
+            'language' => 'English',
+            'country' => 'us',
+        ]);
+
+        // Empty profile — the Livewire state did not survive the round-trip.
+        $converter->convert($session->fresh(), $user, []);
+
+        $plan = ContentPlan::query()->where('website_id', $owned->id)->first();
+        $this->assertNotNull($plan, 'the owned site ends up with a plan');
+        $this->assertSame(
+            'We restore vintage mechanical watches and sell serviced classics.',
+            $plan->business_description,
+            'business description carried off the deleted provisional plan'
+        );
+        $this->assertSame(['Watch servicing'], $plan->offerings['sell']);
+        $this->assertSame(['Smartwatch repair'], $plan->offerings['dont_sell']);
+        // Cadence chosen in the wizard must beat the stub's 7/2000 defaults.
+        $this->assertSame(3, $plan->articles_per_week);
+        $this->assertSame(1500, $plan->article_length);
+        $this->assertSame('us', $plan->country);
+    }
+
+    /** An explicitly supplied profile still wins over the carried-over one. */
+    public function test_supplied_profile_beats_the_carried_over_provisional_plan(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $owned = Website::factory()->for($user)->create(['domain' => 'owned2.com']);
+
+        $converter = app(ContentOnboardingConverter::class);
+        [$session, $provisional] = $converter->begin('owned2.com', '127.0.0.1');
+        ContentPlan::factory()->create([
+            'website_id' => $provisional->id,
+            'business_description' => 'Stale description from an earlier step.',
+            'offerings' => ['sell' => ['Old'], 'dont_sell' => []],
+        ]);
+
+        $converter->convert($session->fresh(), $user, [
+            'business_description' => 'The description the user actually submitted at signup.',
+            'sell' => ['New'],
+            'dont_sell' => ['Nope'],
+        ]);
+
+        $plan = ContentPlan::query()->where('website_id', $owned->id)->first();
+        $this->assertSame('The description the user actually submitted at signup.', $plan->business_description);
+        $this->assertSame(['New'], $plan->offerings['sell']);
+    }
+
+    /** A site the user configured earlier must not be clobbered by a later funnel run. */
+    public function test_carry_over_does_not_overwrite_an_already_configured_plan(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $owned = Website::factory()->for($user)->create(['domain' => 'owned3.com']);
+        ContentPlan::factory()->create([
+            'website_id' => $owned->id,
+            'business_description' => 'The description this site was already set up with.',
+            'articles_per_week' => 2,
+        ]);
+
+        $converter = app(ContentOnboardingConverter::class);
+        [$session, $provisional] = $converter->begin('owned3.com', '127.0.0.1');
+        ContentPlan::factory()->create([
+            'website_id' => $provisional->id,
+            'business_description' => 'Something the funnel guessed on a second pass.',
+            'articles_per_week' => 7,
+        ]);
+
+        $converter->convert($session->fresh(), $user, []);
+
+        $plan = ContentPlan::query()->where('website_id', $owned->id)->first();
+        $this->assertSame('The description this site was already set up with.', $plan->business_description);
+        $this->assertSame(2, $plan->articles_per_week);
     }
 
     public function test_gc_removes_stale_unconverted_sessions_and_sites(): void

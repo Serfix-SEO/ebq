@@ -19,9 +19,7 @@ use Illuminate\Support\Str;
  */
 class ContentOnboardingConverter
 {
-    public function __construct(private readonly ContentEntitlements $entitlements)
-    {
-    }
+    public function __construct(private readonly ContentEntitlements $entitlements) {}
 
     /**
      * A FRESH throwaway system user that owns ONE provisional onboarding site.
@@ -88,19 +86,21 @@ class ContentOnboardingConverter
      */
     /**
      * @param  array{business_description?:?string, sell?:array, dont_sell?:array}  $profile
-     *         Wizard profile. May be EMPTY (e.g. Google SSO round-trip loses the
-     *         Livewire state) — the plan already carries the persisted profile
-     *         from the wizard, so empty input must NOT wipe it.
+     *                                                                                        Wizard profile. May be EMPTY (e.g. Google SSO round-trip loses the
+     *                                                                                        Livewire state) — the plan already carries the persisted profile
+     *                                                                                        from the wizard, so empty input must NOT wipe it.
      * @return array{website: Website, covered: bool}
-     *         covered=false → the site is attached but not on a plan yet (trial
-     *         already used for another site, or subscription slots full) → the
-     *         caller sends the user to Get started to pay for this (additional) site.
+     *                                                covered=false → the site is attached but not on a plan yet (trial
+     *                                                already used for another site, or subscription slots full) → the
+     *                                                caller sends the user to Get started to pay for this (additional) site.
      */
     public function convert(ContentOnboardingSession $session, User $user, array $profile): array
     {
         return DB::transaction(function () use ($session, $user, $profile): array {
             $provisional = $session->website;
             $leadUser = $provisional?->user;
+            /** @var array<string, mixed> $carried Wizard setup rescued off a provisional plan we are about to delete. */
+            $carried = [];
 
             // Attach the onboarded site: fold into the user's existing site for
             // this domain if they already have one, else re-parent the provisional.
@@ -110,6 +110,12 @@ class ContentOnboardingConverter
 
             if ($existing !== null && $provisional !== null && $existing->id !== $provisional->id) {
                 $website = $existing;
+                // The provisional plan is what the wizard has been writing to,
+                // and content_plans.website_id is ON DELETE CASCADE — deleting
+                // the provisional site destroys it. Carry its wizard-authored
+                // setup over first, or a user who ALREADY owned this domain
+                // silently ends up on a bare stub plan (prod 2026-07-20).
+                $carried = $this->carryOverProfile($provisional);
                 $provisional->delete();
             } else {
                 $provisional->forceFill(['user_id' => $user->id])->save();
@@ -125,10 +131,22 @@ class ContentOnboardingConverter
             // DRAFT plan carrying the profile. Only overwrite fields the caller
             // actually supplied — an empty profile keeps what the wizard persisted.
             $plan = ContentPlan::query()->firstOrNew(['website_id' => $website->id]);
-            if (! $plan->exists) {
+            $planIsNew = ! $plan->exists;
+            if ($planIsNew) {
                 $plan->status = ContentPlan::STATUS_DRAFT;
                 $plan->articles_per_week = 7;
                 $plan->article_length = 2000;
+            }
+            // Setup rescued from the now-deleted provisional plan. Applied
+            // BEFORE $profile so an explicitly supplied profile still wins.
+            // A brand-new plan takes ALL of it — the stub's 7/2000 are defaults,
+            // not choices, and must not beat the cadence picked in the wizard.
+            // An EXISTING plan only gets its blanks filled: a site the user
+            // configured earlier must not be clobbered by a later funnel run.
+            foreach ($carried as $column => $value) {
+                if ($planIsNew || blank($plan->{$column})) {
+                    $plan->{$column} = $value;
+                }
             }
             if (array_key_exists('business_description', $profile) && filled($profile['business_description'])) {
                 $plan->business_description = (string) $profile['business_description'];
@@ -179,5 +197,40 @@ class ContentOnboardingConverter
 
             return ['website' => $website, 'covered' => $covered];
         });
+    }
+
+    /**
+     * Wizard-authored setup on a provisional plan that is about to be deleted
+     * along with its website (FK is ON DELETE CASCADE).
+     *
+     * Only the columns the public wizard actually writes, and only when filled.
+     * Cadence and structure travel with the profile: the user chose them in the
+     * same wizard, so dropping them would leave the plan half-configured.
+     *
+     * @return array<string, mixed>
+     */
+    private function carryOverProfile(Website $provisional): array
+    {
+        $plan = ContentPlan::query()->where('website_id', $provisional->id)->first();
+        if ($plan === null) {
+            return [];
+        }
+
+        $columns = [
+            'business_description', 'offerings', 'language', 'country',
+            'articles_per_week', 'article_length', 'images_enabled', 'image_style',
+            'image_style_prompt', 'toggles', 'competitor_overrides', 'internal_urls',
+            'custom_instructions', 'cta_url',
+        ];
+
+        $carried = [];
+        foreach ($columns as $column) {
+            $value = $plan->{$column};
+            if (! blank($value)) {
+                $carried[$column] = $value;
+            }
+        }
+
+        return $carried;
     }
 }

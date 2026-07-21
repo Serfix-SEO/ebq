@@ -64,6 +64,20 @@
         <env name="IDEOGRAM_MONTHLY_CAP_USD" value=""/>
         <!-- Prod .env hides the Content UI (operator gate); tests exercise it. -->
         <env name="CONTENT_AUTOPILOT_UI" value="true"/>
+        <!-- Image STORAGE, same leak class as the API keys above (found
+             2026-07-21): phpunit pins only what it overrides, so
+             CONTENT_IMAGES_DISK=content_s3 leaked from prod .env and
+             GenerateContentImagesJob wrote test images into the REAL Hetzner
+             bucket — while ContentImagesTest asserted against Storage::fake
+             ('public') and "failed" for the wrong reason. Pin the disk to
+             public and blank the creds so a stray write can never reach prod
+             storage. Never remove. -->
+        <env name="CONTENT_IMAGES_DISK" value="public"/>
+        <env name="CONTENT_S3_KEY" value=""/>
+        <env name="CONTENT_S3_SECRET" value=""/>
+        <env name="CONTENT_S3_BUCKET" value=""/>
+        <env name="CONTENT_S3_ENDPOINT" value=""/>
+        <env name="CONTENT_S3_URL" value=""/>
         <!-- Same rule for the Site Explorer report providers (found again
              2026-07-14: a plain GET /backlinks in a test dispatched a REAL
              billed DataForSEO generation via QUEUE_CONNECTION=sync, because
