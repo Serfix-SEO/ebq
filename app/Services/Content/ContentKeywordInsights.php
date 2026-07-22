@@ -311,16 +311,7 @@ class ContentKeywordInsights
         // The mention guard already classified each domain against what this
         // client SELLS, so analyze real product competitors first and never
         // waste the single research slot on a classified reference.
-        $guard = (array) ($plan->competitor_guard ?? []);
-        if (! empty($guard['assessed_at'])) {
-            $normalize = static fn ($d) => strtolower(preg_replace('/^www\./', '', trim((string) $d)));
-            $rivals = array_map($normalize, array_column((array) ($guard['auto'] ?? []), 'domain'));
-            $references = array_map($normalize, (array) ($guard['references'] ?? []));
-
-            $preferred = array_values(array_intersect($candidates, $rivals));
-            $rest = array_values(array_diff($candidates, $rivals, $references));
-            $candidates = array_merge($preferred, $rest);
-        }
+        $candidates = app(CompetitorMentionGuard::class)->rankAndFilter($plan, $candidates);
 
         return array_slice($candidates, 0, $limit);
     }
@@ -693,7 +684,7 @@ class ContentKeywordInsights
 
                 Return JSON: {"scrap": ["...", "..."]}
                 PROMPT],
-            ], ['temperature' => 0.1, 'max_tokens' => 800, 'timeout' => 30, '__source' => 'content_autopilot.kw_scrap']);
+            ], ['temperature' => 0.1, 'max_tokens' => 800, 'timeout' => 30, '__source' => 'content_autopilot.kw_scrap', '__unmetered' => true]);
 
             $scrap = is_array($response['scrap'] ?? null) ? $response['scrap'] : [];
 
@@ -798,7 +789,7 @@ class ContentKeywordInsights
 
                 Return JSON: {"relevant": ["...", "..."]}
                 PROMPT],
-            ], ['temperature' => 0.1, 'max_tokens' => 2000, 'timeout' => 40, '__source' => 'content_autopilot.kw_relevance']);
+            ], ['temperature' => 0.1, 'max_tokens' => 2000, 'timeout' => 40, '__source' => 'content_autopilot.kw_relevance', '__unmetered' => true]);
 
             $rel = is_array($response['relevant'] ?? null) ? $response['relevant'] : [];
 

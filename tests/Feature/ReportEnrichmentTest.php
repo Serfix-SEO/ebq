@@ -634,6 +634,36 @@ class ReportEnrichmentTest extends TestCase
         $this->assertEquals('bigoak.com', $result['competitors'][0]['domain']);
     }
 
+    /**
+     * Content Autopilot's competitor discovery (DiscoverContentCompetitorsJob)
+     * passes the plan's target-country `gl` through here — default callers
+     * (the client backlink report, unrelated to Content Autopilot) still get
+     * 'us' unchanged.
+     */
+    public function test_discover_competitors_uses_the_given_gl_for_the_serp_query(): void
+    {
+        config(['services.report.enrichment.serp_query_cap' => 5]);
+
+        $llm = Mockery::mock(LlmClient::class);
+        $llm->shouldReceive('completeJson')->once()->andReturn(['genuine' => true]);
+        $fetcher = Mockery::mock(CrawlFetcher::class);
+        $fetcher->shouldReceive('fetch')->never();
+        $serp = Mockery::mock(SerpCache::class);
+        $serp->shouldReceive('organic')
+            ->once()
+            ->withArgs(fn ($query, $gl) => $gl === 'ae')
+            ->andReturn(['organic' => [['position' => 1, 'link' => 'https://rival.ae/x']]]);
+        $opr = Mockery::mock(OpenPageRankClient::class);
+        $opr->shouldReceive('metricsFor')->andReturn(['rival.ae' => ['rank' => 80, 'score' => 5.0, 'history' => []]]);
+
+        $service = $this->makeService(['llm' => $llm, 'fetcher' => $fetcher, 'serp' => $serp, 'opr' => $opr]);
+        $result = $service->discoverCompetitorsFor('newsite.com', [
+            ['keyword' => 'residential deep clean dubai', 'volume' => 500],
+        ], null, 'ae');
+
+        $this->assertEquals('rival.ae', $result['competitors'][0]['domain']);
+    }
+
     public function test_website_tab_status_reflects_enriching_and_partial(): void
     {
         $user = User::factory()->create();

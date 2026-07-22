@@ -127,7 +127,11 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
 ## Setup wizard v2 (6 steps, 2026-07-17; keyword-research step added 2026-07-18)
 
 `ContentCalendar` Livewire component drives a 6-step wizard:
-1. **Business** — brand (guessed from domain), article language, auto-detected
+1. **Business** — brand (guessed from domain), article language, **target
+   country** (2026-07-22 — `KeywordFinderLocations::countryOptions()`
+   dropdown, auto-guessed from the domain's ccTLD via `ContentCalendar::
+   detectCountryFromDomain()` / the `ContentWizard` trait twin; generic-use
+   TLDs like .co/.io/.me are deliberately never guessed), auto-detected
    description (`SiteProfileExtractor`, wire:init spinner).
 2. **Offerings** — multi-item sell / don't-sell lists (add/remove/reorder/
    inline-edit), auto-filled from the site profile. On Continue creates a
@@ -612,6 +616,103 @@ Cost ≈ $0.06–0.10 per article. Landmines encoded in code/comments:
   one-sided "never shorten" made v4-pro balloon 1500→3046 words.
 - Open Phase-2 item: length adherence on broad keywords (section budget or
   band widening for hub topics).
+
+## "Connect a destination" banner (renamed 2026-07-22)
+
+`resources/views/components/content/connect-integration.blade.php` (was
+`connect-wordpress.blade.php` — renamed, the old name became misleading once
+Laravel/custom-webhook joined WordPress as integration options). Shown in the
+calendar view (`content-calendar.blade.php`) and the article review page
+(`article-review.blade.php`) whenever the website has **no
+`ContentIntegration` row with `status = STATUS_CONNECTED`, regardless of
+platform** — previously it only checked `PLATFORM_WORDPRESS`/
+`PLATFORM_WORDPRESS_APP_PASSWORD`, so a client who connected via the Laravel
+or Custom tab (both stored as `PLATFORM_WEBHOOK`, see
+[Publishing](#publishing-phase-3-2026-07-18)) kept seeing "Connect your
+WordPress site" forever. Copy is now platform-neutral too ("Connect a
+destination to publish").
+
+## Country / geo-targeting (2026-07-22)
+
+`ContentPlan.country` (lowercase code, e.g. `ae`; `'global'` = worldwide) is
+selected in wizard step 1 and threads through the whole pipeline:
+- **Keyword research**: `ContentKeywordInsights` (already correct before this
+  change) — `KeywordFinderPool` country key, Serper `gl`.
+- **Competitor discovery** (step 4/5 SERP fallback):
+  `DiscoverContentCompetitorsJob` resolves `KeywordFinderLocations::
+  serperGl($plan->country)` and passes it into `ReportEnrichmentService::
+  discoverCompetitorsFor(..., $gl)` (new optional 4th param, default `'us'` —
+  other callers of this SHARED service, e.g. the client backlink report, are
+  unaffected).
+- **Topic ideation** (`ContentTopicPlanner::ideate()`): a `TARGET MARKET:
+  {country name}` line is added to the prompt when country ≠ `'global'` (no
+  line at all for worldwide — nothing to localize to).
+- **Article research/write** (`ContentArticleProducer`) — already correct
+  before this change (`AiContentBriefService` + the writer's locale block).
+- **NOT threaded, deliberately**: `ContentKeywordInsights::competitorData()`
+  (the competitor metrics/traffic UI table) and the wizard's own competitor-
+  detection list — both intentionally show every real SERP competitor
+  regardless of market, same reasoning as showing directories there (see the
+  Landmines entry below).
+
+Detection is a zero-cost ccTLD heuristic only — there is no IP-geolocation or
+GSC-country-breakdown signal wired in yet (`app/Support/Countries.php` +
+`PluginInsightResolver::countryBreakdown` exist for a DIFFERENT feature and
+aren't connected here). A future improvement could prefer GSC's top country
+when the site already has Search Console connected.
+
+## Landmines (2026-07-22 prod incident)
+
+- **Coverage lives ON the `ContentPlan` row, not a separate entitlements
+  table.** `ContentEntitlements::hasContentAccessFor()` checks
+  `ContentPlan.billing_covered_at`. Hard-deleting a plan (e.g. to reset a test
+  site for a clean wizard retest) silently revokes coverage too — the site
+  drops out of `preferredWebsite()`, `EnsureContentAccess` bounces it to Get
+  Started. Always restore via `ContentEntitlements::coverWebsite()` after a
+  plan wipe, never recreate the row by hand.
+- **`analyzeSite()` must fail soft on `QuotaExceededException`.** It runs from
+  `wire:init` on every fresh mount. An uncaught throw hits the global handler's
+  `redirect()->back()`, which for a Livewire XHR resolves to the SAME page
+  (Referer header) — Livewire.js turns that 302 into a full navigation, which
+  re-mounts, re-fires `wire:init`, throws again: an infinite refresh loop
+  ("stuck on wizard step 1"), not just a blank profile field. Fixed in
+  `ContentCalendar.php::analyzeSite()` — catch and continue.
+- **Content Autopilot LLM calls are exempt from the generic per-user
+  `UsageMeter` token cap** (`__unmetered => true` on every `completeJson()`
+  call under `app/Services/Content/*` and `app/Jobs/Content/*` +
+  `GenerateContentImagesJob`'s prompt-writing call) — real usage is bounded by
+  trial/monthly article counts and `ContentLlmSpendMeter` instead. Before this
+  fix, `SiteProfileExtractor` and 7 other classification/ideation call sites
+  were still gated by the dashboard's shared SEO-feature token cap, so a
+  content-only account with no `current_plan_slug` (coverage was ever only
+  granted at the `ContentPlan` level, never a dashboard `Plan` tier) could get
+  quota-blocked by unrelated SEO-tool usage pooled into the same counter. Any
+  NEW content-autopilot LLM call site must carry `__unmetered => true` or it
+  silently re-introduces this. `ContentArticleProducer`'s write/de-ai/revise
+  stages and `ContentKeywordInsights`'s People Also Ask call (Serper, not an
+  LLM call) are unaffected/out of scope.
+- **Guard-aware competitor RANKING must be the ONE place every keyword-research
+  call site derives "the competitor(s)" from — `CompetitorMentionGuard::
+  rankAndFilter(ContentPlan $plan, array $candidates): array`.** The raw
+  `ContentSetupInsights::competitorAuthority()` report ranks by SERP authority,
+  which systematically surfaces directories/platforms (thryv.com for a
+  cleaning company) ahead of the real rival. `ContentKeywordInsights::
+  topCompetitorDomains()` was fixed first (2026-07-21), but THREE more call
+  sites independently re-derived their own raw, unfiltered top-N list and kept
+  the bug alive: `ClassifyPlanKeywordsJob::handle()` (the job that actually
+  populates the client-visible gap-keyword set — this was the highest-impact
+  miss), the monthly `ebq:content-keyword-harvest` command (which feeds that
+  same job's `domain_keyword_rankings` source data), and none of them called
+  `ContentSetupInsights::withOverrides()` either, so manual competitor
+  add/remove edits were ALSO silently ignored in both. Fixed 2026-07-22 by
+  extracting the rivals-first/references-excluded/unassessed-raw-order logic
+  into the shared `rankAndFilter()` helper and wiring `withOverrides()` +
+  `rankAndFilter()` into all three sites. `ContentKeywordInsights::
+  competitorData()` (the competitor metrics/traffic UI table) is DELIBERATELY
+  left unfiltered — like the wizard's own competitor-detection list, its job is
+  to show every real SERP competitor, directories included; only research/
+  harvesting call sites need the guard's rival-vs-reference judgment. Any NEW
+  "pick the competitor(s)" call site must go through `rankAndFilter()`.
 
 ## Env (staging QA values 2026-07-17)
 

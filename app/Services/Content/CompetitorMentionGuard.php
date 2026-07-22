@@ -150,6 +150,36 @@ class CompetitorMentionGuard
     }
 
     /**
+     * Reorder an already-normalized, deduped competitor-domain list so
+     * classified product rivals come first and classified references are
+     * dropped entirely — the raw SERP-authority order systematically surfaces
+     * directories/platforms ahead of the real rival (thryv.com for a cleaning
+     * company, prod 2026-07-21/22), and every keyword-research call site that
+     * "picks the top competitor(s)" must use THIS ranking, not the raw report
+     * order, or the guard's classification is silently ignored downstream.
+     * Raw order is returned unchanged when the plan hasn't been assessed yet.
+     *
+     * @param  list<string>  $candidates  lowercase, www-stripped domains
+     * @return list<string>
+     */
+    public function rankAndFilter(ContentPlan $plan, array $candidates): array
+    {
+        $guard = (array) ($plan->competitor_guard ?? []);
+        if (empty($guard['assessed_at'])) {
+            return $candidates;
+        }
+
+        $normalize = static fn ($d) => strtolower(preg_replace('/^www\./', '', trim((string) $d)));
+        $rivals = array_map($normalize, array_column((array) ($guard['auto'] ?? []), 'domain'));
+        $references = array_map($normalize, (array) ($guard['references'] ?? []));
+
+        $preferred = array_values(array_intersect($candidates, $rivals));
+        $rest = array_values(array_diff($candidates, $rivals, $references));
+
+        return array_merge($preferred, $rest);
+    }
+
+    /**
      * Per-topic term list for the writer/lint: a topic explicitly ABOUT a
      * competitor ("semrush alternatives") must be allowed to name it — that is
      * a legitimate, high-value article, not a leak.
@@ -355,6 +385,7 @@ class CompetitorMentionGuard
                 'json_object' => true,
                 'model' => $stage['model'],
                 '__source' => 'content_autopilot.competitor_guard',
+                '__unmetered' => true,
             ]));
         } catch (\Throwable $e) {
             Log::warning('content_autopilot.competitor_guard_failed', ['plan_id' => $plan->id, 'error' => $e->getMessage()]);

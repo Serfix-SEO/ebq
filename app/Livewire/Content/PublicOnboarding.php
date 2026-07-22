@@ -184,6 +184,7 @@ class PublicOnboarding extends Component
         return view('livewire.content.public-onboarding', [
             'publicOnboarding' => true,
             'wizard' => $this->websiteId !== null ? $this->wizardViewData() : [],
+            'countryOptions' => \App\Support\KeywordFinderLocations::countryOptions(),
         ]);
     }
 }

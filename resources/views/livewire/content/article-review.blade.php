@@ -1,5 +1,5 @@
 <div class="space-y-6">
-    <x-content.connect-wordpress />
+    <x-content.connect-integration />
 
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="min-w-0">

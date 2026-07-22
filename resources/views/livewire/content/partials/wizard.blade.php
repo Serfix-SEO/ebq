@@ -98,7 +98,7 @@
                             </div>
                         @endif
 
-                        <div class="mt-6 grid gap-4 sm:grid-cols-2">
+                        <div class="mt-6 grid gap-4 sm:grid-cols-3">
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300" for="w-brand">{{ __('Brand name') }}</label>
                                 <input id="w-brand" wire:model="brandName" type="text"
@@ -111,6 +111,16 @@
                                     <option value="en">English</option>
                                     <option value="ar">العربية</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300" for="w-country">{{ __('Target country') }}</label>
+                                <select id="w-country" wire:model="country"
+                                    class="mt-1.5 w-full rounded-xl border border-slate-300 bg-white pl-3 pr-8 py-2.5 text-sm text-slate-800 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                    @foreach ($countryOptions as $code => $label)
+                                        <option value="{{ $code }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Keyword research targets searches from this country.') }}</p>
                             </div>
                         </div>
 

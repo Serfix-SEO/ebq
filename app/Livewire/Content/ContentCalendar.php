@@ -18,11 +18,13 @@ use App\Services\Content\ContentSetupInsights;
 use App\Services\Content\SiteProfileExtractor;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentImageStyles;
+use App\Support\KeywordFinderLocations;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -77,7 +79,7 @@ class ContentCalendar extends Component
 
     public string $language = 'en';
 
-    public string $country = '';
+    public string $country = 'global';
 
     public string $businessDescription = '';
 
@@ -231,6 +233,15 @@ class ContentCalendar extends Component
         $this->analyzing = false;
 
         $website = $this->website();
+
+        // Country detection is independent of the profile gate below (a
+        // returning user with the description already filled may still be
+        // sitting on the un-set 'global' default) — cheap ccTLD guess, no
+        // API call, so it's fine to run every time step 1 mounts.
+        if ($website !== null && (blank($this->country) || $this->country === 'global') && blank($this->plan()?->country)) {
+            $this->country = $this->detectCountryFromDomain($website) ?? 'global';
+        }
+
         // Gate on the PROFILE, not on the existence of a plan row: a covered
         // stub (created by coverWebsite() at activation / trial start) has no
         // profile yet, and the old `plan() !== null` guard made auto-detect
@@ -241,7 +252,18 @@ class ContentCalendar extends Component
             return;
         }
 
-        $profile = app(SiteProfileExtractor::class)->extract($website);
+        // Fail soft: a QuotaExceededException here must never bubble up. This
+        // runs from wire:init on mount, so an uncaught throw gets turned into
+        // a redirect (the global QuotaExceededException handler sends the user
+        // `back()`) — Livewire.js treats that redirect as a full navigation,
+        // which re-mounts the component, re-fires wire:init, and throws again:
+        // an infinite refresh loop instead of just an empty profile field
+        // (prod 2026-07-22, a quota-exhausted account stuck on step 1).
+        try {
+            $profile = app(SiteProfileExtractor::class)->extract($website);
+        } catch (\App\Exceptions\QuotaExceededException) {
+            $profile = [];
+        }
 
         if ($this->businessDescription === '') {
             $this->businessDescription = (string) ($profile['description'] ?? '');
@@ -266,6 +288,34 @@ class ContentCalendar extends Component
         }
     }
 
+    /**
+     * Guess a target country from the domain's ccTLD (no IP/GSC signal is
+     * wired for Content Autopilot yet — this is deliberately the cheap,
+     * zero-API-cost heuristic, not a claim of accuracy). Generic-use TLDs
+     * that happen to collide with a real country code (io, co, me, tv…) are
+     * excluded rather than guessed, since they're squatted worldwide for
+     * branding, not geography. Compound TLDs (co.uk, com.au) work unaided —
+     * the last label IS the country signal either way.
+     */
+    private function detectCountryFromDomain(Website $website): ?string
+    {
+        $host = strtolower(trim((string) ($website->normalized_domain ?: $website->domain)));
+        $host = preg_replace('#^https?://#', '', $host) ?? $host;
+        $host = explode('/', $host)[0];
+        $labels = explode('.', rtrim($host, '.'));
+        $tld = end($labels);
+        if ($tld === false || $tld === '') {
+            return null;
+        }
+
+        static $genericUse = ['co', 'io', 'ai', 'me', 'tv', 'fm', 'cc', 'ly', 'gg', 'to', 'sh', 'app', 'dev', 'xyz'];
+        if (in_array($tld, $genericUse, true)) {
+            return null;
+        }
+
+        return array_key_exists($tld, KeywordFinderLocations::COUNTRIES) ? $tld : null;
+    }
+
     public function goToStep(int $step): void
     {
         // Only allow jumping to steps already unlocked (never skip ahead).
@@ -278,7 +328,8 @@ class ContentCalendar extends Component
     {
         $this->validate([
             'businessDescription' => 'required|string|min:30|max:1000',
-        ], [], ['businessDescription' => __('business description')]);
+            'country' => ['required', 'string', Rule::in(array_keys(KeywordFinderLocations::countryOptions()))],
+        ], [], ['businessDescription' => __('business description'), 'country' => __('target country')]);
 
         $this->wizardStep = 2;
     }
@@ -1294,6 +1345,7 @@ class ContentCalendar extends Component
                 'wizard' => [],
                 'plan' => $plan,
                 'guard' => $this->guardState($plan),
+                'countryOptions' => KeywordFinderLocations::countryOptions(),
             ] + $this->emptyCalendarBindings());
         }
 
@@ -1344,6 +1396,7 @@ class ContentCalendar extends Component
                 'inWizard' => true,
                 'needsSetup' => false,
                 'wizard' => $wizard,
+                'countryOptions' => KeywordFinderLocations::countryOptions(),
             ] + $this->emptyCalendarBindings());
         }
 

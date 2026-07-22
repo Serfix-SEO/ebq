@@ -147,4 +147,50 @@ class ContentTopicPlannerGuardrailsTest extends TestCase
 
         $this->assertStringNotContainsString('does NOT offer', $llm->prompts[0]);
     }
+
+    /** Run the private ideation method directly — it is the unit under test. */
+    private function runIdeate(ContentTopicPlanner $planner, ContentPlan $plan, Website $website): void
+    {
+        $method = (new \ReflectionClass(ContentTopicPlanner::class))->getMethod('ideate');
+        $method->setAccessible(true);
+        $method->invoke($planner, $plan, $website, [], [], 5);
+    }
+
+    /**
+     * A target country must reach the ideation prompt as a market-localization
+     * instruction — otherwise a UAE cleaning business gets US-centric topic
+     * angles (pricing, terminology, regulation) same as a US one.
+     */
+    public function test_ideation_prompt_carries_the_target_market_when_country_is_set(): void
+    {
+        $llm = $this->recordingLlm();
+        $website = Website::factory()->for(User::factory())->create();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'business_description' => 'We provide residential cleaning services.',
+            'country' => 'ae',
+        ]);
+
+        $this->runIdeate(new ContentTopicPlanner($llm), $plan, $website);
+
+        $this->assertNotEmpty($llm->prompts);
+        $this->assertStringContainsString('TARGET MARKET: United Arab Emirates', $llm->prompts[0]);
+    }
+
+    /** No market line is sent for the 'global' default — nothing to localize to. */
+    public function test_ideation_prompt_has_no_target_market_when_country_is_global(): void
+    {
+        $llm = $this->recordingLlm();
+        $website = Website::factory()->for(User::factory())->create();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'business_description' => 'We provide residential cleaning services.',
+            'country' => 'global',
+        ]);
+
+        $this->runIdeate(new ContentTopicPlanner($llm), $plan, $website);
+
+        $this->assertNotEmpty($llm->prompts);
+        $this->assertStringNotContainsString('TARGET MARKET', $llm->prompts[0]);
+    }
 }

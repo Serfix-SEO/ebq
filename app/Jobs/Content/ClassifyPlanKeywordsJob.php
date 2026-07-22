@@ -60,22 +60,29 @@ class ClassifyPlanKeywordsJob implements ShouldQueue
         $country = strtolower(trim((string) $plan->country)) ?: 'global';
         $ownDomain = strtolower(preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
 
-        // Competitor domains (top-3 authority order).
-        $competitors = [];
+        // Competitor domains — gather every candidate first (client add/remove
+        // edits via withOverrides), THEN rank by the mention guard's
+        // classification (real product rivals before directories/platforms
+        // the raw authority order surfaces first, e.g. thryv.com for a
+        // cleaning company) before capping to top-3, so a reference domain
+        // never displaces a real rival just because it's checked earlier.
+        $candidates = [];
         try {
-            $insights = $setup->competitorAuthority($website);
+            $insights = $setup->withOverrides($setup->competitorAuthority($website), $plan);
         } catch (\Throwable) {
             $insights = null;
         }
         foreach ((array) ($insights['competitors'] ?? []) as $c) {
             $d = strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))));
-            if ($d !== '' && $d !== $ownDomain && ! in_array($d, $competitors, true)) {
-                $competitors[] = $d;
-                if (count($competitors) >= self::MAX_COMPETITORS) {
-                    break;
-                }
+            if ($d !== '' && $d !== $ownDomain && ! in_array($d, $candidates, true)) {
+                $candidates[] = $d;
             }
         }
+        $competitors = array_slice(
+            app(\App\Services\Content\CompetitorMentionGuard::class)->rankAndFilter($plan, $candidates),
+            0,
+            self::MAX_COMPETITORS
+        );
         if ($competitors === []) {
             return; // competitors not discovered yet
         }
@@ -220,7 +227,7 @@ class ClassifyPlanKeywordsJob implements ShouldQueue
 
                     Return JSON: {"relevant": ["...", "..."]}
                     PROMPT],
-                ], ['temperature' => 0.1, 'max_tokens' => 4000, 'timeout' => 60, 'model' => $model['model'] ?: null, '__source' => 'content_autopilot.bulk_relevance']);
+                ], ['temperature' => 0.1, 'max_tokens' => 4000, 'timeout' => 60, 'model' => $model['model'] ?: null, '__source' => 'content_autopilot.bulk_relevance', '__unmetered' => true]);
 
                 foreach ((array) ($response['relevant'] ?? []) as $kw) {
                     $hash = $hashByKeyword[mb_strtolower(trim((string) $kw))] ?? null;

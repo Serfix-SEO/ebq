@@ -269,7 +269,7 @@ class ContentTopicPlanner
 
                 Return JSON: {"relevant": ["...", "..."]}
                 PROMPT],
-            ], ['temperature' => 0.1, 'max_tokens' => 1500, 'timeout' => 40, '__source' => 'content_autopilot.topic_relevance']);
+            ], ['temperature' => 0.1, 'max_tokens' => 1500, 'timeout' => 40, '__source' => 'content_autopilot.topic_relevance', '__unmetered' => true]);
 
             $rel = is_array($response['relevant'] ?? null) ? $response['relevant'] : [];
 
@@ -314,6 +314,11 @@ class ContentTopicPlanner
         $domain = (string) $website->domain;
         $today = now()->toFormattedDateString();
         $currentYear = now()->year;
+        $countryCode = strtolower(trim((string) ($plan->country ?: 'global')));
+        $market = $countryCode === '' || $countryCode === 'global'
+            ? null
+            : (\App\Support\KeywordFinderLocations::COUNTRIES[$countryCode] ?? null);
+        $marketBlock = $market === null ? '' : "\nTARGET MARKET: {$market}. Topics, terminology, pricing/regulatory framing, and search intent must fit THIS market — never assume US/UK defaults.\n";
 
         $system = 'You are an SEO content strategist. Respond with valid JSON only.';
         $user = <<<PROMPT
@@ -323,6 +328,7 @@ class ContentTopicPlanner
         {$plan->business_description}
         They offer: {$sell}
         They do NOT offer (never write about these as if they do): {$dontSell}
+        {$marketBlock}
 
         REAL SEARCH QUERIES the site already appears for (impressions = demand, position 8-30 = a dedicated article can win the ranking):
         {$gscBlock}
@@ -349,6 +355,7 @@ class ContentTopicPlanner
             'max_tokens' => 4000,
             'timeout' => 120,
             '__source' => 'content_autopilot.ideate',
+            '__unmetered' => true,
         ];
         if (! empty($model['model'])) {
             $options['model'] = $model['model'];

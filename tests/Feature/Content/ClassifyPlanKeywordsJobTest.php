@@ -57,6 +57,47 @@ class ClassifyPlanKeywordsJobTest extends TestCase
         $this->assertNotNull($plan->fresh()->keywords_classified_at);
     }
 
+    /**
+     * Regression for the thryv.com-class bug (prod 2026-07-21/22): the raw
+     * report lists a directory ahead of the real rival by authority, and the
+     * mention guard already classified it as a reference — the job must skip
+     * it for keyword-gap harvesting too, not just the wizard's research slot.
+     */
+    public function test_a_reference_directory_never_displaces_the_real_rival_in_the_gap(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $website = Website::factory()->for($user)->create(['normalized_domain' => 'mkc.test']);
+        $own = strtolower(preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id, 'country' => 'US', 'status' => ContentPlan::STATUS_DRAFT,
+            'offerings' => ['sell' => ['residential cleaning']],
+            'business_description' => 'Residential cleaning service.',
+            'competitor_guard' => [
+                'assessed_at' => now()->toIso8601String(),
+                'harmful' => false,
+                'reason' => 'Directory, not a cleaning rival.',
+                'auto' => [['brand' => 'Molly Maid', 'domain' => 'mollymaid.com']],
+                'references' => ['directory.com'],
+            ],
+        ]);
+
+        // Directory ranks by raw authority ahead of the real rival.
+        Cache::put('content:setup-insights:v1:'.$website->id, [
+            'my_referring_domains' => 10, 'my_authority' => null,
+            'competitors' => [['domain' => 'directory.com'], ['domain' => 'mollymaid.com']],
+            'median' => null, 'gap' => null, 'behind' => false,
+        ], now()->addDay());
+
+        $this->ranking('directory.com', 'business listing keyword', 9000);
+        $this->ranking('mollymaid.com', 'residential deep clean', 4000);
+
+        (new ClassifyPlanKeywordsJob($plan->id))->handle(app(ContentSetupInsights::class));
+
+        $gap = ContentPlanKeyword::where('plan_id', $plan->id)->where('type', 'gap')->pluck('keyword')->all();
+        $this->assertContains('residential deep clean', $gap);
+        $this->assertNotContains('business listing keyword', $gap);
+    }
+
     public function test_second_run_appends_new_lower_volume_band(): void
     {
         $user = User::factory()->create(['is_admin' => false]);

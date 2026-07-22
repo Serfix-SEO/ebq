@@ -50,21 +50,29 @@ class ContentKeywordHarvest extends Command
                     if ($own !== '') {
                         $domains[$own] = true;
                     }
-                    // Top-3 NON-exhausted competitors (authority order); exhausted
-                    // ones are skipped so the window slides to the next competitor.
+                    // Top-3 NON-exhausted competitors, ranked by the mention
+                    // guard (real product rivals before directories/platforms
+                    // the raw authority order surfaces first, e.g. thryv.com
+                    // for a cleaning company) rather than raw authority order;
+                    // exhausted ones are skipped so the window slides to the
+                    // next candidate.
                     try {
-                        $insights = $setup->competitorAuthority($website);
+                        $insights = $setup->withOverrides($setup->competitorAuthority($website), $plan);
                     } catch (\Throwable) {
                         $insights = null;
                     }
-                    $picked = 0;
+                    $candidates = [];
                     foreach ((array) ($insights['competitors'] ?? []) as $c) {
+                        $d = $this->host((string) ($c['domain'] ?? ''));
+                        if ($d !== '' && $d !== $own && ! in_array($d, $candidates, true)) {
+                            $candidates[] = $d;
+                        }
+                    }
+                    $ranked = app(\App\Services\Content\CompetitorMentionGuard::class)->rankAndFilter($plan, $candidates);
+                    $picked = 0;
+                    foreach ($ranked as $d) {
                         if ($picked >= self::MAX_COMPETITORS) {
                             break;
-                        }
-                        $d = $this->host((string) ($c['domain'] ?? ''));
-                        if ($d === '' || $d === $own) {
-                            continue;
                         }
                         $h = DomainKeywordHarvest::query()->where('domain', $d)->where('country', $country)->first();
                         if ($h !== null && $h->exhausted) {

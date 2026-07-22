@@ -75,6 +75,7 @@ class SiteProfileExtractor
                     'max_tokens' => 900,
                     'timeout' => 45,
                     '__source' => 'content_autopilot.site_profile',
+                    '__unmetered' => true,
                 ]);
                 app(ContentLlmSpendMeter::class)->add(ContentLlmSpendMeter::EST_IDEATE_USD);
 

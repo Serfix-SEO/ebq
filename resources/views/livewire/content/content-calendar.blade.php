@@ -278,7 +278,7 @@
     @include('livewire.content.partials.wizard')
     @else
         {{-- ── Calendar ─────────────────────────────────────────────── --}}
-        <x-content.connect-wordpress />
+        <x-content.connect-integration />
 
         {{-- Auto-publish off → nudge with a one-click toggle; hides once on. --}}
         @unless ($autoPublish)

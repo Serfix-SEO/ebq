@@ -100,7 +100,7 @@ class ReportEnrichmentService
      * @return array{competitors: list<array<string, mixed>>, best: ?string,
      *               scrap: bool, query_source: string, queries: list<string>}
      */
-    public function discoverCompetitorsFor(string $domain, array $keywordRows, ?string $billedUserId = null): array
+    public function discoverCompetitorsFor(string $domain, array $keywordRows, ?string $billedUserId = null, string $gl = 'us'): array
     {
         $cap = max(1, (int) config('services.report.enrichment.serp_query_cap', 8));
         $genuine = $this->keywordsGenuine($keywordRows, $domain, $billedUserId);
@@ -124,7 +124,7 @@ class ReportEnrichmentService
             return ['competitors' => [], 'best' => null, 'scrap' => ! $genuine, 'query_source' => $querySource, 'queries' => []];
         }
 
-        $tally = $this->tallyCompetitors($queries, $domain, $billedUserId);
+        $tally = $this->tallyCompetitors($queries, $domain, $billedUserId, $gl);
 
         return [
             'competitors' => $tally['rows'],
@@ -755,7 +755,7 @@ class ReportEnrichmentService
      * @param  list<string>  $queries
      * @return array{rows: list<array<string, mixed>>, best: ?string}
      */
-    private function tallyCompetitors(array $queries, string $domain, ?string $billedUserId = null): array
+    private function tallyCompetitors(array $queries, string $domain, ?string $billedUserId = null, string $gl = 'us'): array
     {
         $cap = max(1, (int) config('services.report.enrichment.serp_query_cap', 8));
         $queries = array_slice($queries, 0, $cap);
@@ -769,7 +769,7 @@ class ReportEnrichmentService
 
         foreach ($queries as $query) {
             try {
-                $serp = $this->serp->organic($query, 'us', $owner?->id, $owner?->user_id ?? $billedUserId, 'report_enrichment');
+                $serp = $this->serp->organic($query, $gl, $owner?->id, $owner?->user_id ?? $billedUserId, 'report_enrichment');
             } catch (Throwable) {
                 break; // quota exceeded / hard failure — use what we have
             }

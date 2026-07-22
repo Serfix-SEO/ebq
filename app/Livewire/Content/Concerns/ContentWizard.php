@@ -88,11 +88,25 @@ trait ContentWizard
         $this->analyzing = false;
 
         $website = $this->website();
+
+        // Cheap ccTLD guess, no API call — independent of the profile gate
+        // below so it still runs even once a plan exists.
+        if ($website !== null && (blank($this->country) || $this->country === 'global') && blank($this->plan()?->country)) {
+            $this->country = $this->detectCountryFromDomain($website) ?? 'global';
+        }
+
         if ($website === null || $this->plan() !== null) {
             return;
         }
 
-        $profile = app(SiteProfileExtractor::class)->extract($website);
+        // Fail soft: a QuotaExceededException here must never bubble up (same
+        // wire:init/redirect-loop hazard as the dashboard's ContentCalendar
+        // copy, prod 2026-07-22 — see infra/content-autopilot/README.md).
+        try {
+            $profile = app(SiteProfileExtractor::class)->extract($website);
+        } catch (\App\Exceptions\QuotaExceededException) {
+            $profile = [];
+        }
 
         if ($this->businessDescription === '') {
             $this->businessDescription = (string) ($profile['description'] ?? '');
@@ -117,6 +131,26 @@ trait ContentWizard
         }
     }
 
+    /** @see \App\Livewire\Content\ContentCalendar::detectCountryFromDomain() (kept in sync — see infra doc) */
+    private function detectCountryFromDomain(Website $website): ?string
+    {
+        $host = strtolower(trim((string) ($website->normalized_domain ?: $website->domain)));
+        $host = preg_replace('#^https?://#', '', $host) ?? $host;
+        $host = explode('/', $host)[0];
+        $labels = explode('.', rtrim($host, '.'));
+        $tld = end($labels);
+        if ($tld === false || $tld === '') {
+            return null;
+        }
+
+        static $genericUse = ['co', 'io', 'ai', 'me', 'tv', 'fm', 'cc', 'ly', 'gg', 'to', 'sh', 'app', 'dev', 'xyz'];
+        if (in_array($tld, $genericUse, true)) {
+            return null;
+        }
+
+        return array_key_exists($tld, \App\Support\KeywordFinderLocations::COUNTRIES) ? $tld : null;
+    }
+
     public function goToStep(int $step): void
     {
         $max = $this->draftPlanId !== null ? 8 : 2;
@@ -128,7 +162,8 @@ trait ContentWizard
     {
         $this->validate([
             'businessDescription' => 'required|string|min:30|max:1000',
-        ], [], ['businessDescription' => __('business description')]);
+            'country' => ['required', 'string', \Illuminate\Validation\Rule::in(array_keys(\App\Support\KeywordFinderLocations::countryOptions()))],
+        ], [], ['businessDescription' => __('business description'), 'country' => __('target country')]);
 
         $this->wizardStep = 2;
     }

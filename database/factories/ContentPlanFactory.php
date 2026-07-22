@@ -24,7 +24,7 @@ class ContentPlanFactory extends Factory
             'business_description' => $this->faker->sentence(12),
             'offerings' => ['sell' => ['Widgets'], 'dont_sell' => ['Repairs']],
             'language' => 'en',
-            'country' => 'US',
+            'country' => 'us',
         ];
     }
 }

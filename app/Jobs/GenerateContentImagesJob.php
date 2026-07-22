@@ -293,7 +293,7 @@ class GenerateContentImagesJob implements ShouldQueue
                 'output_shape' => ['featured' => 'string prompt', 'inline' => ['<section id>' => 'string prompt']],
             ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-            $options = ['temperature' => 0.7, '__user_id' => $topic?->website?->user_id, '__source' => 'content_autopilot.image_prompts'];
+            $options = ['temperature' => 0.7, '__user_id' => $topic?->website?->user_id, '__source' => 'content_autopilot.image_prompts', '__unmetered' => true];
             if (! empty($model['model'])) {
                 $options['model'] = $model['model'];
             }

@@ -69,7 +69,8 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
             // admins sandbox. billedUserId scopes the metered usage.
             $billedUserId = $website->user?->is_admin ? null : $website->user_id;
 
-            $result = $enrichment->discoverCompetitorsFor((string) $domain, $keywords, $billedUserId);
+            $gl = \App\Support\KeywordFinderLocations::serperGl((string) ($plan->country ?: 'us'));
+            $result = $enrichment->discoverCompetitorsFor((string) $domain, $keywords, $billedUserId, $gl);
             $competitors = array_values(array_filter((array) ($result['competitors'] ?? []), 'is_array'));
 
             if ($competitors !== []) {
@@ -160,6 +161,7 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
                 'max_tokens' => 500,
                 'timeout' => 30,
                 '__source' => 'content_autopilot.competitor_queries',
+                '__unmetered' => true,
             ]);
 
             $list = is_array($response['queries'] ?? null) ? $response['queries'] : [];
