@@ -448,7 +448,18 @@ a competitor unless told. `CompetitorMentionGuard`
   migration `2026_07_21_150000`); `ArticleReview` passes the same per-topic
   terms so the editor's live checks agree with the pipeline.
 
-Tests: `CompetitorMentionGuardTest` (14).
+- **Research pick** (2026-07-21, the thryv.com screenshot): the keyword step's
+  single competitor slot used to take the report list's FIRST domain — authority
+  order, which surfaces directories/platforms (thryv.com for a cleaning company)
+  ahead of the actual rival, and ignored the client's manual add/remove edits.
+  `ContentKeywordInsights::topCompetitorDomains()` now merges `withOverrides()`
+  and re-orders by the guard's classification: blocked product rivals first,
+  classified references never picked. `PrepareContentKeywordInsightsJob` runs
+  `assess()` inline when the plan is unassessed so the pick cannot race ahead of
+  the classification; with no assessment at all it falls back to raw order
+  rather than stalling research.
+
+Tests: `CompetitorMentionGuardTest` (19).
 
 ### The Laravel receiver is a published package
 

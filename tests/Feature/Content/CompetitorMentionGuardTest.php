@@ -9,10 +9,12 @@ use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentArticleProducer;
+use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\HumanizerService;
 use App\Services\Llm\LlmClient;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -360,5 +362,82 @@ class CompetitorMentionGuardTest extends TestCase
         $terms = app(CompetitorMentionGuard::class)->terms($plan->refresh());
         $this->assertContains('se ranking', $terms);
         $this->assertNotContains('semrush', $terms);
+    }
+
+    // ── keyword-research competitor pick ────────────────────────────────
+
+    /** @param list<string> $domains */
+    private function seedCompetitorCache(Website $website, array $domains): void
+    {
+        Cache::put('content:setup-insights:v1:'.$website->id, [
+            'my_referring_domains' => 0, 'my_authority' => null,
+            'competitors' => array_map(static fn ($d) => [
+                'domain' => $d, 'referring_domains' => null, 'backlinks' => null,
+                'authority' => null, 'da' => null, 'pa' => null,
+            ], $domains),
+            'median' => null, 'gap' => null, 'behind' => false,
+        ], now()->addDay());
+    }
+
+    /** @return list<string> */
+    private function researchPick(ContentPlan $plan): array
+    {
+        $svc = app(ContentKeywordInsights::class);
+        $m = (new \ReflectionClass($svc))->getMethod('topCompetitorDomains');
+        $m->setAccessible(true);
+
+        return $m->invoke($svc, $plan, $plan->website, 1);
+    }
+
+    /**
+     * The screenshot bug: a cleaning company's single research slot went to
+     * thryv.com — a directory that merely OUTRANKS them — because the pick was
+     * authority order over the raw report list. A classified product rival
+     * further down the list must win.
+     */
+    public function test_research_analyzes_the_classified_rival_not_the_directory(): void
+    {
+        [, $website, $plan] = $this->planWithGuard([
+            'assessed_at' => '2026-07-21T12:00:00+00:00',
+            'harmful' => true, 'reason' => 'x',
+            'auto' => [['brand' => 'sparklehome', 'domain' => 'sparklehome.com', 'reason' => 'cleaning rival']],
+            'references' => ['thryv.com'],
+        ]);
+        $this->seedCompetitorCache($website, ['thryv.com', 'sparklehome.com']);
+
+        $this->assertSame(['sparklehome.com'], $this->researchPick($plan));
+    }
+
+    /** A classified reference must never consume the research slot, even with no rival found. */
+    public function test_research_skips_references_when_nothing_is_blocked(): void
+    {
+        [, $website, $plan] = $this->planWithGuard([
+            'assessed_at' => '2026-07-21T12:00:00+00:00',
+            'harmful' => false, 'reason' => '',
+            'auto' => [],
+            'references' => ['thryv.com'],
+        ]);
+        $this->seedCompetitorCache($website, ['thryv.com', 'unclassified-rival.com']);
+
+        $this->assertSame(['unclassified-rival.com'], $this->researchPick($plan));
+    }
+
+    /** No assessment yet → the raw order still works (research never stalls on the guard). */
+    public function test_research_falls_back_to_raw_order_when_unassessed(): void
+    {
+        [, $website, $plan] = $this->planWithGuard();
+        $this->seedCompetitorCache($website, ['thryv.com', 'sparklehome.com']);
+
+        $this->assertSame(['thryv.com'], $this->researchPick($plan));
+    }
+
+    /** Removing a competitor on the wizard step must remove it from research too. */
+    public function test_research_respects_manual_competitor_removal(): void
+    {
+        [, $website, $plan] = $this->planWithGuard();
+        $this->seedCompetitorCache($website, ['thryv.com', 'sparklehome.com']);
+        $plan->update(['competitor_overrides' => ['removed' => ['thryv.com']]]);
+
+        $this->assertSame(['sparklehome.com'], $this->researchPick($plan->fresh()));
     }
 }

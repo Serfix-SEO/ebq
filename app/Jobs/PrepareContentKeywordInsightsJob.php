@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ContentPlan;
+use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentKeywordInsights;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
@@ -43,6 +44,22 @@ class PrepareContentKeywordInsightsJob implements ShouldQueue
         if ($plan === null) {
             return;
         }
+
+        // Classify competitors FIRST when it hasn't happened yet: the research
+        // slot is a single competitor, and without the classification the pick
+        // falls back to authority order — which surfaces directories (thryv.com
+        // for a cleaning company) ahead of the actual rival, then caches the
+        // wasted request. One fast flash call; failures never block research.
+        $guard = app(CompetitorMentionGuard::class);
+        try {
+            if (! $guard->assessed($plan)) {
+                $guard->assess($plan);
+                $plan->refresh();
+            }
+        } catch (\Throwable) {
+            // fail-soft — ensureStarted() proceeds with the unclassified list
+        }
+
         $insights->ensureStarted($plan);
     }
 }

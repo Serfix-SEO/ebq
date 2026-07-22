@@ -24,6 +24,7 @@ use App\Support\ContentAutopilotConfig;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * "Here's the keyword research we did for you" — the Content Autopilot
@@ -285,25 +286,43 @@ class ContentKeywordInsights
         if ($website === null) {
             return [];
         }
-        $out = [];
+        $candidates = [];
         try {
-            $insights = app(ContentSetupInsights::class)->competitorAuthority($website);
+            $svc = app(ContentSetupInsights::class);
+            // withOverrides: the client's manual add/remove edits on the
+            // competitors step must steer the research too — previously a
+            // removed domain was still analyzed (raw report list only).
+            $insights = $svc->withOverrides($svc->competitorAuthority($website), $plan);
             $competitors = is_array($insights) ? ($insights['competitors'] ?? []) : [];
             $own = strtolower(preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
             foreach ($competitors as $c) {
                 $d = strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))));
-                if ($d !== '' && $d !== $own && ! in_array($d, $out, true)) {
-                    $out[] = $d;
-                    if (count($out) >= $limit) {
-                        break;
-                    }
+                if ($d !== '' && $d !== $own && ! in_array($d, $candidates, true)) {
+                    $candidates[] = $d;
                 }
             }
         } catch (\Throwable) {
             // no competitor data — skip competitor keywords
         }
 
-        return $out;
+        // The report's "competitors" are SERP neighbours ranked by authority —
+        // which systematically surfaces directories and platforms (thryv.com
+        // for a cleaning company, prod 2026-07-21) ahead of the actual rival.
+        // The mention guard already classified each domain against what this
+        // client SELLS, so analyze real product competitors first and never
+        // waste the single research slot on a classified reference.
+        $guard = (array) ($plan->competitor_guard ?? []);
+        if (! empty($guard['assessed_at'])) {
+            $normalize = static fn ($d) => strtolower(preg_replace('/^www\./', '', trim((string) $d)));
+            $rivals = array_map($normalize, array_column((array) ($guard['auto'] ?? []), 'domain'));
+            $references = array_map($normalize, (array) ($guard['references'] ?? []));
+
+            $preferred = array_values(array_intersect($candidates, $rivals));
+            $rest = array_values(array_diff($candidates, $rivals, $references));
+            $candidates = array_merge($preferred, $rest);
+        }
+
+        return array_slice($candidates, 0, $limit);
     }
 
     /**
@@ -752,7 +771,7 @@ class ContentKeywordInsights
 
     /**
      * @param  list<string>  $items
-     * @return list<string>|null  lowercased on-topic items; null on LLM unavailable/error
+     * @return list<string>|null lowercased on-topic items; null on LLM unavailable/error
      */
     private function llmRelevantItems(array $items, string $offer, string $desc, string $noun): ?array
     {
@@ -1267,7 +1286,7 @@ class ContentKeywordInsights
                 if (! str_contains($kw, $term)) {
                     continue;
                 }
-                $groups[$term] ??= ['label' => (string) \Illuminate\Support\Str::title($term), 'count' => 0, 'volume' => 0, 'top' => []];
+                $groups[$term] ??= ['label' => (string) Str::title($term), 'count' => 0, 'volume' => 0, 'top' => []];
                 $groups[$term]['count']++;
                 $groups[$term]['volume'] += (int) ($r['volume'] ?? 0);
                 $groups[$term]['top'][] = $r;
@@ -1407,7 +1426,7 @@ class ContentKeywordInsights
                 // "PUBG Names") — title-case the all-lowercase ones only, so
                 // acronyms survive.
                 $display = $label === mb_strtolower($label)
-                    ? (string) \Illuminate\Support\Str::title($label)
+                    ? (string) Str::title($label)
                     : $label;
                 $grouped[$label] ??= ['label' => $display, 'count' => 0, 'volume' => 0, 'top' => []];
                 $grouped[$label]['count']++;
