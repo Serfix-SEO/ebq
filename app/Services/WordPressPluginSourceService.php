@@ -13,7 +13,7 @@ class WordPressPluginSourceService
 
     public function pluginMainFile(): string
     {
-        return base_path('ebq-seo-wp/ebq-seo.php');
+        return base_path('ebq-wordpress-plugin/ebq-seo.php');
     }
 
     public function readCurrentVersion(): ?string
@@ -104,7 +104,7 @@ class WordPressPluginSourceService
         $who = $user ? 'Current process user: '.$user.'. ' : '';
 
         return $who.
-            'Fix ownership/ACL so the web/PHP user can write `ebq-seo-wp/ebq-seo.php` and `public/downloads/` '.
+            'Fix ownership/ACL so the web/PHP user can write `ebq-wordpress-plugin/ebq-seo.php` and `public/downloads/` '.
             '(example on Debian/Ubuntu: `sudo chown -R www-data:www-data '.$dir.'` if PHP-FPM runs as www-data). '.
             'Alternatively, apply the version over SSH as the deploy user: `cd '.base_path().' && php artisan ebq:apply-plugin-version <version> --package`.';
     }

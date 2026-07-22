@@ -19,7 +19,7 @@ class WordPressPluginVersionController extends Controller
         $channel = request()->query('channel', 'stable');
         $channel = in_array($channel, ['stable', 'beta'], true) ? $channel : 'stable';
 
-        $sourceFile = base_path('ebq-seo-wp/ebq-seo.php');
+        $sourceFile = base_path('ebq-wordpress-plugin/ebq-seo.php');
         $release = $resolver->latestPublished($channel);
 
         $version = $release?->version ?: $this->parseVersion($sourceFile);

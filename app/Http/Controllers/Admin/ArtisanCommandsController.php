@@ -143,7 +143,7 @@ class ArtisanCommandsController extends Controller
             'category' => 'WordPress plugin',
             'schedule' => null,
             'destructive' => false,
-            'notes' => 'Zips ebq-seo-wp/ into public/downloads/ebq-seo.zip for public download. Run after every plugin release before the marketing download link reflects the new build.',
+            'notes' => 'Zips ebq-wordpress-plugin/ into public/downloads/ebq-seo.zip for public download. Run after every plugin release before the marketing download link reflects the new build.',
             'examples' => [
                 'php artisan ebq:package-plugin',
                 'php artisan ebq:package-plugin --output=storage/app/ebq-seo-3.0.zip',
@@ -153,7 +153,7 @@ class ArtisanCommandsController extends Controller
             'category' => 'WordPress plugin',
             'schedule' => null,
             'destructive' => false,
-            'notes' => 'Rewrites the Version: header + EBQ_SEO_VERSION constant in ebq-seo-wp/ebq-seo.php. Requires write access to the plugin source — run as the deploy user.',
+            'notes' => 'Rewrites the Version: header + EBQ_SEO_VERSION constant in ebq-wordpress-plugin/ebq-seo.php. Requires write access to the plugin source — run as the deploy user.',
             'examples' => ['php artisan ebq:apply-plugin-version 3.1.0'],
         ],
         'ebq:publish-scheduled-plugin-releases' => [

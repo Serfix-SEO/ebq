@@ -5,7 +5,7 @@
         <div>
             <h2 class="text-lg font-semibold">Plugin Releases</h2>
             <p class="text-sm text-slate-500">
-                Set the version in <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-slate-800">ebq-seo-wp/ebq-seo.php</code> and run
+                Set the version in <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-slate-800">ebq-wordpress-plugin/ebq-seo.php</code> and run
                 <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-slate-800">php artisan ebq:package-plugin</code> automatically when you publish or when a scheduled release goes live.
             </p>
             @if ($sourceVersion)

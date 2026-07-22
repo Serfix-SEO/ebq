@@ -281,6 +281,64 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-22 (WordPress plugin source path was stale since the 2026-06-16
+  rename — publish silently broken for a month)** — `WordPressPluginSourceService::
+  pluginMainFile()`, `PackageWordPressPlugin`, and `WordPressPluginVersionController`
+  all still hardcoded `ebq-seo-wp/ebq-seo.php`, the plugin's OLD checkout path before
+  it was renamed to `ebq-wordpress-plugin/` (documented at the time in this file's
+  2026-06-16 entry, but these 3 call sites were missed and untested). `ebq:package-plugin`
+  would fail outright ("Plugin source not found"). Fixed; see
+  [wordpress-plugin/releases.md](./wordpress-plugin/releases.md).
+- **2026-07-22 (connect-a-destination banner no longer WordPress-only)** — The
+  calendar/article-review "Connect your WordPress site" banner only cleared
+  for `PLATFORM_WORDPRESS`/`PLATFORM_WORDPRESS_APP_PASSWORD` — a client
+  connected via the Laravel or Custom webhook tab (both `PLATFORM_WEBHOOK`)
+  kept seeing it forever. Now checks ANY connected integration row and reads
+  platform-neutral; component renamed `connect-wordpress.blade.php` →
+  `connect-integration.blade.php`. See
+  [content-autopilot/README.md](./content-autopilot/README.md).
+- **2026-07-22 (Content Autopilot: target-country selector + full pipeline
+  threading)** — Wizard step 1 gained a target-country dropdown
+  (`KeywordFinderLocations::countryOptions()`), auto-guessed from the domain's
+  ccTLD (generic-use TLDs like .co/.io/.me deliberately excluded from the
+  guess). Threaded into the two pipeline stages that were ignoring
+  `ContentPlan.country`: `ContentTopicPlanner::ideate()` (adds a "TARGET
+  MARKET" prompt line) and the step-5 SERP competitor-discovery fallback
+  (`DiscoverContentCompetitorsJob` → `ReportEnrichmentService::
+  discoverCompetitorsFor()`, new optional `$gl` param, default unchanged for
+  the shared client-report caller). Keyword research and the article
+  writer/researcher were already correctly geo-targeted. Also fixed a latent
+  bug found while testing: `ContentCalendar::$country` defaulted to `''`
+  (empty string) while the anonymous-onboarding twin's copy defaulted to
+  `'global'` — the detection guard's `=== 'global'` check silently never
+  fired on a real fresh visit. See
+  [content-autopilot/README.md](./content-autopilot/README.md).
+- **2026-07-22 (competitor guard: 3 more keyword-research sites bypassed it)** —
+  The 2026-07-21 fix only covered the wizard's single research-slot picker.
+  `ClassifyPlanKeywordsJob` (the actual client-visible gap-keyword dataset) and
+  the monthly `ebq:content-keyword-harvest` command each independently
+  re-derived their own raw, guard-blind, override-blind top-N competitor list,
+  so a directory like thryv.com kept contributing "gap" keywords even after
+  being correctly classified as a reference. Consolidated into one shared
+  `CompetitorMentionGuard::rankAndFilter()` helper and wired it (+
+  `withOverrides()`) into both. See
+  [content-autopilot/README.md](./content-autopilot/README.md).
+- **2026-07-22 (Content Autopilot exempted from the dashboard token cap)** —
+  Content Autopilot LLM calls (write/revise, site-profile auto-detect,
+  competitor-guard classification, topic ideation/relevance, keyword
+  classification, image-prompt writing) now all pass `__unmetered => true` to
+  `OpenAiCompatibleClient`, exempting them from `UsageMeter`'s generic
+  per-user monthly token cap — real usage is already bounded by trial/monthly
+  article counts and `ContentLlmSpendMeter`. Found after a prod incident where
+  `analyzeSite()` threw `QuotaExceededException` (account had no dashboard
+  `Plan` tier, only content-level coverage, so it fell back to the lowest
+  default cap) and the resulting `redirect()->back()` looped forever through
+  Livewire's XHR-redirect-as-full-navigation behavior — also fixed by making
+  `analyzeSite()` fail soft on that exception. Same incident surfaced that
+  `ContentPlan.billing_covered_at` (not a separate entitlements table) IS the
+  coverage marker — deleting a plan row to reset test data silently revokes
+  access too. All three landmines documented in
+  [content-autopilot/README.md](./content-autopilot/README.md).
 - **2026-07-21 (competitor-mention guard)** — A serfix.io article recommended
   Semrush. New `CompetitorMentionGuard`: LLM classifies each wizard competitor as
   product-competitor (blocked brand) vs valid reference (google.com stays

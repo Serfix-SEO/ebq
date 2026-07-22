@@ -155,7 +155,7 @@ class PluginReleaseController extends Controller
             'channel' => $pluginRelease->channel,
         ]);
 
-        return back()->with('status', 'Release published; ebq-seo-wp version updated and plugin packaged.');
+        return back()->with('status', 'Release published; ebq-wordpress-plugin version updated and plugin packaged.');
     }
 
     public function rollback(

@@ -191,7 +191,7 @@ publish).
 (`:40`):
 
 1. `setVersionInSource` rewrites **both** the `Version:` header line and the
-   `EBQ_SEO_VERSION` define in `ebq-seo-wp/ebq-seo.php` (regex, validated against
+   `EBQ_SEO_VERSION` define in `ebq-wordpress-plugin/ebq-seo.php` (regex, validated against
    `\d+\.\d+\.\d+(-suffix)?`).
 2. Runs `php artisan ebq:package-plugin --output public/downloads/ebq-seo.zip`.
 
@@ -292,6 +292,14 @@ admin can see which sites are connected and last active. Read-only.
 - **Source-tree publish needs a writable FS + FPM restart** to actually serve new code
   (opcache, see `CLAUDE.local.md`). The ZIP-upload path avoids the writable-source
   requirement entirely.
+- **The `ebq-seo-wp` → `ebq-wordpress-plugin` rename (2026-06-16) broke source-tree
+  publish silently for over a month (found 2026-07-22)** — `WordPressPluginSourceService::
+  pluginMainFile()`, `PackageWordPressPlugin`, and `WordPressPluginVersionController` all
+  still hardcoded the old `ebq-seo-wp/ebq-seo.php` path (the directory itself had already
+  been renamed/re-cloned as `ebq-wordpress-plugin/` and the `.gitignore`/main.md changelog
+  were updated at the time, but these three call sites were missed). `ebq:package-plugin`
+  would have failed outright ("Plugin source not found"); no test covered any of these
+  three, so nothing caught it. Fixed — all three now point at `ebq-wordpress-plugin/`.
 
 ## Key files
 

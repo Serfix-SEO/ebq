@@ -138,7 +138,7 @@ All tries=1 (paid external calls; never auto-retry), all `ShouldBeUnique`.
 | `ebq:fetch-keyword-metrics {--website=}{--country=}{--min-impressions=100}{--days=28}{--limit=500}{--force}{--sync}{--dry-run}` (`FetchKeywordMetrics.php`) | Queue KE lookups for GSC queries above an impression threshold | manual | no |
 | `ebq:import-historical {--days=480}{--website=}` (`ImportHistoricalData.php`) | Dispatch full GA4+GSC history import (upsert) | manual | no (additive upsert) |
 | `ebq:resync-gsc {--days=30}{--website=}` (`ResyncGsc.php`) | Queue `SyncSearchConsoleData` with extended lookback to backfill country/device dims | manual | **caution** — see below |
-| `ebq:apply-plugin-version {…}` (`ApplyPluginVersionCommand.php`) | Bump Version/`EBQ_SEO_VERSION` in `ebq-seo-wp/ebq-seo.php` | manual | no (file edit) |
+| `ebq:apply-plugin-version {…}` (`ApplyPluginVersionCommand.php`) | Bump Version/`EBQ_SEO_VERSION` in `ebq-wordpress-plugin/ebq-seo.php` | manual | no (file edit) |
 | `ebq:package-plugin {--output=}` (`PackageWordPressPlugin.php`) | Zip the WP plugin source for public download | manual | no (writes a file) |
 | `ebq:purge-empty-country-gsc {--older-than=30}{--website=}{--dry-run}` (`PurgeEmptyCountryGsc.php`) | Delete legacy `country=''` GSC rows older than N days | manual | **YES — deletes rows** (see below) |
 | `ebq:purge-sync-data {--website=}{--dry-run}{--force}` (`PurgeSyncData.php`) | Wipe GSC+GA + derived data so next sync re-pulls fresh | manual | **YES — bulk delete + `Cache::flush()`** (see below) |

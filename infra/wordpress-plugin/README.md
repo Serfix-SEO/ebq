@@ -62,7 +62,7 @@ install on the public version endpoint.
 | Feature flags (admin) | `app/Http/Controllers/Admin/WebsiteFeatureController.php` | Per-website + global feature-flag grid |
 | Adoption (admin) | `app/Http/Controllers/Admin/PluginAdoptionController.php` | Per-website install + token-usage listing |
 | Release resolver | `app/Services/PluginReleaseResolver.php` | `latestPublished()`, `publishScheduled()`, `markPublished()` (one-published-per-channel invariant) |
-| Source/packaging | `app/Services/WordPressPluginSourceService.php` | Rewrites `Version:`/`EBQ_SEO_VERSION` in `ebq-seo-wp/ebq-seo.php`, runs `ebq:package-plugin` |
+| Source/packaging | `app/Services/WordPressPluginSourceService.php` | Rewrites `Version:`/`EBQ_SEO_VERSION` in `ebq-wordpress-plugin/ebq-seo.php`, runs `ebq:package-plugin` |
 | Insight resolver | `app/Services/PluginInsightResolver.php` | Per-post insight payload (GSC totals, tracked-rank, cannibalization/striking flags) |
 
 ## Auth model (Sanctum token per Website)
@@ -111,7 +111,7 @@ install on the public version endpoint.
   `app/Services/{PluginReleaseResolver,WordPressPluginSourceService}.php`,
   `app/Console/Commands/{PublishScheduledPluginReleases,ApplyPluginVersionCommand,PackageWordPressPlugin}.php`,
   model `app/Models/PluginRelease.php`
-- Plugin source — `ebq-seo-wp/ebq-seo.php` (header `Version:`, `EBQ_SEO_VERSION` define)
+- Plugin source — `ebq-wordpress-plugin/ebq-seo.php` (header `Version:`, `EBQ_SEO_VERSION` define)
 
 ## Live test install (owner-provided, for plugin QA)
 

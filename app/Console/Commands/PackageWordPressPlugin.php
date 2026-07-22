@@ -9,11 +9,11 @@ use Illuminate\Support\Facades\File;
 class PackageWordPressPlugin extends Command
 {
     protected $signature = 'ebq:package-plugin {--output=public/downloads/ebq-seo.zip}';
-    protected $description = 'Zip the ebq-seo-wp/ plugin source into public/downloads/ebq-seo.zip for public download.';
+    protected $description = 'Zip the ebq-wordpress-plugin/ plugin source into public/downloads/ebq-seo.zip for public download.';
 
     public function handle(): int
     {
-        $base = base_path('ebq-seo-wp');
+        $base = base_path('ebq-wordpress-plugin');
         if (! is_dir($base)) {
             $this->error('Plugin source not found at '.$base);
 
