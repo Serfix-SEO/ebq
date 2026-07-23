@@ -25,31 +25,52 @@ class ContentAutopilotPipelineTest extends TestCase
         // from topic + business profile alone. That's the degradation path.
     }
 
-    /** Fake the LLM: draft-shaped JSON for writes, patch-shaped for revisions. */
+    /**
+     * Fake the LLM. Writes are CHUNKED (2026-07-22): an outline call
+     * ("PLANNING STEP") then one call per section ("WRITING STEP — write
+     * ONLY section N"), so the fake speaks that protocol; revisions
+     * ("PROBLEMS TO FIX") stay single-call patch-shaped.
+     */
     private function fakeLlm(string $draftHtml, ?string $revisedHtml = null): void
     {
-        Http::fake([
-            'api.mistral.ai/*' => function ($request) use ($draftHtml, $revisedHtml) {
-                $body = json_encode($request->data());
-                $isRevision = str_contains($body, 'PROBLEMS TO FIX');
+        $sections = [
+            ['heading' => 'Why blue widget cleaning matters', 'html' => '<h2>Why blue widget cleaning matters</h2><p>'.$draftHtml.'</p>'],
+            ['heading' => 'Tools you need', 'html' => '<h2>Tools you need</h2><p>Short list. A soft brush works well because it lifts grime without scratching the coating on most widgets sold today.</p>'],
+            ['heading' => 'Step by step process', 'html' => '<h2>Step by step process</h2><p>Start dry. Then work through each surface with slow passes, checking corners where dust builds up over weeks of normal use.</p>'],
+            ['heading' => 'Mistakes to avoid', 'html' => '<h2>Mistakes to avoid</h2><p>Skip harsh solvents. They strip finish fast, and replacing a damaged widget costs far more than five careful minutes.</p>'],
+        ];
 
-                $payload = $isRevision
-                    ? [
+        Http::fake([
+            'api.mistral.ai/*' => function ($request) use ($draftHtml, $revisedHtml, $sections) {
+                $body = json_encode($request->data());
+
+                if (str_contains($body, 'PROBLEMS TO FIX')) {
+                    $payload = [
                         'html' => $revisedHtml ?? $draftHtml,
                         'meta_title' => 'Blue Widget Cleaning Guide For Homes',
                         'meta_description' => 'Learn blue widget cleaning with this practical walkthrough covering tools, steps, and mistakes to avoid so your widgets stay spotless year round.',
                         'h1' => 'Blue Widget Cleaning Done Right',
-                    ]
-                    : [
+                    ];
+                } elseif (str_contains($body, 'PLANNING STEP')) {
+                    $payload = [
+                        'h1' => 'Blue Widget Cleaning Done Right',
+                        'summary' => 'A practical walkthrough of blue widget cleaning covering tools, steps, and common mistakes to avoid for spotless widgets year round in any home.',
+                        'outline' => array_map(static fn ($s) => [
+                            'heading' => $s['heading'], 'focus' => 'cover it well', 'word_target' => 250,
+                        ], $sections),
+                    ];
+                } elseif (preg_match('/write ONLY section (\d+)/', $body, $m)) {
+                    $payload = $sections[((int) $m[1]) - 1] ?? $sections[0];
+                } else {
+                    // Legacy single-call draft shape (non-chunked callers).
+                    $payload = [
                         'summary' => 'A practical walkthrough of blue widget cleaning covering tools, steps, and common mistakes to avoid for spotless widgets year round in any home.',
                         'h1' => 'Blue Widget Cleaning Done Right',
-                        'sections' => [
-                            ['kind' => 'add', 'title' => 'Why blue widget cleaning matters', 'proposed_html' => '<p>'.$draftHtml.'</p>'],
-                            ['kind' => 'add', 'title' => 'Tools you need', 'proposed_html' => '<p>Short list. A soft brush works well because it lifts grime without scratching the coating on most widgets sold today.</p>'],
-                            ['kind' => 'add', 'title' => 'Step by step process', 'proposed_html' => '<p>Start dry. Then work through each surface with slow passes, checking corners where dust builds up over weeks of normal use.</p>'],
-                            ['kind' => 'add', 'title' => 'Mistakes to avoid', 'proposed_html' => '<p>Skip harsh solvents. They strip finish fast, and replacing a damaged widget costs far more than five careful minutes.</p>'],
-                        ],
+                        'sections' => array_map(static fn ($s) => [
+                            'kind' => 'add', 'title' => $s['heading'], 'proposed_html' => $s['html'],
+                        ], $sections),
                     ];
+                }
 
                 return Http::response([
                     'choices' => [['message' => ['content' => json_encode($payload)]]],
@@ -228,5 +249,31 @@ class ContentAutopilotPipelineTest extends TestCase
         $this->artisan('ebq:content-autopilot')->assertSuccessful();
 
         Queue::assertNotPushed(ProduceContentArticleJob::class);
+    }
+
+    /**
+     * Meta descriptions must never truncate mid-clause (live serfix.io meta
+     * ended "…a detailed checklist, and" — 2026-07-22). Sentence-aware first,
+     * then word boundary with dangling conjunctions stripped.
+     */
+    public function test_meta_clamp_is_sentence_aware_and_strips_dangling_words(): void
+    {
+        $producer = app(\App\Services\Content\ContentArticleProducer::class);
+        $m = (new \ReflectionClass($producer))->getMethod('clampLength');
+        $m->setAccessible(true);
+
+        // A full sentence fits comfortably → cut lands on its period.
+        $twoSentences = 'A complete SEO audit guide tailored for 2026, covering every step from preparation to reporting in plain language. It includes key takeaways, a detailed checklist, and more beyond.';
+        $clamped = $m->invoke($producer, $twoSentences, 155);
+        $this->assertSame('A complete SEO audit guide tailored for 2026, covering every step from preparation to reporting in plain language.', $clamped);
+
+        // No usable sentence end → word boundary, dangling conjunction dropped.
+        $noSentence = str_repeat('word ', 28).'a detailed checklist and everything else that follows';
+        $clamped2 = $m->invoke($producer, $noSentence, 155);
+        $this->assertLessThanOrEqual(155, mb_strlen($clamped2));
+        $this->assertDoesNotMatchRegularExpression('/\s(?:and|or|with|for|to|the|a|an|of|in)$/i', $clamped2);
+
+        // Short strings pass through untouched.
+        $this->assertSame('Short and sweet.', $m->invoke($producer, 'Short and sweet.', 155));
     }
 }

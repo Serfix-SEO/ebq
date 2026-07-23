@@ -293,7 +293,17 @@ class AiWriterService
         if (! empty($input['__unmetered'])) {
             $llmOptions['__unmetered'] = true;
         }
-        $response = $this->llm->completeJson($messages, $llmOptions);
+        // Chunked mode (Content Autopilot): outline first, then one small call
+        // per section, assembled server-side into the exact same response
+        // shape. A single mega-call can blow the 16k output cap on hub topics
+        // ("Ultimate Guide …", prod 2026-07-22: two attempts, both truncated at
+        // exactly 16000 completion tokens → llm_parse_failed, ~21k tokens
+        // billed each for zero output). Per-section calls are structurally
+        // incapable of hitting the cap, and a failed section retries or skips
+        // individually instead of losing the whole article.
+        $response = ! empty($input['chunked'])
+            ? $this->chunkedDraft($messages, $llmOptions)
+            : $this->llm->completeJson($messages, $llmOptions);
 
         if (! is_array($response) || ! isset($response['sections']) || ! is_array($response['sections'])) {
             Log::warning('AiWriterService: malformed LLM response', [
@@ -564,6 +574,150 @@ class AiWriterService
         Cache::put($cacheKey, $result, self::CACHE_TTL_SEC);
 
         return $result;
+    }
+
+    /**
+     * Section-by-section generation: an outline call, then one small call per
+     * section, assembled into the SAME response shape the single mega-call
+     * returns ({h1, summary, sections: [{kind, title, proposed_html, ...}]})
+     * so every downstream consumer (normalizeSections, LSI audit, anchors,
+     * caching) is untouched.
+     *
+     * Failsafe properties (why this exists — the 16k-cap incident):
+     *  - No call can hit the output cap: outline ≤2500 tokens, each section
+     *    ≤4000 (a section is 200-800 words ≈ 300-1200 tokens).
+     *  - A section that fails to parse retries ONCE with a tighter word cap,
+     *    then is skipped — the article still completes with the rest.
+     *  - Wall-clock budget: after ~15 min of writing, remaining failed
+     *    sections are skipped rather than retried, so the produce job's
+     *    1800s timeout is never at risk.
+     *
+     * Costs more prompt tokens (context re-sent per call) — accepted
+     * trade-off, owner decision 2026-07-22.
+     *
+     * @param  list<array{role: string, content: string}>  $messages  the full single-call prompt
+     * @param  array<string, mixed>  $llmOptions  the single-call options (billing hints reused)
+     * @return array<string, mixed>|null  same shape completeJson would return, or null
+     */
+    private function chunkedDraft(array $messages, array $llmOptions): ?array
+    {
+        $startedAt = microtime(true);
+        $budgetSec = 900; // retries stop past this; the job has 1800s total
+
+        // ── 1. Outline ──────────────────────────────────────────────────
+        // reasoning is stripped here too: DeepSeek's thinking tokens count
+        // against max_tokens, so a 2500-cap outline call with reasoning on
+        // spent its entire budget thinking and returned truncated JSON
+        // (observed live 2026-07-22: completion_tokens == cap exactly).
+        $outlineOptions = array_merge($llmOptions, ['max_tokens' => 3000, 'timeout' => 120]);
+        unset($outlineOptions['reasoning']);
+        $outlineInstruction = <<<'TXT'
+        PLANNING STEP — do NOT write the article yet. Apply every rule above to
+        produce ONLY the article plan, as ONE JSON object:
+        {"h1": "...", "summary": "...", "outline": [{"heading": "...", "focus": "one sentence on what this section must cover", "word_target": 300}]}
+        - "h1" and "summary" follow the same specs as the output rules above.
+        - 6-14 outline entries covering the brief's outline/subtopics/gaps.
+        - word_target per section: 150-500 (respect the article's total target
+          length — the sum of word_targets must not exceed it by more than 20%).
+        - When the FAQ rules above require a FAQ section, it MUST be the LAST
+          outline entry, heading "Frequently Asked Questions".
+        - No "sections" key, no HTML — the plan only.
+        TXT;
+        $outline = null;
+        for ($try = 1; $try <= 2; $try++) {
+            $decoded = $this->llm->completeJson(
+                array_merge($messages, [['role' => 'user', 'content' => $outlineInstruction]]),
+                $outlineOptions
+            );
+            if (is_array($decoded) && is_array($decoded['outline'] ?? null) && $decoded['outline'] !== []) {
+                $outline = $decoded;
+                break;
+            }
+        }
+        if ($outline === null) {
+            Log::warning('AiWriterService: chunked outline failed');
+
+            return null;
+        }
+
+        $entries = array_values(array_filter(
+            array_slice((array) $outline['outline'], 0, 14),
+            static fn ($e) => is_array($e) && trim((string) ($e['heading'] ?? '')) !== ''
+        ));
+        if ($entries === []) {
+            return null;
+        }
+
+        // ── 2. One call per section ─────────────────────────────────────
+        // Sections don't need thinking mode — each is a small, tightly-scoped
+        // write; reasoning would double the wall time × N sections.
+        $sectionOptions = array_merge($llmOptions, ['max_tokens' => 4000, 'timeout' => 90]);
+        unset($sectionOptions['reasoning']);
+
+        $planBlock = implode("\n", array_map(
+            static fn ($e, $i) => ($i + 1).'. '.trim((string) $e['heading']),
+            $entries,
+            array_keys($entries)
+        ));
+
+        $sections = [];
+        $total = count($entries);
+        foreach ($entries as $i => $entry) {
+            $heading = trim((string) $entry['heading']);
+            $focus = trim((string) ($entry['focus'] ?? ''));
+            $words = max(150, min(800, (int) ($entry['word_target'] ?? 300)));
+            $overBudget = (microtime(true) - $startedAt) > $budgetSec;
+
+            $html = null;
+            for ($try = 1; $try <= ($overBudget ? 1 : 2); $try++) {
+                $cap = $try === 1 ? $words : (int) ceil($words / 2);
+                $first = $i === 0
+                    ? ' This is the FIRST section of the article — follow the H1/intro rule from the output rules above (the H1 + intro paragraph open this section when those rules require it).'
+                    : '';
+                $instruction = 'WRITING STEP — write ONLY section '.($i + 1).' of '.$total.' of this article plan:'."\n"
+                    .$planBlock."\n\n"
+                    .'Section '.($i + 1).': "'.$heading.'"'.($focus !== '' ? ' — '.$focus : '')."\n"
+                    .'Target ~'.$cap.' words (hard maximum '.($cap * 2).').'.$first."\n"
+                    .'Every content/style/link/language rule above applies to this section. '
+                    .'Do NOT write any other section, no intro/outro for the article as a whole, no repetition of other sections. '
+                    .'Return ONE JSON object only: {"heading": "'.str_replace('"', '\"', $heading).'", "html": "<h2>…</h2><p>…</p>"}';
+                $decoded = $this->llm->completeJson(
+                    array_merge($messages, [['role' => 'user', 'content' => $instruction]]),
+                    $sectionOptions
+                );
+                $candidate = is_array($decoded) ? trim((string) ($decoded['html'] ?? '')) : '';
+                if ($candidate !== '' && strip_tags($candidate) !== '') {
+                    $html = $candidate;
+                    break;
+                }
+            }
+
+            if ($html === null) {
+                Log::warning('AiWriterService: chunked section skipped', ['index' => $i, 'heading' => $heading]);
+                continue;
+            }
+
+            $sections[] = [
+                'kind' => 'add',
+                'title' => $heading,
+                'proposed_html' => $html,
+                'source_tags' => ['brief'],
+            ];
+        }
+
+        // Fewer than 3 usable sections is not an article — fail like a parse
+        // error so the producer's existing retry/fail path takes over.
+        if (count($sections) < 3) {
+            Log::warning('AiWriterService: chunked draft too few sections', ['got' => count($sections)]);
+
+            return null;
+        }
+
+        return [
+            'h1' => (string) ($outline['h1'] ?? ''),
+            'summary' => (string) ($outline['summary'] ?? ''),
+            'sections' => $sections,
+        ];
     }
 
     /**

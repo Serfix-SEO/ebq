@@ -281,6 +281,27 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-22 (competitors step: SERP-first, giants filtered, SERP order,
+  top-10)** — Owner decision. `ContentSetupInsights::build()` now takes
+  SERP-discovered competitors as LAYER 1 (displayed in SERP tally order; the
+  strongest-backlinks re-sort is gone), with the backlink report demoted to
+  authority metrics + fallback rows. `GiantDomains` expanded 15 → ~90 entries
+  (amazon/ebay/netflix/booking/nytimes-class platforms, extendable) and now
+  filters BOTH sources. `MAX_COMPETITORS` 5 → 10. `ensureGenerating()`
+  dispatches SERP discovery before the paid report. All 14 live insight
+  caches busted on deploy. See
+  [content-autopilot/README.md](./content-autopilot/README.md).
+- **2026-07-22 (chunked article writing — the 16k-cap failure class is gone)** —
+  Content Autopilot's write stage no longer generates the whole article in one
+  16k-max_tokens call (hub topics blew the cap → truncated JSON →
+  `llm_parse_failed`, ~21k tokens billed per failed attempt). New
+  `AiWriterService::chunkedDraft()` (opt-in `chunked` flag, set only by
+  `ContentArticleProducer`): outline call + one small capped call per section
+  + server-side assembly into the identical response shape; per-section
+  retry-then-skip, wall-clock budget. WP-plugin wizard keeps the legacy
+  single call. ~1.5-2× token cost per article, owner-approved. Also resolves
+  the long-standing hub-topic length-adherence item. See
+  [content-autopilot/README.md](./content-autopilot/README.md).
 - **2026-07-22 (WordPress plugin source path was stale since the 2026-06-16
   rename — publish silently broken for a month)** — `WordPressPluginSourceService::
   pluginMainFile()`, `PackageWordPressPlugin`, and `WordPressPluginVersionController`

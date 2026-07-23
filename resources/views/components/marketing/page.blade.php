@@ -5,6 +5,11 @@
     'active' => null,
     'ogImage' => null,
     'robots' => 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+    // 'article' on blog posts (unlocks article:published_time/modified_time
+    // below); default 'website' everywhere else.
+    'ogType' => 'website',
+    'publishedTime' => null,
+    'modifiedTime' => null,
 ])
 @php
     $canonicalUrl = $canonical ?? url()->current();
@@ -50,7 +55,7 @@
     <link rel="canonical" href="{{ $canonicalUrl }}">
 
     {{-- Open Graph --}}
-    <meta property="og:type" content="website">
+    <meta property="og:type" content="{{ $ogType }}">
     <meta property="og:title" content="{{ $title }}">
     <meta property="og:description" content="{{ $description }}">
     <meta property="og:url" content="{{ $canonicalUrl }}">
@@ -59,6 +64,12 @@
     <meta property="og:image" content="{{ $ogImageUrl }}">
     <meta property="og:image:secure_url" content="{{ $ogImageUrl }}">
     <meta property="og:image:alt" content="{{ $title }}">
+    @if ($ogType === 'article' && $publishedTime)
+        <meta property="article:published_time" content="{{ $publishedTime }}">
+    @endif
+    @if ($ogType === 'article' && $modifiedTime)
+        <meta property="article:modified_time" content="{{ $modifiedTime }}">
+    @endif
 
     {{-- Twitter card --}}
     <meta name="twitter:card" content="summary_large_image">

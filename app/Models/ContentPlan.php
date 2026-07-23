@@ -39,6 +39,7 @@ class ContentPlan extends Model
             'internal_urls' => 'array',
             'auto_publish' => 'boolean',
             'images_enabled' => 'boolean',
+            'ymyl' => 'boolean',
             'keywords_classified_at' => 'datetime',
             'keywords_classify_cursor' => 'integer',
         ];

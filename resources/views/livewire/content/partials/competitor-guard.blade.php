@@ -74,7 +74,36 @@
                     </button>
                 </div>
                 @error('newBlockedTerm') <p class="mt-1.5 text-xs text-error">{{ $message }}</p> @enderror
+
+                {{-- Allowed references (Phase E): the classifier's other half —
+                     directories/platforms/citation sources articles may still
+                     link to. One click blocks one anyway. --}}
+                @if (! empty($guard['references']))
+                    <div class="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+                        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ __('Allowed as sources') }}</p>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('These share your search results but are citation sources, not rivals — articles may still reference them.') }}</p>
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                            @foreach ($guard['references'] as $ref)
+                                <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1 pe-1.5 ps-3 text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400" wire:key="guard-ref-{{ $ref }}">
+                                    {{ $ref }}
+                                    <button type="button" wire:click="blockReference('{{ $ref }}')" title="{{ __('Block this brand too') }}" aria-label="{{ __('Block this brand too') }}"
+                                        class="flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700">
+                                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                                    </button>
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </div>
+
+            {{-- Value counter: protection you can see. --}}
+            @if (($guard['stats']['articles_checked'] ?? 0) > 0)
+                <p class="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <svg class="-mt-0.5 me-1 inline h-3.5 w-3.5 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    {{ trans_choice(':n article checked|:n articles checked', $guard['stats']['articles_checked'], ['n' => $guard['stats']['articles_checked']]) }}@if(($guard['stats']['mentions_removed'] ?? 0) > 0) · {{ trans_choice(':n competitor mention removed|:n competitor mentions removed', $guard['stats']['mentions_removed'], ['n' => $guard['stats']['mentions_removed']]) }}@endif
+                </p>
+            @endif
         @else
             <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">{{ __('Protection is off — articles may mention any brand, including competitors.') }}</p>
         @endif

@@ -23,11 +23,49 @@ abstract class TestCase extends BaseTestCase
      * in-memory sqlite (or a clearly-named *test* database), we throw and the
      * whole run stops — regardless of cached config.
      */
+    /**
+     * Once per phpunit process: wipe the DEDICATED test Redis databases
+     * (phpunit.xml pins REDIS_DB=13 / REDIS_CACHE_DB=14 — see the ops
+     * incident where tests hit prod Redis). Unlike sqlite :memory:, those
+     * DBs persist across runs, so fixed-window counters leak between runs:
+     * found 2026-07-23 when MozSpendMeter's monthly row counter reached its
+     * 40-row cap purely from accumulated test runs and two Moz tests started
+     * failing with silent stale-nulls. Guarded hard: flush ONLY dbs 13/14 —
+     * anything else aborts the run (same philosophy as the DB guard below).
+     */
+    private static bool $testRedisFlushed = false;
+
     protected function setUpTraits()
     {
         $this->guardAgainstNonTestDatabase();
+        $this->flushDedicatedTestRedisOnce();
 
         return parent::setUpTraits();
+    }
+
+    private function flushDedicatedTestRedisOnce(): void
+    {
+        if (self::$testRedisFlushed) {
+            return;
+        }
+        self::$testRedisFlushed = true;
+
+        $default = (int) config('database.redis.default.database', -1);
+        $cache = (int) config('database.redis.cache.database', -1);
+        if ($default !== 13 || $cache !== 14) {
+            throw new \RuntimeException(
+                "REFUSING TO FLUSH REDIS: test run resolved redis dbs [default={$default}, cache={$cache}] "
+                ."instead of the dedicated test dbs [13, 14] pinned in phpunit.xml. "
+                ."This almost always means config is CACHED — run: php artisan config:clear"
+            );
+        }
+
+        try {
+            \Illuminate\Support\Facades\Redis::connection()->flushdb();
+            \Illuminate\Support\Facades\Redis::connection('cache')->flushdb();
+        } catch (\Throwable) {
+            // Redis down: tests that need it will fail on their own terms.
+        }
     }
 
     private function guardAgainstNonTestDatabase(): void

@@ -3,6 +3,7 @@
 namespace App\Services\Content;
 
 use App\Models\ContentPlan;
+use App\Models\ContentPlanKeyword;
 use App\Models\ContentTopic;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
@@ -41,8 +42,18 @@ class ContentTopicPlanner
     public function plan(ContentPlan $plan, int $count = 30): array
     {
         $website = $plan->website;
-        if ($website === null || ! $this->llm->isAvailable()) {
+        if ($website === null) {
             return [];
+        }
+
+        // The client's confirmed "best search terms" (wizard keyword step)
+        // become topics FIRST, 1:1 and deterministically — the user picked
+        // them, no LLM gets to veto or reshape that. Runs BEFORE the pool-cap
+        // math (it supersedes llm fillers when full) and works without an LLM.
+        $confirmed = $this->materializeConfirmedTopics($plan, $website);
+
+        if (! $this->llm->isAvailable()) {
+            return $confirmed;
         }
 
         // Maintain a fixed pool of at most `cap` (default 30) UNPUBLISHED topics
@@ -57,7 +68,7 @@ class ContentTopicPlanner
             ->count();
         $count = max(0, min($count, $cap) - $existingActive);
         if ($count === 0) {
-            return [];
+            return $confirmed;
         }
 
         $existingTitles = $this->existingPageTitles($website);
@@ -67,6 +78,9 @@ class ContentTopicPlanner
         $gscSignals = $this->gscSignals($website);
 
         $candidates = $this->ideate($plan, $website, $gscSignals, $existingTitles, $count);
+        if ($candidates === [] && $confirmed !== []) {
+            return $confirmed;
+        }
         if ($candidates === []) {
             return [];
         }
@@ -78,7 +92,7 @@ class ContentTopicPlanner
         if ($plan->keywords_classified_at === null) {
             $candidates = $this->filterRelevant($candidates, $plan);
             if ($candidates === []) {
-                return [];
+                return $confirmed;
             }
         }
 
@@ -121,7 +135,115 @@ class ContentTopicPlanner
             ]);
         }
 
+        return array_merge($confirmed, $created);
+    }
+
+    /**
+     * One topic per client-confirmed "best search term" (wizard keyword step,
+     * `content_plan_keywords.type = chosen`), created deterministically —
+     * no LLM in the loop, so the 1:1 promise the wizard makes always holds.
+     *
+     * Idempotent: a term that EVER had a topic (any status, including
+     * published/skipped) is never re-materialized, so monthly top-up runs
+     * don't duplicate. When the pool is full, each new confirmed topic
+     * supersedes the farthest-out unstarted llm-filler topic and takes over
+     * its calendar slot — the user's own picks always fit.
+     *
+     * @return list<ContentTopic>
+     */
+    private function materializeConfirmedTopics(ContentPlan $plan, Website $website): array
+    {
+        try {
+            $terms = ContentPlanKeyword::query()
+                ->where('plan_id', $plan->id)
+                ->where('type', ContentPlanKeyword::TYPE_CONFIRMED)
+                ->orderBy('id')
+                ->get();
+        } catch (\Throwable) {
+            return [];
+        }
+        if ($terms->isEmpty()) {
+            return [];
+        }
+
+        $existingKeywords = $plan->topics()
+            ->pluck('target_keyword')
+            ->map(static fn ($k) => mb_strtolower(trim((string) $k)))
+            ->flip();
+
+        $cap = \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $created = [];
+
+        foreach ($terms as $term) {
+            $keyword = mb_strtolower(trim((string) $term->keyword));
+            if ($keyword === '' || $existingKeywords->has($keyword) || count($created) >= 10) {
+                continue;
+            }
+
+            $poolSize = $plan->topics()
+                ->whereNotIn('status', [ContentTopic::STATUS_PUBLISHED, ContentTopic::STATUS_SKIPPED])
+                ->count();
+
+            $scheduledFor = null;
+            $position = $poolSize;
+            if ($poolSize >= $cap) {
+                // Pool full: bump the farthest-out llm filler and take its slot.
+                $victim = $plan->topics()
+                    ->whereIn('status', [ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED])
+                    ->where('source', 'llm')
+                    ->orderByDesc('scheduled_for')
+                    ->first();
+                if ($victim === null) {
+                    continue; // everything in-flight or user-curated — don't force it
+                }
+                $scheduledFor = $victim->scheduled_for;
+                $position = (int) $victim->position;
+                $victim->update(['status' => ContentTopic::STATUS_SKIPPED, 'last_error' => 'superseded_by_confirmed_term']);
+            } else {
+                $scheduledFor = $this->scheduleDates($plan, 1)[0] ?? null;
+            }
+
+            $intent = in_array($term->search_intent, ['informational', 'commercial', 'transactional', 'navigational'], true)
+                ? $term->search_intent : 'informational';
+
+            $created[] = $plan->topics()->create([
+                'website_id' => $website->id,
+                'title' => mb_substr($this->confirmedTitle($keyword, $intent), 0, 300),
+                'target_keyword' => mb_substr($keyword, 0, 200),
+                'secondary_keywords' => [],
+                'intent' => $intent,
+                'source' => 'confirmed',
+                'status' => ContentTopic::STATUS_APPROVED,
+                'scheduled_for' => $scheduledFor,
+                'position' => $position,
+                'keyword_volume' => $term->search_volume,
+            ]);
+            $existingKeywords->put($keyword, true);
+        }
+
         return $created;
+    }
+
+    /**
+     * Deterministic, presentable working title for a confirmed term. The
+     * writer generates its own H1 at draft time, so this only needs to read
+     * well on the calendar — never bland enough to look broken, never clever
+     * enough to lie about the article.
+     */
+    private function confirmedTitle(string $keyword, string $intent): string
+    {
+        $title = (string) \Illuminate\Support\Str::title($keyword);
+
+        // Question-shaped terms already read as titles.
+        if (preg_match('/^(how|what|why|when|where|which|who|can|should|is|are|do|does)\b/i', $keyword)) {
+            return $title;
+        }
+
+        return match ($intent) {
+            'commercial' => $title.': '.__('How to Choose Well'),
+            'transactional' => $title.': '.__('What to Know Before You Buy'),
+            default => $title.': '.__('The Complete Guide'),
+        };
     }
 
     // ── evidence gathering ──────────────────────────────────────────────
@@ -320,6 +442,23 @@ class ContentTopicPlanner
             : (\App\Support\KeywordFinderLocations::COUNTRIES[$countryCode] ?? null);
         $marketBlock = $market === null ? '' : "\nTARGET MARKET: {$market}. Topics, terminology, pricing/regulatory framing, and search intent must fit THIS market — never assume US/UK defaults.\n";
 
+        // Type-aware mix + audience (Phase F): the site type's TOFU/MOFU/BOFU
+        // ratio steers what KIND of articles get planned. Null type = no
+        // block, exact pre-site-type prompt.
+        $typeBlock = '';
+        if (\App\Support\ContentSiteTypeProfiles::isValid($plan->site_type)) {
+            $profile = \App\Support\ContentSiteTypeProfiles::profile($plan->site_type);
+            $mix = $profile['article_mix'];
+            $typeBlock = "\nSITE TYPE: ".\App\Support\ContentSiteTypeProfiles::label($plan->site_type)
+                .'. Aim for roughly '.round($mix['tofu'] * 100).'% broad how-to/educational topics, '
+                .round($mix['mofu'] * 100).'% comparison/consideration topics, and '
+                .round($mix['bofu'] * 100).'% decision-stage topics (cost, choosing, buying).';
+            if (filled($plan->audience)) {
+                $typeBlock .= "\nAUDIENCE: ".trim((string) $plan->audience).' — every topic must be something THIS audience would search.';
+            }
+            $typeBlock .= "\n";
+        }
+
         $system = 'You are an SEO content strategist. Respond with valid JSON only.';
         $user = <<<PROMPT
         Plan {$count} blog article topics for the website {$domain}.
@@ -328,7 +467,7 @@ class ContentTopicPlanner
         {$plan->business_description}
         They offer: {$sell}
         They do NOT offer (never write about these as if they do): {$dontSell}
-        {$marketBlock}
+        {$marketBlock}{$typeBlock}
 
         REAL SEARCH QUERIES the site already appears for (impressions = demand, position 8-30 = a dedicated article can win the ranking):
         {$gscBlock}

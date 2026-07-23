@@ -57,6 +57,10 @@
         <env name="MISTRAL_API_KEY" value=""/>
         <env name="DEEPSEEK_API_KEY" value=""/>
         <env name="IDEOGRAM_API_KEY" value=""/>
+        <!-- Pin the model: the machine .env moved to v4 (2026-07) and leaked
+             into tests asserting the v3 default (phpunit only isolates env it
+             overrides — same class as the billable-key leak). -->
+        <env name="IDEOGRAM_MODEL" value=""/>
         <!-- Spend breakers off by default in tests (prod .env now carries real
              caps; the spend Redis key accumulates across runs in the pinned
              test db). Tests that exercise a breaker set config() explicitly. -->

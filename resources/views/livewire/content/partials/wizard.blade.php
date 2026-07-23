@@ -124,11 +124,35 @@
                             </div>
                         </div>
 
+                        {{-- Site type: auto-detected, one click to correct. Drives
+                             keyword intent, competitor guard and CTA style downstream. --}}
+                        <div class="mt-5">
+                            <span class="block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ __('What kind of website is this?') }}</span>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('We tailor your keywords, competitors and article style to this.') }}</p>
+                            <div class="mt-2.5 grid gap-2 sm:grid-cols-3">
+                                @foreach (\App\Support\ContentSiteTypeProfiles::options() as $typeKey => $opt)
+                                    <button type="button" wire:click="selectSiteType('{{ $typeKey }}')"
+                                        class="flex flex-col items-start gap-0.5 rounded-xl border px-3.5 py-2.5 transition-all
+                                            {{ $siteType === $typeKey
+                                                ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-100 dark:bg-orange-950 dark:ring-orange-900'
+                                                : 'border-slate-300 bg-white hover:border-orange-300 dark:border-slate-700 dark:bg-slate-800' }}">
+                                        <span class="text-sm font-semibold {{ $siteType === $typeKey ? 'text-orange-700 dark:text-orange-300' : 'text-slate-800 dark:text-slate-100' }}">{{ __($opt['label']) }}</span>
+                                        <span class="text-xs text-slate-500 dark:text-slate-400">{{ __($opt['description']) }}</span>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+
                         <label class="mt-5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="w-desc">{{ __('What does your business do?') }}</label>
                         <textarea id="w-desc" wire:model="businessDescription" rows="4" maxlength="1000"
                             class="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                             placeholder="{{ __('Describe your products, services, and who they are for…') }}"></textarea>
                         @error('businessDescription') <p class="mt-1 text-sm text-error">{{ $message }}</p> @enderror
+
+                        <label class="mt-5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="w-audience">{{ __('Who is this for?') }} <span class="font-normal text-slate-400">{{ __('(optional)') }}</span></label>
+                        <input id="w-audience" wire:model="audience" type="text" maxlength="500"
+                            class="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            placeholder="{{ __('e.g. busy homeowners in Dubai who want a spotless house') }}" />
 
                         <div class="mt-7 flex justify-end">
                             <button wire:click="toOfferings" wire:loading.attr="disabled" wire:target="toOfferings" @disabled($analyzing) class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 transition-transform hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"><svg wire:loading wire:target="toOfferings" class="-ms-1 me-1 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
@@ -436,8 +460,25 @@
                         {{-- Established site only: authority comparison (referring domains /
                              median / gap). Fresh sites ($fresh) skip it — the header already
                              frames the step as a plain competitor list. --}}
+                        @php
+                            // Peer-honest numbers (Phase D): compare against rivals in the
+                            // client's weight class, not directories or giants. Falls back
+                            // to the all-rows figures when nothing classified as peer.
+                            $peerMedian = $ins['peer_median'] ?? $ins['median'];
+                            $peerGap = $ins['peer_gap'] ?? $ins['gap'];
+                            $peerBehind = $ins['peer_behind'] ?? $ins['behind'];
+                            $mainRows = array_values(array_filter($ins['competitors'], fn ($c) => ! in_array($c['class'] ?? 'peer', ['reference', 'giant'], true)));
+                            $refRows = array_values(array_filter($ins['competitors'], fn ($c) => in_array($c['class'] ?? null, ['reference', 'giant'], true)));
+                            // Rank ladder incl. the client's own row ("YOU"), by referring
+                            // domains where known — references are out of this list, so the
+                            // old directories-on-top failure can't come back.
+                            if (! $fresh) {
+                                $mainRows[] = ['domain' => '__you__', 'referring_domains' => (int) $ins['my_referring_domains'], 'backlinks' => null, 'da' => $ins['my_authority'], 'pa' => null, 'class' => 'you'];
+                                usort($mainRows, fn ($a, $b) => (int) ($b['referring_domains'] ?? -1) <=> (int) ($a['referring_domains'] ?? -1));
+                            }
+                        @endphp
                         @unless ($fresh)
-                            @if ($ins['behind'])
+                            @if ($peerBehind)
                                 <div class="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                                     <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                                     {{ __('Room to grow') }}
@@ -449,12 +490,12 @@
                                     <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($ins['my_referring_domains']) }}</div>
                                 </div>
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/40">
-                                    <div class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Competitor median') }}</div>
-                                    <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $ins['median'] !== null ? number_format($ins['median']) : '—' }}</div>
+                                    <div class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Peer median') }}</div>
+                                    <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $peerMedian !== null ? number_format($peerMedian) : '—' }}</div>
                                 </div>
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/40">
                                     <div class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Current gap') }}</div>
-                                    <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $ins['gap'] !== null ? $ins['gap'].'×' : '—' }}</div>
+                                    <div class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $peerGap !== null ? $peerGap.'×' : '—' }}</div>
                                 </div>
                             </div>
                         @endunless
@@ -473,36 +514,74 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                                    @foreach ($ins['competitors'] as $c)
-                                        <tr class="group bg-white dark:bg-slate-900" wire:key="comp-{{ $c['domain'] }}">
-                                            <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
-                                                <div class="flex items-center gap-2">
-                                                    <img src="https://www.google.com/s2/favicons?domain={{ urlencode($c['domain']) }}&sz=32"
-                                                         alt="" width="16" height="16" loading="lazy"
-                                                         class="h-4 w-4 flex-none rounded-sm bg-slate-100 dark:bg-slate-800"
-                                                         onerror="this.style.visibility='hidden'">
-                                                    {{ $c['domain'] }}
-                                                </div>
-                                            </td>
-                                            @if ($showCompMetrics)
-                                                <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $c['referring_domains'] !== null ? number_format($c['referring_domains']) : '—' }}</td>
-                                                <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ isset($c['backlinks']) && $c['backlinks'] !== null ? number_format($c['backlinks']) : '—' }}</td>
-                                                <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] ?? '—' }}</td>
-                                                <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['pa'] ?? '—' }}</td>
-                                            @endif
-                                            <td class="px-2 py-3 text-end">
-                                                <button type="button" wire:click="removeCompetitor('{{ $c['domain'] }}')" wire:key="comp-rm-{{ $c['domain'] }}"
-                                                        class="text-slate-300 opacity-0 transition hover:text-error group-hover:opacity-100" aria-label="{{ __('Remove') }}">
-                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                                </button>
-                                            </td>
-                                        </tr>
+                                    @foreach ($mainRows as $c)
+                                        @if (($c['class'] ?? null) === 'you')
+                                            <tr class="bg-orange-50 dark:bg-orange-950" wire:key="comp-you">
+                                                <td class="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">
+                                                    <div class="flex items-center gap-2">
+                                                        {{ $brandName !== '' ? $brandName : __('Your site') }}
+                                                        <span class="rounded-full bg-orange-600 px-2 py-0.5 text-xs font-bold text-white">{{ __('YOU') }}</span>
+                                                    </div>
+                                                </td>
+                                                @if ($showCompMetrics)
+                                                    <td class="px-4 py-3 text-end font-bold text-slate-900 dark:text-slate-100">{{ number_format($c['referring_domains']) }}</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">—</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] ?? '—' }}</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">—</td>
+                                                @endif
+                                                <td class="px-2 py-3"></td>
+                                            </tr>
+                                        @else
+                                            <tr class="group bg-white dark:bg-slate-900" wire:key="comp-{{ $c['domain'] }}">
+                                                <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
+                                                    <div class="flex items-center gap-2">
+                                                        <img src="https://www.google.com/s2/favicons?domain={{ urlencode($c['domain']) }}&sz=32"
+                                                             alt="" width="16" height="16" loading="lazy"
+                                                             class="h-4 w-4 flex-none rounded-sm bg-slate-100 dark:bg-slate-800"
+                                                             onerror="this.style.visibility='hidden'">
+                                                        {{ $c['domain'] }}
+                                                        @if (($c['class'] ?? null) === 'aspirational')
+                                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ __('Ahead of you') }}</span>
+                                                        @endif
+                                                    </div>
+                                                </td>
+                                                @if ($showCompMetrics)
+                                                    <td class="px-4 py-3 text-end font-bold text-slate-800 dark:text-slate-200">{{ $c['referring_domains'] !== null ? number_format($c['referring_domains']) : '—' }}</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ isset($c['backlinks']) && $c['backlinks'] !== null ? number_format($c['backlinks']) : '—' }}</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] ?? '—' }}</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['pa'] ?? '—' }}</td>
+                                                @endif
+                                                <td class="px-2 py-3 text-end">
+                                                    <button type="button" wire:click="removeCompetitor('{{ $c['domain'] }}')" wire:key="comp-rm-{{ $c['domain'] }}"
+                                                            class="text-slate-300 opacity-0 transition hover:text-error group-hover:opacity-100" aria-label="{{ __('Remove') }}">
+                                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        @endif
                                     @endforeach
                                 </tbody>
                             </table>
                         </div>
                         @if ($showCompMetrics)
                             <p class="mt-2 text-center text-xs text-slate-400">{{ __('DA/PA from Moz; referring domains and backlinks from DataForSEO, where available.') }}</p>
+                        @endif
+
+                        {{-- Directories/platforms that share your results pages but aren't
+                             rivals — kept out of the ladder and the gap math on purpose. --}}
+                        @if (! empty($refRows))
+                            <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                                <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Also on your results pages') }}</h3>
+                                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __("Directories and platforms — they share your search results but they aren't competing businesses, so they don't count toward your gap.") }}</p>
+                                <div class="mt-2.5 flex flex-wrap gap-2">
+                                    @foreach ($refRows as $r)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" wire:key="ref-{{ $r['domain'] }}">
+                                            <img src="https://www.google.com/s2/favicons?domain={{ urlencode($r['domain']) }}&sz=32" alt="" width="14" height="14" loading="lazy" class="h-3.5 w-3.5 rounded-sm" onerror="this.style.visibility='hidden'">
+                                            {{ $r['domain'] }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            </div>
                         @endif
                     @elseif ($ins !== null && $hasOverrides)
                         {{-- Data exists, but the user's own edits emptied the table — distinct from "still loading". --}}
@@ -538,9 +617,6 @@
                         </div>
                         @error('newCompetitorDomain') <p class="mt-1.5 text-xs text-error">{{ $message }}</p> @enderror
                     </div>
-
-                    {{-- ── Competitor mention protection (guard card) ── --}}
-                    @include('livewire.content.partials.competitor-guard', ['guard' => $wizard['guard'] ?? null])
 
                     <div class="mt-7 flex items-center justify-between">
                         <button wire:click="goToStep(4)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
@@ -584,6 +660,20 @@
                         </p>
                     </div>
 
+                    {{-- ── Competitor mention protection (guard card) ──
+                         Shown here, not on the competitors step, because the
+                         list is only FINAL once the user leaves that step —
+                         classifying (and displaying) it mid-edit risked a
+                         result that didn't match what was about to change, and
+                         nothing guaranteed a job had been queued yet for the
+                         current state. wire:init is a safety net for anyone
+                         who navigates back to this step without re-running
+                         toKeywordResearch() (which already dispatches it). --}}
+                    @php $guardCard = $wizard['guard'] ?? null; @endphp
+                    <div @if($guardCard === null || ! $guardCard['assessed']) wire:init="loadCompetitors" @endif>
+                        @include('livewire.content.partials.competitor-guard', ['guard' => $guardCard])
+                    </div>
+
                     @if ($kw === null)
                         <div wire:poll.5s="refreshKeywordInsights" class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
                             <svg class="mx-auto h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
@@ -612,6 +702,54 @@
                              the digest refreshes in place (the loader's poll is gone once $kw is set). --}}
                         @if (! empty($kw['competitors_pending']))
                             <div wire:poll.6s="refreshKeywordInsights" class="hidden"></div>
+                        @endif
+
+                        {{-- ── Your best search terms: the winnability-ranked picks the first
+                             articles are built from, 1:1. Crossed-out terms are skipped when
+                             the user continues; each pick shows WHICH offer it came from. --}}
+                        @if (! empty($kw['opportunities']))
+                            @php $firstKept = collect($kw['opportunities'])->first(fn ($o) => ! in_array($o['keyword'], $removedTerms ?? [], true)); @endphp
+                            <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('This is what your future customers are searching on Google right now') }}</p>
+                                <p class="mt-3 select-none text-2xl font-bold tracking-tight" aria-hidden="true"><span style="color:#4285F4">G</span><span style="color:#EA4335">o</span><span style="color:#FBBC05">o</span><span style="color:#4285F4">g</span><span style="color:#34A853">l</span><span style="color:#EA4335">e</span></p>
+                                <div class="mx-auto mt-3 flex max-w-md items-center gap-2.5 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-start shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                                    <svg class="h-4 w-4 flex-none text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.3-4.3"/></svg>
+                                    <span class="truncate text-sm text-slate-800 dark:text-slate-100">{{ $firstKept['keyword'] ?? $kw['opportunities'][0]['keyword'] }}</span>
+                                </div>
+                                <p class="mt-2 text-xs font-medium text-orange-600 dark:text-orange-400">{{ __('Your article could show up right here.') }}</p>
+
+                                <div class="mt-5 border-t border-slate-100 pt-4 text-start dark:border-slate-800">
+                                    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Your best search terms') }}</h3>
+                                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __("We'll write one article for each term you keep. Remove any that don't fit your business.") }}</p>
+                                    <div class="mt-3 flex flex-wrap gap-2">
+                                        @foreach ($kw['opportunities'] as $opp)
+                                            @php $isRemoved = in_array($opp['keyword'], $removedTerms ?? [], true); @endphp
+                                            <button type="button" wire:click="toggleTerm('{{ $opp['keyword'] }}')" wire:key="term-{{ $loop->index }}"
+                                                class="group inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-start transition-all
+                                                    {{ $isRemoved
+                                                        ? 'border-slate-200 bg-slate-50 opacity-60 dark:border-slate-700 dark:bg-slate-800'
+                                                        : 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' }}">
+                                                <span class="flex flex-col">
+                                                    <span class="text-sm font-semibold {{ $isRemoved ? 'text-slate-400 line-through' : 'text-orange-800 dark:text-orange-200' }}">{{ $opp['keyword'] }}</span>
+                                                    @if (! empty($opp['origin']))
+                                                        <span class="text-xs {{ $isRemoved ? 'text-slate-400' : 'text-orange-600/70 dark:text-orange-300/80' }}">{{ __('because you sell:') }} {{ $opp['origin'] }}</span>
+                                                    @endif
+                                                </span>
+                                                @if ($showVolumes && $opp['volume'] !== null && ! $isRemoved)
+                                                    <span class="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 shadow-sm dark:bg-slate-900 dark:text-slate-300">{{ number_format($opp['volume']) }}/mo</span>
+                                                @endif
+                                                <svg class="h-3.5 w-3.5 flex-none {{ $isRemoved ? 'text-slate-400' : 'text-orange-400' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                                    @if ($isRemoved)
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M21.015 4.356v4.992m0 0h-4.992m4.993 0l-3.181-3.183a8.25 8.25 0 00-13.803 3.7"/>
+                                                    @else
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                                    @endif
+                                                </svg>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         @endif
 
                         {{-- Headline stats (volume + traffic cards hidden until that data exists) --}}
@@ -950,7 +1088,7 @@
                                     </span>
                                     <div class="min-w-0 flex-1">
                                         <div class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $t->title }}</div>
-                                        <div class="text-xs text-slate-500 dark:text-slate-400">{{ $t->target_keyword }}@if($t->keyword_volume) · <span class="font-semibold text-orange-600 dark:text-orange-400">{{ number_format($t->keyword_volume) }} {{ __('searches/mo') }}</span>@endif</div>
+                                        <div class="text-xs text-slate-500 dark:text-slate-400">{{ $t->target_keyword }}@if($t->keyword_volume) · <span class="font-semibold text-orange-600 dark:text-orange-400">{{ number_format($t->keyword_volume) }} {{ __('searches/mo') }}</span>@endif @if($t->source === 'confirmed') <span class="ms-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ __('Your pick') }}</span>@endif</div>
                                     </div>
                                     <button wire:click="dropTopic('{{ $t->id }}')" class="shrink-0 text-slate-300 hover:text-error" aria-label="{{ __('Remove') }}">
                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>

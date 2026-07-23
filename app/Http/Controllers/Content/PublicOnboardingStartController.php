@@ -70,6 +70,19 @@ class PublicOnboardingStartController extends Controller
         [$session] = $converter->begin($domain, $ip);
         session(['content_onboarding_token' => $session->token]);
 
+        // Remember the URL the visitor actually TYPED (path included) — the
+        // profile detector prefers it over the bare domain, because sites like
+        // kayali.com serve nothing at the root (a bare 302 to /en-ae) and the
+        // real content lives under the entered path. SSRF-guarded above.
+        $path = trim((string) parse_url($raw, PHP_URL_PATH), '/');
+        if ($path !== '' && $session->website_id) {
+            \Illuminate\Support\Facades\Cache::put(
+                'content:entered-url:'.$session->website_id,
+                $raw,
+                now()->addDays(30)
+            );
+        }
+
         // Straight into the wizard (Business step) — no second domain prompt.
         return redirect()->route('content.onboarding');
     }

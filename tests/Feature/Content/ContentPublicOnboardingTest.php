@@ -68,6 +68,8 @@ class ContentPublicOnboardingTest extends TestCase
             ->assertSet('wizardStep', 1)
             ->set('businessDescription', 'We sell handmade wooden tables and chairs for small apartments.')
             ->set('sellItems', ['Tables', 'Chairs'])
+            ->call('selectSiteType', 'brand')
+            ->set('audience', 'Apartment dwellers who want compact furniture.')
             ->call('toOfferings')
             ->call('toHowItWorks')
             ->call('toAccount')
@@ -91,6 +93,10 @@ class ContentPublicOnboardingTest extends TestCase
         // Plan persisted from the wizard + research dispatched.
         $plan = ContentPlan::query()->where('website_id', $website->id)->first();
         $this->assertSame(['Tables', 'Chairs'], $plan->offerings['sell']);
+        // Site type: a chip click is a human decision, recorded as such.
+        $this->assertSame('brand', $plan->site_type);
+        $this->assertSame('user', $plan->site_type_source);
+        $this->assertSame('Apartment dwellers who want compact furniture.', $plan->audience);
         // Covered → plan goes LIVE so the dashboard shows the calendar, not the wizard.
         $this->assertSame(ContentPlan::STATUS_ACTIVE, $plan->status);
         Queue::assertPushed(PlanContentTopicsJob::class);
@@ -308,5 +314,112 @@ class ContentPublicOnboardingTest extends TestCase
 
         $this->assertDatabaseMissing('content_onboarding_sessions', ['id' => $session->id]);
         $this->assertDatabaseMissing('websites', ['id' => $websiteId]);
+    }
+
+    // ── Competitor-mention guard (2026-07-22): the anonymous flow's
+    // ContentWizard trait never had the guard wired in at all — the card sat
+    // at "still loading" forever for every public-onboarding user, since
+    // nothing ever dispatched AssessCompetitorGuardJob or populated
+    // wizardViewData()'s `guard` key. ──────────────────────────────────────
+
+    private function toStep6(string $domain = 'mkcexample.com')
+    {
+        return $this->beginAndResume($domain)
+            ->set('businessDescription', 'A residential cleaning service serving the whole metro area.')
+            ->call('toOfferings')
+            ->call('toHowItWorks')
+            ->set('wizardStep', 6);
+    }
+
+    public function test_guard_state_is_computed_on_the_keyword_research_step(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $component = $this->toStep6();
+
+        $session = ContentOnboardingSession::query()->first();
+        $plan = ContentPlan::query()->where('website_id', $session->website_id)->first();
+        app(\App\Services\Content\CompetitorMentionGuard::class)->assess($plan, new class implements \App\Services\Llm\LlmClient
+        {
+            public function isAvailable(): bool { return false; }
+            public function complete(array $messages, array $options = []): array { return ['ok' => false, 'content' => '', 'model' => '', 'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0]]; }
+            public function completeJson(array $messages, array $options = []): ?array { return null; }
+            public function completeWithTools(array $messages, array $tools, callable $dispatcher, array $options = []): array { return ['ok' => false, 'decoded' => null, 'content' => '', 'model' => '', 'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0], 'tool_calls' => []]; }
+        });
+
+        $component->set('wizardStep', 6)
+            ->assertSee(__('Competitor mention protection'))
+            ->assertDontSee(__('Checking which of your competitors could pull readers away…'));
+    }
+
+    public function test_loading_competitors_dispatches_the_guard_job_when_unassessed(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $component = $this->toStep6()->call('loadCompetitors');
+
+        $session = ContentOnboardingSession::query()->first();
+        $plan = ContentPlan::query()->where('website_id', $session->website_id)->first();
+        \Illuminate\Support\Facades\Queue::assertPushed(
+            \App\Jobs\AssessCompetitorGuardJob::class,
+            fn ($job) => $job->planId === $plan->id
+        );
+    }
+
+    public function test_guard_actions_work_on_the_anonymous_flow(): void
+    {
+        $component = $this->toStep6();
+        $session = ContentOnboardingSession::query()->first();
+        $plan = ContentPlan::query()->where('website_id', $session->website_id)->first();
+        $plan->update([
+            'competitor_guard' => ['assessed_at' => now()->toIso8601String(), 'harmful' => true, 'reason' => '', 'auto' => [['brand' => 'rival', 'domain' => 'rival.com']], 'references' => []],
+            'toggles' => [\App\Services\Content\CompetitorMentionGuard::TOGGLE => true],
+        ]);
+
+        $component->set('wizardStep', 6)
+            ->set('newBlockedTerm', 'other brand')
+            ->call('addBlockedTerm')
+            ->call('removeBlockedTerm', 'rival')
+            ->call('toggleCompetitorGuard');
+
+        $guard = app(\App\Services\Content\CompetitorMentionGuard::class);
+        $terms = $guard->terms($plan->refresh());
+        $this->assertContains('other brand', $terms);
+        $this->assertNotContains('rival', $terms);
+        $this->assertFalse($guard->enabled($plan));
+    }
+
+    /**
+     * 2026-07-22 (kayali.com/en-ae): the URL the visitor typed — path
+     * included — is cached for the profile detector, because some sites'
+     * roots are bare region redirects with all content under the path.
+     */
+    public function test_begin_caches_the_entered_url_when_it_carries_a_path(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $this->post(route('content.onboarding.begin'), ['domain' => 'kayali.com/en-ae'])
+            ->assertRedirect(route('content.onboarding'));
+
+        $session = ContentOnboardingSession::query()->latest('id')->first();
+        $this->assertSame(
+            'https://kayali.com/en-ae',
+            \Illuminate\Support\Facades\Cache::get('content:entered-url:'.$session->website_id)
+        );
+
+        // A bare domain caches nothing — the default host fetch handles it.
+        $this->post(route('content.onboarding.begin'), ['domain' => 'plain.com'])->assertRedirect();
+        $plain = ContentOnboardingSession::query()->latest('id')->first();
+        $this->assertNull(\Illuminate\Support\Facades\Cache::get('content:entered-url:'.$plain->website_id));
+    }
+
+    public function test_manually_adding_a_competitor_dispatches_domain_metric_enrichment(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $this->toStep6()
+            ->set('newCompetitorDomain', 'freshrival.com')
+            ->call('addCompetitor');
+
+        \Illuminate\Support\Facades\Queue::assertPushed(
+            \App\Jobs\Content\EnrichCompetitorDomainMetricsJob::class,
+            fn ($job) => in_array('freshrival.com', $job->domains, true)
+        );
     }
 }

@@ -26,7 +26,10 @@ class AssessCompetitorGuardJob implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 1;
 
-    public int $timeout = 120;
+    // LLM budget 40s + up to 8 homepage-context fetches × 8s (worst case
+    // ~104s total); redis-long retry_after is 3900 (config/queue.php), so
+    // 180 is safe headroom.
+    public int $timeout = 180;
 
     public int $uniqueFor = 300;
 

@@ -249,6 +249,152 @@ class DataForSeoBacklinkClient
     }
 
     /**
+     * DataForSEO Labs "keyword overview" — volume / competition / difficulty /
+     * intent for an EXPLICIT keyword list (≤700/task; we send ≤50). Used to
+     * price the offer-spine candidate queries so they can compete in the
+     * "best search terms" ranking on real numbers instead of arriving
+     * volume-less. Flat Labs pricing, spend-metered by the caller.
+     *
+     * @param  list<string>  $keywords
+     * @param  array{language_name?:string, location_code?:int}  $opts
+     * @return list<array{keyword:string, search_volume:?int, cpc:?float, competition:?float, keyword_difficulty:?int, search_intent:?string}>
+     */
+    public function keywordOverview(array $keywords, array $opts = []): array
+    {
+        $clean = [];
+        foreach ($keywords as $kw) {
+            $kw = mb_strtolower(trim((string) $kw));
+            if ($kw !== '' && mb_strlen($kw) <= 80) {
+                $clean[$kw] = true;
+            }
+        }
+        $clean = array_slice(array_keys($clean), 0, 50);
+        if ($clean === []) {
+            return [];
+        }
+
+        $result = $this->firstResult('/dataforseo_labs/google/keyword_overview/live', [
+            'keywords' => $clean,
+            'language_name' => $opts['language_name'] ?? 'English',
+            'location_code' => (int) ($opts['location_code'] ?? 2840),
+            'include_serp_info' => false,
+        ]);
+
+        $items = $result['items'] ?? null;
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $num = static fn ($v) => is_numeric($v) ? $v : null;
+        $out = [];
+        foreach ($items as $it) {
+            if (! is_array($it)) {
+                continue;
+            }
+            $kw = mb_strtolower(trim((string) ($it['keyword'] ?? '')));
+            if ($kw === '') {
+                continue;
+            }
+            $out[] = [
+                'keyword' => $kw,
+                'search_volume' => ($v = $num(data_get($it, 'keyword_info.search_volume'))) !== null ? (int) $v : null,
+                'cpc' => ($v = $num(data_get($it, 'keyword_info.cpc'))) !== null ? (float) $v : null,
+                'competition' => ($v = $num(data_get($it, 'keyword_info.competition'))) !== null ? (float) $v : null,
+                'keyword_difficulty' => ($v = $num(data_get($it, 'keyword_properties.keyword_difficulty'))) !== null ? (int) $v : null,
+                'search_intent' => ($si = data_get($it, 'search_intent_info.main_intent')) ? (string) $si : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * DataForSEO Labs "keyword suggestions" — long-tail queries CONTAINING the
+     * seed phrase, with volume/competition/difficulty/intent. The offer-spine's
+     * demand discovery: seeded with an offer head it surfaces the real searches
+     * around what the site sells ("vanilla perfume" → "best vanilla perfume"
+     * 12,100/mo — verified live for kayali.com, 2026-07-23). Flat Labs pricing
+     * (~$0.01/seed + rows), spend-metered by the caller.
+     *
+     * NOTE: this endpoint frequently reports keyword_difficulty as 0 where it
+     * has none — 0 is normalized to null so winnability never treats "no data"
+     * as "trivially easy"; the competition float still tiers those rows.
+     *
+     * @param  array{language_name?:string, location_code?:int, limit?:int}  $opts
+     * @return list<array{keyword:string, search_volume:?int, cpc:?float, competition:?float, keyword_difficulty:?int, search_intent:?string}>
+     */
+    public function keywordSuggestions(string $seed, array $opts = []): array
+    {
+        $seed = mb_strtolower(trim($seed));
+        if ($seed === '' || mb_strlen($seed) > 80) {
+            return [];
+        }
+
+        $result = $this->firstResult('/dataforseo_labs/google/keyword_suggestions/live', [
+            'keyword' => $seed,
+            'language_name' => $opts['language_name'] ?? 'English',
+            'location_code' => (int) ($opts['location_code'] ?? 2840),
+            'limit' => max(1, min(100, (int) ($opts['limit'] ?? 30))),
+            'include_seed_keyword' => true,
+            'order_by' => ['keyword_info.search_volume,desc'],
+        ]);
+
+        $items = $result['items'] ?? null;
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $num = static fn ($v) => is_numeric($v) ? $v : null;
+        $out = [];
+        foreach ($items as $it) {
+            if (! is_array($it)) {
+                continue;
+            }
+            // Items carry the fields either at the top level or nested under
+            // keyword_data depending on endpoint version — accept both.
+            $kw = mb_strtolower(trim((string) ($it['keyword'] ?? data_get($it, 'keyword_data.keyword', ''))));
+            if ($kw === '') {
+                continue;
+            }
+            $info = is_array($it['keyword_info'] ?? null) ? $it['keyword_info'] : (array) data_get($it, 'keyword_data.keyword_info', []);
+            $props = is_array($it['keyword_properties'] ?? null) ? $it['keyword_properties'] : (array) data_get($it, 'keyword_data.keyword_properties', []);
+            $intent = data_get($it, 'search_intent_info.main_intent')
+                ?? data_get($it, 'keyword_data.search_intent_info.main_intent');
+            $kd = $num($props['keyword_difficulty'] ?? null);
+            $out[] = [
+                'keyword' => $kw,
+                'search_volume' => ($v = $num($info['search_volume'] ?? null)) !== null ? (int) $v : null,
+                'cpc' => ($v = $num($info['cpc'] ?? null)) !== null ? (float) $v : null,
+                'competition' => ($v = $num($info['competition'] ?? null)) !== null ? (float) $v : null,
+                'keyword_difficulty' => $kd !== null && (int) $kd > 0 ? (int) $kd : null,
+                'search_intent' => $intent ? (string) $intent : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * country code → [location_code, language_name] for DataForSEO Labs.
+     * Twin of HarvestDomainKeywordsJob::geoFor() — keep in sync.
+     */
+    public static function labsGeo(string $country): array
+    {
+        return match (strtolower(trim($country))) {
+            'gb', 'uk' => [2826, 'English'],
+            'in' => [2356, 'English'],
+            'ca' => [2124, 'English'],
+            'au' => [2036, 'English'],
+            'de' => [2276, 'German'],
+            'fr' => [2250, 'French'],
+            'es' => [2724, 'Spanish'],
+            'ae' => [2784, 'English'],
+            'sa' => [2682, 'Arabic'],
+            default => [2840, 'English'], // US / global
+        };
+    }
+
+    /**
      * DataForSEO Labs "ranked keywords" — the organic keywords a domain ranks for,
      * with per-keyword volume/cpc/competition/difficulty/intent AND this domain's
      * ranking (position, URL, ETV). One page of ≤1,000 rows, ordered by search

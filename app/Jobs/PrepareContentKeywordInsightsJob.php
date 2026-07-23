@@ -30,7 +30,9 @@ class PrepareContentKeywordInsightsJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public int $timeout = 60;
+    // 60 → 120 (2026-07-23): seeds() now warms the OfferQueryGenerator LLM
+    // call (≤40s) on a cache miss, on top of the ~15s keyword-server POST.
+    public int $timeout = 120;
 
     public function __construct(public string $planId)
     {

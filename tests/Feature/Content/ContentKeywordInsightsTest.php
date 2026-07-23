@@ -74,6 +74,40 @@ class ContentKeywordInsightsTest extends TestCase
         Queue::assertPushed(PrepareContentKeywordInsightsJob::class, 1);
     }
 
+    public function test_opportunities_rank_by_winnability_not_volume_and_carry_offer_lineage(): void
+    {
+        // The offer-spine ranking flip: a winnable long-tail term the client
+        // can actually rank for must outrank a high-competition head term,
+        // no matter the volume gap — and confident picks show their offer.
+        [$user, $website, $plan] = $this->userWithPlan([
+            'business_description' => 'Luxury gourmand perfumes you can layer.',
+            'offerings' => ['sell' => ['Vanilla eau de parfum'], 'dont_sell' => []],
+            'site_type' => 'brand',
+        ]);
+        $this->storeCompletedRequest($plan, [
+            ['keyword' => 'perfume', 'avgMonthlySearches' => 90000, 'competitionIndex' => 80],
+            ['keyword' => 'sweet vanilla parfum', 'avgMonthlySearches' => 400, 'competitionIndex' => 20],
+        ]);
+
+        $kw = app(\App\Services\Content\ContentKeywordInsights::class)->get($plan);
+
+        $this->assertNotNull($kw);
+        $keywords = array_column($kw['opportunities'], 'keyword');
+        // Offer-led list: the winnable long-tail server term ranks with its
+        // lineage; the offer-spine candidates (generated from the offerings)
+        // rank above the unwinnable head term.
+        $vanillaIdx = array_search('sweet vanilla parfum', $keywords, true);
+        $headIdx = array_search('perfume', $keywords, true);
+        $this->assertNotFalse($vanillaIdx);
+        $this->assertSame('Vanilla eau de parfum', $kw['opportunities'][$vanillaIdx]['origin']);
+        // The first pick is offer-derived (carries lineage), never the head term.
+        $this->assertNotNull($kw['opportunities'][0]['origin']);
+        $this->assertNotSame(0, $headIdx, 'the unwinnable head term must never rank first');
+        if ($headIdx !== false) {
+            $this->assertGreaterThan($vanillaIdx, $headIdx);
+        }
+    }
+
     public function test_completed_request_renders_rich_insights(): void
     {
         [$user, $website, $plan] = $this->userWithPlan();
@@ -149,6 +183,47 @@ class ContentKeywordInsightsTest extends TestCase
         $this->assertSame(310, $row['keywords']);
     }
 
+    /**
+     * Regression (prod 2026-07-22): a competitor removed on the competitors
+     * step kept showing on the "how your competitors stack up" table on the
+     * keyword-research step, because competitorData() read the raw cached
+     * report and never applied the client's competitor_overrides.
+     */
+    public function test_competitor_stack_up_table_respects_a_manual_removal(): void
+    {
+        [, $website, $plan] = $this->userWithPlan([
+            'competitor_overrides' => ['added' => [], 'removed' => ['thryv.com']],
+        ]);
+
+        Cache::put('content:setup-insights:v1:'.$website->id, [
+            'my_referring_domains' => 0, 'my_authority' => null,
+            'competitors' => [
+                ['domain' => 'thryv.com', 'referring_domains' => null, 'backlinks' => null, 'authority' => null, 'da' => null, 'pa' => null],
+                ['domain' => 'mollymaid.com', 'referring_domains' => null, 'backlinks' => null, 'authority' => null, 'da' => null, 'pa' => null],
+            ],
+            'median' => null, 'gap' => null, 'behind' => false,
+        ], now()->addDay());
+
+        $this->storeCompletedRequest($plan, [
+            ['keyword' => 'cleaning tips', 'avgMonthlySearches' => 1000, 'competitionIndex' => 10],
+        ]);
+        $compReq = KeywordApiRequest::query()->create([
+            'request_id' => (string) \Illuminate\Support\Str::uuid(),
+            'type' => KeywordApiRequest::TYPE_IDEAS, 'mode' => 'keywords',
+            'payload' => [], 'status' => KeywordApiRequest::STATUS_COMPLETED,
+            'result' => ['results' => [['keyword' => 'residential deep clean', 'avgMonthlySearches' => 500, 'competitionIndex' => 20]]],
+            'website_id' => $plan->website_id,
+        ]);
+        Cache::put('content:kw-insights:comp-req:'.$plan->id.':0', $compReq->id, now()->addHours(2));
+
+        $insights = app(ContentKeywordInsights::class)->get($plan);
+        $this->assertNotNull($insights);
+
+        $domains = array_column($insights['competitor_metrics'], 'domain');
+        $this->assertContains('mollymaid.com', $domains);
+        $this->assertNotContains('thryv.com', $domains);
+    }
+
     public function test_gap_comes_from_the_single_competitor_keyword_request(): void
     {
         [, $website, $plan] = $this->userWithPlan();
@@ -206,8 +281,20 @@ class ContentKeywordInsightsTest extends TestCase
         $this->assertArrayHasKey('informational', $insights['intents']); // "how to"
         $this->assertArrayHasKey('commercial', $insights['intents']); // "best"
         $this->assertSame('how to pick a username', $insights['questions'][0]['keyword']);
-        // Low-competition 1000-vol beats high-competition 700-vol.
-        $this->assertSame('name generator tool', $insights['opportunities'][0]['keyword']);
+        // Winnability ranking (2026-07-23): among the SERVER terms, both
+        // low-competition ones outrank the high-competition one regardless of
+        // volume (offer-spine candidates from the factory offerings may rank
+        // in between — compare relative positions, not absolute slots).
+        $keywords = array_column($insights['opportunities'], 'keyword');
+        $howTo = array_search('how to pick a username', $keywords, true);
+        $tool = array_search('name generator tool', $keywords, true);
+        $hard = array_search('best username ideas', $keywords, true);
+        $this->assertNotFalse($howTo);
+        $this->assertNotFalse($tool);
+        if ($hard !== false) {
+            $this->assertGreaterThan($howTo, $hard);
+            $this->assertGreaterThan($tool, $hard);
+        }
     }
 
     public function test_failed_request_falls_back_to_topic_derived_insights(): void

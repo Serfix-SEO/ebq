@@ -102,6 +102,13 @@ class ContentKeywordInsights
         // CLIENT's own domain (what they actually rank for — site-scope), and
         // (3) the top competitor's domain. (2) and (3) are crawl-derived so they
         // pass through an LLM scrap filter (drop login / create-account / cart…).
+        // Plus: price the offer-spine candidate queries via DataForSEO so they
+        // arrive in the "best search terms" ranking with real volumes instead
+        // of being filtered out as volume-less, AND discover the real demand
+        // around each offer via DFS keyword_suggestions (both run in the
+        // queued job, once per plan per 30d).
+        $this->enrichCandidateMetrics($plan);
+        $this->ensureDfsSuggestions($plan);
         $this->ensureOwnRequest($plan);
         $this->ensureSiteRequest($plan, $this->ownDomainKey($plan), fn () => $plan->website?->normalized_domain ?: $plan->website?->domain);
 
@@ -576,7 +583,13 @@ class ContentKeywordInsights
         }
 
         try {
-            $insights = app(ContentSetupInsights::class)->competitorAuthority($website);
+            $svc = app(ContentSetupInsights::class);
+            // withOverrides: the client's manual add/remove edits on the
+            // competitors step must be reflected here too — this table
+            // silently kept showing a removed competitor (thryv.com, prod
+            // 2026-07-22) because it read the raw cached report, never the
+            // client's edits layered on top.
+            $insights = $svc->withOverrides($svc->competitorAuthority($website), $plan);
         } catch (\Throwable) {
             return $empty;
         }
@@ -618,7 +631,11 @@ class ContentKeywordInsights
             $etv = data_get($dfs[$d] ?? null, 'metrics.organic.etv');
             $kwCount = data_get($dfs[$d] ?? null, 'metrics.organic.count');
             $traffic = is_numeric($etv) && (float) $etv > 0 ? (int) round((float) $etv) : null;
-            if ($traffic !== null) {
+            // "Est. monthly traffic" sums PEERS ONLY (Phase D classes from
+            // withOverrides): summing Sephora/Kohl's ETV produced a 74M
+            // headline for a niche brand — absurd and demoralizing. The
+            // table below still shows every competitor's own traffic.
+            if ($traffic !== null && ($c['class'] ?? 'peer') === 'peer') {
                 $total += (float) $etv;
                 $count++;
             }
@@ -1024,6 +1041,322 @@ class ContentKeywordInsights
         return $out;
     }
 
+    /**
+     * DataForSEO keyword-overview pricing for the offer-spine candidate
+     * queries (fix for the kayali onboarding: candidates never surfaced in
+     * "best search terms" because the ranking required a volume and only the
+     * keyword server assigned volumes). Writes into the shared
+     * `keyword_metrics` asset (same `dfs_labs` source/TTL discipline as the
+     * harvest); the digest's metric lookup then prices candidates for free.
+     *
+     * Once per plan per 30 days (Cache::add guard keyed on the candidate
+     * signature); admin-owned sites sandbox and NEVER persist mock data or
+     * charge the meter (same policy as every other DFS call site).
+     */
+    private function enrichCandidateMetrics(ContentPlan $plan): void
+    {
+        try {
+            $candidates = app(OfferQueryGenerator::class)->candidates($plan);
+            if ($candidates === []) {
+                return;
+            }
+            $keywords = array_column($candidates, 'query');
+            if (! Cache::add('content:kw-cand-dfs:'.$plan->id.':'.md5(implode('|', $keywords)), 1, now()->addDays(30))) {
+                return;
+            }
+
+            // Skip keywords the shared asset already has (any country — a
+            // volume from the wrong market beats none for display purposes;
+            // the harvest's country-exact rows win naturally on insert).
+            $hashes = [];
+            foreach ($keywords as $kw) {
+                $hashes[KeywordMetric::hashKeyword($kw)] = $kw;
+            }
+            $have = KeywordMetric::query()
+                ->whereIn('keyword_hash', array_keys($hashes))
+                ->pluck('keyword_hash')->all();
+            $missing = array_values(array_intersect_key($hashes, array_flip(array_diff(array_keys($hashes), $have))));
+            if ($missing === []) {
+                return;
+            }
+
+            $dfs = app(\App\Services\DataForSeoBacklinkClient::class);
+            $meter = app(\App\Services\Reports\DataForSeoSpendMeter::class);
+            if (! $dfs->isConfigured() || $meter->exhausted()) {
+                return;
+            }
+
+            $country = strtolower((string) ($plan->country ?: 'global'));
+            [$location, $language] = \App\Services\DataForSeoBacklinkClient::labsGeo($country);
+            $sandbox = (bool) $plan->website?->user?->is_admin;
+
+            $rows = $dfs->useSandbox($sandbox)->resetCost()->keywordOverview($missing, [
+                'location_code' => $location,
+                'language_name' => $language,
+            ]);
+            $dfs->useSandbox(false);
+
+            if ($sandbox || $rows === []) {
+                return; // mock data must never enter the shared asset
+            }
+            $meter->add($dfs->totalCost());
+
+            $now = now();
+            $insert = [];
+            foreach ($rows as $r) {
+                $hash = KeywordMetric::hashKeyword($r['keyword']);
+                if (in_array($hash, $have, true)) {
+                    continue;
+                }
+                $insert[] = [
+                    'id' => (string) Str::ulid(),
+                    'keyword' => $r['keyword'],
+                    'keyword_hash' => $hash,
+                    'country' => $country,
+                    'data_source' => 'dfs_labs',
+                    'search_volume' => $r['search_volume'],
+                    'cpc' => $r['cpc'],
+                    'competition' => $r['competition'],
+                    'keyword_difficulty' => $r['keyword_difficulty'],
+                    'search_intent' => $r['search_intent'],
+                    'fetched_at' => $now,
+                    'expires_at' => $now->copy()->addDays(30),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            if ($insert !== []) {
+                KeywordMetric::query()->insert($insert);
+            }
+        } catch (\Throwable) {
+            // pricing candidates is an upgrade, never a blocker
+        }
+    }
+
+    /**
+     * DFS keyword_suggestions per offer head — the demand-discovery half of
+     * the offer spine (2026-07-23, after the kayali three-way comparison:
+     * suggestions found "best vanilla perfume" 12,100/mo that neither our
+     * keyword-server expansion nor the LLM candidates surfaced). One call per
+     * offer (≤5 offers, ≤30 rows each, ~$0.08/onboarding), token-signature
+     * deduped (the endpoint reports one query cluster as several word-order
+     * variants), demand floor 50/mo, cap 8 per offer / 40 total. Results are
+     * cached per plan as candidates ({query, offer, intent}) AND persisted
+     * into the shared keyword_metrics asset so the ranking prices them.
+     *
+     * Admin-owned sites use the sandbox host and NEVER persist mock rows into
+     * the shared asset or charge the meter (candidates cache is plan-local,
+     * so mock terms only ever show on the admin's own plan).
+     */
+    private function ensureDfsSuggestions(ContentPlan $plan): void
+    {
+        try {
+            $generator = app(OfferQueryGenerator::class);
+            $offers = array_values(array_filter(array_map(
+                static fn ($v) => trim((string) $v),
+                (array) (($plan->offerings ?? [])['sell'] ?? [])
+            ), static fn ($v) => $v !== '' && ! OfferQueryGenerator::isPromoOffer($v)));
+            $offers = array_slice($offers, 0, 5);
+            if ($offers === []) {
+                return;
+            }
+            $cacheKey = $this->dfsSuggestionKey($plan);
+            if (Cache::has($cacheKey)) {
+                return;
+            }
+
+            $dfs = app(\App\Services\DataForSeoBacklinkClient::class);
+            $meter = app(\App\Services\Reports\DataForSeoSpendMeter::class);
+            if (! $dfs->isConfigured() || $meter->exhausted()) {
+                return;
+            }
+
+            $country = strtolower((string) ($plan->country ?: 'global'));
+            [$location, $language] = \App\Services\DataForSeoBacklinkClient::labsGeo($country);
+            $sandbox = (bool) $plan->website?->user?->is_admin;
+
+            $candidates = [];
+            $metricRows = [];
+            $sigSeen = [];
+            $dfs->useSandbox($sandbox)->resetCost();
+            foreach ($offers as $offer) {
+                $head = $generator->offerHead($offer);
+                if ($head === '') {
+                    continue;
+                }
+                $perOffer = 0;
+                foreach ($dfs->keywordSuggestions($head, ['location_code' => $location, 'language_name' => $language, 'limit' => 30]) as $row) {
+                    if ($perOffer >= 8 || count($candidates) >= 40) {
+                        break;
+                    }
+                    if (($row['search_volume'] ?? 0) < 50) {
+                        continue; // demand floor — this source exists FOR demand
+                    }
+                    // One Google query cluster arrives as several word-order
+                    // variants ("best perfume vanilla"/"best vanilla perfume").
+                    $tokens = preg_split('/\s+/', $row['keyword'], -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                    sort($tokens);
+                    $sig = implode(' ', $tokens);
+                    if ($sig === '' || isset($sigSeen[$sig])) {
+                        continue;
+                    }
+                    $sigSeen[$sig] = true;
+                    $intent = in_array($row['search_intent'], ['informational', 'commercial', 'transactional', 'navigational'], true)
+                        ? $row['search_intent'] : 'commercial';
+                    $candidates[] = ['query' => $row['keyword'], 'offer' => $offer, 'intent' => $intent];
+                    $metricRows[] = $row;
+                    $perOffer++;
+                }
+            }
+            $dfs->useSandbox(false);
+
+            // Relevance vetting — same LLM pass questions/gap already use.
+            // Kills cross-brand drift a junk offer seed drags in ("Exclusive
+            // offers" → "nespresso exclusive offers", live kayali round #3);
+            // fails open (null → keep all), and drops nothing when the model
+            // is unavailable.
+            if ($candidates !== []) {
+                $offerLine = implode('; ', $offers);
+                $desc = mb_substr((string) $plan->business_description, 0, 300);
+                $kept = $this->llmRelevantItems(array_column($candidates, 'query'), $offerLine, $desc, 'search terms');
+                if (is_array($kept)) {
+                    $keptSet = array_flip(array_map(static fn ($k) => mb_strtolower(trim((string) $k)), $kept));
+                    $candidates = array_values(array_filter(
+                        $candidates,
+                        static fn ($c) => isset($keptSet[$c['query']])
+                    ));
+                }
+            }
+
+            Cache::put($cacheKey, $candidates, now()->addDays(30));
+            if ($sandbox || $metricRows === []) {
+                return; // mock data never enters the shared asset
+            }
+            $meter->add($dfs->totalCost());
+
+            $now = now();
+            $hashes = [];
+            foreach ($metricRows as $r) {
+                $hashes[KeywordMetric::hashKeyword($r['keyword'])] = $r;
+            }
+            $have = KeywordMetric::query()->whereIn('keyword_hash', array_keys($hashes))->pluck('keyword_hash')->all();
+            $insert = [];
+            foreach (array_diff(array_keys($hashes), $have) as $hash) {
+                $r = $hashes[$hash];
+                $insert[] = [
+                    'id' => (string) Str::ulid(),
+                    'keyword' => $r['keyword'],
+                    'keyword_hash' => $hash,
+                    'country' => $country,
+                    'data_source' => 'dfs_labs',
+                    'search_volume' => $r['search_volume'],
+                    'cpc' => $r['cpc'],
+                    'competition' => $r['competition'],
+                    'keyword_difficulty' => $r['keyword_difficulty'],
+                    'search_intent' => $r['search_intent'],
+                    'fetched_at' => $now,
+                    'expires_at' => $now->copy()->addDays(30),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            if ($insert !== []) {
+                KeywordMetric::query()->insert($insert);
+            }
+        } catch (\Throwable) {
+            // demand discovery is an upgrade, never a blocker
+        }
+    }
+
+    private function dfsSuggestionKey(ContentPlan $plan): string
+    {
+        $offers = (array) (($plan->offerings ?? [])['sell'] ?? []);
+
+        return 'content:kw-dfs-sugg:v1:'.$plan->id.':'.md5(json_encode([$plan->country, array_slice($offers, 0, 5)]));
+    }
+
+    /** @return list<array{query:string, offer:string, intent:string}> */
+    private function dfsSuggestionCandidates(ContentPlan $plan): array
+    {
+        $cached = Cache::get($this->dfsSuggestionKey($plan));
+
+        return is_array($cached) ? $cached : [];
+    }
+
+    /**
+     * Persist the client's kept "best search terms" (the wizard's keyword
+     * step, minus explicit removals) as `content_plan_keywords` type
+     * `chosen` — the topic planner then materializes exactly one article per
+     * row (source 'confirmed'). Shared by BOTH wizard hosts so the 1:1
+     * behavior can't drift between dashboard and public onboarding.
+     *
+     * Idempotent upsert; a term the client removed in a later wizard visit is
+     * deleted again unless a topic was already materialized from it.
+     *
+     * @param  list<string>  $removed  keywords the client crossed out
+     * @return int number of confirmed terms now stored
+     */
+    public function confirmTerms(ContentPlan $plan, array $removed = []): int
+    {
+        $digest = $this->get($plan);
+        if ($digest === null) {
+            return 0;
+        }
+
+        $removedSet = array_flip(array_map(
+            static fn ($k) => mb_strtolower(trim((string) $k)), $removed
+        ));
+
+        $kept = [];
+        foreach ((array) ($digest['opportunities'] ?? []) as $opp) {
+            $kw = mb_strtolower(trim((string) ($opp['keyword'] ?? '')));
+            if ($kw === '' || isset($removedSet[$kw])) {
+                continue;
+            }
+            $kept[$kw] = $opp;
+        }
+
+        try {
+            $materialized = $plan->topics()
+                ->where('source', 'confirmed')
+                ->pluck('target_keyword')
+                ->map(static fn ($k) => mb_strtolower(trim((string) $k)))
+                ->flip();
+
+            // Drop previously-confirmed terms the client has now crossed out —
+            // unless the planner already turned them into a topic (the topic
+            // list is the source of truth once materialized; dropTopic handles
+            // those).
+            ContentPlanKeyword::query()
+                ->where('plan_id', $plan->id)
+                ->where('type', ContentPlanKeyword::TYPE_CONFIRMED)
+                ->get()
+                ->each(function (ContentPlanKeyword $row) use ($kept, $materialized) {
+                    $kw = mb_strtolower(trim((string) $row->keyword));
+                    if (! isset($kept[$kw]) && ! $materialized->has($kw)) {
+                        $row->delete();
+                    }
+                });
+
+            foreach ($kept as $kw => $opp) {
+                ContentPlanKeyword::query()->updateOrCreate(
+                    ['plan_id' => $plan->id, 'keyword_hash' => KeywordMetric::hashKeyword($kw)],
+                    [
+                        'keyword' => $kw,
+                        'type' => ContentPlanKeyword::TYPE_CONFIRMED,
+                        'country' => (string) ($plan->country ?: 'global'),
+                        'search_volume' => is_numeric($opp['volume'] ?? null) ? (int) $opp['volume'] : null,
+                        'search_intent' => KeywordIntentClassifier::classify($kw),
+                    ]
+                );
+            }
+
+            return count($kept);
+        } catch (\Throwable) {
+            return 0; // never block a wizard step transition on this
+        }
+    }
+
     /** Clear cached insights + both request pointers so a refetch redispatches. */
     public function forget(ContentPlan $plan): void
     {
@@ -1042,7 +1375,10 @@ class ContentKeywordInsights
 
     private function insightsKey(ContentPlan $plan): string
     {
-        return 'content:kw-insights:v1:'.$plan->id;
+        // v2 (2026-07-23): payload gained offer lineage + winnability-ranked
+        // opportunities. Version bump retires v1 entries naturally — never
+        // mutate a live cache shape.
+        return 'content:kw-insights:v2:'.$plan->id;
     }
 
     private function requestKey(ContentPlan $plan): string
@@ -1086,6 +1422,17 @@ class ContentKeywordInsights
     private function seeds(ContentPlan $plan, Website $website): array
     {
         $seeds = [];
+
+        // Offer-spine first: buyer-shaped candidate queries generated from the
+        // confirmed offers × the site type's intent profile. These carry the
+        // lineage the digest surfaces later; the server expands them into the
+        // real keyword set. Fail-soft [] → the classic heads below still seed.
+        foreach (app(OfferQueryGenerator::class)->candidates($plan) as $candidate) {
+            $seeds[] = $candidate['query'];
+            if (count($seeds) >= 10) {
+                break; // leave room for offering heads + GSC within MAX_SEEDS
+            }
+        }
 
         foreach ((array) (($plan->offerings ?? [])['sell'] ?? []) as $item) {
             $item = mb_strtolower(trim((string) $item));
@@ -1369,6 +1716,35 @@ class ContentKeywordInsights
         bool $competitorsPending = false, int $competitorsDone = 0, int $competitorsTotal = 0,
         array $peopleAlso = []): array
     {
+        // ── Brand hygiene (2026-07-23, the kayali onboarding): guard-blocked
+        // brand keywords out of the WHOLE digest — the guard forbids writing
+        // about Sephora while the old digest simultaneously recommended
+        // targeting "sephora birthday gift sets" and grew a 1,633-keyword
+        // "Sephora Perfume" pillar. Own-brand terms stay in the digest (the
+        // "Kayali Perfume" pillar is genuinely theirs) but are excluded from
+        // opportunities below — people searching your brand already found you.
+        $blockedTerms = [];
+        $ownBrand = null;
+        try {
+            $guardSvc = app(CompetitorMentionGuard::class);
+            $blockedTerms = $guardSvc->terms($plan);
+            $ownBrand = $guardSvc->ownBrandToken($plan);
+        } catch (\Throwable) {
+        }
+        $containsAny = static function (string $keyword, array $terms): bool {
+            foreach ($terms as $t) {
+                if ($t !== '' && str_contains($keyword, $t)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+        if ($blockedTerms !== []) {
+            $rows = array_values(array_filter($rows, fn ($r) => ! $containsAny((string) $r['keyword'], $blockedTerms)));
+            $gap = array_values(array_filter($gap, fn ($g) => ! $containsAny(mb_strtolower((string) ($g['keyword'] ?? '')), $blockedTerms)));
+        }
+
         $plannedKeywords = $plan->topics()->pluck('target_keyword')
             ->map(fn ($k) => mb_strtolower(trim((string) $k)))->filter()->flip()->all();
 
@@ -1491,16 +1867,168 @@ class ContentKeywordInsights
         $questionsTotal = count($questionList);
         $questions = array_slice($questionList, 0, 8);
 
-        // ── Opportunities: volume weighted by how winnable the keyword looks.
-        $weight = ['low' => 1.0, 'medium' => 0.7, 'unknown' => 0.55, 'high' => 0.4];
+        // ── Opportunities — the offer-spine ranking flip (2026-07-23):
+        // winnability (keyword difficulty vs OWN authority, else competition
+        // tier) × the site type's intent weight decides the order; volume only
+        // breaks ties. A DA-15 site no longer gets difficulty-60 head terms it
+        // can never win just because they carry volume. Each pick also carries
+        // its offer lineage ("because you sell: X") when attribution is
+        // confident.
+        $profile = \App\Support\ContentSiteTypeProfiles::profile($plan->site_type);
+        $intentWeights = $profile['intent_weights'] + ['other' => 0.5];
+        $avoidPatterns = (array) ($profile['avoid_patterns'] ?? []);
+        $ownDa = null;
+        $difficultyByKeyword = [];
+        $volumeByKeyword = [];
+        $competitionByKeyword = [];
+        $originByKeyword = [];
+        $candidates = [];
+        try {
+            $website = $plan->website;
+            $ownDa = $website !== null ? KeywordWinnability::ownAuthority($website) : null;
+
+            $generator = app(OfferQueryGenerator::class);
+            $candidates = $generator->candidates($plan);
+            // DFS demand-discovered candidates (real searches around each
+            // offer) join the LLM/mechanical ones — first source wins on a
+            // duplicate query.
+            $candidateQueries = array_flip(array_column($candidates, 'query'));
+            foreach ($this->dfsSuggestionCandidates($plan) as $c) {
+                if (! isset($candidateQueries[$c['query']])) {
+                    $candidates[] = $c;
+                    $candidateQueries[$c['query']] = true;
+                }
+            }
+            $sell = array_values(array_filter(array_map(
+                static fn ($v) => trim((string) $v),
+                (array) (($plan->offerings ?? [])['sell'] ?? [])
+            )));
+            $originByKeyword = $generator->attribute(array_column($rows, 'keyword'), $candidates, $sell);
+            // Candidates KNOW their offer — exact lineage beats attribution.
+            foreach ($candidates as $c) {
+                $originByKeyword[$c['query']] = $c['offer'];
+            }
+
+            // Difficulty + volume from the shared asset (harvest + the
+            // candidate keyword-overview enrichment) — already-paid data.
+            $hashes = [];
+            foreach ($rows as $r) {
+                $hashes[KeywordMetric::hashKeyword($r['keyword'])] = $r['keyword'];
+            }
+            foreach ($candidates as $c) {
+                $hashes[KeywordMetric::hashKeyword($c['query'])] = $c['query'];
+            }
+            foreach (KeywordMetric::query()->whereIn('keyword_hash', array_keys($hashes))
+                ->get(['keyword_hash', 'keyword_difficulty', 'search_volume', 'competition']) as $m) {
+                $kw = $hashes[$m->keyword_hash] ?? null;
+                if ($kw === null) {
+                    continue;
+                }
+                if ($m->keyword_difficulty !== null) {
+                    $difficultyByKeyword[$kw] = (int) $m->keyword_difficulty;
+                }
+                if ($m->search_volume !== null) {
+                    $volumeByKeyword[$kw] = (int) $m->search_volume;
+                }
+                if ($m->competition !== null) {
+                    $competitionByKeyword[$kw] = (float) $m->competition;
+                }
+            }
+        } catch (\Throwable) {
+            // Deterministic fallback below still ranks by competition tier.
+        }
+
+        $score = function (array $r) use ($intentWeights, $difficultyByKeyword, $ownDa, $avoidPatterns): float {
+            $winnability = KeywordWinnability::score(
+                $difficultyByKeyword[$r['keyword']] ?? null,
+                (string) $r['competition'],
+                $ownDa
+            );
+            $score = $winnability * (float) ($intentWeights[$r['intent']] ?? 0.5);
+            // Offer-spine candidates: fit bonus when demand exists or is
+            // unknown — but a DFS-priced ZERO volume means nobody searches
+            // the phrase, and offer-true-but-unsearched must sink below real
+            // demand (live kayali round #2: six vol=0 candidates crowded out
+            // a 5,500/mo real term).
+            if (! empty($r['is_candidate'])) {
+                $volume = $r['volume'] ?? null;
+                $score *= match (true) {
+                    $volume === null => 1.1,   // unpriced — plausible
+                    $volume === 0 => 0.4,      // priced: no demand
+                    default => 1.25,           // priced: real demand + offer fit
+                };
+            }
+            // Wrong-site-type queries ("perfume reviews" for a brand) sink.
+            foreach ($avoidPatterns as $pattern) {
+                if (@preg_match($pattern, $r['keyword']) === 1) {
+                    $score *= 0.2;
+                    break;
+                }
+            }
+
+            return $score;
+        };
+
         $opps = array_values(array_filter($rows, fn ($r) => ($r['volume'] ?? 0) > 0));
-        usort($opps, fn ($a, $b) => ($b['volume'] * $weight[$b['competition']]) <=> ($a['volume'] * $weight[$a['competition']]));
+        // Offer-spine candidates join as first-class rows (volume from the
+        // DFS candidate enrichment where it landed; null is allowed — an
+        // offer-true term without a priced volume still beats junk).
+        $inRows = array_flip(array_column($opps, 'keyword'));
+        foreach ($candidates as $c) {
+            $kw = $c['query'];
+            if (isset($inRows[$kw]) || ($blockedTerms !== [] && $containsAny($kw, $blockedTerms))) {
+                continue;
+            }
+            $difficulty = $difficultyByKeyword[$kw] ?? null;
+            // Tier from difficulty when known, else from the DFS competition
+            // float (suggestions often carry competition but zero difficulty).
+            $comp01 = $competitionByKeyword[$kw] ?? null;
+            $tier = match (true) {
+                $difficulty !== null => $difficulty < 34 ? 'low' : ($difficulty < 67 ? 'medium' : 'high'),
+                $comp01 !== null => $comp01 < 0.34 ? 'low' : ($comp01 < 0.67 ? 'medium' : 'high'),
+                default => 'unknown',
+            };
+            $opps[] = [
+                'keyword' => $kw,
+                'volume' => $volumeByKeyword[$kw] ?? null,
+                'competition' => $tier,
+                'intent' => $c['intent'],
+                'is_candidate' => true,
+            ];
+        }
+        // Own-brand terms out of opportunities only: people searching the
+        // brand already found the site — articles must win NEW audiences.
+        if ($ownBrand !== null) {
+            $opps = array_values(array_filter($opps, fn ($r) => ! str_contains((string) $r['keyword'], $ownBrand)));
+        }
+        usort($opps, function ($a, $b) use ($score) {
+            $cmp = $score($b) <=> $score($a);
+
+            return $cmp !== 0 ? $cmp : ((int) ($b['volume'] ?? 0) <=> (int) ($a['volume'] ?? 0));
+        });
+        // Mix guard: at most 4 of the 6 picks may be generator candidates —
+        // the list must stay anchored in observed demand, not read as a
+        // template output.
+        $picked = [];
+        $candidateCount = 0;
+        foreach ($opps as $r) {
+            $isCandidate = ! empty($r['is_candidate']);
+            if ($isCandidate && $candidateCount >= 4) {
+                continue;
+            }
+            $picked[] = $r;
+            $candidateCount += $isCandidate ? 1 : 0;
+            if (count($picked) >= 6) {
+                break;
+            }
+        }
         $opportunities = array_map(fn ($r) => [
             'keyword' => $r['keyword'],
-            'volume' => $r['volume'],
+            'volume' => $r['volume'] ?? ($volumeByKeyword[$r['keyword']] ?? null),
             'competition' => $r['competition'],
             'planned' => isset($plannedKeywords[$r['keyword']]),
-        ], array_slice($opps, 0, 6));
+            'origin' => $originByKeyword[$r['keyword']] ?? null,
+        ], $picked);
 
         return [
             'stats' => [

@@ -17,6 +17,12 @@ class ContentPlanKeyword extends Model
 
     public const TYPE_GAP = 'gap';
 
+    // A "best search term" the client explicitly kept on the wizard's keyword
+    // step — the topic planner materializes exactly one article per row
+    // (source 'confirmed'). Stored value is 'chosen' because the `type`
+    // column is string(8); the constant name is the semantic one.
+    public const TYPE_CONFIRMED = 'chosen';
+
     protected $guarded = [];
 
     protected function casts(): array

@@ -43,6 +43,10 @@ class IdeogramModelTest extends TestCase
 
     public function test_v3_default_hits_v3_path_with_prompt_field(): void
     {
+        // Explicitly blank — never inherit the machine .env's IDEOGRAM_MODEL
+        // (prod flipped to v4 in 2026-07 and silently broke this assertion).
+        config(['services.ideogram.model' => null]);
+
         // no model configured → 'v3' default
         $r = app(IdeogramClient::class)->generate('a red circle');
         $this->assertTrue($r['ok']);

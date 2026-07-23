@@ -124,6 +124,332 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   ESCAPED colons (`hover\:border-orange-300`) — plain `-F ".hover:…"` false-
   negatives; `min-h-*`/`lg:order-last` are NOT compiled (inline styles used).
 
+## Site types — the offer spine (Phase A, 2026-07-23)
+
+`content_plans.site_type` (nullable enum, migration `2026_07_23_090000`) +
+`site_type_source` (`auto|user`) + `audience` (one line, ≤500). The taxonomy
+and ALL per-type behavior live in `app/Support/ContentSiteTypeProfiles.php`
+(pure config: intent weights, query shapes, guard default, CTA style, voice,
+TOFU/MOFU/BOFU mix): `blog | affiliate | brand | ecommerce_reseller |
+local_service | saas | tool | b2b_services | nonprofit | other`.
+(`tool` added 2026-07-23 #5: free browser tools/generators — the
+namesforfreefire/pubgnamegenerator archetype fit nothing and flip-flopped
+other/saas between runs. Utility query shapes ("free {offer}", "{offer}
+ideas"), guard `protect` (traffic IS the product), CTA `trial` framing,
+informational-heavy mix. Classifier prompts got explicit tool-vs-saas hints:
+free-no-signup ⇒ tool, sign-up/pay ⇒ saas. Verified live: namesforfreefire
+reclassified `tool` on first try.)
+
+(2026-07-23 #6 — three more types + per-site YMYL: `creator`
+(person-is-the-brand; first-person voice, CTA "course or newsletter"),
+`marketplace` (two-sided platforms/directories; find/compare/price shapes,
+CTA "browse the listings"), `education` (paid courses; the old "Nonprofit /
+education" chip conflated a course academy with a charity — nonprofit is now
+"Nonprofit / charity"). All three guard-default `protect`. Plus
+**`content_plans.ymyl`** (nullable bool, migration `2026_07_23_120000`):
+classifier-assessed, TYPE-INDEPENDENT — the extractor prompts return a
+`ymyl` boolean and the writer's CARE rule fires on `profile.ymyl_care OR
+plan.ymyl === true`, including for type-blind null-type plans. No UI —
+silently persisted by both wizard hosts + the backfill command (never
+clobbers an existing value). Live-verified: a freelance-writing coach
+profile → `creator`/ymyl false; a UAE dentist-booking platform →
+`marketplace`/**ymyl true** — exactly the health-subject-on-non-health-type
+case the flag exists for. 13 chips in the step-1 picker — near the UI
+ceiling; next type addition should rethink the layout.)
+
+- **Detection**: `SiteProfileExtractor` returns `site_type` + `audience` from
+  the SAME single LLM call (no extra spend); invalid enum values become null.
+  Profile cache key bumped `content:site-profile:v1:` → **`:v2:`** (old
+  entries lack the new keys and age out naturally). Remember the 7-day
+  empty-profile cache when retesting a failed site — bust `:v2:` now.
+- **Confirmation**: wizard step 1 renders a chip selector (shared partial);
+  `selectSiteType()` exists on BOTH hosts (`ContentWizard` trait +
+  `ContentCalendar`) — a click records `site_type_source='user'`, which
+  re-detection/backfill NEVER overwrites. Persisted at step 2 alongside the
+  profile (`toHowItWorks` twins + `saveSettings`).
+- **Null = type-blind**: every consumer must treat null/`other` exactly like
+  the pre-site-type pipeline. Classification failure is a degradation, not an
+  error.
+- **Backfill**: `ebq:content-classify-plans {--dry-run} {--limit=50}` — one
+  flash call per already-profiled plan (stored text only, NO page fetches,
+  `Http::assertSentCount(1)`-tested), spend-metered, idempotent, skips
+  user-classified rows. Run dry-run first; failures stay null and retry.
+
+Tests: `SiteProfileExtractorTest` (enum validation, backfill classification),
+`ContentClassifyPlansCommandTest`, `ContentPublicOnboardingTest` (full-flow
+persists chip choice as `user`).
+
+## Offer-grounded keywords + winnability ranking (Phase B, 2026-07-23)
+
+- **`OfferQueryGenerator`** (`app/Services/Content/OfferQueryGenerator.php`):
+  one flash call per plan turns confirmed offers × the type's query shapes ×
+  audience into ≤30 buyer-shaped candidate queries, EACH carrying its offer
+  lineage. Cache `content:offer-queries:v1:{plan}:{input-hash}` (30d — the
+  hash makes offer/type edits self-invalidating). LLM-free fallback fills the
+  shapes mechanically, so a plan with offerings NEVER yields []. `attribute()`
+  maps server-expanded keywords back to offers by token overlap (≥0.5
+  confidence, candidate queries extend their offer's token set).
+- **`KeywordWinnability`** (same dir): pure math — `difficultyCeiling(ownDa)`
+  (DA band → max winnable KD, unknown DA assumes small site) and
+  `score(difficulty, competitionTier, ownDa)` 0..1 (never 0). Own DA read
+  from the shared `domain_metrics.moz_da`. Difficulty comes from the DFS
+  harvest's `keyword_metrics.keyword_difficulty` — captured since 07-20,
+  first actually USED here.
+- **`ContentKeywordInsights` changes**: `seeds()` now leads with up to 10
+  generator queries (offer heads + GSC still follow, MAX_SEEDS 20 unchanged);
+  `build()`'s opportunities are ranked `winnability × intent-weight
+  (ContentSiteTypeProfiles)` with volume as TIEBREAK ONLY, and each pick
+  carries `origin` (the offer, null when unconfident). Digest cache key
+  bumped `content:kw-insights:v1:` → **`:v2:`**. Head terms are never hidden,
+  just outranked. `PrepareContentKeywordInsightsJob` timeout 60 → 120 (the
+  generator's ≤40s call runs inside `seeds()` on cache miss).
+- **Behavior change note**: for type-less plans the 'other' profile weights
+  informational ≥ transactional — `test_insights_classify_intent_questions_
+  and_opportunities` was updated accordingly (winnability-first is the
+  intended new semantics, not a regression).
+
+Tests: `KeywordWinnabilityTest` (unit), `OfferQueryGeneratorTest` (lineage
+snap, mechanical fallback, attribution), `ContentKeywordInsightsTest::
+test_opportunities_rank_by_winnability_not_volume_and_carry_offer_lineage`.
+
+## Confirmed terms → first articles 1:1 (Phase C, 2026-07-23)
+
+Step 6 now opens with a **"Your best search terms" card** (Google-mockup
+teaser + the winnability-ranked opportunity picks as keep/✕ chips, each
+showing "because you sell: {offer}"). Crossing a term out is wizard state
+(`removedTerms` + `toggleTerm()` — BOTH hosts); leaving the step
+(`toFirstArticles()`, both hosts) calls the SHARED
+`ContentKeywordInsights::confirmTerms($plan, $removed)`:
+
+- Kept opportunities upsert into `content_plan_keywords` as
+  **`ContentPlanKeyword::TYPE_CONFIRMED`** (stored value `'chosen'` — the
+  `type` column is string(8), 'confirmed' wouldn't fit; do NOT widen the
+  column, use the constant). Flipping an existing gap row is safe (unique
+  plan+hash; the classifier uses insertOrIgnore so it never crashes back).
+- `ContentTopicPlanner::materializeConfirmedTopics()` then creates exactly
+  ONE topic per confirmed term — deterministic (`source='confirmed'`,
+  deterministic title via `confirmedTitle()`, no LLM required, runs even when
+  `llm->isAvailable()` is false and BEFORE the pool-cap math). Idempotent: a
+  term that EVER had a topic (any status) never re-materializes. Pool full →
+  the farthest-out unstarted `llm` filler topic is skipped
+  (`last_error='superseded_by_confirmed_term'`) and the confirmed topic takes
+  its calendar slot. Cap 10 per run.
+- Research still pending on step-6 exit → `confirmTerms` returns 0, the
+  transition never blocks (terms can still be confirmed on a Settings
+  revisit).
+- Step 7 badges confirmed topics "Your pick"; planner source whitelist for
+  LLM candidates unchanged (LLM output can never claim `confirmed`).
+
+Tests: `ContentConfirmedTermsTest` (6 — materialize/idempotent/supersede/
+wizard persist/pending-safe/gap-flip).
+
+## Peer competitor split + honest gap (Phase D, 2026-07-23)
+
+`ContentSetupInsights::withOverrides()` now ends in `withPeerClasses()` — a
+READ-TIME overlay (never cached: it depends on the guard classification and
+manual overrides, both of which can land after the 30-day snapshot). Each
+competitor row gains `class`:
+
+- `reference` — in the guard's `competitor_guard['references']` list;
+- `peer` — rival in the client's weight class: |DA delta| ≤ 25 when both DAs
+  known (own DA preferred from `domain_metrics.moz_da`, falling back to the
+  citation score), else referring domains ≤ 5× the client's, else (no data)
+  **peer** — unknown must never quietly demote a real rival. A weaker rival
+  is also peer (only clearly-above rivals are `aspirational`).
+- `aspirational` — real rival, clearly above the weight class.
+
+Payload adds `peer_median` / `peer_gap` / `peer_behind` (same math, PEERS
+ONLY; falls back to the all-rows figures when nothing classifies). The old
+`median`/`gap`/`behind` are untouched for other readers. Zero new API calls —
+pure re-labeling of data already fetched.
+
+Step-5 UI: stats lead with the peer median/gap; the table shows peers +
+aspirationals ranked by referring domains **with the client's own "YOU" row
+inserted in rank position** (references are out of that ladder, so the old
+directories-on-top failure cannot return); aspirationals get an "Ahead of
+you" chip; references collapse into an "Also on your results pages" chip
+section explicitly excluded from gap math. Fresh sites keep SERP order, no
+YOU row.
+
+Tests: `ContentPeerClassesTest` (3).
+
+## Guard evolution (Phase E, 2026-07-23)
+
+- **Policy modes** — `CompetitorMentionGuard::mode($plan)`: explicit
+  `guard['mode']` wins, else the site type's `guard_default`
+  (brand/local/saas/b2b → `protect`; affiliate → `brands_required`; reseller
+  → `stocked_only`; blog/nonprofit → `off`; null type → `protect` = exact
+  pre-mode behavior). `modeBlocks()` gates BOTH `termsForTopic()` (an
+  affiliate's articles may name any brand even with the toggle on) and
+  assess()'s auto-enable (never auto-protect an affiliate/blog).
+  `stocked_only` additionally drops any blocked term appearing in the
+  sell-offerings — a reseller's stocked brands are the content; only
+  competing retailers stay blocked.
+- **Aliases** — the SAME classify call now returns ≤4 aliases per blocked
+  brand ("uc" for Urban Company); stored on `auto[i].aliases`, merged into
+  `terms()`, removed together with their parent brand. No extra LLM cost.
+- **Value counter** — `guard['stats'].articles_checked/mentions_removed`,
+  bumped by `ContentArticleProducer` after READY (checked when the guard was
+  active; removed when an earlier version carried the `competitor_mentions`
+  lint and the final doesn't). Rendered on the guard card ("2 articles
+  checked · 1 competitor mention removed"). Fail-soft — a lost tick never
+  fails an article.
+- **Retroactive scan** — `ScanPublishedForBlockedTermsJob` (dispatched by
+  `addTerm()`; unique per plan, deterministic, no LLM): lints PUBLISHED
+  articles' current version against blocked terms/domains → stamps
+  `topic.meta['brand_safety']` (and clears stale flags). Flags only — never
+  edits published content.
+- **UI** — guard card gains an "Allowed as sources" reference-chip group
+  (block-anyway button per chip → `blockReference()` on BOTH hosts, via the
+  new public `brandForDomain()`), plus the counter line.
+
+Tests: `ContentGuardEvolutionTest` (7); the pre-existing
+`CompetitorMentionGuardTest` (24) is untouched and green.
+
+## Type-aware writing (Phase F, 2026-07-23)
+
+Instruction-text only — the chunked write protocol, scorer, and revise loop
+are untouched:
+
+- `ContentArticleProducer::siteTypeRules()` (in `templateInstructions()`):
+  VOICE per the type profile (personal / brand-"we" / friendly-professional /
+  professional / warm), AUDIENCE line from `plan.audience`, and a CARE rule
+  when the profile sets `ymyl_care` (b2b_services). `ctaFraming()` refines
+  the existing CTA rule per `cta_style` (product/category/contact/trial/
+  consultation/subscribe/support) — only when the client already enabled a
+  CTA URL; nothing is added otherwise.
+- `ContentTopicPlanner::ideate()` gains a SITE TYPE block: the profile's
+  TOFU/MOFU/BOFU `article_mix` as percentage guidance + the audience line.
+- Null/unclassified site type adds ZERO text in both places — byte-identical
+  prompts to the pre-site-type pipeline (test-asserted).
+
+Tests: `ContentTypeAwareWritingTest` (4).
+
+## Brand-hygiene round (2026-07-23 #2 — the kayali onboarding vs getautoseo)
+
+Side-by-side of our live step 6 against the competitor's for kayali.com
+exposed five gaps; all fixed same day, deployed prod + staging:
+
+1. **Candidates now surface in "best search terms" with real volumes.**
+   The opportunities gate (`volume > 0`) silently excluded every
+   `OfferQueryGenerator` candidate the keyword server didn't price. Now:
+   `ContentKeywordInsights::enrichCandidateMetrics()` (called in
+   `ensureStarted()`, i.e. inside the queued job) prices candidates via the
+   NEW `DataForSeoBacklinkClient::keywordOverview()`
+   (`/dataforseo_labs/google/keyword_overview/live`, ≤50 kw/call, spend-
+   metered, admin-sandboxed, mock never persisted) into the shared
+   `keyword_metrics` asset (`dfs_labs`, 30d TTL, insert-if-missing). The
+   digest merges candidates as first-class opportunity rows (volume/difficulty
+   from the asset; null volume allowed) with exact offer lineage and a
+   volume-aware fit factor — ×1.25 when priced with real demand, ×1.1 when
+   unpriced, **×0.4 when DFS priced it ZERO** (offer-true-but-unsearched must
+   sink; live round #2 had six vol=0 candidates crowd out a 5,500/mo term) —
+   plus a mix guard of ≤4 candidates among the 6 picks so the list stays
+   anchored in observed demand. `labsGeo()` on the client is the geo map
+   (twin of `HarvestDomainKeywordsJob::geoFor` — keep in sync).
+2. **Guard-blocked brand keywords purged from the WHOLE digest** (rows + gap)
+   — the guard used to forbid writing about Sephora while the digest
+   recommended "sephora birthday gift sets" and grew a 1,633-keyword
+   "Sephora Perfume" pillar.
+3. **Own brand is never a competitor, never blocked, never an opportunity.**
+   `CompetitorMentionGuard::ownBrandToken()` (domain-derived, ≥4 chars) —
+   filters `competitorDomains()` (kayaliofficial.shop was classified a rival
+   of kayali.com), `terms()` (safety net vs stale assessments — works without
+   reassessing), and the digest's opportunities (brand searchers already
+   found the site; own-brand demand stays visible in pillars/searches).
+4. **"Est. monthly traffic" sums PEER-class competitors only** (Phase D
+   classes via `withOverrides`) — summing Sephora+Kohl's ETV had produced a
+   74M headline for a niche brand. The per-competitor table is unchanged.
+5. **`avoid_patterns` per site type** (`ContentSiteTypeProfiles`): brand
+   sites down-weight ×0.2 affiliate-shaped queries (`reviews?`, `comparison`,
+   `vs`) — "perfume reviews" belongs to affiliates, not a brand's own blog.
+
+Behavioral note: candidates joining opportunities also means `confirmTerms`
+persists them → `ContentConfirmedTermsTest` expectations were relaxed
+accordingly (contains/not-contains instead of exact list).
+
+Tests: `ContentBrandHygieneTest` (5).
+
+## DFS demand discovery (2026-07-23 #3 — hybrid sourcing)
+
+Three-way comparison (our step 6 vs getautoseo vs a raw-DFS simulation)
+showed DFS `keyword_suggestions` seeded from offer heads finds bigger real
+demand than both ("best vanilla perfume" 12,100/mo for kayali). Now a THIRD
+candidate source feeding the SAME ranking pipeline:
+
+- **`DataForSeoBacklinkClient::keywordSuggestions()`** — one call per offer
+  head (≤5 offers × ≤30 rows, ~$0.08/onboarding), volume-ordered. The
+  endpoint reports KD=0 where it has none → normalized to null (competition
+  float tiers those rows instead; never treat "no data" as "trivially easy").
+- **`ContentKeywordInsights::ensureDfsSuggestions()`** (in `ensureStarted()`,
+  queued): token-signature dedupe (one query cluster arrives as several
+  word-order variants), demand floor 50/mo, cap 8/offer & 40 total, then the
+  SAME `llmRelevantItems` vetting questions/gap use (kills cross-brand drift
+  like "nespresso exclusive offers"; fails open). Candidates cached per plan
+  30d (`content:kw-dfs-sugg:v1:{plan}:{raw-offers-hash}`); metrics persisted
+  into shared `keyword_metrics` (sandbox never persists/bills). `build()`
+  merges them with the LLM/mechanical candidates — dedupe by query, first
+  source wins.
+- **`OfferQueryGenerator::isPromoOffer()`** — promo-mechanics offerings
+  ("Exclusive offers", "Complimentary samples with orders") are HOW a shop
+  sells, not WHAT; they are never used as query seeds by either the
+  generator or the suggestions pass (LLM vetting can't catch these — the
+  junk offer is in the plan's own offerings, so the model believes it).
+  The real fix is the client editing their offerings; this is the pipeline
+  defense.
+
+Live kayali result: best signature perfumes (110, lineage) · signature scent
+perfumes (390) · best scents (5,500) · top 10 luxury perfume brands (550) ·
+layering-collection candidate — zero junk. Caveat: the 12,100/mo vanilla
+term only flows once the plan's offerings name the actual product line
+(this plan's stored offers predate the v2 extractor); fresh onboardings get
+it automatically.
+
+Tests: `ContentBrandHygieneTest::test_dfs_suggestions_discover_demand_and_
+join_best_terms_with_lineage` (dedupe, demand floor, lineage, tiering,
+shared-asset persist).
+
+## Signal-based giant detection + entity types (2026-07-23 #4, LIVE TEST)
+
+The static GiantDomains list is precision-high/recall-bounded — sephora and
+kohls walked through it for kayali.com. Now a signal layer catches unlisted
+giants, **flag-gated for instant no-deploy revert**:
+
+    Setting::set('content.giant_signals.enabled', false)   // ← the revert
+    (default true; mind the Setting cache-bust landmine)
+
+- **`GiantDomains::isScaleGiant()`** — listless, from stored metrics only:
+  organic keyword count > 500k, OR DA ≥ 70 AND ≥ 20× the client's referring
+  domains, OR (client unknown) DA ≥ 75 AND > 100k refs. Conservative on
+  purpose — a merely-larger niche rival never demotes.
+- **Entity types** — the guard's SAME classify call now tags every domain
+  `brand|retailer|marketplace|directory|media|service|other`
+  (`guard['entities']`, `entityFor()`). Retailer/marketplace/directory/media
+  ⇒ giant-class regardless of scale.
+- **`CompetitorMentionGuard::isGiantClass()`** is the single authority
+  (entity OR scale); consumed by (a) `rankAndFilter()` — giants sink to the
+  END of the research order, never dropped, so a client whose ONLY SERP
+  competitors are giants still gets research; (b) `withPeerClasses()` —
+  class `giant`, grouped with references in the step-5 collapsed section,
+  excluded from peer math automatically.
+- **Peer stats honesty**: zero peers now yields peer_median/gap **null**
+  ("—"), NOT a fallback to the all-rows median (which re-imported the
+  giant-skewed 12,294/30× the split exists to kill).
+- **`brandFromDomain()` rewritten**: the last hostname label is ALWAYS
+  dropped as a TLD (the old known-TLD allowlist turned unknown TLDs into the
+  brand: kayaliofficial.shop → "shop", so the own-brand filter missed it and
+  the client's own shop won the research slot). Own-brand variants are now
+  also filtered from `rankAndFilter()` candidates and from the displayed
+  competitor rows.
+
+Live kayali end-state: retailers all `giant` (collapsed), directories
+`reference`, own shop domain gone, peer stats honestly "—" (its SERP cache
+holds no brand peer yet — a future SERP refresh supplies them), research
+falls back to giants as designed.
+
+Tests: `ContentPeerClassesTest` (7 — incl. flag-off reverts to prior
+behavior, scale rule, entity demotion, research-slot demotion).
+
 ## Setup wizard v2 (6 steps, 2026-07-17; keyword-research step added 2026-07-18)
 
 `ContentCalendar` Livewire component drives a 6-step wizard:
@@ -140,16 +466,24 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
    user reads the next steps.
 3. **How it works** — 3-step explainer (research → daily article → traffic;
    the reference's backlinks step is deliberately omitted).
-4. **Competitors & authority** — `ContentSetupInsights`: your referring domains
-   vs competitor **median + gap multiplier** (reference-style "13.6×") + a
-   top-3 competitor table (favicon, referring domains, **Moz DA/PA**). Reads
-   the shared report snapshot (read-only), enriches each competitor's
-   referring-domains count via **OpenPageRank free bulk** (snapshot competitor
-   rows lack it), caches the whole result 30 days. When no usable snapshot
-   exists, `ensureGenerating()` FORCE-dispatches the standard paid report ONCE
-   (spend-metered; sandbox on staging; guarded once/30min) and step 4 polls
-   (`refreshCompetitors`) until it lands. Graceful "analyzing" / "appears
-   shortly" states otherwise.
+4. **Competitors & authority** — `ContentSetupInsights`. **Source order
+   flipped 2026-07-22 (owner decision)**: LAYER 1 is now **SERP discovery**
+   (`DiscoverContentCompetitorsJob` → `ReportEnrichmentService::
+   discoverCompetitorsFor`, geo-targeted, cached 30d at
+   `content:serp-competitors:{website_id}`) — whoever actually ranks for the
+   plan's real target searches, displayed **in SERP tally order** (most
+   appearances / best positions first; the old strongest-backlinks re-sort is
+   GONE — it's what surfaced directories above real rivals). The backlink
+   report snapshot is now only (a) the AUTHORITY side (your referring domains
+   vs median + gap multiplier) and (b) the competitor FALLBACK when SERP
+   discovery found nothing. **`GiantDomains` filter applies to BOTH sources**
+   (expanded 2026-07-22 from 15 to ~90 entries — amazon/ebay/netflix/booking/
+   tripadvisor/nytimes-class platforms; extendable, deliberately NOT
+   exhaustive, and niche-scale sites stay out because for some client they
+   ARE the competitor). Cap raised **top-3 → top-10** (`MAX_COMPETITORS`).
+   `ensureGenerating()` dispatches SERP discovery first, paid report second;
+   step 4 polls (`refreshCompetitors`) until either lands. Note the Moz
+   free-tier math: 10 competitor rows/site against the 40-row monthly meter.
    - **Moz DA/PA** (2026-07-18, owner request): every competitor row (auto AND
      manual) is enriched via `MozLinksClient::urlMetrics()`, 30-day cached
      **per domain** (`content:moz:{host}`, independent of the insights cache
@@ -251,8 +585,23 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
      enrichment can land after the digest is first cached; card hides when 0
      (not landed / no DFS data) and is gated behind `$showVolumes` so public
      onboarding keeps it behind the teaser.
-5. **Keyword research** (2026-07-18) — `ContentKeywordInsights`: the client-
-   facing digest of the research behind their plan. Background flow:
+5. **Keyword research** (2026-07-18; this doc's step numbering is stale — the
+   live wizard has 7 steps, this is actually `wizardStep === 6`, right after
+   Competitors at `=== 5`) — `ContentKeywordInsights`: the client-facing
+   digest of the research behind their plan. Also where the
+   **competitor-mention guard card** now renders (moved off the competitors
+   step, 2026-07-22) — the competitor list is only FINAL once the user
+   leaves that step, and nothing there guaranteed a job had been queued for
+   the current state (only the `needsReportGen`-triggered `wire:init` and
+   explicit add/remove actions dispatched `AssessCompetitorGuardJob`) — a
+   site with an already-cached competitor report could sit on the
+   competitors step with the card polling forever, nothing ever landing.
+   `toKeywordResearch()` (the competitors→keyword-research transition)
+   already dispatches the job unconditionally when unassessed; the card's
+   own `wire:init="loadCompetitors"` (reused, not a new method) is the
+   belt-and-braces trigger for anyone who navigates back without re-running
+   that transition. `ContentCalendar::render()` computes `$wizard['guard']`
+   for `wizardStep === 6` now (was `=== 5`). Background flow:
    `PrepareContentKeywordInsightsJob` fires at the end of step 2 (alongside
    topic ideation) and dispatches an UNMETERED ideas request to the
    self-hosted keyword server (`KeywordFinderPool::dispatchIdeas`, seeds =
@@ -433,6 +782,17 @@ a competitor unless told. `CompetitorMentionGuard`
   (google.com for an SEO tool — valid citation, links stay allowed). Fail-soft
   with no LLM: block every competitor domain under its domain-derived brand —
   over-blocking is the safe default and the list is editable.
+  - **Classifier inputs hardened (2026-07-22 #2, the justlife.com misfire)**:
+    each prompt line now carries the domain's own homepage title + meta
+    description (fetched via `CrawlFetcher`, SSRF-guarded, ≤8 fetches × 8s
+    per assessment, cached 30 days per host at `content:guard-ctx:{host}`,
+    1-day cache for failures, per-domain fail-soft → bare line), and
+    client-added domains are marked `(added by the client as their
+    competitor)` (`competitorDomains()` now returns `{domain, manual}`
+    pairs, manual-first ordering). Prompt bias flipped: client-added ⇒
+    block unless unmistakably a pure reference; unknown/no-context ⇒ block
+    — matching `failSoft()`'s over-blocking philosophy.
+    `AssessCompetitorGuardJob` timeout raised 120→180 for the fetch budget.
 - **Auto-enable**: a harmful verdict turns `toggles['block_competitor_mentions']`
   on ONLY while the client never decided; `auto_enabled_at` drives the wizard's
   prominent "we turned this on for you" banner, cleared by any human toggle
@@ -463,7 +823,7 @@ a competitor unless told. `CompetitorMentionGuard`
   the classification; with no assessment at all it falls back to raw order
   rather than stalling research.
 
-Tests: `CompetitorMentionGuardTest` (19).
+Tests: `CompetitorMentionGuardTest` (24).
 
 ### The Laravel receiver is a published package
 
@@ -614,8 +974,41 @@ Cost ≈ $0.06–0.10 per article. Landmines encoded in code/comments:
   links (scorer rejects them) — same "passed-but-dropped" class as writer v25.
 - Length rules must be bidirectional (expand under / tighten over) — a
   one-sided "never shorten" made v4-pro balloon 1500→3046 words.
-- Open Phase-2 item: length adherence on broad keywords (section budget or
-  band widening for hub topics).
+- Length adherence on broad keywords — RESOLVED 2026-07-22 by **chunked
+  writing** (below); per-section word budgets are the one thing the model
+  actually respects, since each call physically cannot exceed its small cap.
+
+## Chunked article writing (2026-07-22)
+
+**Why**: the write stage was ONE 16k-max_tokens `completeJson` call returning
+the whole article. Hub topics ("The Ultimate Guide to …") made v4-pro write
+past the cap — prod incident: two attempts truncated at exactly 16000
+completion tokens → `llm_parse_failed`, ~21k tokens billed each for zero
+output, topic failed.
+
+**How** (`AiWriterService::chunkedDraft()`, opt-in via `$input['chunked']` —
+set ONLY by `ContentArticleProducer`; the WP-plugin wizard keeps the legacy
+single call):
+1. **Outline call** (max_tokens 2500, keeps `reasoning`): same full prompt +
+   a PLANNING STEP instruction → `{h1, summary, outline: [{heading, focus,
+   word_target}]}`, 6-14 entries, FAQ last when required. One retry.
+2. **Per-section calls** (max_tokens 4000, `reasoning` stripped, timeout 90):
+   full prompt + WRITING STEP instruction naming exactly one section →
+   `{heading, html}`. Structurally cap-proof (a section is 150-800 words).
+   Parse failure → ONE retry at half the word budget → skip the section
+   (article completes with the rest). Wall-clock budget: past ~900s no more
+   retries (produce job timeout is 1800s).
+3. Assembled into the exact single-call response shape (`sections[]` with
+   `kind: add`/`title`/`proposed_html`) — everything downstream
+   (normalizeSections, anchors, humanizer, scorer, revise loop) unchanged.
+   Fewer than 3 usable sections → null → the producer's normal
+   `draft_failed` path.
+
+**Cost**: prompt context re-sent per call ⇒ roughly 1.5-2× tokens/article
+(~$0.06-0.10 → ~$0.12-0.20). Owner-approved trade-off; on articles that
+previously failed-and-retried it is net cheaper (no more 21k-token
+zero-output attempts). Pipeline tests' `fakeLlm()` speaks the chunked
+protocol (PLANNING STEP / "write ONLY section N" markers).
 
 ## "Connect a destination" banner (renamed 2026-07-22)
 
@@ -631,6 +1024,41 @@ or Custom tab (both stored as `PLATFORM_WEBHOOK`, see
 [Publishing](#publishing-phase-3-2026-07-18)) kept seeing "Connect your
 WordPress site" forever. Copy is now platform-neutral too ("Connect a
 destination to publish").
+
+## Two parallel wizard implementations — a recurring drift trap
+
+`ContentCalendar` (dashboard) and the `ContentWizard` trait + `PublicOnboarding`
+(anonymous funnel) are two FULLY INDEPENDENT PHP implementations of the same
+7-step wizard — shared only via one blade partial
+(`livewire/content/partials/wizard.blade.php`), so the markup stays pixel-
+identical but the LOGIC does not. **The competitor-mention guard was built
+2026-07-21 into `ContentCalendar` only** — `AssessCompetitorGuardJob` was never
+dispatched anywhere in the trait (`loadCompetitors()`, `addCompetitor()`,
+`removeCompetitor()`, `resetCompetitors()`, `toKeywordResearch()`), the guard
+card's action methods (`toggleCompetitorGuard`/`addBlockedTerm`/
+`removeBlockedTerm`) didn't exist on `PublicOnboarding` at all, and
+`wizardViewData()` never set the `guard` view key — so every anonymous-
+onboarding user saw "Checking which of your competitors could pull readers
+away…" forever, with nothing ever able to resolve it (found 2026-07-22,
+reported as "still loading" against mkccleaningservices.com, which onboards
+exclusively through the anonymous funnel). Fixed by mirroring all of the above
+into the trait, and extracting the one genuinely shared piece —
+`CompetitorMentionGuard::stateFor(ContentPlan $plan): array` — so both
+`ContentCalendar::guardState()` and the trait's `wizardViewData()` build the
+card's view state from one place instead of two copies that can silently
+diverge again. **Any future Content Autopilot wizard feature must be added to
+BOTH `ContentCalendar` and `ContentWizard`/`PublicOnboarding`, or it silently
+only works for logged-in dashboard users.**
+
+Same investigation also found the "Est. traffic/mo" / "Organic keywords"
+columns going blank for a MANUALLY added competitor forever: those come from
+`DomainMetric.dfs_metrics`, populated only by `EnrichCompetitorDomainMetricsJob`
+— which `ContentSetupInsights::build()` dispatches for the raw
+auto-discovered competitor list only. `withOverrides()` backfills DA/PA for a
+manual add (via `metricsForDomain()`) but never touched `dfs_metrics`. Fixed
+by dispatching `EnrichCompetitorDomainMetricsJob` for the single new domain
+from both `addCompetitor()` implementations (idempotent — skips domains
+already fresh, so this is cheap).
 
 ## Country / geo-targeting (2026-07-22)
 
@@ -661,8 +1089,39 @@ GSC-country-breakdown signal wired in yet (`app/Support/Countries.php` +
 aren't connected here). A future improvement could prefer GSC's top country
 when the site already has Search Console connected.
 
+## Site-profile detection vs bot-hostile / region-routed sites (2026-07-22)
+
+kayali.com/en-ae onboarded to a blank step 1: the crawl came back `blocked`
+(Shopify bot protection; even robots.txt serves an error page), the root URL
+is a bare 302 to /en-ae, and `SiteProfileExtractor`'s live fallback fetched
+only the bare root with the honest bot UA → nothing → empty profile cached
+7 days. Two fixes:
+- **(a) Entered-path preference** — `PublicOnboardingStartController` caches
+  the URL the visitor actually typed (path included) at
+  `content:entered-url:{website_id}` (30d, only when a path is present);
+  `liveSignals()` tries it before the bare host.
+- **(b) Hardened live fetch** — `SiteProfileExtractor::
+  fetchFollowingRedirects()`: manual redirect-following up to 4 hops with
+  EVERY hop re-checked through `SafeHttpGuard` (CrawlFetcher's per-hop SSRF
+  policy), honest `SerfixBot/1.0` UA first, one retry with a browser-like UA
+  when the bot is blocked (403/406/429/5xx/transport error).
+Verified live against the real kayali.com: full description + sell/dont_sell
+extracted. Remember the 7-day EMPTY-profile cache when retesting a
+previously-failed site — bust `content:site-profile:v1:{website_id}` or the
+blank result persists.
+
 ## Landmines (2026-07-22 prod incident)
 
+- **Bare-domain LLM classification misfires on unknown brands.** justlife.com
+  and urbancompany.com — real UAE cleaning rivals the client HAND-ADDED at
+  mkccleaningservices.com — were classified "reference" because the flash-tier
+  classifier got only `- domain.com` lines: no page context, no signal that the
+  client picked them, and a prompt that biased unknowns toward "not a
+  competitor". Any future domain-classification prompt must (a) carry the
+  site's own homepage title/meta, (b) carry the manual-add signal, (c) default
+  unknowns to block — matching `failSoft()`'s over-blocking philosophy.
+  `AssessCompetitorGuardJob`'s timeout is 180 specifically to cover the
+  context-fetch budget (≤8 × 8s) on top of the 40s LLM call.
 - **Coverage lives ON the `ContentPlan` row, not a separate entitlements
   table.** `ContentEntitlements::hasContentAccessFor()` checks
   `ContentPlan.billing_covered_at`. Hard-deleting a plan (e.g. to reset a test

@@ -11,6 +11,7 @@ use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentArticleProducer;
 use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\HumanizerService;
+use App\Services\Crawler\CrawlFetcher;
 use App\Services\Llm\LlmClient;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,6 +35,15 @@ class CompetitorMentionGuardTest extends TestCase
     {
         parent::setUp();
         $this->seed(PlanSeeder::class);
+        // The guard now fetches homepage context per candidate domain — never
+        // let tests touch the network. Individual tests re-bind their own
+        // stub as needed. (Mockery mocks skip the constructor, so
+        // SafeHttpGuard's live DNS never runs.)
+        $this->instance(CrawlFetcher::class, tap(\Mockery::mock(CrawlFetcher::class), function ($m) {
+            $m->shouldReceive('fetch')
+                ->andReturn(['ok' => false, 'status' => null, 'body' => '', 'error' => 'stubbed'])
+                ->byDefault();
+        }));
     }
 
     // ── fixtures ────────────────────────────────────────────────────────
@@ -63,6 +73,9 @@ class CompetitorMentionGuardTest extends TestCase
     {
         return new class($verdict) implements LlmClient
         {
+            /** @var list<array> every $messages array completeJson received */
+            public array $captured = [];
+
             public function __construct(private readonly ?array $verdict) {}
 
             public function isAvailable(): bool
@@ -78,6 +91,8 @@ class CompetitorMentionGuardTest extends TestCase
 
             public function completeJson(array $messages, array $options = []): ?array
             {
+                $this->captured[] = $messages;
+
                 return $this->verdict;
             }
 
@@ -276,6 +291,102 @@ class CompetitorMentionGuardTest extends TestCase
         ]));
 
         $this->assertSame(['semrush'], app(CompetitorMentionGuard::class)->terms($plan->fresh()));
+    }
+
+    // ── classifier prompt inputs (2026-07-22: justlife.com misfire) ──────
+
+    /** Fixed verdict used by the prompt-input tests below. */
+    private const PROMPT_VERDICT = [
+        'harmful' => true, 'reason' => 'x',
+        'domains' => [['domain' => 'justlife.com', 'verdict' => 'block', 'brand' => 'Justlife', 'why' => 'rival']],
+    ];
+
+    public function test_assess_prompt_carries_fetched_homepage_context(): void
+    {
+        $this->instance(CrawlFetcher::class, tap(\Mockery::mock(CrawlFetcher::class), function ($m) {
+            $m->shouldReceive('fetch')->andReturn([
+                'ok' => true, 'status' => 200,
+                'body' => '<html><head><title>Justlife: Book Home Cleaning Services in Dubai</title>'
+                    .'<meta name="description" content="On-demand cleaning and salon services in the UAE."></head></html>',
+            ])->byDefault();
+        }));
+        [, , $plan] = $this->planWithGuard();
+        $plan->update(['competitor_overrides' => ['added' => ['justlife.com']]]);
+
+        $llm = $this->fakeLlm(self::PROMPT_VERDICT);
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $llm);
+
+        $prompt = $llm->captured[0][1]['content'];
+        $this->assertStringContainsString('Justlife: Book Home Cleaning Services in Dubai', $prompt);
+        $this->assertStringContainsString('On-demand cleaning', $prompt);
+    }
+
+    public function test_assess_prompt_marks_client_added_domains(): void
+    {
+        [, $website, $plan] = $this->planWithGuard();
+        $this->seedCompetitorCache($website, ['thryv.com']);
+        $plan->update(['competitor_overrides' => ['added' => ['justlife.com']]]);
+
+        $llm = $this->fakeLlm(self::PROMPT_VERDICT);
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $llm);
+
+        $prompt = $llm->captured[0][1]['content'];
+        $this->assertStringContainsString('justlife.com', $prompt);
+        $this->assertStringContainsString('(added by the client as their competitor)', $prompt);
+        // The auto-discovered directory must NOT carry the marker.
+        $this->assertMatchesRegularExpression('/- thryv\.com(?! .*added by the client)/', $prompt);
+    }
+
+    public function test_assess_survives_context_fetch_failure(): void
+    {
+        $this->instance(CrawlFetcher::class, tap(\Mockery::mock(CrawlFetcher::class), function ($m) {
+            $m->shouldReceive('fetch')->andThrow(new \RuntimeException('boom'))->byDefault();
+        }));
+        [, , $plan] = $this->planWithGuard();
+        $plan->update(['competitor_overrides' => ['added' => ['justlife.com']]]);
+
+        $llm = $this->fakeLlm(self::PROMPT_VERDICT);
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $llm);
+
+        $this->assertTrue(app(CompetitorMentionGuard::class)->assessed($plan->fresh()));
+        $this->assertStringContainsString('- justlife.com', $llm->captured[0][1]['content']);
+    }
+
+    public function test_context_fetch_is_cached_between_assessments(): void
+    {
+        $this->instance(CrawlFetcher::class, tap(\Mockery::mock(CrawlFetcher::class), function ($m) {
+            $m->shouldReceive('fetch')->once()->andReturn([
+                'ok' => true, 'status' => 200,
+                'body' => '<html><head><title>Justlife Home Services</title></head></html>',
+            ]);
+        }));
+        [, , $plan] = $this->planWithGuard();
+        $plan->update(['competitor_overrides' => ['added' => ['justlife.com']]]);
+
+        $guard = app(CompetitorMentionGuard::class);
+        $first = $this->fakeLlm(self::PROMPT_VERDICT);
+        $guard->assess($plan->fresh(), $first);
+        $second = $this->fakeLlm(self::PROMPT_VERDICT);
+        $guard->assess($plan->fresh(), $second);
+
+        // Mockery's ->once() fails the test if a second fetch fired; both
+        // prompts still carry the title (second served from cache).
+        $this->assertStringContainsString('Justlife Home Services', $first->captured[0][1]['content']);
+        $this->assertStringContainsString('Justlife Home Services', $second->captured[0][1]['content']);
+    }
+
+    /** Prompt-regression guard for the bias flip: unknowns default to block. */
+    public function test_prompt_rules_flip_the_bias_toward_blocking(): void
+    {
+        [, , $plan] = $this->planWithGuard();
+        $plan->update(['competitor_overrides' => ['added' => ['justlife.com']]]);
+
+        $llm = $this->fakeLlm(self::PROMPT_VERDICT);
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $llm);
+
+        $prompt = $llm->captured[0][1]['content'];
+        $this->assertStringContainsString('classify it "block"', $prompt);
+        $this->assertStringNotContainsString('NOT necessarily', $prompt);
     }
 
     // ── producer wiring ─────────────────────────────────────────────────

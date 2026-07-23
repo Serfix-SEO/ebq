@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Content\Concerns;
 
+use App\Jobs\AssessCompetitorGuardJob;
 use App\Jobs\PlanContentTopicsJob;
 use App\Jobs\PrepareContentKeywordInsightsJob;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\Website;
+use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentSetupInsights;
 use App\Services\Content\SiteProfileExtractor;
@@ -36,6 +38,14 @@ trait ContentWizard
     public string $language = 'English';
     public string $country = 'global';
     public string $businessDescription = '';
+    // Site type drives the whole offer-spine (intent weights, guard posture,
+    // CTA framing). '' = unclassified => pipeline behaves type-blind.
+    public string $siteType = '';
+    public string $siteTypeSource = '';
+    public string $audience = '';
+    // Classifier-assessed, type-independent YMYL flag (null = unknown). No
+    // UI — silently drives the writer's conservative-claims rule.
+    public ?bool $ymylFlag = null;
 
     /** @var list<string> */
     public array $sellItems = [];
@@ -44,6 +54,7 @@ trait ContentWizard
     public string $newSell = '';
     public string $newDont = '';
     public string $newCompetitorDomain = '';
+    public string $newBlockedTerm = '';
 
     public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true, 'featured_image' => true];
 
@@ -63,6 +74,10 @@ trait ContentWizard
         if ($existing !== null) {
             $this->draftPlanId = $existing->id;
             $this->businessDescription = $this->businessDescription ?: (string) $existing->business_description;
+            $this->siteType = $this->siteType ?: (string) $existing->site_type;
+            $this->siteTypeSource = $this->siteTypeSource ?: (string) $existing->site_type_source;
+            $this->audience = $this->audience ?: (string) $existing->audience;
+            $this->ymylFlag ??= $existing->ymyl;
             $offerings = (array) ($existing->offerings ?? []);
             $this->sellItems = $this->sellItems ?: array_values((array) ($offerings['sell'] ?? []));
             $this->dontSellItems = $this->dontSellItems ?: array_values((array) ($offerings['dont_sell'] ?? []));
@@ -117,6 +132,18 @@ trait ContentWizard
         if ($this->dontSellItems === [] && ! empty($profile['dont_sell'])) {
             $this->dontSellItems = array_values($profile['dont_sell']);
         }
+        // A user's chip click always outranks re-detection.
+        if ($this->siteTypeSource !== 'user' && $this->siteType === ''
+            && \App\Support\ContentSiteTypeProfiles::isValid($profile['site_type'] ?? null)) {
+            $this->siteType = (string) $profile['site_type'];
+            $this->siteTypeSource = 'auto';
+        }
+        if ($this->audience === '') {
+            $this->audience = (string) ($profile['audience'] ?? '');
+        }
+        if ($this->ymylFlag === null && is_bool($profile['ymyl'] ?? null)) {
+            $this->ymylFlag = $profile['ymyl'];
+        }
 
         if ($this->businessDescription === '') {
             try {
@@ -155,6 +182,19 @@ trait ContentWizard
     {
         $max = $this->draftPlanId !== null ? 8 : 2;
         $this->wizardStep = max(1, min($step, $max));
+    }
+
+    /** Step-1 site-type chip click — an explicit human decision. */
+    public function selectSiteType(string $type): void
+    {
+        if (! \App\Support\ContentSiteTypeProfiles::isValid($type)) {
+            return;
+        }
+        $this->siteType = $type;
+        $this->siteTypeSource = 'user';
+        // Persist immediately when a plan already exists (Settings revisit) —
+        // same immediate-write pattern as image settings.
+        $this->plan()?->update(['site_type' => $type, 'site_type_source' => 'user']);
     }
 
     /** Step 1 → 2 */
@@ -246,6 +286,10 @@ trait ContentWizard
                 ),
                 'business_description' => $this->businessDescription,
                 'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
+                'site_type' => \App\Support\ContentSiteTypeProfiles::isValid($this->siteType) ? $this->siteType : null,
+                'site_type_source' => $this->siteType !== '' ? ($this->siteTypeSource ?: 'auto') : null,
+                'audience' => $this->audience !== '' ? mb_substr($this->audience, 0, 500) : null,
+                'ymyl' => $this->ymylFlag,
                 'language' => $this->language ?: 'en',
                 'country' => $this->country ?: null,
             ]
@@ -319,6 +363,12 @@ trait ContentWizard
         if ($insights->competitorAuthority($website) === null) {
             $insights->ensureGenerating($website);
         }
+        // Mention-guard classification runs alongside — the keyword-research
+        // step's guard card polls and fills in when it lands.
+        if (($plan = $this->plan()) !== null
+            && ! app(CompetitorMentionGuard::class)->assessed($plan)) {
+            AssessCompetitorGuardJob::dispatch($plan->id);
+        }
     }
 
     public function refreshCompetitors(): void
@@ -331,7 +381,12 @@ trait ContentWizard
 
     public function resetCompetitors(): void
     {
-        $this->plan()?->update(['competitor_overrides' => null]);
+        $plan = $this->plan();
+        if ($plan === null) {
+            return;
+        }
+        $plan->update(['competitor_overrides' => null]);
+        $this->reassessGuard($plan);
     }
 
     public function addCompetitor(): void
@@ -365,6 +420,11 @@ trait ContentWizard
         }
 
         $plan->update(['competitor_overrides' => ['added' => array_values($added), 'removed' => $removed]]);
+        $this->reassessGuard($plan);
+        // "Est. traffic/mo" / "Organic keywords" come from DomainMetric.dfs_metrics,
+        // otherwise ONLY populated for auto-discovered competitors (see the
+        // ContentCalendar twin of this method). Idempotent/cheap.
+        \App\Jobs\Content\EnrichCompetitorDomainMetricsJob::dispatch($plan->website_id, [$domain]);
     }
 
     public function removeCompetitor(string $domain): void
@@ -383,6 +443,65 @@ trait ContentWizard
         }
 
         $plan->update(['competitor_overrides' => ['added' => $added, 'removed' => array_values($removed)]]);
+        $this->reassessGuard($plan);
+    }
+
+    /** The competitor list changed — the guard's classification is stale. */
+    private function reassessGuard(ContentPlan $plan): void
+    {
+        app(CompetitorMentionGuard::class)->invalidate($plan);
+        AssessCompetitorGuardJob::dispatch($plan->id);
+    }
+
+    // ── Competitor-mention guard (wizard card) ──────────────────────────
+
+    public function toggleCompetitorGuard(): void
+    {
+        $plan = $this->plan();
+        if ($plan === null) {
+            return;
+        }
+        $guard = app(CompetitorMentionGuard::class);
+        // An explicit click is a human decision — recorded as such, so a later
+        // re-assessment never flips it back.
+        $guard->setEnabled($plan, ! $guard->enabled($plan));
+    }
+
+    public function addBlockedTerm(): void
+    {
+        $this->resetErrorBag('newBlockedTerm');
+        $term = trim($this->newBlockedTerm);
+        $this->newBlockedTerm = '';
+        $plan = $this->plan();
+        if ($plan === null || $term === '') {
+            return;
+        }
+        if (mb_strlen($term) > 60) {
+            $this->addError('newBlockedTerm', __('Keep blocked terms under 60 characters.'));
+
+            return;
+        }
+        app(CompetitorMentionGuard::class)->addTerm($plan, $term);
+    }
+
+    public function removeBlockedTerm(string $term): void
+    {
+        $plan = $this->plan();
+        if ($plan !== null) {
+            app(CompetitorMentionGuard::class)->removeTerm($plan, $term);
+        }
+    }
+
+    /** Guard card: block a classified reference's brand anyway (Phase E). */
+    public function blockReference(string $domain): void
+    {
+        $plan = $this->plan();
+        $domain = strtolower(trim($domain));
+        if ($plan === null || $domain === '') {
+            return;
+        }
+        $guard = app(CompetitorMentionGuard::class);
+        $guard->addTerm($plan, $guard->brandForDomain($domain));
     }
 
     private function normalizeCompetitorDomain(string $raw): ?string
@@ -411,6 +530,11 @@ trait ContentWizard
         $this->wizardStep = 6;
         if (($plan = $this->plan()) !== null) {
             PrepareContentKeywordInsightsJob::dispatch($plan->id);
+            // Competitor list is final once the user leaves the step —
+            // (re)classify it for the mention guard if needed.
+            if (! app(CompetitorMentionGuard::class)->assessed($plan)) {
+                AssessCompetitorGuardJob::dispatch($plan->id);
+            }
         }
     }
 
@@ -425,8 +549,30 @@ trait ContentWizard
         }
     }
 
+    /** Keywords the client crossed out on the "best search terms" card. */
+    public array $removedTerms = [];
+
+    /** Cross out / restore a best-search-term pick (step 6). */
+    public function toggleTerm(string $keyword): void
+    {
+        $keyword = mb_strtolower(trim($keyword));
+        if ($keyword === '') {
+            return;
+        }
+        $this->removedTerms = in_array($keyword, $this->removedTerms, true)
+            ? array_values(array_diff($this->removedTerms, [$keyword]))
+            : array_merge($this->removedTerms, [$keyword]);
+    }
+
     public function toFirstArticles(): void
     {
+        // Kept terms become confirmed keywords → the planner materializes one
+        // article per term (1:1). Fail-soft: research still pending → 0 stored,
+        // the step transition never blocks.
+        if (($plan = $this->plan()) !== null
+            && app(ContentKeywordInsights::class)->confirmTerms($plan, $this->removedTerms) > 0) {
+            PlanContentTopicsJob::dispatch($plan->id);
+        }
         $this->wizardStep = 7;
     }
 
@@ -490,15 +636,21 @@ trait ContentWizard
 
         $keywords = null;
         $keywordStatus = [];
+        $guard = null;
         if ($this->wizardStep === 6 && ($plan5 = $this->plan()) !== null) {
             $kwSvc = app(ContentKeywordInsights::class);
             $keywords = $kwSvc->get($plan5);
             if ($keywords === null) {
                 $keywordStatus = $kwSvc->researchStatus($plan5);
             }
+            // Competitor-mention guard card — shown here, not on the
+            // competitors step, same reasoning as ContentCalendar (see
+            // infra/content-autopilot/README.md, 2026-07-22).
+            $guard = app(CompetitorMentionGuard::class)->stateFor($plan5);
         }
 
         return [
+            'guard' => $guard,
             'draftTopics' => $this->wizardStep >= 7 ? $this->draftTopics() : collect(),
             'insights' => $insights,
             'generating' => $generating,

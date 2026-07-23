@@ -83,6 +83,19 @@ class ContentCalendar extends Component
 
     public string $businessDescription = '';
 
+    // Site type drives the offer-spine (intent weights, guard posture, CTA
+    // framing). '' = unclassified => pipeline behaves type-blind. Kept in
+    // sync with the ContentWizard trait twin — see infra doc drift trap.
+    public string $siteType = '';
+
+    public string $siteTypeSource = '';
+
+    public string $audience = '';
+
+    // Classifier-assessed, type-independent YMYL flag (null = unknown). No
+    // UI — silently drives the writer's conservative-claims rule.
+    public ?bool $ymylFlag = null;
+
     /** @var list<string> */
     public array $sellItems = [];
 
@@ -144,7 +157,7 @@ class ContentCalendar extends Component
     public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
-        $this->reset('wizardStep', 'draftPlanId', 'businessDescription', 'sellItems', 'dontSellItems', 'brandName');
+        $this->reset('wizardStep', 'draftPlanId', 'businessDescription', 'sellItems', 'dontSellItems', 'brandName', 'siteType', 'siteTypeSource', 'audience');
         $this->wizardStep = 1;
         $this->bootWizard();
     }
@@ -173,6 +186,10 @@ class ContentCalendar extends Component
             }
             $this->draftPlanId = $existing->id;
             $this->businessDescription = $this->businessDescription ?: (string) $existing->business_description;
+            $this->siteType = $this->siteType ?: (string) $existing->site_type;
+            $this->siteTypeSource = $this->siteTypeSource ?: (string) $existing->site_type_source;
+            $this->audience = $this->audience ?: (string) $existing->audience;
+            $this->ymylFlag ??= $existing->ymyl;
             $offerings = (array) ($existing->offerings ?? []);
             $this->sellItems = $this->sellItems ?: array_values((array) ($offerings['sell'] ?? []));
             $this->dontSellItems = $this->dontSellItems ?: array_values((array) ($offerings['dont_sell'] ?? []));
@@ -274,6 +291,18 @@ class ContentCalendar extends Component
         if ($this->dontSellItems === [] && ! empty($profile['dont_sell'])) {
             $this->dontSellItems = array_values($profile['dont_sell']);
         }
+        // A user's chip click always outranks re-detection.
+        if ($this->siteTypeSource !== 'user' && $this->siteType === ''
+            && \App\Support\ContentSiteTypeProfiles::isValid($profile['site_type'] ?? null)) {
+            $this->siteType = (string) $profile['site_type'];
+            $this->siteTypeSource = 'auto';
+        }
+        if ($this->audience === '') {
+            $this->audience = (string) ($profile['audience'] ?? '');
+        }
+        if ($this->ymylFlag === null && is_bool($profile['ymyl'] ?? null)) {
+            $this->ymylFlag = $profile['ymyl'];
+        }
 
         if ($this->businessDescription === '') {
             try {
@@ -286,6 +315,19 @@ class ContentCalendar extends Component
             } catch (\Throwable) {
             }
         }
+    }
+
+    /** Step-1 site-type chip click — an explicit human decision. */
+    public function selectSiteType(string $type): void
+    {
+        if (! \App\Support\ContentSiteTypeProfiles::isValid($type)) {
+            return;
+        }
+        $this->siteType = $type;
+        $this->siteTypeSource = 'user';
+        // Persist immediately when a plan already exists (Settings revisit) —
+        // same immediate-write pattern as image settings.
+        $this->plan()?->update(['site_type' => $type, 'site_type_source' => 'user']);
     }
 
     /**
@@ -425,6 +467,10 @@ class ContentCalendar extends Component
                 ),
                 'business_description' => $this->businessDescription,
                 'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
+                'site_type' => \App\Support\ContentSiteTypeProfiles::isValid($this->siteType) ? $this->siteType : null,
+                'site_type_source' => $this->siteType !== '' ? ($this->siteTypeSource ?: 'auto') : null,
+                'audience' => $this->audience !== '' ? mb_substr($this->audience, 0, 500) : null,
+                'ymyl' => $this->ymylFlag,
                 'language' => $this->language ?: 'en',
                 'country' => $this->country ?: null,
             ]
@@ -599,6 +645,14 @@ class ContentCalendar extends Component
 
         $plan->update(['competitor_overrides' => ['added' => array_values($added), 'removed' => $removed]]);
         $this->reassessGuard($plan);
+        // withOverrides() only backfills DA/PA for a manual add — the
+        // "Est. traffic/mo" / "Organic keywords" columns come from
+        // DomainMetric.dfs_metrics, which is otherwise ONLY populated for
+        // auto-discovered competitors (ContentSetupInsights::build()'s
+        // batched EnrichCompetitorDomainMetricsJob dispatch). Without this, a
+        // manually-added competitor sat with those two columns blank forever
+        // (prod 2026-07-22). Idempotent/cheap — skips if already fresh.
+        \App\Jobs\Content\EnrichCompetitorDomainMetricsJob::dispatch($plan->website_id, [$domain]);
     }
 
     /** Remove a competitor (auto-discovered or manually added) from the step-4 table. */
@@ -621,21 +675,10 @@ class ContentCalendar extends Component
         $this->reassessGuard($plan);
     }
 
-    /** Guard-card view state for the wizard's competitors step and Settings. */
+    /** Guard-card view state for the wizard's keyword-research step and Settings. */
     private function guardState(ContentPlan $plan): array
     {
-        $guard = app(CompetitorMentionGuard::class);
-        $g = (array) ($plan->competitor_guard ?? []);
-
-        return [
-            'assessed' => $guard->assessed($plan),
-            'enabled' => $guard->enabled($plan),
-            // "We turned this on for you" banner: shows until the client
-            // clicks the toggle themselves (setEnabled clears the marker).
-            'autoEnabled' => $guard->autoEnabled($plan),
-            'reason' => (string) ($g['reason'] ?? ''),
-            'terms' => $guard->terms($plan),
-        ];
+        return app(CompetitorMentionGuard::class)->stateFor($plan);
     }
 
     /** The competitor list changed — the guard's classification is stale. */
@@ -682,6 +725,18 @@ class ContentCalendar extends Component
         if ($plan !== null) {
             app(CompetitorMentionGuard::class)->removeTerm($plan, $term);
         }
+    }
+
+    /** Guard card: block a classified reference's brand anyway (Phase E). */
+    public function blockReference(string $domain): void
+    {
+        $plan = $this->plan();
+        $domain = strtolower(trim($domain));
+        if ($plan === null || $domain === '') {
+            return;
+        }
+        $guard = app(CompetitorMentionGuard::class);
+        $guard->addTerm($plan, $guard->brandForDomain($domain));
     }
 
     /** Bare lowercase host, or null if not a plausible domain / is the user's own site. */
@@ -732,8 +787,30 @@ class ContentCalendar extends Component
         }
     }
 
+    /** Keywords the client crossed out on the "best search terms" card. */
+    public array $removedTerms = [];
+
+    /** Cross out / restore a best-search-term pick (step 6). */
+    public function toggleTerm(string $keyword): void
+    {
+        $keyword = mb_strtolower(trim($keyword));
+        if ($keyword === '') {
+            return;
+        }
+        $this->removedTerms = in_array($keyword, $this->removedTerms, true)
+            ? array_values(array_diff($this->removedTerms, [$keyword]))
+            : array_merge($this->removedTerms, [$keyword]);
+    }
+
     public function toFirstArticles(): void
     {
+        // Kept terms become confirmed keywords → the planner materializes one
+        // article per term (1:1). Fail-soft: research still pending → 0 stored,
+        // the step transition never blocks. Twin of the ContentWizard trait.
+        if (($plan = $this->plan()) !== null
+            && app(ContentKeywordInsights::class)->confirmTerms($plan, $this->removedTerms) > 0) {
+            PlanContentTopicsJob::dispatch($plan->id);
+        }
         $this->wizardStep = 7;
     }
 
@@ -797,6 +874,10 @@ class ContentCalendar extends Component
         $plan->update([
             'business_description' => $this->businessDescription,
             'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
+            'site_type' => \App\Support\ContentSiteTypeProfiles::isValid($this->siteType) ? $this->siteType : null,
+            'site_type_source' => $this->siteType !== '' ? ($this->siteTypeSource ?: 'auto') : null,
+            'audience' => $this->audience !== '' ? mb_substr($this->audience, 0, 500) : null,
+            'ymyl' => $this->ymylFlag,
             'language' => $this->language ?: 'en',
             'country' => $this->country ?: null,
             'articles_per_week' => max(1, min(7, $this->articlesPerWeek)),
@@ -1375,8 +1456,14 @@ class ContentCalendar extends Component
                     $keywordStatus = $kwSvc->researchStatus($plan5);
                 }
             }
-            // Competitor-mention guard card state (competitors step).
-            $guardState = $this->wizardStep === 5 && ($plan4g = $this->plan()) !== null
+            // Competitor-mention guard card state — shown on the keyword-research
+            // step (6), AFTER competitors are finalized (step 5), not mid-edit:
+            // assessing while the user might still add/remove competitors risked
+            // showing (and re-triggering) against a list that was about to change,
+            // and nothing guaranteed a job had ever been queued for the current
+            // state, so the card could poll forever with nothing to find
+            // (prod 2026-07-22).
+            $guardState = $this->wizardStep === 6 && ($plan4g = $this->plan()) !== null
                 ? $this->guardState($plan4g)
                 : null;
 

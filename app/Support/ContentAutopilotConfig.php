@@ -185,6 +185,18 @@ class ContentAutopilotConfig
         return max(1, (int) self::setting('content.limits.monthly_articles_per_website', 30));
     }
 
+    /**
+     * Signal-based giant detection + entity-type demotion (2026-07-23 live
+     * test). ON by default; instant revert without a deploy:
+     *   Setting::set('content.giant_signals.enabled', false)
+     * (mind the Setting cache-bust). Off = exact pre-signal behavior
+     * (static GiantDomains list only).
+     */
+    public static function giantSignalsEnabled(): bool
+    {
+        return (bool) self::setting('content.giant_signals.enabled', true);
+    }
+
     /** Crawl page cap for content-only users (feeds the pipeline, not the dashboard). */
     public static function contentOnlyCrawlCap(): int
     {

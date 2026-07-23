@@ -315,4 +315,34 @@ class ContentCompetitorsTest extends TestCase
         $this->assertSame(70, $row['da']);
         $this->assertSame(60, $row['pa']);
     }
+
+    /**
+     * Owner decision 2026-07-22: SERP discovery is the PRIMARY competitor
+     * source (layer 1, kept in SERP order), mega-platforms are filtered from
+     * every source, and the step shows up to 10.
+     */
+    public function test_serp_competitors_are_the_primary_source_in_serp_order_giants_filtered(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create(['normalized_domain' => 'mysite.test']);
+
+        // 12 SERP rows in tally order, with giants interleaved. No report
+        // snapshot exists at all — SERP alone must be enough to render.
+        $serp = [['domain' => 'amazon.com'], ['domain' => 'rival-1.com'], ['domain' => 'netflix.com']];
+        for ($i = 2; $i <= 12; $i++) {
+            $serp[] = ['domain' => "rival-{$i}.com"];
+        }
+        Cache::put('content:serp-competitors:'.$website->id, $serp, now()->addDay());
+
+        $insights = app(ContentSetupInsights::class)->competitorAuthority($website);
+
+        $this->assertNotNull($insights, 'SERP rows alone render the step — no paid report required');
+        $domains = array_column($insights['competitors'], 'domain');
+        $this->assertNotContains('amazon.com', $domains);
+        $this->assertNotContains('netflix.com', $domains);
+        $this->assertCount(10, $domains, 'capped at 10 for the competitors step');
+        // SERP order preserved — no authority re-sort.
+        $this->assertSame('rival-1.com', $domains[0]);
+        $this->assertSame('rival-10.com', $domains[9]);
+    }
 }

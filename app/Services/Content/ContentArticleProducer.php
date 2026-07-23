@@ -103,6 +103,11 @@ class ContentArticleProducer
             '__user_id' => $website->user_id,
             '__source' => 'content_autopilot.write',
             '__unmetered' => true, // capped by ContentLlmSpendMeter + entitlements, not the dashboard token cap
+            // Section-by-section generation — a single mega-call blew the 16k
+            // output cap on hub topics ("Ultimate Guide…", prod 2026-07-22)
+            // and lost the whole article to llm_parse_failed. Chunked writing
+            // is structurally cap-proof; costs more prompt tokens (accepted).
+            'chunked' => true,
         ];
         if (! empty($writeModel['model'])) {
             $draftInput['model'] = $writeModel['model'];
@@ -250,6 +255,28 @@ class ContentArticleProducer
 
         $topic->enterStage(ContentTopic::STATUS_READY);
 
+        // Guard value counter (Phase E): make the protection visible. Checked
+        // whenever the guard was active for this topic; "removed" when an
+        // earlier version carried a competitor mention the final one doesn't.
+        try {
+            $guardSvc = app(CompetitorMentionGuard::class);
+            if ($guardSvc->termsForTopic($plan, $topic) !== []) {
+                $guardSvc->recordArticleChecked($plan);
+                $hadMention = $topic->articles()
+                    ->where('version', '<', $article->version)
+                    ->get(['style_issues'])
+                    ->contains(fn ($v) => in_array('competitor_mentions',
+                        array_column((array) ($v->style_issues ?? []), 'code'), true));
+                $finalHasMention = in_array('competitor_mentions',
+                    array_column((array) ($article->style_issues ?? []), 'code'), true);
+                if ($hadMention && ! $finalHasMention) {
+                    $guardSvc->recordMentionRemoved($plan);
+                }
+            }
+        } catch (\Throwable) {
+            // stats are cosmetic — never fail a READY article over them
+        }
+
         return $article;
     }
 
@@ -375,10 +402,29 @@ class ContentArticleProducer
             return $s;
         }
         $cut = mb_substr($s, 0, $max);
+
+        // Prefer ending on a COMPLETE SENTENCE when one ends reasonably far
+        // in — a word-boundary cut still leaves dangling clauses ("…a
+        // detailed checklist, and", live serfix.io meta 2026-07-22), which
+        // reads broken in the SERP snippet.
+        $sentenceEnd = false;
+        foreach (['.', '!', '?'] as $t) {
+            $pos = mb_strrpos($cut, $t);
+            if ($pos !== false && ($sentenceEnd === false || $pos > $sentenceEnd)) {
+                $sentenceEnd = $pos;
+            }
+        }
+        if ($sentenceEnd !== false && $sentenceEnd >= (int) ($max * 0.6)) {
+            return trim(mb_substr($cut, 0, $sentenceEnd + 1));
+        }
+
         $sp = mb_strrpos($cut, ' ');
         if ($sp !== false && $sp >= $max - 20) {
             $cut = mb_substr($cut, 0, $sp);
         }
+        // A trailing conjunction/preposition dangles just as badly as a
+        // half-word — drop it along with trailing punctuation.
+        $cut = (string) preg_replace('/\s+(?:and|or|but|with|for|to|the|a|an|of|in|on|at|is|are)$/iu', '', $cut);
 
         return rtrim($cut, " ,.;:-\u{2013}\u{2014}");
     }
@@ -705,12 +751,18 @@ class ContentArticleProducer
             $rules[] = 'End with an FAQ section (H2) answering 3-5 real questions searchers ask.';
         }
         if ($plan->toggle('cta_enabled') && $plan->cta_url) {
-            $rules[] = 'Include one natural call-to-action linking to '.$plan->cta_url.' where it genuinely helps the reader.';
+            $rules[] = 'Include one natural call-to-action linking to '.$plan->cta_url.' where it genuinely helps the reader'
+                .$this->ctaFraming($plan).'.';
         }
         if ($plan->toggle('external_links')) {
             $rules[] = 'Cite at least one authoritative external source with a link.';
         }
         $rules[] = 'Article length target: about '.$plan->article_length.' words.';
+        // Type-aware voice + care rules (Phase F). Null site type adds
+        // nothing — exact pre-site-type behavior.
+        foreach ($this->siteTypeRules($plan) as $rule) {
+            $rules[] = $rule;
+        }
         $rules[] = "Today's date is ".now()->toFormattedDateString().'. Any year you mention must be '
             .now()->year.' unless you are referring to a genuinely historical fact.';
         if (trim((string) $plan->custom_instructions) !== '') {
@@ -727,6 +779,71 @@ class ContentArticleProducer
 
         return implode("\n", array_merge($rules, $this->onPageSeoRules($topic)))
             ."\n".$this->humanizer->promptRules();
+    }
+
+    /**
+     * Voice + audience + care instructions from the plan's site type
+     * (Phase F). Empty for a null/unclassified type — the writer behaves
+     * exactly as it did before site types existed.
+     *
+     * @return list<string>
+     */
+    private function siteTypeRules(ContentPlan $plan): array
+    {
+        if (! \App\Support\ContentSiteTypeProfiles::isValid($plan->site_type)) {
+            // Type-blind plans still get the care rule when the classifier
+            // flagged the SUBJECT as YMYL — safety is type-independent.
+            return $plan->ymyl === true
+                ? ['CARE: this topic area affects readers\' money, health or legal standing. Make only claims you can support, avoid absolute promises, and recommend consulting a qualified professional where a decision has real consequences.']
+                : [];
+        }
+        $profile = \App\Support\ContentSiteTypeProfiles::profile($plan->site_type);
+
+        $rules = [];
+        $voice = match ($profile['voice']) {
+            'personal' => 'VOICE: write in a personal first-person voice ("I", "we") — an experienced enthusiast sharing hands-on advice, never a corporate brochure.',
+            'brand' => 'VOICE: write in a confident first-person-plural brand voice ("we") that reflects the site\'s own products naturally — helpful first, never a sales pitch.',
+            'friendly_professional' => 'VOICE: write in a warm, plain-spoken professional voice a local customer would trust — practical, concrete, no jargon.',
+            'professional' => 'VOICE: write in a precise, professional voice — concrete examples and specifics over hype; the reader is evaluating expertise.',
+            'warm' => 'VOICE: write in a warm, mission-driven voice that connects the topic to real people and impact.',
+            default => null,
+        };
+        if ($voice !== null) {
+            $rules[] = $voice;
+        }
+        if (filled($plan->audience)) {
+            $rules[] = 'AUDIENCE: write for '.trim((string) $plan->audience).' — their vocabulary, their concerns, their level of expertise.';
+        }
+        if ($profile['ymyl_care'] || $plan->ymyl === true) {
+            // Type default OR the classifier's per-site YMYL flag — a
+            // supplements brand / finance blog needs the care rule even
+            // though 'brand'/'blog' don't set ymyl_care.
+            $rules[] = 'CARE: this topic area affects readers\' money, health or legal standing. Make only claims you can support, avoid absolute promises, and recommend consulting a qualified professional where a decision has real consequences.';
+        }
+
+        return $rules;
+    }
+
+    /** Type-appropriate framing appended to the CTA rule (Phase F). */
+    private function ctaFraming(ContentPlan $plan): string
+    {
+        if (! \App\Support\ContentSiteTypeProfiles::isValid($plan->site_type)) {
+            return '';
+        }
+
+        return match (\App\Support\ContentSiteTypeProfiles::profile($plan->site_type)['cta_style']) {
+            'product' => ' — invite the reader to explore the relevant product or collection there',
+            'category' => ' — point the reader to the matching product category there',
+            'contact' => ' — invite the reader to request a quote or book a visit there',
+            'trial' => ' — invite the reader to try it themselves there',
+            'consultation' => ' — invite the reader to book a consultation there',
+            'subscribe' => ' — invite the reader to subscribe or read more there',
+            'support' => ' — invite the reader to get involved or support the cause there',
+            'course' => ' — invite the reader to check out the course or newsletter there',
+            'platform' => ' — invite the reader to browse the listings there',
+            'enroll' => ' — invite the reader to enroll or start learning there',
+            default => '',
+        };
     }
 
     /**
