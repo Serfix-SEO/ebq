@@ -23,20 +23,26 @@ class PackageWordPressPlugin extends Command
         $output = base_path((string) $this->option('output'));
         File::ensureDirectoryExists(dirname($output));
 
-        // build/ is intentionally included — the no-build Gutenberg sidebar
-        // lives in build/sidebar.js and must ship with the plugin.
-        $skipDirs = ['node_modules', '.git', 'tests', 'coverage'];
-        $skipExts = ['zip', 'log'];
+        // Honour `.distignore` so the released zip carries ONLY runtime files.
+        // Without this the zip shipped dev cruft — notably a 13 MB
+        // `.code-review-graph/graph.db` that bloated it to 21 MB and blew the
+        // client's PHP memory/time limit during unzip → "Update failed"
+        // (prod 2026-07-24). build/ is intentionally NOT ignored — the no-build
+        // Gutenberg sidebar lives there and must ship.
+        $ignore = $this->loadDistignore($base);
+        $excluded = fn (string $relative): bool => $this->isExcluded(
+            str_replace(DIRECTORY_SEPARATOR, '/', $relative), $ignore
+        );
 
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveCallbackFilterIterator(
                 new \RecursiveDirectoryIterator($base, \FilesystemIterator::SKIP_DOTS),
-                function (\SplFileInfo $current) use ($skipDirs): bool {
-                    if ($current->isDir() && in_array($current->getBasename(), $skipDirs, true)) {
-                        return false;
-                    }
+                function (\SplFileInfo $current) use ($base, $excluded): bool {
+                    // Prune ignored directories so we never even descend into
+                    // heavy trees (node_modules, .code-review-graph, …).
+                    $relative = substr($current->getPathname(), strlen($base) + 1);
 
-                    return true;
+                    return ! $excluded($relative);
                 }
             ),
             \RecursiveIteratorIterator::SELF_FIRST
@@ -50,12 +56,11 @@ class PackageWordPressPlugin extends Command
             if ($file->isDir()) {
                 continue;
             }
-            if (in_array(strtolower($file->getExtension()), $skipExts, true)) {
-                continue;
-            }
-
             $relative = substr($file->getPathname(), strlen($base) + 1);
             $relative = str_replace(DIRECTORY_SEPARATOR, '/', $relative);
+            if ($excluded($relative)) {
+                continue;
+            }
             $archiveName = 'ebq-seo/'.$relative;
 
             $content = (string) file_get_contents($file->getPathname());
@@ -68,6 +73,71 @@ class PackageWordPressPlugin extends Command
         $this->info(sprintf('Packaged %d files → %s (%s).', $added, $output, $this->formatSize(filesize($output))));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Parse `.distignore` into a pattern list (blank/comment lines dropped,
+     * trailing slashes stripped). Always excludes VCS + this tool's own
+     * artefacts as a safety net even if the file is missing.
+     *
+     * @return list<string>
+     */
+    private function loadDistignore(string $base): array
+    {
+        $patterns = ['.git', 'node_modules', '.code-review-graph', '.claude'];
+        $path = $base.'/.distignore';
+        if (is_file($path)) {
+            foreach (preg_split('/\R/', (string) file_get_contents($path)) ?: [] as $line) {
+                $line = trim($line);
+                if ($line === '' || str_starts_with($line, '#')) {
+                    continue;
+                }
+                $patterns[] = rtrim($line, '/');
+            }
+        }
+
+        return array_values(array_unique(array_filter($patterns)));
+    }
+
+    /**
+     * Whether a plugin-relative path is excluded by any `.distignore` pattern:
+     * glob patterns (`*.md`, `.eslintrc*`) match the basename or any segment;
+     * `foo/bar` patterns match as a path prefix; a plain name matches any path
+     * segment (so a dir or file of that name anywhere is dropped).
+     *
+     * @param  list<string>  $ignore
+     */
+    private function isExcluded(string $relative, array $ignore): bool
+    {
+        $segments = explode('/', $relative);
+        $basename = end($segments) ?: $relative;
+
+        foreach ($ignore as $p) {
+            if (strpbrk($p, '*?[') !== false) {
+                if (fnmatch($p, $basename)) {
+                    return true;
+                }
+                foreach ($segments as $seg) {
+                    if (fnmatch($p, $seg)) {
+                        return true;
+                    }
+                }
+
+                continue;
+            }
+            if (str_contains($p, '/')) {
+                if ($relative === $p || str_starts_with($relative, $p.'/')) {
+                    return true;
+                }
+
+                continue;
+            }
+            if (in_array($p, $segments, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function formatSize(int $bytes): string
