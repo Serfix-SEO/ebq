@@ -203,26 +203,48 @@ class ContentAutopilotDispatcher extends Command
             ->get();
 
         foreach ($plans as $plan) {
+            $now = now($plan->timezone ?: 'UTC');
+            $today = $now->toDateString();
             $inWindow = $this->withinPublishWindow($plan);
-            $today = now($plan->timezone ?: 'UTC')->toDateString();
+            // Today's publish window has already ENDED (we're past the hour band
+            // on an allowed publish day). A dated article that missed its window —
+            // because it finished/was approved late, or no one approved it — must
+            // NOT wait another full day: publish it now (2026-07-24 rule).
+            $windowPassed = ! $inWindow
+                && $this->isPublishDay($plan, $now)
+                && $now->hour > (int) ($plan->publish_hour_end ?? 23);
 
-            // Auto-publish: promote READY topics whose veto window elapsed (only
-            // in-window, so they publish during the client's chosen hours).
-            if ($inWindow && $plan->auto_publish) {
-                $plan->topics()
-                    ->where('status', ContentTopic::STATUS_READY)
-                    ->where('stage_started_at', '<=', now()->subHours(max(0, (int) $plan->review_hours)))
-                    ->get()
-                    ->each(fn (ContentTopic $t) => $t->enterStage(ContentTopic::STATUS_SCHEDULED));
+            if ($plan->auto_publish) {
+                // Normal in-window promotion: READY topics whose review-veto
+                // window elapsed → SCHEDULED (published during the chosen hours).
+                if ($inWindow) {
+                    $plan->topics()
+                        ->where('status', ContentTopic::STATUS_READY)
+                        ->where('stage_started_at', '<=', now()->subHours(max(0, (int) $plan->review_hours)))
+                        ->get()
+                        ->each(fn (ContentTopic $t) => $t->enterStage(ContentTopic::STATUS_SCHEDULED));
+                }
+                // Force rule: once the window has PASSED, promote any READY topic
+                // DUE today-or-earlier even if the review-veto window hasn't
+                // elapsed and no one approved — a missed window must never strand
+                // a dated article.
+                if ($windowPassed) {
+                    $plan->topics()
+                        ->where('status', ContentTopic::STATUS_READY)
+                        ->whereNotNull('scheduled_for')
+                        ->whereDate('scheduled_for', '<=', $today)
+                        ->get()
+                        ->each(fn (ContentTopic $t) => $t->enterStage(ContentTopic::STATUS_SCHEDULED));
+                }
             }
 
-            // In-window: publish anything due today or earlier. Outside the
-            // window: still flush OVERDUE items (scheduled date already passed)
-            // so a missed window never leaves an article stuck forever — the
-            // date the client picked is honoured as a floor, not a hard gate.
+            // Publish scheduled topics. In-window OR after today's window passed:
+            // anything due today or earlier. BEFORE today's window (or a non-
+            // publish day): only cross-day OVERDUE items, so we never pre-empt the
+            // client's chosen hours — the picked date is a floor, not a hard gate.
             $q = $plan->topics()->where('status', ContentTopic::STATUS_SCHEDULED);
-            if ($inWindow) {
-                $q->where(fn ($x) => $x->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', $today));
+            if ($inWindow || $windowPassed) {
+                $q->where(fn ($x) => $x->whereNull('scheduled_for')->orWhereDate('scheduled_for', '<=', $today));
             } else {
                 $q->whereNotNull('scheduled_for')->whereDate('scheduled_for', '<', $today);
             }
@@ -238,13 +260,20 @@ class ContentAutopilotDispatcher extends Command
         return $dispatched;
     }
 
+    /** Whether today (plan tz) is an allowed publish weekday (empty = every day). */
+    private function isPublishDay(ContentPlan $plan, \Illuminate\Support\Carbon $now): bool
+    {
+        $days = array_map('intval', (array) ($plan->publish_days ?? []));
+
+        return $days === [] || in_array($now->isoWeekday(), $days, true);
+    }
+
     /** Allowed weekday + hour band in the plan's timezone. */
     private function withinPublishWindow(ContentPlan $plan): bool
     {
         $now = now($plan->timezone ?: 'UTC');
 
-        $days = array_map('intval', (array) ($plan->publish_days ?? []));
-        if ($days !== [] && ! in_array($now->isoWeekday(), $days, true)) {
+        if (! $this->isPublishDay($plan, $now)) {
             return false;
         }
 

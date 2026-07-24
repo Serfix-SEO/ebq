@@ -728,6 +728,19 @@ topics whose `review_hours` veto window (anchored `stage_started_at`)
 elapsed → SCHEDULED; then ONE due SCHEDULED topic per plan per tick is
 dispatched (steady 15-min drip matches the 1/day cadence).
 
+**Missed-window force rule (2026-07-24).** Three window states now, in the plan
+tz: **in-window** → normal (promote READY-past-veto, publish due≤today);
+**window PASSED today** (publish day, `now.hour > publish_hour_end`) → FORCE:
+promote any READY topic due≤today to SCHEDULED **even if the review-veto window
+hasn't elapsed and no one approved**, and publish due≤today; **before the window**
+(or a non-publish day) → only cross-day OVERDUE (`scheduled_for < today`) flush,
+never pre-empting the chosen hours. Rationale: an article finished/approved late
+(or never manually approved) must not wait a whole extra day — once its window
+passes, it ships. The scheduled date stays a floor, not a hard gate. `isPublishDay()`
+extracted from `withinPublishWindow()`. Tests:
+`ContentPublishingTest::test_dispatcher_force_publishes_ready_article_after_window_passed_without_approval`
++ `…still_waits_before_the_window_opens`.
+
 **Connect UI** — `App\Livewire\Content\PublishingSettings` ("Where your
 articles publish" card under the wizard on /content/settings): WordPress
 app-password form (with in-WP how-to copy) or webhook form (endpoint +

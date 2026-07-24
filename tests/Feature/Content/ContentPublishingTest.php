@@ -442,6 +442,75 @@ class ContentPublishingTest extends TestCase
         Queue::assertPushed(PublishContentArticleJob::class);
     }
 
+    public function test_dispatcher_force_publishes_ready_article_after_window_passed_without_approval(): void
+    {
+        Queue::fake();
+        // Freeze the clock to 12:00 UTC — AFTER an every-day 9–11 window.
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::create(2026, 7, 24, 12, 0, 0, 'UTC'));
+        try {
+            $user = User::factory()->create([
+                'content_trial_started_at' => now(), 'content_trial_ends_at' => now()->addDays(5),
+            ]);
+            $website = Website::factory()->for($user)->create();
+            $plan = ContentPlan::factory()->create([
+                'website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE,
+                'timezone' => 'UTC', 'auto_publish' => true,
+                'publish_hour_start' => 9, 'publish_hour_end' => 11, 'publish_days' => [],
+                'review_hours' => 24,
+            ]);
+            $this->wordpressIntegration($website);
+
+            // READY, due TODAY, generated just now (24h veto NOT elapsed), nobody
+            // approved it. The passed window must force it out anyway.
+            $topic = ContentTopic::factory()->for($plan, 'plan')->create([
+                'website_id' => $website->id,
+                'status' => ContentTopic::STATUS_READY,
+                'stage_started_at' => now(),
+                'scheduled_for' => now()->startOfDay(),
+            ]);
+            ContentArticle::storeVersion($topic, [
+                'h1' => 'X', 'meta_title' => 'X', 'meta_description' => 'D', 'slug' => 'x',
+                'html' => '<p>x</p>', 'word_count' => 500, 'seo_score' => 90, 'seo_issues' => [],
+            ]);
+
+            $this->artisan('ebq:content-autopilot')->assertSuccessful();
+
+            $this->assertSame(ContentTopic::STATUS_SCHEDULED, $topic->fresh()->status, 'force-promoted despite no approval / unelapsed veto');
+            Queue::assertPushed(PublishContentArticleJob::class);
+        } finally {
+            \Illuminate\Support\Carbon::setTestNow();
+        }
+    }
+
+    public function test_dispatcher_still_waits_before_the_window_opens(): void
+    {
+        Queue::fake();
+        // 07:00 UTC — BEFORE a 9–11 window. A today-due article must NOT pre-empt.
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::create(2026, 7, 24, 7, 0, 0, 'UTC'));
+        try {
+            $user = User::factory()->create([
+                'content_trial_started_at' => now(), 'content_trial_ends_at' => now()->addDays(5),
+            ]);
+            $website = Website::factory()->for($user)->create();
+            $plan = ContentPlan::factory()->create([
+                'website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE,
+                'timezone' => 'UTC', 'auto_publish' => true,
+                'publish_hour_start' => 9, 'publish_hour_end' => 11, 'publish_days' => [],
+            ]);
+            $this->wordpressIntegration($website);
+            ContentTopic::factory()->for($plan, 'plan')->create([
+                'website_id' => $website->id, 'status' => ContentTopic::STATUS_SCHEDULED,
+                'scheduled_for' => now()->startOfDay(),
+            ]);
+
+            $this->artisan('ebq:content-autopilot')->assertSuccessful();
+
+            Queue::assertNotPushed(PublishContentArticleJob::class);
+        } finally {
+            \Illuminate\Support\Carbon::setTestNow();
+        }
+    }
+
     public function test_integrations_page_renders(): void
     {
         $user = User::factory()->create([
