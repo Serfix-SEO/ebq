@@ -200,6 +200,34 @@ class ContentPublicOnboardingTest extends TestCase
     }
 
     /**
+     * Regression (prod 2026-07-24): a logged-in user with NO website who starts
+     * Content Autopilot onboarding from the public page was bounced to the
+     * DASHBOARD onboarding. `content.get-started` is reachable → `feature:content`
+     * (EnsureFeatureAccess) saw no website, redirected to firstAccessibleRoute
+     * (websites.index → EnsureOnboarded → 'onboarding'). The gate now lets
+     * content.get-started through for any authenticated user.
+     */
+    public function test_logged_in_user_without_a_website_reaches_content_get_started_not_dashboard_onboarding(): void
+    {
+        $user = User::factory()->create(); // no website, no content access
+
+        $this->actingAs($user)
+            ->get(route('content.get-started'))
+            ->assertOk()
+            ->assertDontSee(route('onboarding'));
+    }
+
+    /** The public "Start" entry for an already-authed user lands on content.get-started. */
+    public function test_authed_start_entry_redirects_to_content_get_started(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('content.onboarding.begin'), ['domain' => 'example.com'])
+            ->assertRedirect(route('content.get-started'));
+    }
+
+    /**
      * Regression (prod 2026-07-20): a registrant who ALREADY owned the onboarded
      * domain lost the whole wizard setup. convert() folds into the existing site
      * and deletes the provisional one — and content_plans.website_id is ON DELETE

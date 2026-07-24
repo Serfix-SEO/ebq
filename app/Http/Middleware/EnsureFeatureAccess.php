@@ -18,6 +18,17 @@ class EnsureFeatureAccess
             return redirect()->route('login');
         }
 
+        // The content "Get started / buy" page is deliberately reachable by ANY
+        // authenticated user — including one with NO website yet (arriving from
+        // the public Content Autopilot onboarding after signing in). It renders
+        // its own no-access / buy state, so this gate must never bounce it: a
+        // no-website user would otherwise be redirected to firstAccessibleRoute
+        // → websites.index → EnsureOnboarded → the DASHBOARD onboarding, landing
+        // a content signup on the wrong (non-content) onboarding. (Prod 2026-07-24.)
+        if ($request->routeIs('content.get-started')) {
+            return $next($request);
+        }
+
         // No unknown-feature bypass here on purpose: a typo'd `feature:` route arg
         // must fail closed, not silently pass every request through (found
         // 2026-07-06 — the old `! array_key_exists(...) -> next()` branch did the
