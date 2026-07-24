@@ -197,6 +197,11 @@ class AnalyzeSiteJob implements ShouldQueue
     {
         foreach ($crawlSite->websites()->pluck('id') as $wid) {
             \App\Services\ReportCache::flushWebsite((string) $wid);
+            // Drop the Content Autopilot site profile: onboarding may have cached
+            // an EMPTY profile before this crawl produced any pages (prod
+            // 2026-07-24, thomasfoods.com). Forgetting it here lets the wizard
+            // reclassify from the pages this run just landed.
+            \App\Services\Content\SiteProfileExtractor::forget((string) $wid);
             // Re-warm each subscriber's dashboard caches (incl. the heavy
             // actionGroups scan this finalize just invalidated).
             \App\Jobs\WarmDashboardCaches::dispatch((string) $wid);

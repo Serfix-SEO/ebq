@@ -33,10 +33,20 @@ class SiteProfileExtractor
 
         // v2: payload gained site_type + audience — old v1 entries lack the
         // keys, so the version bump (not a flush) retires them naturally.
-        return Cache::remember(
-            'content:site-profile:v2:'.$website->id,
-            now()->addDays(7),
-            function () use ($website, $empty): array {
+        $key = self::cacheKey($website->id);
+        $cached = Cache::get($key);
+        if (is_array($cached) && $this->isMeaningful($cached)) {
+            return $cached;
+        }
+
+        // Compute fresh. An EMPTY result — crawl not ready yet AND the live
+        // homepage fallback failed (bot-block / slow / redirect) — must NOT be
+        // long-cached: it would freeze the onboarding wizard on "no type / blank
+        // description" for 7 DAYS even after the crawl lands 80 pages minutes
+        // later (prod 2026-07-24, thomasfoods.com). Empties get a short TTL so a
+        // completed crawl self-heals; only a populated profile earns 7 days.
+        // Crawl finalize also invalidates the key — see CrawlFinalizer.
+        $profile = (function () use ($website, $empty): array {
                 // Prefer crawled pages; but a freshly-added site (e.g. anonymous
                 // onboarding) has no crawl yet — fall back to a live homepage
                 // fetch so the wizard still pre-fills immediately.
@@ -110,8 +120,45 @@ class SiteProfileExtractor
                         ? mb_substr(trim($response['audience']), 0, 500) : null,
                     'ymyl' => is_bool($response['ymyl'] ?? null) ? $response['ymyl'] : null,
                 ];
-            }
+        })();
+
+        Cache::put(
+            $key,
+            $profile,
+            $this->isMeaningful($profile) ? now()->addDays(7) : now()->addMinutes(15)
         );
+
+        return $profile;
+    }
+
+    /** Cache key for a website's extracted profile. */
+    public static function cacheKey(string $websiteId): string
+    {
+        return 'content:site-profile:v2:'.$websiteId;
+    }
+
+    /**
+     * Drop a website's cached profile so the next `extract()` recomputes from
+     * fresh signals. Called when a crawl completes (the profile may have been
+     * cached empty before any pages existed).
+     */
+    public static function forget(string $websiteId): void
+    {
+        Cache::forget(self::cacheKey($websiteId));
+    }
+
+    /**
+     * A profile is "meaningful" once it carries a real signal — a description,
+     * a resolved site type, or at least one offering. Empty results (all null /
+     * empty) are cache-short-lived so they self-heal after the crawl.
+     *
+     * @param  array<string, mixed>  $profile
+     */
+    private function isMeaningful(array $profile): bool
+    {
+        return ($profile['description'] ?? null) !== null
+            || ($profile['site_type'] ?? null) !== null
+            || ! empty($profile['sell']);
     }
 
     /**

@@ -101,6 +101,70 @@ class SiteProfileExtractorTest extends TestCase
         $this->assertNull($profile['audience']);
     }
 
+    /**
+     * Regression (prod 2026-07-24, thomasfoods.com): a profile computed BEFORE
+     * the crawl produced pages returned empty and used to be cached for 7 days,
+     * freezing the wizard on "no type". An empty result must NOT block a later
+     * recompute once crawl pages land.
+     */
+    public function test_empty_profile_is_not_long_cached_and_reclassifies_after_crawl(): void
+    {
+        config(['services.mistral.key' => 'test-key']);
+        $this->stubGuard(false); // no live fallback → first pass is empty
+        $website = Website::factory()->for(User::factory())->create();
+
+        // First pass: no crawl pages yet → empty (and must not stick).
+        $first = app(SiteProfileExtractor::class)->extract($website);
+        $this->assertNull($first['site_type']);
+
+        // Crawl now lands pages + the LLM can classify.
+        $crawlSiteId = $website->crawl_site_id ?: \Illuminate\Support\Str::ulid()->toBase32();
+        if (! $website->crawl_site_id) {
+            \Illuminate\Support\Facades\DB::table('crawl_sites')->insert([
+                'id' => $crawlSiteId, 'normalized_domain' => 'heal.example',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $website->forceFill(['crawl_site_id' => $crawlSiteId])->save();
+        }
+        \Illuminate\Support\Facades\DB::table('website_pages')->insert([
+            'id' => \Illuminate\Support\Str::ulid()->toBase32(),
+            'website_id' => $website->id, 'crawl_site_id' => $crawlSiteId,
+            'url' => 'https://'.$website->domain.'/', 'url_hash' => sha1('u'),
+            'title' => 'Premium Beef & Lamb Supplier', 'meta_description' => 'Wholesale meat for restaurants.',
+            'http_status' => 200, 'inbound_link_count' => 5,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        Http::fake(['api.mistral.ai/*' => Http::response([
+            'choices' => [['message' => ['content' => json_encode([
+                'description' => 'Wholesale beef and lamb for restaurants.',
+                'sell' => ['Beef', 'Lamb'], 'dont_sell' => [], 'site_type' => 'b2b_services',
+                'audience' => 'Restaurants and caterers.', 'ymyl' => false,
+            ])]]],
+            'usage' => ['total_tokens' => 50],
+        ])]);
+
+        // Second pass must RECOMPUTE (empty wasn't meaningfully cached), not
+        // return the stale empty.
+        $second = app(SiteProfileExtractor::class)->extract($website);
+        $this->assertSame('b2b_services', $second['site_type']);
+        $this->assertSame('Wholesale beef and lamb for restaurants.', $second['description']);
+    }
+
+    public function test_forget_clears_the_cached_profile(): void
+    {
+        $website = Website::factory()->for(User::factory())->create();
+        \Illuminate\Support\Facades\Cache::put(
+            SiteProfileExtractor::cacheKey($website->id),
+            ['description' => 'x', 'sell' => [], 'dont_sell' => [], 'site_type' => 'brand', 'audience' => null, 'ymyl' => null],
+            now()->addDay()
+        );
+        $this->assertNotNull(\Illuminate\Support\Facades\Cache::get(SiteProfileExtractor::cacheKey($website->id)));
+
+        SiteProfileExtractor::forget($website->id);
+
+        $this->assertNull(\Illuminate\Support\Facades\Cache::get(SiteProfileExtractor::cacheKey($website->id)));
+    }
+
     public function test_invalid_site_type_from_the_llm_becomes_null(): void
     {
         // A hallucinated enum value must degrade to "unclassified" (type-blind

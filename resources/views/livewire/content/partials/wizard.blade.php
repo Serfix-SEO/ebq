@@ -83,7 +83,10 @@
 
                 {{-- ── Step 1: business ─────────────────────────────── --}}
                 @if ($wizardStep === 1)
-                    <div @if($analyzing) wire:init="analyzeSite" @endif>
+                    {{-- wire:init runs the first analysis immediately; wire:poll retries
+                         every 4s while $analyzing stays true (crawl still landing pages),
+                         self-stopping once a profile resolves or the attempt cap is hit. --}}
+                    <div @if($analyzing) wire:init="analyzeSite" wire:poll.4s="analyzeSite" @endif>
                         <div class="flex items-center gap-3">
                             <x-nodus :state="$analyzing ? 'searching' : 'idle'" :size="60" class="shrink-0 text-slate-400 dark:text-slate-500"/>
                             <div>

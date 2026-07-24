@@ -34,6 +34,12 @@ trait ContentWizard
     public ?string $draftPlanId = null;
     public bool $analyzing = false;
 
+    /** Poll attempts made while waiting for the crawl to land pages to profile. */
+    public int $profileAttempts = 0;
+
+    /** ~60s of 4s polls — enough for a small site's crawl; then stop spinning. */
+    private const MAX_PROFILE_ATTEMPTS = 15;
+
     public string $brandName = '';
     public string $language = 'English';
     public string $country = 'global';
@@ -155,6 +161,18 @@ trait ContentWizard
                 }
             } catch (\Throwable) {
             }
+        }
+
+        // Still nothing to show AND the crawl is mid-flight (the profile was
+        // cached empty before any pages existed — prod 2026-07-24, thomasfoods)?
+        // Keep the wizard in its "reading your website…" state so the poll
+        // retries once pages land. Bounded so a stuck/failed crawl can't spin
+        // forever; after the cap we fall through with whatever we have.
+        $this->profileAttempts++;
+        if ($this->businessDescription === '' && $this->siteType === ''
+            && $this->profileAttempts < self::MAX_PROFILE_ATTEMPTS
+            && $website->isCrawling()) {
+            $this->analyzing = true;
         }
     }
 
