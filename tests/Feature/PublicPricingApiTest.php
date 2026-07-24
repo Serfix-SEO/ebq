@@ -29,6 +29,17 @@ class PublicPricingApiTest extends TestCase
         $this->assertNotContains('startup', $slugs, 'old slug retired');
         $this->assertNotContains('free', $slugs, 'old slug retired');
 
+        // The free-entry tier ($0 + a trial) must NOT be flagged as requiring a
+        // subscription (the rename free→trial used to mis-flag it → the plugin
+        // rendered it "Coming soon").
+        $byslug = collect($res->json('plans'))->keyBy('slug');
+        if (isset($byslug['trial'])) {
+            $this->assertFalse($byslug['trial']['requires_subscription'], 'trial = free entry');
+        }
+        if (isset($byslug['pro'])) {
+            $this->assertTrue($byslug['pro']['requires_subscription'], 'paid plan requires subscription');
+        }
+
         // Every paid, checkout-ready plan must carry a checkout_url (else the
         // plugin renders "Coming soon").
         foreach ($res->json('plans') as $p) {

@@ -98,7 +98,15 @@ class PricingController extends Controller
                 'plan_features' => is_array($planFeatures) ? $planFeatures : array_fill_keys(Plan::FEATURE_KEYS, false),
                 'api_limits' => is_array($apiLimits) ? $apiLimits : null,
                 'max_websites' => $maxWebsites !== null ? (int) $maxWebsites : null,
-                'requires_subscription' => $slug !== 'free',
+                // The free-entry tier (renamed 'free' → 'trial') is a $0 plan
+                // that grants a trial. Detect by shape, not slug, so a rename
+                // can't mis-flag it as paid. Enterprise is $0 too but has no
+                // trial → still "requires subscription" (contact sales).
+                'requires_subscription' => ! (
+                    (int) ($plan['price_monthly_usd'] ?? 0) === 0
+                    && (int) ($plan['price_yearly_usd'] ?? 0) === 0
+                    && (int) ($plan['trial_days'] ?? 0) > 0
+                ),
                 'is_highlighted' => (bool) ($plan['is_highlighted'] ?? false),
                 'checkout_url' => $isReady
                     ? route('billing.checkout', ['plan' => $slug])
