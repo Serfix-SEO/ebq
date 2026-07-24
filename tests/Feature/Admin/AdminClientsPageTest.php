@@ -77,4 +77,43 @@ class AdminClientsPageTest extends TestCase
         $response = $this->actingAs($this->admin())->get(route('admin.clients.index'))->assertOk();
         $this->assertSame(0, $response->viewData('summary')['converted_paid']);
     }
+
+    public function test_admin_can_comp_content_autopilot_free_sites(): void
+    {
+        $this->seed(\Database\Seeders\PlanSeeder::class);
+        $client = User::factory()->create();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.clients.update', $client), [
+                'name' => $client->name,
+                'email' => $client->email,
+                'plan_slug' => 'trial',
+                'content_comp_sites' => 3,
+                'content_comp_until' => now()->addMonth()->toDateString(),
+            ])
+            ->assertRedirect(route('admin.clients.index'));
+
+        $client->refresh();
+        $this->assertSame(3, (int) $client->content_comp_sites);
+        $this->assertNotNull($client->content_comp_until);
+        // Grant takes effect through the entitlement layer.
+        $this->assertTrue(app(\App\Services\Content\ContentEntitlements::class)->hasContentAccess($client));
+        $this->assertSame(3, app(\App\Services\Content\ContentEntitlements::class)->sitesAllowed($client));
+    }
+
+    public function test_blank_expiry_is_a_permanent_content_comp(): void
+    {
+        $this->seed(\Database\Seeders\PlanSeeder::class);
+        $client = User::factory()->create();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.clients.update', $client), [
+                'name' => $client->name, 'email' => $client->email, 'plan_slug' => 'trial',
+                'content_comp_sites' => 1, 'content_comp_until' => '',
+            ])->assertRedirect();
+
+        $client->refresh();
+        $this->assertSame(1, (int) $client->content_comp_sites);
+        $this->assertNull($client->content_comp_until, 'blank date = permanent');
+    }
 }

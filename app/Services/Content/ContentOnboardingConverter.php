@@ -160,21 +160,21 @@ class ContentOnboardingConverter
             $plan->save();
 
             // ── Coverage / billing decision ──────────────────────────────────
-            // Trial allows exactly ONE site. Priority: already-covered → keep;
-            // never-trialed & no sub → start the trial (covers this site);
-            // active subscription with a free slot → cover it; otherwise leave
-            // UNCOVERED — the user must pay (single site, or the per-extra-site
-            // addon) from Get started.
+            // Priority: already-covered → keep; ANY access (subscription OR
+            // admin-comped free slots) with a free slot → cover it; else a
+            // never-trialed, non-subscriber → start the ONE-site trial; otherwise
+            // leave UNCOVERED — the user must pay from Get started. Access-first
+            // so a comped client uses a free slot instead of burning their trial.
             $covered = ContentPlan::query()->where('website_id', $website->id)
                 ->whereNotNull('billing_covered_at')->exists();
 
             if (! $covered) {
-                if ($user->content_trial_started_at === null && ! $this->entitlements->hasContentSubscription($user)) {
-                    $this->entitlements->startTrial($user, $website);
-                    $covered = true;
-                } elseif ($this->entitlements->hasContentAccess($user)
+                if ($this->entitlements->hasContentAccess($user)
                     && $this->entitlements->sitesCovered($user) < $this->entitlements->sitesAllowed($user)) {
                     $this->entitlements->coverWebsite($website);
+                    $covered = true;
+                } elseif ($user->content_trial_started_at === null && ! $this->entitlements->hasContentSubscription($user)) {
+                    $this->entitlements->startTrial($user, $website);
                     $covered = true;
                 }
             }

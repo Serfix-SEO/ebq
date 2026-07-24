@@ -231,6 +231,11 @@ class ClientController extends Controller
             'is_disabled' => ['nullable', 'boolean'],
             // Force-applied (comped) plan slug. Must be a real plan row.
             'plan_slug' => ['required', 'string', Rule::in(Plan::query()->pluck('slug')->all())],
+            // Admin-comped FREE Content Autopilot website slots (0 = none) with
+            // an optional expiry (blank = permanent). Additive to any real
+            // subscription/trial allowance; enforced in ContentEntitlements.
+            'content_comp_sites' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'content_comp_until' => ['nullable', 'date'],
         ]);
 
         // Snapshot the comped plan onto current_plan_slug — the same column
@@ -242,12 +247,23 @@ class ClientController extends Controller
         $oldPlanSlug = $user->current_plan_slug;
         $planChanged = $oldPlanSlug !== $newPlanSlug;
 
+        // Comped Content Autopilot free slots — 0 clears the grant; a blank date
+        // is a permanent grant (null expiry).
+        $newCompSites = (int) ($data['content_comp_sites'] ?? 0);
+        $newCompUntil = $newCompSites > 0 && ! empty($data['content_comp_until'])
+            ? $data['content_comp_until'] : null;
+        $oldCompSites = (int) ($user->content_comp_sites ?? 0);
+        $compChanged = $oldCompSites !== $newCompSites
+            || (string) $user->content_comp_until?->toDateString() !== (string) ($newCompUntil ? \Illuminate\Support\Carbon::parse($newCompUntil)->toDateString() : '');
+
         $user->forceFill([
             'name' => $data['name'],
             'email' => $data['email'],
             'is_admin' => (bool) ($data['is_admin'] ?? false),
             'is_disabled' => (bool) ($data['is_disabled'] ?? false),
             'current_plan_slug' => $newPlanSlug,
+            'content_comp_sites' => $newCompSites,
+            'content_comp_until' => $newCompUntil,
         ])->save();
 
         $logger->log('admin.client_updated', userId: $user->id, meta: [
@@ -272,9 +288,25 @@ class ClientController extends Controller
                 ->each(fn (CrawlSite $cs) => $cs->recomputeEffectiveCap());
         }
 
+        // Comped content grant: audit distinctly + reconcile coverage so a
+        // REDUCED grant clamps covered sites back down (newest-first, non-
+        // destructive — matches subscription-downgrade behaviour).
+        if ($compChanged) {
+            $logger->log('admin.client_content_comp', userId: $user->id, meta: [
+                'from_sites' => $oldCompSites,
+                'to_sites' => $newCompSites,
+                'until' => $newCompUntil,
+            ]);
+            app(\App\Services\Content\ContentEntitlements::class)->reconcileCoverage($user);
+        }
+
         $msg = "Client {$user->email} updated.";
         if ($planChanged) {
             $msg = "Client {$user->email} updated — plan set to ".($newPlanSlug ?? User::TIER_FREE).' (no payment).';
+        }
+        if ($compChanged) {
+            $msg = rtrim($msg, '.').' — Content Autopilot free slots: '.$newCompSites
+                .($newCompUntil ? ' (until '.\Illuminate\Support\Carbon::parse($newCompUntil)->toDateString().')' : ' (permanent)').'.';
         }
 
         return redirect()->route('admin.clients.index')->with('status', $msg);

@@ -429,6 +429,33 @@
                                             @error('plan_slug') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                         </div>
 
+                                        {{-- Comp FREE Content Autopilot website slots (separate product from the
+                                             dashboard plan above). Additive to any real content subscription/trial.
+                                             0 = none; blank date = permanent. --}}
+                                        <div class="rounded-md border border-sky-200 bg-sky-50/60 px-3 py-2.5">
+                                            <div class="flex flex-wrap items-end gap-3">
+                                                <label class="flex flex-col gap-1 text-xs text-slate-700">
+                                                    <span class="font-medium">Content Autopilot free sites <span class="font-normal text-sky-700">(comp)</span></span>
+                                                    <input type="number" name="content_comp_sites" min="0" max="1000"
+                                                           value="{{ old('content_comp_sites', (int) ($client->content_comp_sites ?? 0)) }}"
+                                                           class="w-28 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500" />
+                                                </label>
+                                                <label class="flex flex-col gap-1 text-xs text-slate-700">
+                                                    <span class="font-medium">Free until <span class="font-normal text-slate-400">(blank = permanent)</span></span>
+                                                    <input type="date" name="content_comp_until"
+                                                           value="{{ old('content_comp_until', $client->content_comp_until?->toDateString()) }}"
+                                                           class="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500" />
+                                                </label>
+                                                <p class="flex-1 text-[11px] leading-relaxed text-sky-800">
+                                                    Grants N websites of Content Autopilot for free (no Stripe). Adds to any
+                                                    real content subscription. Reducing the count un-covers the newest sites
+                                                    (non-destructive). Takes effect on the client's next request.
+                                                </p>
+                                            </div>
+                                            @error('content_comp_sites') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                            @error('content_comp_until') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                        </div>
+
                                         <div class="flex items-center justify-between">
                                             <a href="{{ route('admin.usage.index', ['user_id' => $client->id]) }}"
                                                class="text-xs font-semibold text-orange-600 hover:underline">

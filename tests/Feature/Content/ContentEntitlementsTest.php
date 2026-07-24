@@ -38,6 +38,37 @@ class ContentEntitlementsTest extends TestCase
         }
     }
 
+    public function test_admin_comp_grants_access_and_additive_slots(): void
+    {
+        // No sub, no trial — a comp of 2 grants access + 2 slots.
+        $user = User::factory()->create(['content_comp_sites' => 2, 'content_comp_until' => null]);
+        $this->assertTrue($this->ent()->hasContentAccess($user));
+        $this->assertSame(2, $this->ent()->sitesAllowed($user));
+
+        // Comp is ADDITIVE to a trial (trial = 1) → 3.
+        $user->forceFill([
+            'content_trial_started_at' => now(),
+            'content_trial_ends_at' => now()->addDays(5),
+        ])->save();
+        $this->assertSame(3, $this->ent()->sitesAllowed($user));
+    }
+
+    public function test_expired_comp_grants_nothing(): void
+    {
+        $user = User::factory()->create([
+            'content_comp_sites' => 3,
+            'content_comp_until' => now()->subDay(), // expired
+        ]);
+        $this->assertFalse($this->ent()->hasContentAccess($user));
+        $this->assertSame(0, $this->ent()->sitesAllowed($user));
+        $this->assertSame(0, $this->ent()->compSites($user));
+
+        // A future expiry is still live.
+        $user->forceFill(['content_comp_until' => now()->addMonth()])->save();
+        $this->assertSame(3, $this->ent()->compSites($user));
+        $this->assertTrue($this->ent()->hasContentAccess($user));
+    }
+
     public function test_start_trial_sets_window_and_coverage_once(): void
     {
         $user = User::factory()->create();

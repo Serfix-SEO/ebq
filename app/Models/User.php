@@ -143,6 +143,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'trial_data_deleted_at' => 'datetime',
             'content_trial_started_at' => 'datetime',
             'content_trial_ends_at' => 'datetime',
+            'content_comp_sites' => 'integer',
+            'content_comp_until' => 'datetime',
             'is_system' => 'boolean',
         ];
     }

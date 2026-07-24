@@ -49,9 +49,31 @@ class ContentEntitlements
             && $user->content_trial_ends_at->isFuture();
     }
 
+    /**
+     * Admin-comped free content website slots currently in effect. Zero once the
+     * optional `content_comp_until` expiry has passed (non-destructive: existing
+     * covered sites keep working — only NEW coverage is gated). Null expiry =
+     * permanent grant.
+     */
+    public function compSites(User $user): int
+    {
+        $sites = (int) ($user->content_comp_sites ?? 0);
+        if ($sites <= 0) {
+            return 0;
+        }
+        $until = $user->content_comp_until;
+        if ($until !== null && $until->isPast()) {
+            return 0;
+        }
+
+        return $sites;
+    }
+
     public function hasContentAccess(User $user): bool
     {
-        return $this->hasContentSubscription($user) || $this->onContentTrial($user);
+        return $this->hasContentSubscription($user)
+            || $this->onContentTrial($user)
+            || $this->compSites($user) > 0;
     }
 
     /** Access AND this specific website occupies a covered slot. */
@@ -69,14 +91,18 @@ class ContentEntitlements
 
     // ── Coverage / slots ────────────────────────────────────────────────
 
-    /** Websites the user may run content on: trial = 1; sub = 1 + addon qty. */
+    /**
+     * Websites the user may run content on. Admin-comped free slots are ADDITIVE
+     * to any real allowance (sub = 1 + addon qty; trial = 1; otherwise 0), so an
+     * operator can top up a paying client or grant a free-only client N slots.
+     */
     public function sitesAllowed(User $user): int
     {
-        if ($this->hasContentSubscription($user)) {
-            return 1 + $this->addonQuantity($user);
-        }
+        $base = $this->hasContentSubscription($user)
+            ? 1 + $this->addonQuantity($user)
+            : ($this->onContentTrial($user) ? 1 : 0);
 
-        return $this->onContentTrial($user) ? 1 : 0;
+        return $base + $this->compSites($user);
     }
 
     /** Quantity of the addon price line on the content subscription. */

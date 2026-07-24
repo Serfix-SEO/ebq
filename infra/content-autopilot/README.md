@@ -908,6 +908,19 @@ The dashboard side has a website limit (`User::websiteLimit()`); sites past it a
 has its own subscription/trial and its own explicit per-site coverage
 (`content_plans.billing_covered_at`).
 
+**Admin comp (2026-07-24).** An operator can grant a client FREE Content Autopilot
+website slots from the admin client editor (`Admin\ClientController::update` →
+`users.content_comp_sites` + optional `content_comp_until`). This is separate from
+the dashboard-plan force-apply (`current_plan_slug`) — one comps SEO, the other
+comps content. Enforced in `ContentEntitlements`: `compSites()` (0 once
+`content_comp_until` is past — non-destructive), `hasContentAccess()` |= comp>0,
+`sitesAllowed()` = base(sub/trial) **+ comp** (additive, so you can top up a payer
+or grant a free-only client N). `ContentOnboardingConverter` covers via any access
+(comp/sub) BEFORE starting a trial, so a comped client doesn't burn their trial.
+Reducing the count runs `reconcileCoverage()` (un-covers newest sites, non-
+destructive). Tests: `ContentEntitlementsTest` (comp access/additive/expiry),
+`AdminClientsPageTest` (comp save + permanent-on-blank).
+
 Freeze kept leaking across that line. Every case was invisible — no error, just a
 paid product quietly not working (all found 2026-07-21, one prod account):
 
