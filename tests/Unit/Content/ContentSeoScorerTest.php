@@ -111,8 +111,12 @@ class ContentSeoScorerTest extends TestCase
         $a = $this->goodArticle();
         $clean = $this->scorer->score($a['html'], $a['meta_title'], $a['meta_description'], $a['h1'], $a['slug'], $a['context']);
 
+        // style_clean tolerates up to 2 minor nits (the revise loop is the real
+        // gate); it only fails — and dents the score — beyond that.
         $a['context']['style_issues'] = [
             ['code' => 'banned_phrases', 'message' => 'Replace giveaway phrases.'],
+            ['code' => 'ai_tell', 'message' => 'Remove robotic phrasing.'],
+            ['code' => 'filler', 'message' => 'Cut filler.'],
         ];
         $dirty = $this->scorer->score($a['html'], $a['meta_title'], $a['meta_description'], $a['h1'], $a['slug'], $a['context']);
 

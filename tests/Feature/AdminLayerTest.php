@@ -30,6 +30,21 @@ class AdminLayerTest extends TestCase
             ->assertSee('Clients');
     }
 
+    public function test_clients_listing_hides_system_content_lead_accounts(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $client = User::factory()->create(['is_admin' => false, 'email' => 'real-client@example.com']);
+        // A content-funnel throwaway owner (ContentOnboardingConverter::newLeadUser()).
+        $lead = User::factory()->create(['email' => 'lead+ABC@leads.serfix.internal']);
+        $lead->forceFill(['is_system' => true])->save();
+
+        $this->actingAs($admin)
+            ->get(route('admin.clients.index'))
+            ->assertOk()
+            ->assertSee('real-client@example.com')
+            ->assertDontSee('leads.serfix.internal');
+    }
+
     public function test_admin_can_impersonate_client(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

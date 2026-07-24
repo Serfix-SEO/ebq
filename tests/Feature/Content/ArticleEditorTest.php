@@ -57,7 +57,13 @@ class ArticleEditorTest extends TestCase
             ->call('startEditing')
             ->assertSet('editing', true)
             ->assertSee(__('Live SEO checks'))
-            ->assertSee(__('Keyphrase in SEO title'));
+            ->assertSee(__('Keyphrase in SEO title'))
+            // Plugin-style SEO panel + previews render.
+            ->assertSee(__('SEO settings for this article'))
+            ->assertSee(__('Google preview'))
+            ->assertSee(__('Focus keyphrase'))
+            ->assertSee(__('Social preview (Facebook / X)'))
+            ->assertSee(__('Advanced (search engine directives)'));
     }
 
     public function test_rescore_updates_live_score_when_body_changes(): void
@@ -94,6 +100,89 @@ class ArticleEditorTest extends TestCase
         $this->assertSame('client', $current->generation_meta['edited_by'] ?? null);
         $this->assertFalse((bool) $article->fresh()->is_current);
         $this->assertNotNull($current->seo_score); // re-scored on save
+    }
+
+    public function test_save_persists_per_article_seo_overrides(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+
+        Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')
+            ->set('editSlug', 'custom-slug')
+            ->set('editCanonical', 'https://example.com/canonical')
+            ->set('editNoindex', true)
+            ->set('editNofollow', true)
+            ->set('editOgTitle', 'Social Title')
+            ->set('editOgDescription', 'Social description')
+            ->set('editOgImage', 'https://example.com/og.jpg')
+            ->set('editTwitterTitle', 'X Title')
+            ->set('editTwitterCard', 'summary')
+            ->call('saveEdits', '<p>Body with the pubg name generator phrase.</p><h2 id="a">S</h2><p>More.</p>');
+
+        $current = $topic->fresh()->currentArticle;
+        $this->assertSame('custom-slug', $current->slug);
+        $this->assertSame('https://example.com/canonical', $current->canonical_url);
+        $this->assertTrue((bool) $current->robots_noindex);
+        $this->assertTrue((bool) $current->robots_nofollow);
+        $this->assertSame('Social Title', $current->og_title);
+        $this->assertSame('Social description', $current->og_description);
+        $this->assertSame('https://example.com/og.jpg', $current->og_image);
+        $this->assertSame('X Title', $current->twitter_title);
+        $this->assertSame('summary', $current->twitter_card);
+    }
+
+    public function test_focus_keyword_defaults_to_topic_but_override_persists_only_when_changed(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+
+        // Defaults to the topic keyword; leaving it unchanged stores no override.
+        Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')
+            ->assertSet('editFocusKeyword', 'pubg name generator')
+            ->call('saveEdits', '<p>Body with the pubg name generator phrase.</p><h2 id="a">S</h2><p>x.</p>');
+        $this->assertNull($topic->fresh()->currentArticle->focus_keyword, 'unchanged focus keyword stays null (flows from topic)');
+
+        // A genuine override is stored.
+        Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')
+            ->set('editFocusKeyword', 'stylish pubg names')
+            ->call('saveEdits', '<p>Body about stylish pubg names here.</p><h2 id="a">S</h2><p>x.</p>');
+        $this->assertSame('stylish pubg names', $topic->fresh()->currentArticle->focus_keyword);
+    }
+
+    public function test_failing_checks_carry_a_fix_hint(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+
+        // Force a keyphrase the title/body don't contain → placement checks fail
+        // and must surface an actionable hint, not just the label.
+        $component = Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')
+            ->set('editFocusKeyword', 'entirely absent phrase');
+
+        $checks = collect($component->get('liveChecks'));
+        $failing = $checks->firstWhere('passed', false);
+        $this->assertNotNull($failing);
+        $this->assertNotEmpty($failing['hint'] ?? '', 'a failing check must include a fix hint');
+        $component->assertSee(__('Add your focus keyphrase to the SEO title.'));
+    }
+
+    public function test_focus_keyword_override_drives_the_live_audit(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+
+        // A keyphrase absent from the title/body → its placement checks fail,
+        // proving the audit re-scores against the override, not the topic.
+        $component = Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing');
+        $baseline = $component->get('liveScore');
+
+        $component->set('editFocusKeyword', 'wholly unrelated phrase');
+        $this->assertLessThan($baseline, $component->get('liveScore'));
     }
 
     public function test_save_edits_strips_scripts(): void

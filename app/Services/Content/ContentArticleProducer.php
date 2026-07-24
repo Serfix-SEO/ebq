@@ -58,7 +58,10 @@ class ContentArticleProducer
         // never block production; the guard fail-softs internally.
         $guard = app(CompetitorMentionGuard::class);
         try {
-            if (! $guard->assessed($plan)) {
+            // Also re-assess when the 30-day SERP re-discovery swapped the
+            // competitor list under an existing assessment (2026-07-23) — the
+            // block list must describe the CURRENT rivals at write time.
+            if (! $guard->assessed($plan) || $guard->assessmentStale($plan)) {
                 $guard->assess($plan);
                 $plan->refresh();
             }

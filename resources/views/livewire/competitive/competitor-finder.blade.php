@@ -43,7 +43,7 @@
         @endphp
         <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center gap-3">
-                <span class="h-5 w-5 flex-none animate-spin rounded-full border-2 border-slate-200 border-t-orange-500 dark:border-slate-700"></span>
+                <x-nodus state="analyzing" :size="72" class="flex-none text-orange-400 dark:text-orange-500" />
                 <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">
                     {{ $status === 'discovering' ? __('Searching the web for :d’s competitors…', ['d' => $domain]) : __('Analyzing :d…', ['d' => $domain]) }}
                 </p>
@@ -128,7 +128,7 @@
         </div>
     @elseif (in_array($status, ['done', 'no_keywords'], true) && empty($competitors))
         <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <svg class="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75l-2.489-2.489m0 0a3.375 3.375 0 10-4.773-4.773 3.375 3.375 0 004.774 4.774zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <x-nodus state="confused" :size="72" class="mx-auto text-slate-400 dark:text-slate-500" />
             <p class="mt-3 text-sm font-medium text-slate-600 dark:text-slate-300">{{ __('No clear competitors found for :d yet.', ['d' => $domain]) }}</p>
             <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">{{ __('The site may be too new or too niche to share search results with others. Try again later, or add competitors manually in the Keyword Gap tool.') }}</p>
         </div>

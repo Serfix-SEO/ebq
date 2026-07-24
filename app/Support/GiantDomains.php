@@ -42,7 +42,10 @@ final class GiantDomains
 
         // Marketplaces / retail giants
         'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.it',
-        'amazon.es', 'amazon.ca', 'amazon.ae', 'amazon.in',
+        'amazon.es', 'amazon.ca', 'amazon.ae', 'amazon.in', 'amazon.sa',
+        // MENA mega-marketplaces (2026-07-23: noon.com won carmenperfumes.ae's
+        // research slot — the Amazon of the Middle East wasn't listed)
+        'noon.com', 'namshi.com', 'dubizzle.com', 'talabat.com', 'careem.com',
         'ebay.com', 'ebay.co.uk', 'ebay.de', 'etsy.com', 'aliexpress.com',
         'alibaba.com', 'walmart.com', 'target.com', 'bestbuy.com', 'temu.com',
         'craigslist.org', 'ikea.com',
@@ -104,6 +107,17 @@ final class GiantDomains
         // Client size unknown: only the unambiguous mega-profile qualifies.
         if ($domainDa !== null && $domainDa >= 75
             && $domainReferring !== null && $domainReferring > 100_000) {
+            return true;
+        }
+        // Cold-metrics window (2026-07-23): DA not yet fetched (Moz cap /
+        // enrichment pending) but referring domains alone already tell the
+        // story — noon.com at 8,829 refs vs a 21-ref client. Absolute floor
+        // (5k) keeps mid-size real rivals (ajmal, 1.3k) safe for even the
+        // tiniest clients.
+        if ($domainDa === null
+            && $domainReferring !== null && $domainReferring > 5_000
+            && $clientReferring !== null && $clientReferring > 0
+            && $domainReferring > 50 * $clientReferring) {
             return true;
         }
 

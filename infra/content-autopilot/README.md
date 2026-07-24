@@ -111,6 +111,25 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   publish as classic HTML and the client converts to Gutenberg blocks in WP
   themselves (SEO fields + images carry over). Check labels updated to the
   current bands (title 40-60, meta 130-155, density 0.5-2.5%).
+  **2026-07-24 additions — per-article SEO fields (WP-plugin parity):** the
+  editor now exposes the SAME on-page SEO fields the plugin's post-edit sidebar
+  does, editable for THAT article only: **focus keyphrase override** (the live
+  audit re-scores against it — `ArticleReview::scoreCurrent` swaps
+  `context['target_keyword']`; stored as `content_articles.focus_keyword` ONLY
+  when it diverges from the topic, so re-targeting the topic still flows through
+  a null override), **URL slug**, **canonical**, **robots noindex/nofollow**,
+  and **social** (OpenGraph + Twitter title/description/image + card). Plus a
+  live **Google snippet preview** and **social card preview** (server-rendered
+  from the wire props, same debounce as the char counters — no new Alpine
+  plugin; `x-collapse` was intentionally NOT used, it isn't bundled). Columns:
+  migration `2026_07_24_140000` (all nullable/defaulted, append-only per
+  version). Publish mapping: `WordPressAppPasswordDriver::seoMeta()` → plugin
+  `_ebq_*` meta (canonical/robots/og/twitter; robots are BOOLEAN REST meta —
+  send real bools, only when ON so a manual WP setting isn't clobbered);
+  `WebhookDriver` payload gains the same keys. All `_ebq_*` keys are already
+  `register_post_meta(show_in_rest)` in `Ebq_Meta_Fields::KEYS`. Tests:
+  `ArticleEditorTest` (save persists overrides, focus-override drives audit),
+  `ContentPublishingTest` (WP meta + webhook payload mapping).
 - **Gating layers** (landmine, cost 3 test rounds): a new plan feature key
   must be added in FOUR places — `PlanSeeder plan_features`,
   `Plan::FEATURE_KEYS` (featureMap whitelist), `Website::FEATURE_KEYS`
@@ -263,13 +282,14 @@ ONLY; falls back to the all-rows figures when nothing classifies). The old
 `median`/`gap`/`behind` are untouched for other readers. Zero new API calls —
 pure re-labeling of data already fetched.
 
-Step-5 UI: stats lead with the peer median/gap; the table shows peers +
-aspirationals ranked by referring domains **with the client's own "YOU" row
-inserted in rank position** (references are out of that ladder, so the old
-directories-on-top failure cannot return); aspirationals get an "Ahead of
-you" chip; references collapse into an "Also on your results pages" chip
-section explicitly excluded from gap math. Fresh sites keep SERP order, no
-YOU row.
+Step-5 UI: stats lead with the peer median/gap; the table shows ALL
+competitors ranked by referring domains **with the client's own "YOU" row
+inserted in rank position**. References/giants STAY in the table (user
+request 2026-07-23: guard classification must not make rows vanish) but are
+badged "Not a rival"; aspirationals get an "Ahead of you" chip. The gap math
+still excludes references/giants (peer_* figures, service-side), and they're
+ALSO summarized in the "Also on your results pages" chip section. Fresh
+sites keep SERP order, no YOU row.
 
 Tests: `ContentPeerClassesTest` (3).
 
@@ -449,6 +469,43 @@ falls back to giants as designed.
 
 Tests: `ContentPeerClassesTest` (7 — incl. flag-off reverts to prior
 behavior, scale rule, entity demotion, research-slot demotion).
+
+## The carmenperfumes race + Moz-cap fallback (2026-07-23 #7)
+
+Live onboarding of carmenperfumes.ae exposed three holes; all fixed:
+
+1. **Empty-assessment race**: the guard assessed BEFORE SERP discovery landed
+   → stamped `assessed_at` on an empty list → protection silently off, zero
+   entities, giant demotion blind, and noon.com won the research slot while
+   8 real UAE perfume rivals (ajmal, swiss arabian, arabian oud…) sat in the
+   SERP cache. Fix: `CompetitorMentionGuard::assessedEmpty()`;
+   `DiscoverContentCompetitorsJob` invalidates + redispatches assessment when
+   competitors land over an empty assessment, and
+   `PrepareContentKeywordInsightsJob`'s inline assess treats assessedEmpty as
+   unassessed. (The empty-list assess path is LLM-free, so re-running it for
+   genuinely competitor-less plans costs nothing.)
+2. **MENA giants listed**: noon.com, namshi.com, dubizzle, talabat, careem,
+   amazon.sa added to `GiantDomains` — noon now filtered from the list
+   entirely, not just demoted. Plus a cold-metrics `isScaleGiant` branch:
+   DA unknown AND refs > 5k AND > 50× the client's ⇒ giant (covers the
+   window before Moz/DA enrichment lands; the 5k floor keeps ajmal-class
+   1.3k-ref real rivals safe for even the tiniest clients).
+3. **Moz cap ⇒ blank DA/PA columns**: the free-tier 40-row/month meter
+   exhausts mid-month and the whole authority table went "—".
+   `dfsMetrics()` now stores DataForSEO's domain `rank` (0-1000) in the
+   long-existing `domain_metrics.dfs_rank` column (rides the same summary
+   call, zero extra spend) and competitor rows carry `rank` — but **OWNER
+   DECISION (same day): the DA/PA columns show Moz values ONLY**. A brief
+   "DR {n}" fallback render in the DA cell was reverted; rank stays a
+   stored data asset (feeds isScaleGiant-style signals), never displayed
+   as authority. Columns legitimately show "—" while the Moz cap is
+   exhausted — real Moz numbers return when the monthly window resets, or
+   sooner if the cap/account is raised.
+
+Live end-state for carmen: guard auto-ON with 8 real rival brands, noon
+gone, entities tagged (ajmal=brand, faces.ae=retailer…), research pick
+ajmal → swiss arabian → arabian oud, DR values fill the authority column,
+peer median 66 / 3.1× intact.
 
 ## Setup wizard v2 (6 steps, 2026-07-17; keyword-research step added 2026-07-18)
 
@@ -1060,6 +1117,108 @@ by dispatching `EnrichCompetitorDomainMetricsJob` for the single new domain
 from both `addCompetitor()` implementations (idempotent — skips domains
 already fresh, so this is cheap).
 
+## Wizard interaction lag → optimistic Alpine UI (2026-07-23)
+
+User-reported: every chip/toggle click in the wizard (site-type chips, step-3
+structure switches, step-4 images toggle + style picker, step-6 term chips)
+felt laggy — each was a plain `wire:click` whose selected state was rendered
+server-side, so the UI froze for a full Livewire round-trip (~300-600ms on a
+distant client) before anything visibly changed.
+
+Fix (all in the SHARED partial `livewire/content/partials/wizard.blade.php`,
+so both wizard implementations get it): selection state binds to
+**`$wire.<prop>`** — Livewire's reactive client-side property mirror, which
+stays correct through every morph — and the click ASSIGNS it optimistically
+(`$wire.siteType = 'x'`; instant, no round-trip wait) before calling the
+persisting server method in the background. Rules for this pattern:
+
+- **⛔ NEVER snapshot server state into a local Alpine `x-data` mirror**
+  (`x-data="{ st: @js($siteType) }"`). The first version shipped exactly
+  that and broke immediately (smart-bricks, 2026-07-23): `analyzeSite`
+  (async `wire:init`) set `siteType` server-side AFTER first render, the
+  snapshot stayed stale/empty — nothing looked selected — and a later
+  morph re-initialized the mirror to the stale auto value (`saas`),
+  clobbering the user's click. `$wire.<prop>` has no such staleness.
+- **Flip-methods take an explicit target value** — `toggleStructure($key,
+  ?bool $value)`, `toggleImages(?bool $value)`, `toggleTerm($kw, ?bool
+  $removed)` (null = legacy flip). The optimistic click assigns the prop
+  AND passes the value, so the dirty-prop sync + method call SET the same
+  state instead of double-flipping. Same reason `@entangle` is banned here.
+- **No server-side conditional classes on these controls** — state classes
+  live ONLY in `:class` (a static copy can't be removed by Alpine, so a
+  deselected chip would stay highlighted).
+- Step-4 style picker visibility is `x-show="$wire.imagesEnabled"` (server
+  seeds `style="display:none"` when off — no pre-Alpine flash).
+- Step-6 term chips keep keys LOWERCASED (`toggleTerm()` lowercases before
+  storing to `removedTerms`).
+- The guard card's switch has NO backing Livewire prop ($guard is a view
+  array), so it keeps a local mirror but is `wire:key`-ed BY VALUE
+  (`guard-switch-on/off`) — any server-side change swaps the element and
+  re-initializes the mirror.
+- Covered by `ContentWizardOptimisticUiTest` (binding present, no local
+  snapshot, explicit-value idempotence, user-choice persistence).
+
+### Site-type section is compact-by-default (2026-07-23)
+
+The 13-chip grid dominated step 1 and confused clients, so once a type is
+known the section renders as ONE summary row (check icon, label, description,
+an "Auto-detected" pill when `siteTypeSource === 'auto'`, and a "Change"
+link); the full grid only shows when no type is set yet or after "Change",
+and collapses again on pick. Mechanics (all in the shared partial):
+
+- Visibility binds to `$wire.siteType` — the compact row appears BY ITSELF
+  the moment `analyzeSite`'s async auto-detect lands, no morph help needed.
+  `typeGridOpen` (expand/collapse) is pure UI disclosure state, so a local
+  `x-data` is fine for it — the never-mirror rule applies to SERVER state.
+- Compact label/description come from an `x-text` lookup into a static
+  `Js::from` map of the translated options (config data, not server state).
+- Both halves get server-seeded `style="display:none"` for their initial
+  state (same no-flash pattern as the step-4 style picker).
+- Known-acceptable edge: if a morph lands while the grid is open via
+  "Change" (rare — deferred wire:model means few mid-step round-trips), the
+  server-seeded style re-hides the grid; clicking "Change" again recovers.
+
+Also `goToStep` was added to the step-transition overlay's `wire:target`, so
+back/rail navigation shows the working overlay instead of a dead click.
+
+Server side, the per-round-trip cost was cut too: `ContentCalendar::render()`
+and the trait's `wizardViewData()` used to call `plan()`/`website()` up to 4×
+per Livewire update (unmemoized queries — `website()` is an
+`accessibleWebsitesQuery` join); both now fetch each exactly once per render.
+
+## Nodus — the wizard mascot (2026-07-23)
+
+`resources/views/components/nodus.blade.php` — the Content Autopilot mascot
+from the owner's character sheet: a glowing signal core with two "search
+point" eyes and nodes orbiting a tilted halo. **Self-contained inline SVG +
+scoped `@once` CSS — deliberately zero dependency on the compiled Tailwind
+bundle** (uncompiled utility classes render as nothing; this component can't
+be bitten by that).
+
+Usage: `<x-nodus state="searching" :size="92" class="text-slate-400 dark:text-slate-500"/>`
+- States (expression = motion + light, the face never changes): `idle`,
+  `searching` (eyes scan), `analyzing` (fast orbit + quick glow pulse),
+  `success` (strong steady glow, calm orbit), `confused` (halo wobbles, one
+  node runs backwards).
+- `size < 40` drops the eyes (micro/icon tier from the sheet's scale system).
+- Halo ring color = `currentColor` — set via a compiled `text-*` class.
+- Node motion is SMIL `animateMotion` (keeps dots round; works in every
+  browser incl. Safari) split into back/front halves via shared `clipPath`s
+  so nodes pass BEHIND the core on the far side and IN FRONT on the near
+  side. Expression states are CSS-only. `prefers-reduced-motion` stops all
+  CSS animation and swaps moving nodes for a static pose.
+- Palette is exact brand hex (`#F26419`/`#C44E0E` core, `#9AD6FF` accent
+  node) — NOT the concept sheet's `#FF7A00` (brand-token hard rule).
+
+Placements (wizard partial + guard card, so BOTH wizard implementations get
+it): step-transition overlay (searching, 116px), step-1 header
+(idle/searching, 60px), step-1 "Analyzing your website" banner (searching,
+46px), competitors generating (analyzing, 92px) + no-data state (confused,
+72px), keyword-research loader (analyzing, 92px), guard "checking" row
+(searching, 38px), step-7 header (searching→success, 80px) + topics loader
+(analyzing, 92px). One state per screen — the expression system only reads
+if used consistently.
+
 ## Country / geo-targeting (2026-07-22)
 
 `ContentPlan.country` (lowercase code, e.g. `ae`; `'global'` = worldwide) is
@@ -1150,6 +1309,21 @@ blank result persists.
   silently re-introduces this. `ContentArticleProducer`'s write/de-ai/revise
   stages and `ContentKeywordInsights`'s People Also Ask call (Serper, not an
   LLM call) are unaffected/out of scope.
+- **`__unmetered` was only HALF-isolating until 2026-07-24.** It skipped the
+  pre-flight cap *check* (`assertCanSpend`) so content writing was never
+  *blocked* — but `OpenAiCompatibleClient` still **logged** the real token spend
+  as a `client_activities` row under the pooled provider (`deepseek`/`mistral`),
+  and `UsageMeter::consumedInWindow()` sums exactly that pool. So content tokens
+  (≈20k/article × ~30/mo/site) silently **depleted** the dashboard token quota
+  that gates the AI Writer / block editor for any account holding BOTH products,
+  and `ClientActivityLogger::log()`'s unconditional `release()` decremented the
+  live mistral reservation into the negative (unmetered calls never `reserve()`),
+  weakening burst protection. Fix: `OpenAiCompatibleClient` now logs unmetered
+  spend under a **non-pool label** `'{provider}:unmetered'` — `whereIn(pool)`
+  excludes it from the cap, and `release()` hits a dead key. Real model/provider
+  stay in `meta` for telemetry; admin Usage page shows it as "… (content)". The
+  rule is now the full one: `__unmetered` = **out of the dashboard meter
+  entirely** (don't block AND don't count). Tests: `ContentUsageIsolationTest`.
 - **Guard-aware competitor RANKING must be the ONE place every keyword-research
   call site derives "the competitor(s)" from — `CompetitorMentionGuard::
   rankAndFilter(ContentPlan $plan, array $candidates): array`.** The raw

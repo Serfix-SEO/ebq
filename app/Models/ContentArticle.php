@@ -27,6 +27,8 @@ class ContentArticle extends Model
             'style_issues' => 'array',
             'generation_meta' => 'array',
             'is_current' => 'boolean',
+            'robots_noindex' => 'boolean',
+            'robots_nofollow' => 'boolean',
         ];
     }
 

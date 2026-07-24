@@ -74,6 +74,19 @@ class WebhookDriver implements PublishDriver
                 'language' => (string) ($topic?->plan?->language ?? 'en'),
                 'target_keyword' => (string) ($topic?->target_keyword ?? ''),
                 'secondary_keywords' => array_values((array) ($topic?->secondary_keywords ?? [])),
+                // Per-article SEO overrides set in the in-app editor. focus_keyword
+                // prefers the article override, falling back to the topic keyword.
+                'focus_keyword' => (string) ($article->focus_keyword ?: ($topic?->target_keyword ?? '')),
+                'canonical_url' => (string) ($article->canonical_url ?? ''),
+                'robots_noindex' => (bool) $article->robots_noindex,
+                'robots_nofollow' => (bool) $article->robots_nofollow,
+                'og_title' => (string) ($article->og_title ?? ''),
+                'og_description' => (string) ($article->og_description ?? ''),
+                'og_image' => (string) ($article->og_image ?? ''),
+                'twitter_title' => (string) ($article->twitter_title ?? ''),
+                'twitter_description' => (string) ($article->twitter_description ?? ''),
+                'twitter_image' => (string) ($article->twitter_image ?? ''),
+                'twitter_card' => (string) ($article->twitter_card ?? ''),
             ],
             'sent_at' => now()->toIso8601String(),
         ];

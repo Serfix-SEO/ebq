@@ -28,20 +28,26 @@ class ClientController extends Controller
             ->whereColumn('subscriptions.user_id', 'users.id')
             ->where('stripe_status', 'active');
 
+        // Content-funnel throwaway owners (is_system, email lead+…@leads.serfix.internal)
+        // are NOT clients — they own provisional onboarding sites and are GC'd. They
+        // used to make up ~60% of prod rows, drowning the real client list. Every
+        // count and the listing itself scope them out. `real` = the base client query.
+        $real = fn () => User::query()->where('is_system', false);
+
         $summary = [
-            'total' => User::query()->count(),
-            'admins' => User::query()->where('is_admin', true)->count(),
-            'disabled' => User::query()->where('is_disabled', true)->count(),
-            'new_7d' => User::query()->where('created_at', '>=', Carbon::now()->subDays(7))->count(),
+            'total' => $real()->count(),
+            'admins' => $real()->where('is_admin', true)->count(),
+            'disabled' => $real()->where('is_disabled', true)->count(),
+            'new_7d' => $real()->where('created_at', '>=', Carbon::now()->subDays(7))->count(),
             // Trial → paid: users holding an ACTIVE Stripe subscription (every
             // account starts as trial, so an active sub = a conversion). Uses
             // the Cashier subscriptions table, not current_plan_slug — comped
             // plans (admin force-apply) also set the slug and must not count.
-            'converted_paid' => User::query()->whereExists($activeSub)->count(),
+            'converted_paid' => $real()->whereExists($activeSub)->count(),
             // Trial users who added a card but haven't subscribed: Cashier
             // stamps pm_type/pm_last_four when a payment method is saved.
             // High-intent segment worth chasing.
-            'trial_with_card' => User::query()
+            'trial_with_card' => $real()
                 ->whereNotNull('pm_type')
                 ->whereNotExists($activeSub)
                 ->count(),
@@ -55,6 +61,7 @@ class ClientController extends Controller
         //     stays a single query as it grows. None of these are filterable
         //     (we only use them for display), so sub-selects are fine here. ─
         $clients = User::query()
+            ->where('is_system', false)
             ->select('users.*')
             ->selectSub(
                 fn ($q) => $q->from('websites')

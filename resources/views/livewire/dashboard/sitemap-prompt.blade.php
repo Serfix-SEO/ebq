@@ -11,9 +11,7 @@
                 </div>
             @else
                 <div class="flex items-start gap-3">
-                    <div class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" /></svg>
-                    </div>
+                    <x-nodus state="searching" :size="72" class="flex-none text-slate-400 dark:text-slate-500" />
                     <div class="min-w-0 flex-1">
                         <h3 class="text-sm font-semibold text-slate-900 dark:text-white">{{ __('Add a sitemap to start seeing your data') }}</h3>
                         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">

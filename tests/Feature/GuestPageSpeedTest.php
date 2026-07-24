@@ -172,4 +172,17 @@ class GuestPageSpeedTest extends TestCase
             ->assertSee('Largest Contentful Paint', false)
             ->assertSee('Start free', false);
     }
+
+    /** Security (2026-07-24): reCAPTCHA is now enforced server-side on submit. */
+    public function test_recaptcha_is_required_on_submit_when_enabled(): void
+    {
+        $this->actingAs(\App\Models\User::factory()->create());
+        config(['services.recaptcha.site_key' => 'sk', 'services.recaptcha.secret_key' => 'secret']);
+        Queue::fake();
+
+        $this->postJson(route('guest-pagespeed.store'), ['url' => 'a.com/p'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('g-recaptcha-response');
+        Queue::assertNothingPushed();
+    }
 }

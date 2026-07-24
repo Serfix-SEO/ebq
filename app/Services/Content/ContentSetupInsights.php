@@ -159,6 +159,7 @@ class ContentSetupInsights
             'authority' => null,
             'da' => $moz['domain_authority'],
             'pa' => $moz['page_authority'],
+            'rank' => $dfs['rank'] ?? null,
             'manual' => true,
         ];
     }
@@ -362,7 +363,7 @@ class ContentSetupInsights
      */
     private function dfsMetrics(string $domain, bool $sandbox = false): array
     {
-        $empty = ['referring_domains' => null, 'backlinks' => null];
+        $empty = ['referring_domains' => null, 'backlinks' => null, 'rank' => null];
 
         $host = $this->normalizeHost($domain);
         if ($host === '') {
@@ -373,11 +374,11 @@ class ContentSetupInsights
         $fresh = $existing?->dfs_refreshed_at !== null
             && $existing->dfs_refreshed_at->gt(now()->subDays(self::CACHE_TTL_DAYS));
         if ($fresh) {
-            return ['referring_domains' => $existing->dfs_referring_domains, 'backlinks' => $existing->dfs_backlinks];
+            return ['referring_domains' => $existing->dfs_referring_domains, 'backlinks' => $existing->dfs_backlinks, 'rank' => $existing->dfs_rank];
         }
 
         $stale = $existing !== null
-            ? ['referring_domains' => $existing->dfs_referring_domains, 'backlinks' => $existing->dfs_backlinks]
+            ? ['referring_domains' => $existing->dfs_referring_domains, 'backlinks' => $existing->dfs_backlinks, 'rank' => $existing->dfs_rank]
             : $empty;
 
         if (! $this->dfs->isConfigured() || (! $sandbox && $this->dfsSpend->exhausted())) {
@@ -390,9 +391,13 @@ class ContentSetupInsights
 
         $referring = isset($summary['referring_domains']) ? (int) $summary['referring_domains'] : null;
         $backlinks = isset($summary['backlinks']) ? (int) $summary['backlinks'] : null;
+        // DataForSEO domain rank (0-1000) — the authority fallback when the
+        // Moz free-tier row cap is exhausted (2026-07-23: a whole competitor
+        // table rendered DA/PA "—" mid-month).
+        $rank = isset($summary['rank']) && is_numeric($summary['rank']) ? (int) $summary['rank'] : null;
 
         if ($sandbox) {
-            return ['referring_domains' => $referring, 'backlinks' => $backlinks]; // mock data — never cached/billed
+            return ['referring_domains' => $referring, 'backlinks' => $backlinks, 'rank' => $rank]; // mock data — never cached/billed
         }
 
         $this->dfsSpend->add($this->dfs->totalCost());
@@ -404,13 +409,14 @@ class ContentSetupInsights
             [
                 'dfs_referring_domains' => $referring,
                 'dfs_backlinks' => $backlinks,
+                'dfs_rank' => $rank,
                 'dfs_refreshed_at' => now(),
                 'last_seen_at' => now(),
                 'first_seen_at' => $existing?->first_seen_at ?? now(),
             ]
         );
 
-        return ['referring_domains' => $referring, 'backlinks' => $backlinks];
+        return ['referring_domains' => $referring, 'backlinks' => $backlinks, 'rank' => $rank];
     }
 
     /**
@@ -533,13 +539,21 @@ class ContentSetupInsights
         // (no wasted spend).
         $fresh = $myReferring < 1;
 
+        // The CLIENT's own Moz DA too (one row per site per 30d): the peer
+        // banding (withPeerClasses) prefers DA-vs-DA when both sides are
+        // known — without this, the client side stayed null and banding fell
+        // back to the referring-domains ratio even with full competitor DA.
+        if (! $fresh) {
+            $this->mozMetrics($domain);
+        }
+
         $competitors = [];
         foreach ($competitorRows as $c) {
             $cd = trim((string) ($c['domain'] ?? ''));
             if ($cd === '' || $cd === $domain) {
                 continue;
             }
-            $dfs = $fresh ? ['referring_domains' => null, 'backlinks' => null] : $this->dfsMetrics($cd, $sandbox);
+            $dfs = $fresh ? ['referring_domains' => null, 'backlinks' => null, 'rank' => null] : $this->dfsMetrics($cd, $sandbox);
             $moz = $fresh ? ['domain_authority' => null, 'page_authority' => null] : $this->mozMetrics($cd);
             $competitors[] = [
                 'domain' => $cd,
@@ -548,6 +562,7 @@ class ContentSetupInsights
                 'authority' => isset($c['cs']) ? (int) $c['cs'] : null,
                 'da' => $moz['domain_authority'],
                 'pa' => $moz['page_authority'],
+                'rank' => $dfs['rank'] ?? null,
             ];
         }
 

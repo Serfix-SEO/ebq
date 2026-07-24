@@ -235,3 +235,49 @@ per page) rather than eyeballing screenshots.
   `app/Livewire/{Keywords,Competitive,Pages}/*`
 - Assets — `vite.config.js`, `resources/css/app.css`, `resources/js/{app,bootstrap,marketing}.js`
 - Build output — `public/build/` (manifest)
+
+## Nodus — the mascot design system (site-wide since 2026-07-23)
+
+**Nodus** is the Serfix Content-Autopilot mascot: a glowing signal core with two
+"search point" eyes and nodes orbiting an asymmetric tilted halo. It fronts
+loading / empty / error / success states across the whole app (started in the
+content-onboarding wizard, then rolled out site-wide).
+
+- **Primitive** — `resources/views/components/nodus.blade.php` → `<x-nodus state=… :size=… class=…/>`.
+  Self-contained inline SVG (needs NOTHING from the compiled Tailwind bundle — dodges
+  the prebuilt-class landmine). States drive **motion + light, never face swaps**:
+  `idle | searching | analyzing | success | confused`. The `text-*` class sets the halo
+  ring color (`stroke: currentColor`); eyes auto-hide below 40px. Brand hex exact
+  `#F26419 / #C44E0E` + one soft-blue accent node. `prefers-reduced-motion` → static pose.
+- **Composed wrappers** (`resources/views/components/nodus/`):
+  - `<x-nodus.state state=… :title=… :message=… :size=… bordered tone="neutral|brand"/>` —
+    the standard centered panel (loading/empty/success/error card). Pass-through attributes
+    let callers add `wire:poll`/`wire:loading`/`wire:target`. Default slot = action buttons.
+  - `<x-nodus.inline state=… tone=…>{{ text }}</x-nodus.inline>` — compact mascot+text chip
+    for inline "working…" rows.
+- **Auto-inherited** — the two shared blocks now front Nodus with their prop contracts
+  UNCHANGED, so every consumer inherited the mascot with zero per-file edits:
+  `components/insights/empty-state.blade.php` (was a warning triangle → `confused`) and
+  `components/overview/processing-panel.blade.php` (was an amber spinner → `analyzing`).
+- **Error pages** — `resources/views/errors/{404,419,429,500,503}.blade.php` +
+  `components/errors/shell.blade.php`. The shell is a STANDALONE html doc (does NOT use
+  `x-layouts.app`) so a 500 renders even when the app shell is failing; it inlines the CSS
+  via `@vite` and the mascot SVG shows even if the stylesheet fails. States: 404/500/419 =
+  `confused`, 429 = `analyzing`, 503 = `searching`.
+- **Auth + public heroes** — Nodus hero in the shared guest layout
+  (`components/layouts/guest.blade.php` → login/register/verify-email) and a centered
+  `searching` mascot above the H1 on the public marketing heroes (`landing.blade.php`,
+  `content-landing.blade.php`). Marketing pages are LIGHT-ONLY (`x-marketing.page` shell
+  has no `dark` class), so the mascot's `dark:` classes are inert there — harmless, the
+  base slate tone applies.
+- **Landmine (dark mode)** — the app uses **class-based dark mode**, and the prebuilt bundle
+  only carried the `dark:text-orange-*` variants that existing blades already used. Adding
+  new `dark:text-orange-{400,500,800}` usages means you MUST rebuild the bundle
+  (`npm run build`) or the dark shade silently falls back to the light base. Every mascot
+  ships a compiled base orange as a fallback, so it never renders invisible — but the dark
+  shade is wrong until rebuilt. See project memory `prebuilt-tailwind-classes`.
+- **Tests** — `tests/Feature/NodusUiTest.php` (error pages render + carry the mascot with the
+  right state; composed + shared components render).
+- **QA recipe** — static render + inline the built CSS + headless-Chrome screenshot (light &
+  dark), same recipe as the mobile-nav fix. Script pair in scratchpad: `render-nodus-qa.php`
+  + `shoot-nodus.js`.

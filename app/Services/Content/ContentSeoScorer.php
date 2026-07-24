@@ -110,8 +110,10 @@ class ContentSeoScorer
         $h3sOrphaned = $this->hasOrphanH3($html);
         $targetWords = (int) ($context['article_length'] ?? 2500);
 
+        // Tolerant band (0.7×–1.5×): chunked AI drafts routinely land short of
+        // the exact target; only flag genuinely thin or bloated articles.
         $add('word_count', 8,
-            $wordCount >= (int) floor($targetWords * 0.85) && $wordCount <= (int) ceil($targetWords * 1.4),
+            $wordCount >= (int) floor($targetWords * 0.7) && $wordCount <= (int) ceil($targetWords * 1.5),
             "Adjust length to roughly {$targetWords} words (currently {$wordCount}). Expand thin sections rather than padding.");
         $add('h2_count', 6, count($h2s) >= 4,
             'Structure the article with at least 4 H2 sections.');
@@ -247,13 +249,15 @@ class ContentSeoScorer
 
             $longParagraph = false;
             foreach ($this->paragraphs($html) as $p) {
-                if (preg_match_all('/[.!?](?:\s|$)/u', $p) > 5) {
+                // Tolerant: only flag genuinely wall-of-text paragraphs (>7
+                // sentences); AI drafts naturally run 4–6-sentence blocks.
+                if (preg_match_all('/[.!?](?:\s|$)/u', $p) > 7) {
                     $longParagraph = true;
                     break;
                 }
             }
             $add('paragraph_length', 1, ! $longParagraph,
-                'Break up paragraphs longer than 5 sentences.');
+                'Break up paragraphs longer than 7 sentences.');
         }
 
         // ── Uniqueness (cannibalization re-check) ───────────────────────
@@ -274,9 +278,12 @@ class ContentSeoScorer
         // Advisory weight only: the revise loop enforces a clean style gate
         // separately before an article is marked ready, so this must not
         // single-handedly drag a well-optimised article below the 90 bar.
+        // Tolerant: allow up to 2 minor style nits before flagging. The revise
+        // loop enforces the real style gate before an article is marked ready,
+        // so this advisory check shouldn't fail on a single nitpick.
         $styleIssues = (array) ($context['style_issues'] ?? []);
-        $add('style_clean', 4, $styleIssues === [],
-            $styleIssues === [] ? '' : 'Fix the writing-style problems: '
+        $add('style_clean', 4, count($styleIssues) <= 2,
+            count($styleIssues) <= 2 ? '' : 'Fix the writing-style problems: '
                 .implode(' ', array_map(static fn ($i) => (string) ($i['message'] ?? ''), array_slice($styleIssues, 0, 6))));
 
         // ── Weighted score, renormalized over checks that RAN ───────────

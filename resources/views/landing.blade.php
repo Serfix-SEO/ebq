@@ -52,17 +52,18 @@
     <section class="relative">
         <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(ellipse_at_top,rgba(242,100,25,0.08),transparent_60%)]"></div>
 
-        <div class="mx-auto max-w-4xl px-6 pb-20 pt-16 text-center lg:px-8 lg:pb-28 lg:pt-24">
+        <div class="mx-auto max-w-4xl px-6 pb-16 pt-5 text-center lg:px-8 lg:pb-24">
+            <x-nodus state="searching" :size="120" class="mx-auto mb-2 h-[88px] w-[88px] text-slate-400 sm:h-[120px] sm:w-[120px]"/>
             <h1 class="mx-auto max-w-3xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
                 {{ __('The SEO command center for teams that ship.') }}
             </h1>
 
-            <p class="mx-auto mt-6 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
+            <p class="mx-auto mt-3 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
                 {{ __('Unify Search Console, Analytics, ranking, audits, and backlinks into one quiet workspace. Serfix tells you what to fix this week, what to ship next, and what changed after release.') }}
             </p>
 
             {{-- ── Free tools ── --}}
-            <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <div class="mt-2 flex flex-wrap items-center justify-center gap-2">
                 <span class="text-xs font-semibold text-slate-500">{{ __('Free tools:') }}</span>
                 <a href="{{ route('tools.pagespeed') }}" class="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-sm transition hover:border-orange-400 hover:bg-orange-100 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">
                     <svg class="h-3.5 w-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
@@ -87,7 +88,7 @@
             </div>
 
             {{-- ── Hero: free instant audit (full-width search bar) ── --}}
-            <div class="relative mx-auto mt-10 max-w-3xl">
+            <div class="relative mx-auto mt-4 max-w-3xl">
                 <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -inset-y-10 sm:-inset-x-8 -z-10 bg-[radial-gradient(55%_60%_at_50%_0%,rgba(242,100,25,0.20),transparent_70%)] blur-2xl"></div>
 
                 @include('partials.analyze-hero')

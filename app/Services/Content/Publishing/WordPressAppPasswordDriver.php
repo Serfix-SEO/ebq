@@ -148,7 +148,7 @@ class WordPressAppPasswordDriver implements PublishDriver
      * show_in_rest), keyed off the article + its topic. Empty when the plugin
      * isn't detected on the target site.
      *
-     * @return array<string, string>
+     * @return array<string, string|bool>
      */
     private function seoMeta(ContentArticle $article, ContentIntegration $integration, ?string $base): array
     {
@@ -166,8 +166,30 @@ class WordPressAppPasswordDriver implements PublishDriver
         $meta = array_filter([
             '_ebq_title' => (string) ($article->meta_title ?? ''),
             '_ebq_description' => (string) ($article->meta_description ?? ''),
-            '_ebq_focus_keyword' => (string) ($topic?->target_keyword ?? ''),
+            // Per-article focus-keyphrase override wins over the topic default.
+            '_ebq_focus_keyword' => (string) ($article->focus_keyword ?: ($topic?->target_keyword ?? '')),
+            // Editor-set per-article SEO overrides — same meta keys the plugin's
+            // post-edit sidebar writes (Ebq_Seo_Fields_Meta_Box::FIELDS).
+            '_ebq_canonical' => (string) ($article->canonical_url ?? ''),
+            '_ebq_og_title' => (string) ($article->og_title ?? ''),
+            '_ebq_og_description' => (string) ($article->og_description ?? ''),
+            '_ebq_og_image' => (string) ($article->og_image ?? ''),
+            '_ebq_twitter_title' => (string) ($article->twitter_title ?? ''),
+            '_ebq_twitter_description' => (string) ($article->twitter_description ?? ''),
+            '_ebq_twitter_image' => (string) ($article->twitter_image ?? ''),
+            '_ebq_twitter_card' => (string) ($article->twitter_card ?? ''),
         ], static fn (string $v): bool => $v !== '');
+
+        // Robots flags are registered as BOOLEAN REST meta in the plugin
+        // (Ebq_Meta_Fields: rest_sanitize_boolean) — send real booleans. Only
+        // when the toggle is on, so we never clobber a manual WP-side setting
+        // with a default-off value.
+        if ($article->robots_noindex) {
+            $meta['_ebq_robots_noindex'] = true;
+        }
+        if ($article->robots_nofollow) {
+            $meta['_ebq_robots_nofollow'] = true;
+        }
 
         $secondary = array_values(array_filter(array_map(
             static fn ($k): string => trim((string) $k),

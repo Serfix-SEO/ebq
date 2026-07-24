@@ -91,7 +91,7 @@
     {{-- In-flight --}}
     @if ($this->isPolling())
         <div class="mt-4 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-medium text-amber-800">
-            <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            <x-nodus state="analyzing" :size="40" class="shrink-0 text-orange-400 dark:text-orange-500" />
             {{ __('Working on it — keyword ideas are being generated') }} ({{ $status }}). {{ __('This page will update automatically.') }}
         </div>
     @endif
@@ -330,7 +330,10 @@
                                 </table>
                             </div>
                         @empty
-                            <div class="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">{{ __('No keywords match your filters.') }}</div>
+                            <div class="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">
+                                <x-nodus state="confused" :size="56" class="mx-auto mb-2 text-slate-400 dark:text-slate-500" />
+                                {{ __('No keywords match your filters.') }}
+                            </div>
                         @endforelse
                     </div>
                 @else
@@ -364,7 +367,10 @@
                                     @forelse ($rows as $row)
                                         @include('livewire.keywords.partials.idea-row', ['row' => $row, 'compPill' => $compPill, 'intentPill' => $intentPill, 'selected' => $selected, 'withCheckbox' => true, 'hasGsc' => $hasGsc, 'gscMetrics' => $gscMetrics])
                                     @empty
-                                        <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-slate-500">{{ __('No keywords match your filters.') }}</td></tr>
+                                        <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-slate-500">
+                                            <x-nodus state="confused" :size="56" class="mx-auto mb-2 text-slate-400 dark:text-slate-500" />
+                                            {{ __('No keywords match your filters.') }}
+                                        </td></tr>
                                     @endforelse
                                 </tbody>
                             </table>
@@ -394,6 +400,7 @@
         </div>
     @elseif ($hasRun && ! $this->isPolling() && ! $errorMessage)
         <div class="mt-4 rounded-md border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">
+            <x-nodus state="confused" :size="72" class="mx-auto mb-3 text-slate-400 dark:text-slate-500" />
             {{ __('No keyword ideas were returned. Try different seeds or a different URL.') }}
         </div>
     @endif

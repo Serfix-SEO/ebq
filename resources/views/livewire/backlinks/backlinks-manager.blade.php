@@ -1,7 +1,7 @@
 <div>
     @if (! $canAccessWebsite)
         <div class="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 dark:border-slate-800 dark:bg-slate-900">
-            <svg class="h-12 w-12 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3" /></svg>
+            <x-nodus state="searching" :size="72" class="text-slate-400 dark:text-slate-500" />
             <p class="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('Select a website from the header') }}</p>
             <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">{{ __('Add a website under Websites if you have not yet.') }}</p>
         </div>
@@ -430,7 +430,7 @@
                 <div class="mt-3">{{ $rows->links() }}</div>
             @else
                 <div class="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 dark:border-slate-800 dark:bg-slate-900">
-                    <svg class="h-12 w-12 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+                    <x-nodus state="confused" :size="72" class="text-slate-400 dark:text-slate-500" />
                     <p class="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('No backlinks yet') }}</p>
                     <p class="mt-1 text-center text-xs text-slate-400 dark:text-slate-500">{{ __('Use the form above or open a sheet for a date to add entries.') }}</p>
                 </div>

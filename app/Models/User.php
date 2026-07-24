@@ -277,6 +277,12 @@ class User extends Authenticatable implements MustVerifyEmail
             }
 
             foreach (TeamPermissions::FEATURES as $key => $meta) {
+                // Globally-disabled areas (e.g. AI Studio beta) must never be a
+                // landing route — their routes 404 via feature.enabled, which
+                // would trap a redirected user in a loop.
+                if ($key === 'ai_studio' && ! config('features.ai_studio')) {
+                    continue;
+                }
                 if ($this->hasFeatureAccess($key, $websiteId)) {
                     return $meta['route'];
                 }

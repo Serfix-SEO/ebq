@@ -498,10 +498,13 @@ class ContentCalendar extends Component
         $this->wizardStep = 5;
     }
 
-    /** Persist the image enable/style choice to the draft plan immediately. */
-    public function toggleImages(): void
+    /**
+     * Persist the image enable/style choice to the draft plan immediately.
+     * $value: explicit target state from the optimistic UI; null = plain flip.
+     */
+    public function toggleImages(?bool $value = null): void
     {
-        $this->imagesEnabled = ! $this->imagesEnabled;
+        $this->imagesEnabled = $value ?? ! $this->imagesEnabled;
         $this->persistImageSettings();
     }
 
@@ -530,12 +533,12 @@ class ContentCalendar extends Component
      * exists by step 3, so the change survives without waiting for a later
      * step. Future articles pick it up; already-written ones are unchanged.
      */
-    public function toggleStructure(string $key): void
+    public function toggleStructure(string $key, ?bool $value = null): void
     {
         if (! array_key_exists($key, $this->structureToggles)) {
             return;
         }
-        $this->structureToggles[$key] = ! $this->structureToggles[$key];
+        $this->structureToggles[$key] = $value ?? ! $this->structureToggles[$key];
 
         $plan = $this->plan();
         if ($plan !== null) {
@@ -790,16 +793,20 @@ class ContentCalendar extends Component
     /** Keywords the client crossed out on the "best search terms" card. */
     public array $removedTerms = [];
 
-    /** Cross out / restore a best-search-term pick (step 6). */
-    public function toggleTerm(string $keyword): void
+    /**
+     * Cross out / restore a best-search-term pick (step 6).
+     * $removed: explicit target state from the optimistic UI; null = plain flip.
+     */
+    public function toggleTerm(string $keyword, ?bool $removed = null): void
     {
         $keyword = mb_strtolower(trim($keyword));
         if ($keyword === '') {
             return;
         }
-        $this->removedTerms = in_array($keyword, $this->removedTerms, true)
-            ? array_values(array_diff($this->removedTerms, [$keyword]))
-            : array_merge($this->removedTerms, [$keyword]);
+        $removed ??= ! in_array($keyword, $this->removedTerms, true);
+        $this->removedTerms = $removed
+            ? array_values(array_unique(array_merge($this->removedTerms, [$keyword])))
+            : array_values(array_diff($this->removedTerms, [$keyword]));
     }
 
     public function toFirstArticles(): void
@@ -1408,7 +1415,10 @@ class ContentCalendar extends Component
 
     public function render()
     {
-        $plan = $this->activePlan();
+        // One plan fetch per render — the wizard branch below used to re-query
+        // plan()/website() up to 4× per Livewire round-trip (every click).
+        $anyPlan = $this->plan();
+        $plan = ($anyPlan !== null && $anyPlan->status !== ContentPlan::STATUS_DRAFT) ? $anyPlan : null;
         // Post-onboarding (plan is no longer a draft) the Settings page becomes
         // a real SETTINGS layout — profile/offerings/structure/cadence only —
         // skipping the onboarding-only steps (how-it-works, competitors,
@@ -1433,27 +1443,27 @@ class ContentCalendar extends Component
         // ── Wizard data ──
         $wizard = [];
         if ($inWizard) {
+            $site = $this->website();
             $insights = null;
             $generating = false;
             $needsReportGen = false;
             $hasOverrides = false;
-            if ($this->wizardStep === 5 && ($w = $this->website()) !== null) {
+            if ($this->wizardStep === 5 && $site !== null) {
                 $svc = app(ContentSetupInsights::class);
-                $rawInsights = $svc->competitorAuthority($w);
+                $rawInsights = $svc->competitorAuthority($site);
                 $needsReportGen = $rawInsights === null;
-                $plan4 = $this->plan();
-                $insights = $plan4 !== null ? $svc->withOverrides($rawInsights, $plan4) : $rawInsights;
-                $generating = $needsReportGen && $insights === null && $svc->isGenerating($w);
-                $overrides = (array) ($plan4?->competitor_overrides ?? []);
+                $insights = $anyPlan !== null ? $svc->withOverrides($rawInsights, $anyPlan) : $rawInsights;
+                $generating = $needsReportGen && $insights === null && $svc->isGenerating($site);
+                $overrides = (array) ($anyPlan?->competitor_overrides ?? []);
                 $hasOverrides = ! empty($overrides['added']) || ! empty($overrides['removed']);
             }
             $keywords = null;
             $keywordStatus = [];
-            if ($this->wizardStep === 6 && ($plan5 = $this->plan()) !== null) {
+            if ($this->wizardStep === 6 && $anyPlan !== null) {
                 $kwSvc = app(ContentKeywordInsights::class);
-                $keywords = $kwSvc->get($plan5);
+                $keywords = $kwSvc->get($anyPlan);
                 if ($keywords === null) {
-                    $keywordStatus = $kwSvc->researchStatus($plan5);
+                    $keywordStatus = $kwSvc->researchStatus($anyPlan);
                 }
             }
             // Competitor-mention guard card state — shown on the keyword-research
@@ -1463,8 +1473,8 @@ class ContentCalendar extends Component
             // and nothing guaranteed a job had ever been queued for the current
             // state, so the card could poll forever with nothing to find
             // (prod 2026-07-22).
-            $guardState = $this->wizardStep === 6 && ($plan4g = $this->plan()) !== null
-                ? $this->guardState($plan4g)
+            $guardState = $this->wizardStep === 6 && $anyPlan !== null
+                ? $this->guardState($anyPlan)
                 : null;
 
             $wizard = [
@@ -1476,7 +1486,7 @@ class ContentCalendar extends Component
                 'hasOverrides' => $hasOverrides,
                 'keywords' => $keywords,
                 'keywordStatus' => $keywordStatus,
-                'hasWebsite' => $this->website() !== null,
+                'hasWebsite' => $site !== null,
             ];
 
             return view('livewire.content.content-calendar', [
@@ -1529,7 +1539,10 @@ class ContentCalendar extends Component
             // the visible month) so the four cards always sum to the dots on the
             // grid — using $all (every month) made "Planned" not match the month.
             'stats' => $this->overviewStats($topics),
-            'audience' => $this->audienceSearches($all),
+            // 'audienceSearches', NOT 'audience' — the public string $audience
+            // (wizard step-1 field) wins Livewire's view-data merge and would
+            // shadow this array (foreach-on-string 500, prod 2026-07-23).
+            'audienceSearches' => $this->audienceSearches($all),
             'clusters' => $this->strategyClusters($all),
             'publishConnected' => $this->hasPublishDestination(),
             'hasInFlight' => $topics->contains(fn ($t) => in_array($t->status, ContentTopic::IN_FLIGHT, true)),
@@ -1583,7 +1596,7 @@ class ContentCalendar extends Component
             'monthStart' => Carbon::createFromFormat('Y-m', $this->month)->startOfMonth(),
             'hasWebsite' => $this->website() !== null,
             'stats' => [],
-            'audience' => [],
+            'audienceSearches' => [],
             'clusters' => [],
             'publishConnected' => false,
             'hasInFlight' => false,

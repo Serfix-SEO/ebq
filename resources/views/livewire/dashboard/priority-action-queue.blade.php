@@ -50,7 +50,7 @@
                  above already shows progress; poll so this section catches up
                  the moment the crawl finishes without a manual refresh. --}}
             <div wire:poll.15s class="mt-6 rounded-lg border border-dashed border-amber-200 bg-amber-50/40 px-4 py-10 text-center dark:border-amber-500/30 dark:bg-amber-500/5">
-                <div class="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-amber-200 border-t-amber-500 dark:border-amber-500/30 dark:border-t-amber-400"></div>
+                <x-nodus state="analyzing" :size="72" class="mx-auto mb-2 text-orange-400 dark:text-orange-500" />
                 <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Crawl in progress') }}</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Crawl-derived issues (broken links, on-page problems, orphan pages) will appear here once your first crawl finishes.') }}</p>
             </div>
@@ -59,12 +59,13 @@
                  Poll quickly so this self-corrects the moment they land,
                  instead of asserting "all caught up" with zero evidence yet. --}}
             <div wire:poll.5s class="mt-6 rounded-lg border border-dashed border-amber-200 bg-amber-50/40 px-4 py-10 text-center dark:border-amber-500/30 dark:bg-amber-500/5">
-                <div class="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-amber-200 border-t-amber-500 dark:border-amber-500/30 dark:border-t-amber-400"></div>
+                <x-nodus state="analyzing" :size="72" class="mx-auto mb-2 text-orange-400 dark:text-orange-500" />
                 <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Still finalizing your results') }}</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Your crawl just finished — we’re scoring pages and checking for issues. This updates automatically.') }}</p>
             </div>
         @elseif (count($items) === 0)
             <div class="mt-6 rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center dark:border-slate-700">
+                <x-nodus state="success" :size="72" class="mx-auto mb-3 text-orange-400 dark:text-orange-500" />
                 <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ __("You're all caught up") }}</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('No priority actions right now. We re-check your data every day.') }}</p>
             </div>

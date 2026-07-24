@@ -155,6 +155,65 @@ class CompetitorMentionGuard
             && ! empty((($plan->competitor_guard ?? [])['auto_enabled_at'] ?? null));
     }
 
+    /**
+     * True when the assessment ran against an EMPTY competitor list (raced
+     * ahead of SERP discovery, 2026-07-23 carmenperfumes incident: guard sat
+     * silently off with zero entities while 15 real rivals waited in the
+     * SERP cache). Such an assessment must not block re-assessment once
+     * competitors exist.
+     */
+    public function assessedEmpty(ContentPlan $plan): bool
+    {
+        $g = (array) ($plan->competitor_guard ?? []);
+
+        return ! empty($g['assessed_at'])
+            && (array) ($g['auto'] ?? []) === []
+            && (array) ($g['references'] ?? []) === []
+            && (array) ($g['entities'] ?? []) === [];
+    }
+
+    /**
+     * True when the competitor list has CHANGED since the assessment ran —
+     * the 30-day SERP re-discovery can swap the list wholesale
+     * (carmenperfumes 2026-07-23 #2: a fresh discovery replaced subdomain
+     * variants with root domains; blocked brands and entities still
+     * described the old list). Stale ⇒ re-assess. Cheap: one cache read +
+     * normalization, no API calls.
+     */
+    public function assessmentStale(ContentPlan $plan): bool
+    {
+        $g = (array) ($plan->competitor_guard ?? []);
+        if (empty($g['assessed_at'])) {
+            return false; // not assessed at all — that's "unassessed", not "stale"
+        }
+        // Pre-signature assessments (before 2026-07-23 #2) count as stale
+        // once, so they self-heal on the next trigger.
+        $stored = $g['assessed_domains'] ?? null;
+        if (! is_string($stored)) {
+            return true;
+        }
+
+        try {
+            $current = self::domainsSignature(array_column($this->competitorDomains($plan), 'domain'));
+        } catch (\Throwable) {
+            return false; // can't compute → don't churn
+        }
+
+        return $current !== $stored;
+    }
+
+    /** Order-insensitive signature of a normalized domain list. */
+    private static function domainsSignature(array $domains): string
+    {
+        $domains = array_values(array_unique(array_map(
+            static fn ($d) => strtolower(preg_replace('/^www\./', '', trim((string) $d))),
+            $domains
+        )));
+        sort($domains);
+
+        return md5(implode('|', $domains));
+    }
+
     /** Wipe the assessment so the next produce()/assess re-classifies. */
     public function invalidate(ContentPlan $plan): void
     {
@@ -507,6 +566,7 @@ class CompetitorMentionGuard
                 'reason' => '',
                 'auto' => [],
                 'references' => [],
+                'assessed_domains' => self::domainsSignature([]),
             ]);
             $plan->update(['competitor_guard' => $guard]);
 
@@ -522,6 +582,7 @@ class CompetitorMentionGuard
             'auto' => $verdict['blocked'],
             'references' => $verdict['references'],
             'entities' => (array) ($verdict['entities'] ?? []),
+            'assessed_domains' => self::domainsSignature(array_column($entries, 'domain')),
         ]);
         // Auto-enable only while the client has never decided; stamp the
         // marker that drives the "we turned this on for you" banner. Modes

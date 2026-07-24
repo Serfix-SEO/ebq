@@ -124,8 +124,9 @@ abstract class OpenAiCompatibleClient implements LlmClient
         // `__unmetered`: skip the per-user dashboard token CAP (the caller
         // enforces its own limits, e.g. Content Autopilot's spend/article caps).
         // The user is still resolved so actual spend is logged/attributed below.
+        $unmetered = (bool) ($options['__unmetered'] ?? false);
         $billedUser = $this->resolveBilledUser($options);
-        if ($billedUser !== null && ! ($options['__unmetered'] ?? false)) {
+        if ($billedUser !== null && ! $unmetered) {
             $estimated = $this->estimateTokens($messages, (int) ($body['max_tokens'] ?? 2048));
             app(UsageMeter::class)->assertCanSpend($billedUser, $provider, $estimated);
         }
@@ -183,11 +184,22 @@ abstract class OpenAiCompatibleClient implements LlmClient
             if ($source !== null && $source !== '') {
                 $meta['source'] = $source;
             }
+            // Attribute UNMETERED spend (Content Autopilot & other callers that
+            // carry their OWN caps — see __unmetered above) under a distinct
+            // provider label OUTSIDE the 'mistral'/'deepseek' pool. This keeps
+            // it fully isolated from the per-user DASHBOARD token quota on two
+            // fronts: (1) UsageMeter::consumedInWindow() filters `whereIn(pool)`,
+            // so a `:unmetered` row is never summed against the dashboard cap
+            // that gates the AI Writer / block editor; (2) the release() call in
+            // ClientActivityLogger::log() targets a dead reservation key instead
+            // of corrupting an in-flight dashboard reservation (unmetered calls
+            // never reserve()). Real model/provider stay in meta for telemetry.
+            $logProvider = $unmetered ? $provider.':unmetered' : $provider;
             app(ClientActivityLogger::class)->log(
                 'api_usage.'.$provider,
                 userId: $billedUser->id,
                 websiteId: isset($options['__website_id']) ? (string) $options['__website_id'] : null,
-                provider: $provider,
+                provider: $logProvider,
                 meta: $meta,
                 unitsConsumed: $totalTokens,
             );

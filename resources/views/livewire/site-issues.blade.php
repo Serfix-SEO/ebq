@@ -188,6 +188,7 @@
                     </li>
                 @empty
                     <li class="px-5 py-12 text-center">
+                        <x-nodus state="success" :size="60" class="mx-auto mb-2 text-slate-400 dark:text-slate-500"/>
                         <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Nothing to show') }}</p>
                         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('No issues match your filters.') }}</p>
                     </li>

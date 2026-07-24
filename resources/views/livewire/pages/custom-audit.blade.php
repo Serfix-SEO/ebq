@@ -199,7 +199,7 @@
 
         @if ($hasPending)
             <div class="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50/70 px-4 py-3 text-sm shadow-sm dark:border-orange-900/50 dark:bg-orange-500/10" role="status" aria-live="polite">
-                <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-orange-600 dark:text-orange-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <x-nodus state="analyzing" :size="40" class="mt-0.5 shrink-0 text-orange-400 dark:text-orange-500" />
                 <div class="min-w-0 text-xs leading-relaxed text-orange-900 dark:text-orange-200">
                     <p class="font-semibold">{{ __('Audits are running in the background.') }}</p>
                     <p class="mt-0.5 text-orange-800/90 dark:text-orange-200/80">{{ __('The list updates itself every few seconds. You can close this tab and come back — rows stay here with their final status.') }}</p>
@@ -323,9 +323,7 @@
                 </div>
             @else
                 <div class="flex flex-col items-center justify-center px-6 py-14 text-center">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                        <svg class="h-6 w-6 text-slate-400 dark:text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.25" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                    </div>
+                    <x-nodus state="searching" :size="72" class="text-slate-400 dark:text-slate-500" />
                     <p class="mt-4 text-sm font-medium text-slate-600 dark:text-slate-300">{{ __('No custom audits yet') }}</p>
                     <p class="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">{{ __('Submit the form above to log runs here. Completed audits open in a full report.') }}</p>
                 </div>

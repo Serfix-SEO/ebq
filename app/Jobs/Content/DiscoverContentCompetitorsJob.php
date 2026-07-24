@@ -75,6 +75,20 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
 
             if ($competitors !== []) {
                 Cache::put('content:serp-competitors:'.$this->websiteId, $competitors, now()->addDays(30));
+
+                // The guard may have assessed BEFORE these competitors landed
+                // (empty list → silently off, zero entities — the
+                // carmenperfumes race, 2026-07-23). Real competitors now
+                // exist: force a real assessment.
+                try {
+                    $guard = app(\App\Services\Content\CompetitorMentionGuard::class);
+                    if ($plan !== null && ($guard->assessedEmpty($plan) || $guard->assessmentStale($plan))) {
+                        $guard->invalidate($plan);
+                        \App\Jobs\AssessCompetitorGuardJob::dispatch($plan->id);
+                    }
+                } catch (\Throwable) {
+                    // belt-and-braces reassess also lives in PrepareContentKeywordInsightsJob
+                }
             }
         } catch (\Throwable) {
             // Fail soft — the step falls back to its empty state.

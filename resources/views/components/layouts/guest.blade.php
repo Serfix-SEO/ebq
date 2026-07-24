@@ -25,6 +25,7 @@
             </a>
 
             <div class="max-w-md">
+                <x-nodus state="idle" :size="72" class="mb-6 text-slate-400 dark:text-slate-500"/>
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('SEO command center') }}</p>
                 <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
                     {{ __('The clearest way to run SEO across every site you own.') }}

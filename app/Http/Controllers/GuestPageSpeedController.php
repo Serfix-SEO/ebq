@@ -36,6 +36,16 @@ class GuestPageSpeedController extends Controller
             ], 202);
         }
 
+        // Verify the reCAPTCHA the page renders + posts. Behind the account
+        // wall (guests short-circuit above), but validated on the real submit —
+        // the widget used to be ignored server-side.
+        if (Recaptcha::isEnabled()) {
+            $request->validate(
+                ['g-recaptcha-response' => ['required', 'string', new ValidRecaptcha]],
+                ['g-recaptcha-response.required' => 'Please complete the reCAPTCHA below to continue.'],
+            );
+        }
+
         $ip = (string) $request->ip();
 
         $minuteKey = 'guest-pagespeed:m:'.$ip;

@@ -140,6 +140,68 @@ class ContentPeerClassesTest extends TestCase
         $this->assertSame('aspirational', $out['competitors'][0]['class']);
     }
 
+    public function test_empty_assessment_is_detected_and_rerun_when_competitors_land(): void
+    {
+        [$website, $plan] = $this->planWithSite();
+        $guard = app(\App\Services\Content\CompetitorMentionGuard::class);
+
+        // Assessment raced ahead of SERP discovery → assessed against nothing.
+        $guard->assess($plan);
+        $plan->refresh();
+        $this->assertTrue($guard->assessed($plan));
+        $this->assertTrue($guard->assessedEmpty($plan));
+
+        // Competitors land → DiscoverContentCompetitorsJob invalidates + redispatches.
+        \Illuminate\Support\Facades\Queue::fake();
+        \Illuminate\Support\Facades\Cache::put('content:serp-competitors:'.$website->id,
+            [['domain' => 'rival.com']], now()->addDay());
+        // Simulate the job's post-cache hook directly (the job itself needs live SERP calls).
+        if ($guard->assessedEmpty($plan->fresh())) {
+            $guard->invalidate($plan->fresh());
+            \App\Jobs\AssessCompetitorGuardJob::dispatch($plan->id);
+        }
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\AssessCompetitorGuardJob::class);
+
+        // Re-assessment with the real list (no LLM → fail-soft) is no longer empty.
+        $plan = $plan->fresh();
+        $this->assertFalse($guard->assessed($plan));
+        $guard->assess($plan);
+        $this->assertFalse($guard->assessedEmpty($plan->fresh()));
+    }
+
+    public function test_assessment_goes_stale_when_the_competitor_list_changes(): void
+    {
+        [$website, $plan] = $this->planWithSite();
+        $guard = app(\App\Services\Content\CompetitorMentionGuard::class);
+
+        \Illuminate\Support\Facades\Cache::put('content:serp-competitors:'.$website->id,
+            [['domain' => 'rival-a.com']], now()->addDay());
+        $guard->assess($plan->fresh());
+        $this->assertFalse($guard->assessmentStale($plan->fresh()), 'fresh assessment matches its list');
+
+        // 30-day re-discovery swaps the list wholesale (the job also forgets
+        // the setup-insights cache — mirror that, or the old build is read).
+        \Illuminate\Support\Facades\Cache::put('content:serp-competitors:'.$website->id,
+            [['domain' => 'rival-b.com'], ['domain' => 'rival-c.com']], now()->addDay());
+        app(ContentSetupInsights::class)->forget($website);
+        $this->assertTrue($guard->assessmentStale($plan->fresh()), 'swapped list must read as stale');
+
+        // Re-assessing against the new list clears staleness.
+        $guard->assess($plan->fresh());
+        $this->assertFalse($guard->assessmentStale($plan->fresh()));
+    }
+
+    public function test_cold_metrics_scale_rule_demotes_huge_refs_without_da(): void
+    {
+        // noon.com case: DA not fetched yet, 8,829 refs vs a 21-ref client.
+        $this->assertTrue(\App\Support\GiantDomains::isScaleGiant(8829, null, null, 21));
+        // A real mid-size rival (ajmal, 1.3k refs) stays safe even for tiny clients.
+        $this->assertFalse(\App\Support\GiantDomains::isScaleGiant(1313, null, null, 21));
+        // And noon is now on the static list too.
+        $this->assertTrue(\App\Support\GiantDomains::isGiant('noon.com'));
+        $this->assertTrue(\App\Support\GiantDomains::isGiant('namshi.com'));
+    }
+
     public function test_rank_and_filter_demotes_giants_from_the_research_slot(): void
     {
         [, $plan] = $this->planWithSite();

@@ -311,7 +311,11 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     }
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
 
-    Route::middleware('feature:ai_studio')->group(function (): void {
+    // `feature.enabled:ai_studio` is the global beta kill-switch (config
+    // features.ai_studio); `feature:ai_studio` is the per-team permission gate.
+    // Route names stay registered even when disabled so firstAccessibleRoute()
+    // redirects never hit an unknown route — the middleware just 404s the hit.
+    Route::middleware(['feature.enabled:ai_studio', 'feature:ai_studio'])->group(function (): void {
         Route::get('/ai-studio', [\App\Http\Controllers\AiStudioController::class, 'index'])
             ->name('ai-studio.index');
         Route::post('/ai-studio/tools/{toolId}/run', [\App\Http\Controllers\AiStudioController::class, 'run'])

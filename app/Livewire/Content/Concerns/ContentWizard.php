@@ -314,9 +314,10 @@ trait ContentWizard
         $this->wizardStep = 5;
     }
 
-    public function toggleImages(): void
+    /** $value: explicit target state from the optimistic UI; null = plain flip. */
+    public function toggleImages(?bool $value = null): void
     {
-        $this->imagesEnabled = ! $this->imagesEnabled;
+        $this->imagesEnabled = $value ?? ! $this->imagesEnabled;
         $this->persistImageSettings();
     }
 
@@ -338,12 +339,13 @@ trait ContentWizard
         ]);
     }
 
-    public function toggleStructure(string $key): void
+    /** $value: explicit target state from the optimistic UI; null = plain flip. */
+    public function toggleStructure(string $key, ?bool $value = null): void
     {
         if (! array_key_exists($key, $this->structureToggles)) {
             return;
         }
-        $this->structureToggles[$key] = ! $this->structureToggles[$key];
+        $this->structureToggles[$key] = $value ?? ! $this->structureToggles[$key];
 
         $plan = $this->plan();
         if ($plan !== null) {
@@ -552,16 +554,20 @@ trait ContentWizard
     /** Keywords the client crossed out on the "best search terms" card. */
     public array $removedTerms = [];
 
-    /** Cross out / restore a best-search-term pick (step 6). */
-    public function toggleTerm(string $keyword): void
+    /**
+     * Cross out / restore a best-search-term pick (step 6).
+     * $removed: explicit target state from the optimistic UI; null = plain flip.
+     */
+    public function toggleTerm(string $keyword, ?bool $removed = null): void
     {
         $keyword = mb_strtolower(trim($keyword));
         if ($keyword === '') {
             return;
         }
-        $this->removedTerms = in_array($keyword, $this->removedTerms, true)
-            ? array_values(array_diff($this->removedTerms, [$keyword]))
-            : array_merge($this->removedTerms, [$keyword]);
+        $removed ??= ! in_array($keyword, $this->removedTerms, true);
+        $this->removedTerms = $removed
+            ? array_values(array_unique(array_merge($this->removedTerms, [$keyword])))
+            : array_values(array_diff($this->removedTerms, [$keyword]));
     }
 
     public function toFirstArticles(): void
@@ -618,35 +624,39 @@ trait ContentWizard
      */
     protected function wizardViewData(): array
     {
+        // One website/plan fetch per render — this used to re-query up to 4×
+        // per Livewire round-trip (i.e. on every wizard click).
+        $site = $this->website();
+        $plan = $this->wizardStep >= 5 ? $this->plan() : null;
+
         $insights = null;
         $generating = false;
         $needsReportGen = false;
         $hasOverrides = false;
 
-        if ($this->wizardStep === 5 && ($w = $this->website()) !== null) {
+        if ($this->wizardStep === 5 && $site !== null) {
             $svc = app(ContentSetupInsights::class);
-            $rawInsights = $svc->competitorAuthority($w);
+            $rawInsights = $svc->competitorAuthority($site);
             $needsReportGen = $rawInsights === null;
-            $plan4 = $this->plan();
-            $insights = $plan4 !== null ? $svc->withOverrides($rawInsights, $plan4) : $rawInsights;
-            $generating = $needsReportGen && $insights === null && $svc->isGenerating($w);
-            $overrides = (array) ($plan4?->competitor_overrides ?? []);
+            $insights = $plan !== null ? $svc->withOverrides($rawInsights, $plan) : $rawInsights;
+            $generating = $needsReportGen && $insights === null && $svc->isGenerating($site);
+            $overrides = (array) ($plan?->competitor_overrides ?? []);
             $hasOverrides = ! empty($overrides['added']) || ! empty($overrides['removed']);
         }
 
         $keywords = null;
         $keywordStatus = [];
         $guard = null;
-        if ($this->wizardStep === 6 && ($plan5 = $this->plan()) !== null) {
+        if ($this->wizardStep === 6 && $plan !== null) {
             $kwSvc = app(ContentKeywordInsights::class);
-            $keywords = $kwSvc->get($plan5);
+            $keywords = $kwSvc->get($plan);
             if ($keywords === null) {
-                $keywordStatus = $kwSvc->researchStatus($plan5);
+                $keywordStatus = $kwSvc->researchStatus($plan);
             }
             // Competitor-mention guard card — shown here, not on the
             // competitors step, same reasoning as ContentCalendar (see
             // infra/content-autopilot/README.md, 2026-07-22).
-            $guard = app(CompetitorMentionGuard::class)->stateFor($plan5);
+            $guard = app(CompetitorMentionGuard::class)->stateFor($plan);
         }
 
         return [
@@ -658,7 +668,7 @@ trait ContentWizard
             'hasOverrides' => $hasOverrides,
             'keywords' => $keywords,
             'keywordStatus' => $keywordStatus,
-            'hasWebsite' => $this->website() !== null,
+            'hasWebsite' => $site !== null,
         ];
     }
 }

@@ -97,7 +97,7 @@
     {{-- In-flight (finder async) --}}
     @if ($this->isPolling())
         <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800 dark:border-amber-900/40 dark:bg-amber-500/10 dark:text-amber-300">
-            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            <x-nodus state="analyzing" :size="40" class="shrink-0 text-orange-400 dark:text-orange-500" />
             {{ __('Looking up volumes — this usually takes 20–60 seconds. Results will appear automatically.') }}
         </div>
     @endif
@@ -166,6 +166,7 @@
         </p>
     @elseif ($hasRun && ! $this->isPolling())
         <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-12 text-center dark:border-slate-700 dark:bg-slate-900/40">
+            <x-nodus state="confused" :size="72" class="mx-auto mb-3 text-slate-400 dark:text-slate-500" />
             <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('No results to show.') }}</p>
         </div>
     @endif

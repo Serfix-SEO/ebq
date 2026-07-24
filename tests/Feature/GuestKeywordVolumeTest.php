@@ -160,4 +160,71 @@ class GuestKeywordVolumeTest extends TestCase
             ->assertSee('5,400', false)
             ->assertSee('Start free', false);
     }
+
+    /**
+     * Regression (2026-07-24): with the self-hosted provider, `refresh()` is
+     * ASYNCHRONOUS — it dispatches the node lookup and returns, so the volume is
+     * never in the cache on the immediate re-read. The job used to call that a
+     * failure, which made every public check fail ~1s after submit even though
+     * the node delivered the data 40-70s later. It must re-queue and wait.
+     * (Driven via handle() directly — the surrounding queue wiring is already
+     * covered by the dispatchSync tests above.)
+     */
+    public function test_async_provider_waits_for_the_webhook_instead_of_failing_on_first_miss(): void
+    {
+        \App\Support\KeywordProviderConfig::setProvider(\App\Support\KeywordProviderConfig::PROVIDER_KEYWORD_FINDER);
+        Queue::fake();
+
+        $row = GuestKeywordVolume::start('some async keyword', 'us');
+        // attempt 1 = a poll tick (attempt 0 kicks the lookup off), so no
+        // provider call here — only the wait/re-queue path.
+        (new RunGuestKeywordVolume($row->id, 1))->handle(app(\App\Services\KeywordMetricsService::class));
+
+        $this->assertNotSame(GuestKeywordVolume::STATUS_FAILED, $row->fresh()->status);
+        Queue::assertPushed(RunGuestKeywordVolume::class, 1);
+    }
+
+    /** ...but it still gives up at the deadline rather than polling forever. */
+    public function test_async_provider_gives_up_after_the_deadline(): void
+    {
+        \App\Support\KeywordProviderConfig::setProvider(\App\Support\KeywordProviderConfig::PROVIDER_KEYWORD_FINDER);
+        Queue::fake();
+
+        $row = GuestKeywordVolume::start('never lands', 'us');
+        (new RunGuestKeywordVolume($row->id, 20))->handle(app(\App\Services\KeywordMetricsService::class)); // MAX_ATTEMPTS
+
+        $this->assertSame(GuestKeywordVolume::STATUS_FAILED, $row->fresh()->status);
+        Queue::assertNotPushed(RunGuestKeywordVolume::class);
+    }
+
+    /**
+     * Security (2026-07-24): the page always rendered the reCAPTCHA but the
+     * server never checked it. When reCAPTCHA is configured it must now be
+     * required on submit; a request without a token is rejected before any
+     * paid keyword lookup.
+     */
+    public function test_recaptcha_is_required_on_submit_when_enabled(): void
+    {
+        $this->actingAs(\App\Models\User::factory()->create());
+        config(['services.recaptcha.site_key' => 'sk', 'services.recaptcha.secret_key' => 'secret']);
+        Queue::fake();
+
+        $this->postJson(route('guest-volume.store'), ['keyword' => 'seo tools', 'country' => 'us'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('g-recaptcha-response');
+        Queue::assertNothingPushed();
+    }
+
+    public function test_valid_recaptcha_token_passes(): void
+    {
+        $this->actingAs(\App\Models\User::factory()->create());
+        config(['services.recaptcha.site_key' => 'sk', 'services.recaptcha.secret_key' => 'secret']);
+        Http::fake(['https://www.google.com/recaptcha/api/siteverify' => Http::response(['success' => true], 200)]);
+        Queue::fake();
+
+        $this->postJson(route('guest-volume.store'), [
+            'keyword' => 'seo tools', 'country' => 'us', 'g-recaptcha-response' => 'tok',
+        ])->assertStatus(202);
+        Queue::assertPushed(RunGuestKeywordVolume::class, 1);
+    }
 }

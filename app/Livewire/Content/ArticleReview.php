@@ -50,6 +50,33 @@ class ArticleReview extends Component
 
     public string $editMetaDescription = '';
 
+    // ── Per-article SEO overrides (mirror the WP plugin's post-edit sidebar).
+    //    Edit-only: they apply to THIS article and ride into the plugin's
+    //    `_ebq_*` meta / webhook payload on publish. ──
+    public string $editFocusKeyword = '';
+
+    public string $editSlug = '';
+
+    public string $editCanonical = '';
+
+    public bool $editNoindex = false;
+
+    public bool $editNofollow = false;
+
+    public string $editOgTitle = '';
+
+    public string $editOgDescription = '';
+
+    public string $editOgImage = '';
+
+    public string $editTwitterTitle = '';
+
+    public string $editTwitterDescription = '';
+
+    public string $editTwitterImage = '';
+
+    public string $editTwitterCard = 'summary_large_image';
+
     /** @var list<array{code:string, passed:bool, label:string}> */
     public array $liveChecks = [];
 
@@ -87,6 +114,20 @@ class ArticleReview extends Component
         $this->editH1 = (string) ($article?->h1 ?? '');
         $this->editMetaTitle = (string) ($article?->meta_title ?? '');
         $this->editMetaDescription = (string) ($article?->meta_description ?? '');
+        // SEO overrides — focus keyword defaults to the topic's target when the
+        // article carries no explicit override (so the field is never blank).
+        $this->editFocusKeyword = (string) ($article?->focus_keyword ?: $this->topic()?->target_keyword ?? '');
+        $this->editSlug = (string) ($article?->slug ?? '');
+        $this->editCanonical = (string) ($article?->canonical_url ?? '');
+        $this->editNoindex = (bool) ($article?->robots_noindex ?? false);
+        $this->editNofollow = (bool) ($article?->robots_nofollow ?? false);
+        $this->editOgTitle = (string) ($article?->og_title ?? '');
+        $this->editOgDescription = (string) ($article?->og_description ?? '');
+        $this->editOgImage = (string) ($article?->og_image ?? '');
+        $this->editTwitterTitle = (string) ($article?->twitter_title ?? '');
+        $this->editTwitterDescription = (string) ($article?->twitter_description ?? '');
+        $this->editTwitterImage = (string) ($article?->twitter_image ?? '');
+        $this->editTwitterCard = (string) ($article?->twitter_card ?: 'summary_large_image');
         $this->refreshChecks();
     }
 
@@ -114,7 +155,7 @@ class ArticleReview extends Component
     /** Meta-field edits re-score live too. */
     public function updated(string $property): void
     {
-        if (in_array($property, ['editH1', 'editMetaTitle', 'editMetaDescription'], true)) {
+        if (in_array($property, ['editH1', 'editMetaTitle', 'editMetaDescription', 'editFocusKeyword', 'editSlug'], true)) {
             $this->refreshChecks();
         }
     }
@@ -135,11 +176,29 @@ class ArticleReview extends Component
         $result = $this->scoreCurrent($clean);
         $text = trim(html_entity_decode(strip_tags($clean)));
 
+        // Focus keyword is stored as an override only when it diverges from the
+        // topic's target — an unchanged value stays null so re-targeting the
+        // topic later still flows through.
+        $focus = trim($this->editFocusKeyword);
+        $focusOverride = ($focus !== '' && $focus !== trim((string) $topic->target_keyword)) ? mb_substr($focus, 0, 200) : null;
+        $slug = trim($this->editSlug) !== '' ? mb_substr(trim($this->editSlug), 0, 200) : $article->slug;
+
         ContentArticle::storeVersion($topic, [
             'h1' => mb_substr(trim($this->editH1) !== '' ? trim($this->editH1) : (string) $article->h1, 0, 300),
             'meta_title' => mb_substr(trim($this->editMetaTitle), 0, 300),
             'meta_description' => mb_substr(trim($this->editMetaDescription), 0, 500),
-            'slug' => $article->slug,
+            'slug' => $slug,
+            'focus_keyword' => $focusOverride,
+            'canonical_url' => mb_substr(trim($this->editCanonical), 0, 500) ?: null,
+            'robots_noindex' => $this->editNoindex,
+            'robots_nofollow' => $this->editNofollow,
+            'og_title' => mb_substr(trim($this->editOgTitle), 0, 300) ?: null,
+            'og_description' => mb_substr(trim($this->editOgDescription), 0, 500) ?: null,
+            'og_image' => mb_substr(trim($this->editOgImage), 0, 500) ?: null,
+            'twitter_title' => mb_substr(trim($this->editTwitterTitle), 0, 300) ?: null,
+            'twitter_description' => mb_substr(trim($this->editTwitterDescription), 0, 500) ?: null,
+            'twitter_image' => mb_substr(trim($this->editTwitterImage), 0, 500) ?: null,
+            'twitter_card' => in_array($this->editTwitterCard, ['summary', 'summary_large_image', 'app', 'player'], true) ? $this->editTwitterCard : 'summary_large_image',
             'outline' => $article->outline,
             'html' => $clean,
             'markdown' => $article->markdown,
@@ -250,6 +309,8 @@ class ArticleReview extends Component
             'code' => (string) $c['code'],
             'passed' => (bool) $c['passed'],
             'label' => self::checkLabel((string) $c['code']),
+            // Only failing rows carry a fix hint (passing rows need none).
+            'hint' => ((bool) $c['passed']) ? '' : self::checkHint((string) $c['code']),
         ], $result['checks']);
     }
 
@@ -263,6 +324,12 @@ class ArticleReview extends Component
         }
 
         $context = $this->scorerContext ??= $this->buildScorerContext($topic);
+        // Focus-keyword override: when the client edits the focus keyphrase for
+        // this article, the live audit re-scores against IT (falls back to the
+        // topic's target_keyword baked into the context otherwise).
+        if (($fk = trim($this->editFocusKeyword)) !== '') {
+            $context['target_keyword'] = $fk;
+        }
         // Same competitor-mention rules the producer enforced, so the live
         // checks and the pipeline can never disagree about an edit.
         $guard = app(CompetitorMentionGuard::class);
@@ -280,7 +347,7 @@ class ArticleReview extends Component
             trim($this->editMetaTitle),
             trim($this->editMetaDescription),
             trim($this->editH1) !== '' ? trim($this->editH1) : (string) $article->h1,
-            (string) $article->slug,
+            trim($this->editSlug) !== '' ? trim($this->editSlug) : (string) $article->slug,
             $context,
         );
         $result['style_issues'] = $styleIssues;
@@ -387,6 +454,48 @@ class ArticleReview extends Component
             'title_unique' => __('Title is unique on your site'),
             'style_clean' => __('Natural writing style'),
             default => __('Quality check'),
+        };
+    }
+
+    /**
+     * Actionable "how to fix" for a FAILING check — shown under the row so the
+     * client knows what to change, not just that something's off. Client-safe
+     * copy (no internal jargon). Keyed to the same scorer codes as checkLabel.
+     */
+    public static function checkHint(string $code): string
+    {
+        return match ($code) {
+            'kw_in_meta_title' => __('Add your focus keyphrase to the SEO title.'),
+            'meta_title_length' => __('Aim for 40–60 characters so it doesn\'t get cut off in Google.'),
+            'title_power_word' => __('Add a compelling word (e.g. “best”, “proven”, “ultimate”) to lift clicks.'),
+            'kw_in_h1' => __('Include the focus keyphrase in the headline (H1).'),
+            'h1_length' => __('Keep the headline concise — aim for under ~60 characters.'),
+            'kw_in_meta_description' => __('Work the focus keyphrase naturally into the meta description.'),
+            'meta_description_length' => __('Write 130–155 characters that earn the click.'),
+            'kw_in_first_words' => __('Use the focus keyphrase within the first sentence or two.'),
+            'kw_in_intro' => __('Mention the focus keyphrase in the opening paragraph.'),
+            'kw_in_slug' => __('Add the focus keyphrase to the URL slug.'),
+            'kw_density' => __('Use the keyphrase a little more (or less) — target 0.5–2.5% of the text.'),
+            'kw_distribution' => __('Spread the keyphrase more evenly across the whole article.'),
+            'secondary_coverage' => __('Cover your additional keyphrases at least once each.'),
+            'word_count' => __('Adjust the length toward the target for this topic.'),
+            'h2_count' => __('Break the article into more sections with H2 subheadings.'),
+            'kw_in_a_heading' => __('Put the focus keyphrase in at least one subheading.'),
+            'no_orphan_h3' => __('Fix the heading order — an H3 should sit under an H2.'),
+            'heading_not_stuffed' => __('Make headings read naturally — don\'t repeat the keyphrase in every one.'),
+            'key_takeaways_present' => __('Add the Key takeaways box (enabled in this plan).'),
+            'faq_present' => __('Add an FAQ section (enabled in this plan).'),
+            'cta_present' => __('Add the call-to-action link (enabled in this plan).'),
+            'internal_links' => __('Link to a few relevant pages on your own site.'),
+            'internal_links_valid' => __('Point internal links to pages that actually exist.'),
+            'external_link' => __('Cite at least one authoritative external source.'),
+            'link_density' => __('Ease up on the number of links relative to the text.'),
+            'img_alt_text' => __('Add descriptive alt text to your images.'),
+            'sentence_length' => __('Shorten some long sentences for easier reading.'),
+            'paragraph_length' => __('Break up long paragraphs — aim for short, scannable blocks.'),
+            'title_unique' => __('This title looks similar to another page on your site — make it distinct.'),
+            'style_clean' => __('Smooth out a few phrases so it reads more naturally.'),
+            default => __('A small tweak will improve this.'),
         };
     }
 
@@ -573,15 +682,31 @@ class ArticleReview extends Component
                 ->latest()->first();
         }
 
+        // Default social-preview image: the article's featured image (or any
+        // generated image) — so the OG/Twitter card shows a picture even before
+        // the client sets an explicit social image URL.
+        $socialImageFallback = '';
+        if ($article !== null) {
+            $img = $article->images()
+                ->where('status', ContentImage::STATUS_GENERATED)
+                ->orderByRaw("CASE WHEN role = ? THEN 0 ELSE 1 END", [ContentImage::ROLE_FEATURED])
+                ->latest()
+                ->first();
+            $socialImageFallback = (string) ($img?->url() ?? '');
+        }
+
         return view('livewire.content.article-review', [
             'topic' => $topic,
             'article' => $article,
             'generating' => $generating,
             'progress' => $progress,
             'featuredImage' => $featuredImage,
+            'socialImageFallback' => $socialImageFallback,
             'previewHtml' => $this->sanitize((string) ($article?->html ?? '')),
             'issueLabels' => $issueLabels,
             'traffic' => $topic ? self::trafficWorth($topic) : null,
+            // Bare host for the Google snippet preview breadcrumb (no scheme/www).
+            'siteHost' => preg_replace('#^www\.#', '', mb_strtolower((string) preg_replace('#^https?://#', '', (string) ($topic?->website?->domain ?? '')))),
             'publishConnected' => (bool) $topic?->plan?->website
                 ?->contentIntegrations()->where('status', ContentIntegration::STATUS_CONNECTED)->exists(),
             'presentation' => $topic ? ContentCalendar::statusPresentation($topic->status) : null,

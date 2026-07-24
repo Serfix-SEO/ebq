@@ -131,6 +131,46 @@ class ContentPublishingTest extends TestCase
         });
     }
 
+    public function test_publish_maps_per_article_seo_overrides_to_plugin_meta(): void
+    {
+        Http::fake([
+            'client-blog.com/wp-json/' => Http::response(['namespaces' => ['wp/v2', 'ebq/v1']], 200),
+            'client-blog.com/wp-json/wp/v2/posts' => Http::response(['id' => 91, 'link' => 'https://client-blog.com/o/', 'status' => 'publish'], 201),
+            'client-blog.com/o*' => Http::response('<h1>x</h1>', 200),
+        ]);
+
+        [, $website, , $topic, $article] = $this->scheduledArticle();
+        $article->update([
+            'focus_keyword' => 'article-level keyphrase',
+            'canonical_url' => 'https://client-blog.com/canonical',
+            'robots_noindex' => true,
+            'robots_nofollow' => false,
+            'og_title' => 'OG Title',
+            'og_image' => 'https://client-blog.com/og.jpg',
+            'twitter_card' => 'summary',
+        ]);
+        $this->wordpressIntegration($website);
+
+        (new PublishContentArticleJob($topic->id))->handle(
+            app(\App\Services\Content\Publishing\PublishDriverFactory::class),
+            app(\App\Support\Audit\SafeHttpGuard::class),
+        );
+
+        Http::assertSent(function ($req) {
+            if (! str_ends_with($req->url(), '/wp/v2/posts')) {
+                return false;
+            }
+            $meta = $req->data()['meta'] ?? [];
+
+            return ($meta['_ebq_focus_keyword'] ?? null) === 'article-level keyphrase' // override beats topic
+                && ($meta['_ebq_canonical'] ?? null) === 'https://client-blog.com/canonical'
+                && ($meta['_ebq_og_title'] ?? null) === 'OG Title'
+                && ($meta['_ebq_twitter_card'] ?? null) === 'summary'
+                && ($meta['_ebq_robots_noindex'] ?? null) === true
+                && ! array_key_exists('_ebq_robots_nofollow', $meta); // off → not sent
+        });
+    }
+
     public function test_publish_sends_faq_schema_meta_when_plugin_present(): void
     {
         Http::fake([
@@ -300,6 +340,12 @@ class ContentPublishingTest extends TestCase
         ]);
 
         [, $website, , $topic, $article] = $this->scheduledArticle();
+        $article->update([
+            'canonical_url' => 'https://client.com/canonical',
+            'robots_noindex' => true,
+            'og_title' => 'Webhook OG',
+            'twitter_card' => 'summary',
+        ]);
         ContentIntegration::query()->create([
             'website_id' => $website->id,
             'platform' => ContentIntegration::PLATFORM_WEBHOOK,
@@ -317,9 +363,15 @@ class ContentPublishingTest extends TestCase
                 return false;
             }
             $expected = 'sha256='.hash_hmac('sha256', $req->body(), 'shared-signing-secret');
+            $art = $req->data()['article'] ?? [];
 
             return $req->hasHeader('X-Serfix-Signature')
-                && $req->header('X-Serfix-Signature')[0] === $expected;
+                && $req->header('X-Serfix-Signature')[0] === $expected
+                // Per-article SEO overrides ride the webhook payload too.
+                && ($art['canonical_url'] ?? null) === 'https://client.com/canonical'
+                && ($art['robots_noindex'] ?? null) === true
+                && ($art['og_title'] ?? null) === 'Webhook OG'
+                && ($art['twitter_card'] ?? null) === 'summary';
         });
 
         $publication = ContentPublication::query()->where('article_id', $article->id)->first();

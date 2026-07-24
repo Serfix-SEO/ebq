@@ -334,6 +334,7 @@
             <div class="border-t border-slate-200 px-5 py-3 dark:border-slate-800">{{ $keywords->links() }}</div>
         @else
             <div class="flex flex-col items-center justify-center px-6 py-16">
+                <x-nodus state="confused" :size="72" class="mb-3 text-slate-400 dark:text-slate-500" />
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('No keyword data for this page yet') }}</p>
             </div>
         @endif

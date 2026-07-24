@@ -51,12 +51,15 @@
                 {{-- Transition overlay: step moves can be slow (they persist the plan,
                      dispatch research, and the next step's first render pulls live data).
                      Show an interactive "working" state so the click never feels dead. --}}
-                <div wire:loading.flex wire:target="analyzeSite,toOfferings,toHowItWorks,toImages,toCompetitors,loadCompetitors,toKeywordResearch,toFirstArticles,toAccount,createAccount"
-                     class="absolute inset-0 z-30 hidden flex-col items-center justify-center gap-4 rounded-3xl bg-white/85 text-center backdrop-blur-sm dark:bg-slate-900/85">
-                    <span class="relative flex h-14 w-14 items-center justify-center">
-                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-40"></span>
-                        <svg class="h-10 w-10 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                    </span>
+                <div wire:loading.flex wire:target="analyzeSite,toOfferings,toHowItWorks,toImages,toCompetitors,loadCompetitors,toKeywordResearch,toFirstArticles,toAccount,createAccount,goToStep"
+                     class="absolute inset-0 z-30 hidden flex-col items-center rounded-3xl bg-white/85 text-center backdrop-blur-sm dark:bg-slate-900/85">
+                    {{-- Sticky, not centered-in-card: tall steps make the card much
+                         taller than the viewport, so center-of-card sat below the
+                         fold (and the user may be scrolled anywhere when the overlay
+                         appears). Sticky pins the content into the visible viewport
+                         regardless of card height or scroll position. --}}
+                    <div class="sticky flex flex-col items-center gap-4" style="top:30vh">
+                    <x-nodus state="searching" :size="116" class="text-slate-400 dark:text-slate-500"/>
                     <div>
                         <p class="text-sm font-bold text-slate-900 dark:text-slate-100">
                             <span wire:loading wire:target="analyzeSite">{{ __('Reading your website…') }}</span>
@@ -66,9 +69,10 @@
                             <span wire:loading wire:target="toKeywordResearch">{{ __('Researching keywords for your site…') }}</span>
                             <span wire:loading wire:target="toFirstArticles">{{ __('Lining up your first articles…') }}</span>
                             <span wire:loading wire:target="createAccount">{{ __('Creating your account…') }}</span>
-                            <span wire:loading wire:target="toImages">{{ __('One moment…') }}</span>
+                            <span wire:loading wire:target="toImages,goToStep">{{ __('One moment…') }}</span>
                         </p>
                         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('This can take a few seconds — please keep this tab open.') }}</p>
+                    </div>
                     </div>
                 </div>
 
@@ -81,9 +85,7 @@
                 @if ($wizardStep === 1)
                     <div @if($analyzing) wire:init="analyzeSite" @endif>
                         <div class="flex items-center gap-3">
-                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
-                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15l-.75 18h-13.5L4.5 3zM9 3v18M15 3v18"/></svg>
-                            </span>
+                            <x-nodus :state="$analyzing ? 'searching' : 'idle'" :size="60" class="shrink-0 text-slate-400 dark:text-slate-500"/>
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 1 of 7') }}</p>
                                 <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Tell us about your business') }}</h2>
@@ -92,8 +94,8 @@
                         <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">{{ __('We analyzed your website and filled this in. Adjust anything so every article fits perfectly.') }}</p>
 
                         @if ($analyzing)
-                            <div class="mt-5 flex items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3.5 text-sm font-medium text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-200">
-                                <svg class="h-5 w-5 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            <div class="mt-5 flex items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-200">
+                                <x-nodus state="searching" :size="46" class="shrink-0 text-orange-300 dark:text-orange-800"/>
                                 {{ __('Analyzing your website…') }}
                             </div>
                         @endif
@@ -125,21 +127,57 @@
                         </div>
 
                         {{-- Site type: auto-detected, one click to correct. Drives
-                             keyword intent, competitor guard and CTA style downstream. --}}
-                        <div class="mt-5">
+                             keyword intent, competitor guard and CTA style downstream.
+                             Shown COMPACT (one summary row) once a type is known — the
+                             full chip grid only renders when nothing is selected yet or
+                             the client hits "Change" (it collapses again after a pick). --}}
+                        @php
+                            $siteTypeOptions = \App\Support\ContentSiteTypeProfiles::options();
+                            $siteTypeJsMap = \Illuminate\Support\Js::from(collect($siteTypeOptions)->map(fn ($opt) => [
+                                'label' => __($opt['label']),
+                                'description' => __($opt['description']),
+                            ])->all());
+                        @endphp
+                        <div class="mt-5" x-data="{ typeGridOpen: false, siteTypes: {{ $siteTypeJsMap }} }">
                             <span class="block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ __('What kind of website is this?') }}</span>
-                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('We tailor your keywords, competitors and article style to this.') }}</p>
-                            <div class="mt-2.5 grid gap-2 sm:grid-cols-3">
-                                @foreach (\App\Support\ContentSiteTypeProfiles::options() as $typeKey => $opt)
-                                    <button type="button" wire:click="selectSiteType('{{ $typeKey }}')"
-                                        class="flex flex-col items-start gap-0.5 rounded-xl border px-3.5 py-2.5 transition-all
-                                            {{ $siteType === $typeKey
+
+                            {{-- Optimistic UI: everything here is bound to $wire.siteType /
+                                 $wire.siteTypeSource (Livewire's reactive client state — stays
+                                 correct through every morph, including analyzeSite's async
+                                 auto-detect: the compact row appears by itself the moment the
+                                 detection lands). typeGridOpen is PURE UI disclosure state —
+                                 fine as local x-data. NEVER mirror server state into a local
+                                 x-data snapshot — it goes stale the moment the server changes
+                                 the value (smart-bricks bug). --}}
+                            <div x-show="$wire.siteType !== '' && ! typeGridOpen" @if ($siteType === '') style="display:none" @endif
+                                class="mt-2.5 flex flex-wrap items-center gap-3 rounded-xl border border-orange-500 bg-orange-50 px-3.5 py-2.5 ring-2 ring-orange-100 dark:bg-orange-950 dark:ring-orange-900">
+                                <svg class="h-5 w-5 shrink-0 text-orange-600 dark:text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <div class="min-w-0 flex-1">
+                                    <span class="flex flex-wrap items-center gap-2">
+                                        <span class="text-sm font-semibold text-orange-700 dark:text-orange-300" x-text="siteTypes[$wire.siteType]?.label"></span>
+                                        <span x-show="$wire.siteTypeSource === 'auto'" class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900 dark:text-orange-300">{{ __('Auto-detected') }}</span>
+                                    </span>
+                                    <span class="block text-xs text-slate-500 dark:text-slate-400" x-text="siteTypes[$wire.siteType]?.description"></span>
+                                </div>
+                                <button type="button" x-on:click="typeGridOpen = true"
+                                    class="shrink-0 text-sm font-semibold text-orange-600 underline-offset-2 hover:underline dark:text-orange-400">{{ __('Change') }}</button>
+                            </div>
+
+                            <div x-show="$wire.siteType === '' || typeGridOpen" @if ($siteType !== '') style="display:none" @endif>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('We tailor your keywords, competitors and article style to this.') }}</p>
+                                <div class="mt-2.5 grid gap-2 sm:grid-cols-3">
+                                    @foreach ($siteTypeOptions as $typeKey => $opt)
+                                        <button type="button" wire:key="sitetype-{{ $typeKey }}"
+                                            x-on:click="$wire.siteType = '{{ $typeKey }}'; typeGridOpen = false; $wire.selectSiteType('{{ $typeKey }}')"
+                                            class="flex flex-col items-start gap-0.5 rounded-xl border px-3.5 py-2.5 transition-all"
+                                            :class="$wire.siteType === '{{ $typeKey }}'
                                                 ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-100 dark:bg-orange-950 dark:ring-orange-900'
-                                                : 'border-slate-300 bg-white hover:border-orange-300 dark:border-slate-700 dark:bg-slate-800' }}">
-                                        <span class="text-sm font-semibold {{ $siteType === $typeKey ? 'text-orange-700 dark:text-orange-300' : 'text-slate-800 dark:text-slate-100' }}">{{ __($opt['label']) }}</span>
-                                        <span class="text-xs text-slate-500 dark:text-slate-400">{{ __($opt['description']) }}</span>
-                                    </button>
-                                @endforeach
+                                                : 'border-slate-300 bg-white hover:border-orange-300 dark:border-slate-700 dark:bg-slate-800'">
+                                            <span class="text-sm font-semibold" :class="$wire.siteType === '{{ $typeKey }}' ? 'text-orange-700 dark:text-orange-300' : 'text-slate-800 dark:text-slate-100'">{{ __($opt['label']) }}</span>
+                                            <span class="text-xs text-slate-500 dark:text-slate-400">{{ __($opt['description']) }}</span>
+                                        </button>
+                                    @endforeach
+                                </div>
                             </div>
                         </div>
 
@@ -335,15 +373,19 @@
                                 ];
                             @endphp
                             @foreach ($structOpts as $opt)
-                                @php $on = (bool) ($structureToggles[$opt['key']] ?? true); @endphp
+                                {{-- Optimistic: state binds to $wire.structureToggles (morph-safe);
+                                     the click assigns instantly and passes the explicit new value so
+                                     the server SETS it (never a blind flip → no double-toggle). --}}
                                 <div class="flex items-center justify-between gap-4 rounded-xl border border-slate-100 p-3 dark:border-slate-800" wire:key="struct-{{ $opt['key'] }}">
                                     <div class="min-w-0">
                                         <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $opt['title'] }}</div>
                                         <div class="text-xs text-slate-500 dark:text-slate-400">{{ $opt['desc'] }}</div>
                                     </div>
-                                    <button type="button" wire:click="toggleStructure('{{ $opt['key'] }}')" role="switch" aria-checked="{{ $on ? 'true' : 'false' }}"
-                                        class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition {{ $on ? 'bg-orange-600' : 'bg-slate-300 dark:bg-slate-700' }}">
-                                        <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition {{ $on ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                                    <button type="button" x-data
+                                        x-on:click="$wire.structureToggles['{{ $opt['key'] }}'] = ! $wire.structureToggles['{{ $opt['key'] }}']; $wire.toggleStructure('{{ $opt['key'] }}', $wire.structureToggles['{{ $opt['key'] }}'])"
+                                        role="switch" :aria-checked="$wire.structureToggles['{{ $opt['key'] }}'] ? 'true' : 'false'"
+                                        class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition" :class="$wire.structureToggles['{{ $opt['key'] }}'] ? 'bg-orange-600' : 'bg-slate-300 dark:bg-slate-700'">
+                                        <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition" :class="$wire.structureToggles['{{ $opt['key'] }}'] ? 'translate-x-6' : 'translate-x-1'"></span>
                                     </button>
                                 </div>
                             @endforeach
@@ -372,39 +414,44 @@
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('We can generate a featured image and in-article visuals for every post.') }}</p>
                     </div>
 
-                    {{-- Enable toggle --}}
-                    <div class="mx-auto mt-6 flex max-w-2xl items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-                        <div class="min-w-0">
-                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Generate images') }}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400">{{ __('Turn off if you prefer to add your own images.') }}</div>
+                    {{-- Optimistic: bound to $wire.imagesEnabled / $wire.imageStyle (Livewire's
+                         reactive client state — morph-safe; never snapshot into local x-data).
+                         Clicks assign instantly, persisting calls run in the background; the
+                         toggle passes its explicit new value so the server SETS it (no blind
+                         flip → no double-toggle). --}}
+                    <div x-data>
+                        {{-- Enable toggle --}}
+                        <div class="mx-auto mt-6 flex max-w-2xl items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                            <div class="min-w-0">
+                                <div class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Generate images') }}</div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">{{ __('Turn off if you prefer to add your own images.') }}</div>
+                            </div>
+                            <button type="button" x-on:click="$wire.imagesEnabled = ! $wire.imagesEnabled; $wire.toggleImages($wire.imagesEnabled)" role="switch" :aria-checked="$wire.imagesEnabled ? 'true' : 'false'"
+                                class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition" :class="$wire.imagesEnabled ? 'bg-orange-600' : 'bg-slate-300 dark:bg-slate-700'">
+                                <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition" :class="$wire.imagesEnabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                            </button>
                         </div>
-                        <button type="button" wire:click="toggleImages" role="switch" aria-checked="{{ $imagesEnabled ? 'true' : 'false' }}"
-                            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition {{ $imagesEnabled ? 'bg-orange-600' : 'bg-slate-300 dark:bg-slate-700' }}">
-                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition {{ $imagesEnabled ? 'translate-x-6' : 'translate-x-1' }}"></span>
-                        </button>
-                    </div>
 
-                    {{-- Style picker (only when enabled) --}}
-                    @if ($imagesEnabled)
-                        <div class="mx-auto mt-5 max-w-2xl">
+                        {{-- Style picker (only when enabled; server-rendered display state
+                             avoids a pre-Alpine flash, x-show takes over after init) --}}
+                        <div class="mx-auto mt-5 max-w-2xl" x-show="$wire.imagesEnabled" @if (! $imagesEnabled) style="display:none" @endif>
                             <div class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Pick a visual style') }}</div>
                             <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                                 @foreach (\App\Support\ContentImageStyles::all() as $key => $st)
-                                    @php $sel = $imageStyle === $key; @endphp
-                                    <button type="button" wire:click="selectImageStyle('{{ $key }}')" wire:key="imgstyle-{{ $key }}"
-                                        class="rounded-2xl border-2 p-4 text-start transition {{ $sel ? 'border-orange-500 bg-orange-50 dark:border-orange-500 dark:bg-orange-950' : 'border-slate-200 bg-white hover:border-orange-300 dark:border-slate-800 dark:bg-slate-900' }}">
+                                    <button type="button" wire:key="imgstyle-{{ $key }}"
+                                        x-on:click="$wire.imageStyle = '{{ $key }}'; $wire.imagesEnabled = true; $wire.selectImageStyle('{{ $key }}')"
+                                        class="rounded-2xl border-2 p-4 text-start transition"
+                                        :class="$wire.imageStyle === '{{ $key }}' ? 'border-orange-500 bg-orange-50 dark:border-orange-500 dark:bg-orange-950' : 'border-slate-200 bg-white hover:border-orange-300 dark:border-slate-800 dark:bg-slate-900'">
                                         <div class="flex items-center justify-between">
                                             <span class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __($st['label']) }}</span>
-                                            @if ($sel)
-                                                <svg class="h-4 w-4 text-orange-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                            @endif
+                                            <svg x-show="$wire.imageStyle === '{{ $key }}'" class="h-4 w-4 text-orange-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                                         </div>
                                         <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __($st['desc']) }}</div>
                                     </button>
                                 @endforeach
                             </div>
                         </div>
-                    @endif
+                    </div>
 
                     <div class="mt-8 flex items-center justify-between">
                         <button wire:click="goToStep(3)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
@@ -467,11 +514,14 @@
                             $peerMedian = $ins['peer_median'] ?? $ins['median'];
                             $peerGap = $ins['peer_gap'] ?? $ins['gap'];
                             $peerBehind = $ins['peer_behind'] ?? $ins['behind'];
-                            $mainRows = array_values(array_filter($ins['competitors'], fn ($c) => ! in_array($c['class'] ?? 'peer', ['reference', 'giant'], true)));
+                            // Guard-classified references/giants STAY in the main table
+                            // (user-requested 2026-07-23: classification must not make rows
+                            // vanish) — they're badged "Not a rival" instead, and the peer
+                            // math above already excludes them, so the gap stays honest.
+                            $mainRows = $ins['competitors'];
                             $refRows = array_values(array_filter($ins['competitors'], fn ($c) => in_array($c['class'] ?? null, ['reference', 'giant'], true)));
                             // Rank ladder incl. the client's own row ("YOU"), by referring
-                            // domains where known — references are out of this list, so the
-                            // old directories-on-top failure can't come back.
+                            // domains where known.
                             if (! $fresh) {
                                 $mainRows[] = ['domain' => '__you__', 'referring_domains' => (int) $ins['my_referring_domains'], 'backlinks' => null, 'da' => $ins['my_authority'], 'pa' => null, 'class' => 'you'];
                                 usort($mainRows, fn ($a, $b) => (int) ($b['referring_domains'] ?? -1) <=> (int) ($a['referring_domains'] ?? -1));
@@ -542,6 +592,8 @@
                                                         {{ $c['domain'] }}
                                                         @if (($c['class'] ?? null) === 'aspirational')
                                                             <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ __('Ahead of you') }}</span>
+                                                        @elseif (in_array($c['class'] ?? null, ['reference', 'giant'], true))
+                                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ __('Not a rival') }}</span>
                                                         @endif
                                                     </div>
                                                 </td>
@@ -593,12 +645,13 @@
                             </button>
                         </div>
                     @elseif ($generating)
-                        <div wire:poll.5s="refreshCompetitors" class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
-                            <svg class="h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                        <div wire:poll.5s="refreshCompetitors" class="mt-6 flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                            <x-nodus state="analyzing" :size="92" class="text-slate-400 dark:text-slate-500"/>
                             <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('Analyzing your competitive landscape…') }}</p>
                         </div>
                     @else
                         <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                            <x-nodus state="confused" :size="72" class="mx-auto mb-2 text-slate-400 dark:text-slate-500"/>
                             <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('No competitor authority data yet') }}</p>
                             <p class="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">{{ __("This is normal for newer sites with a small backlink footprint — there's no established authority to compare yet. Add competitors you know below, or just continue; your content plan is already being built.") }}</p>
                         </div>
@@ -676,8 +729,8 @@
 
                     @if ($kw === null)
                         <div wire:poll.5s="refreshKeywordInsights" class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-800/40">
-                            <svg class="mx-auto h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                            <p class="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Researching live search data for your market…') }}</p>
+                            <x-nodus state="analyzing" :size="92" class="mx-auto text-slate-400 dark:text-slate-500"/>
+                            <p class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Researching live search data for your market…') }}</p>
                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('We analyze your site and your competitors in depth — this can take a few minutes. Your full results appear here all at once.') }}</p>
 
                             @php $kwStatus = $wizard['keywordStatus'] ?? []; @endphp
@@ -721,29 +774,33 @@
                                 <div class="mt-5 border-t border-slate-100 pt-4 text-start dark:border-slate-800">
                                     <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Your best search terms') }}</h3>
                                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __("We'll write one article for each term you keep. Remove any that don't fit your business.") }}</p>
+                                    {{-- Optimistic: cross-out binds to $wire.removedTerms (Livewire's
+                                         reactive client state — morph-safe, never a local snapshot);
+                                         the click assigns the new array instantly, then toggleTerm
+                                         persists with the explicit target state (no blind flip).
+                                         toggleTerm stores lowercased terms — keep keys lowercased. --}}
                                     <div class="mt-3 flex flex-wrap gap-2">
                                         @foreach ($kw['opportunities'] as $opp)
-                                            @php $isRemoved = in_array($opp['keyword'], $removedTerms ?? [], true); @endphp
-                                            <button type="button" wire:click="toggleTerm('{{ $opp['keyword'] }}')" wire:key="term-{{ $loop->index }}"
-                                                class="group inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-start transition-all
-                                                    {{ $isRemoved
-                                                        ? 'border-slate-200 bg-slate-50 opacity-60 dark:border-slate-700 dark:bg-slate-800'
-                                                        : 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' }}">
+                                            @php $termKey = mb_strtolower(trim($opp['keyword'])); @endphp
+                                            <button type="button" wire:key="term-{{ $loop->index }}"
+                                                x-data="{ kw: @js($termKey) }"
+                                                x-on:click="let rm = ! $wire.removedTerms.includes(kw); $wire.removedTerms = rm ? [...$wire.removedTerms, kw] : $wire.removedTerms.filter(t => t !== kw); $wire.toggleTerm(kw, rm)"
+                                                class="group inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-start transition-all"
+                                                :class="$wire.removedTerms.includes(kw)
+                                                    ? 'border-slate-200 bg-slate-50 opacity-60 dark:border-slate-700 dark:bg-slate-800'
+                                                    : 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950'">
                                                 <span class="flex flex-col">
-                                                    <span class="text-sm font-semibold {{ $isRemoved ? 'text-slate-400 line-through' : 'text-orange-800 dark:text-orange-200' }}">{{ $opp['keyword'] }}</span>
+                                                    <span class="text-sm font-semibold" :class="$wire.removedTerms.includes(kw) ? 'text-slate-400 line-through' : 'text-orange-800 dark:text-orange-200'">{{ $opp['keyword'] }}</span>
                                                     @if (! empty($opp['origin']))
-                                                        <span class="text-xs {{ $isRemoved ? 'text-slate-400' : 'text-orange-600/70 dark:text-orange-300/80' }}">{{ __('because you sell:') }} {{ $opp['origin'] }}</span>
+                                                        <span class="text-xs" :class="$wire.removedTerms.includes(kw) ? 'text-slate-400' : 'text-orange-600/70 dark:text-orange-300/80'">{{ __('because you sell:') }} {{ $opp['origin'] }}</span>
                                                     @endif
                                                 </span>
-                                                @if ($showVolumes && $opp['volume'] !== null && ! $isRemoved)
-                                                    <span class="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 shadow-sm dark:bg-slate-900 dark:text-slate-300">{{ number_format($opp['volume']) }}/mo</span>
+                                                @if ($showVolumes && $opp['volume'] !== null)
+                                                    <span x-show="! $wire.removedTerms.includes(kw)" class="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 shadow-sm dark:bg-slate-900 dark:text-slate-300">{{ number_format($opp['volume']) }}/mo</span>
                                                 @endif
-                                                <svg class="h-3.5 w-3.5 flex-none {{ $isRemoved ? 'text-slate-400' : 'text-orange-400' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                                    @if ($isRemoved)
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M21.015 4.356v4.992m0 0h-4.992m4.993 0l-3.181-3.183a8.25 8.25 0 00-13.803 3.7"/>
-                                                    @else
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                                                    @endif
+                                                <svg class="h-3.5 w-3.5 flex-none" :class="$wire.removedTerms.includes(kw) ? 'text-slate-400' : 'text-orange-400'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                                    <path x-show="$wire.removedTerms.includes(kw)" stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M21.015 4.356v4.992m0 0h-4.992m4.993 0l-3.181-3.183a8.25 8.25 0 00-13.803 3.7"/>
+                                                    <path x-show="! $wire.removedTerms.includes(kw)" stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                                                 </svg>
                                             </button>
                                         @endforeach
@@ -999,9 +1056,10 @@
                             @endif
 
                             {{-- Competitor domain metrics — authority + organic traffic (DataForSEO)
-                                 for the rivals we analyzed. Shares the gap row at half width. --}}
+                                 for the rivals we analyzed. Full width: 6 numeric columns need
+                                 the room (half width forced horizontal scrolling). --}}
                             @if (! empty($kw['competitor_metrics']))
-                            <div class="flex flex-col overflow-hidden rounded-2xl border border-orange-200 shadow-sm dark:border-orange-900">
+                            <div class="flex flex-col overflow-hidden rounded-2xl border border-orange-200 shadow-sm lg:col-span-2 dark:border-orange-900">
                                 <div class="flex shrink-0 items-start gap-3 bg-gradient-to-r from-orange-50 to-white px-4 py-3 dark:from-orange-950 dark:to-slate-900">
                                     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
                                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
@@ -1066,17 +1124,15 @@
                 @elseif ($wizardStep === 7)
                     @php $dts = $wizard['draftTopics'] ?? collect(); @endphp
                     <div class="text-center">
-                        <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
-                            <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a5.25 5.25 0 016.775-5.025.75.75 0 01.313 1.248l-3.32 3.319c.063.475.276.934.641 1.299.365.365.824.578 1.3.64l3.318-3.319a.75.75 0 011.248.313 5.25 5.25 0 01-5.472 6.756c-1.018-.086-1.87.1-2.309.634L7.344 21.3A3.298 3.298 0 112.7 16.657l8.684-7.151c.533-.44.72-1.291.634-2.309a5.342 5.342 0 01-.068-.447z"/></svg>
-                        </span>
+                        <x-nodus :state="$dts->isEmpty() ? 'searching' : 'success'" :size="80" class="mx-auto mb-1 text-slate-400 dark:text-slate-500"/>
                         <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 7 of 7') }}</p>
                         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Your first articles are ready') }}</h2>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Built from what your audience is really searching for. Remove any that don\'t fit, then launch.') }}</p>
                     </div>
 
                     @if ($dts->isEmpty())
-                        <div wire:poll.4s class="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
-                            <svg class="h-6 w-6 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                        <div wire:poll.4s class="mt-6 flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
+                            <x-nodus state="analyzing" :size="92" class="text-slate-400 dark:text-slate-500"/>
                             <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('Researching the best topics for your site…') }}</p>
                         </div>
                     @else

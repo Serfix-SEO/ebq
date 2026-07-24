@@ -39,6 +39,17 @@ class GuestKeywordVolumeController extends Controller
             ], 202);
         }
 
+        // Verify the reCAPTCHA the page has always rendered + posted. The tool
+        // is behind the account wall (guests short-circuit above), but we still
+        // validate it on the real submit — the widget was previously ignored
+        // server-side, so a scripted/replayed request skipped it entirely.
+        if (Recaptcha::isEnabled()) {
+            $request->validate(
+                ['g-recaptcha-response' => ['required', 'string', new ValidRecaptcha]],
+                ['g-recaptcha-response.required' => 'Please complete the reCAPTCHA below to continue.'],
+            );
+        }
+
         $ip = (string) $request->ip();
 
         $minuteKey = 'guest-volume:m:'.$ip;

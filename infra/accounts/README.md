@@ -23,7 +23,7 @@ session value (`current_website_id`) chosen by `WebsiteSelector`.
 | Login | `app/Http/Controllers/Auth/AuthenticatedSessionController.php:20` | Authenticates, regenerates session, picks first accessible website + route, logs `auth.login`. |
 | Login request | `app/Http/Requests/Auth/LoginRequest.php:41` | `Auth::attempt` + throttle (5/key); disabled-account block; recaptcha when enabled. Errors keyed to **`auth`** (banner, not field). |
 | Registration | `app/Http/Controllers/Auth/RegisteredUserController.php:45` | Creates user, accepts pending invitations, fires `Registered`, optional pay-first redirect to Stripe checkout. |
-| Google SSO | `app/Http/Controllers/GoogleOAuthController.php:17` | `ssoRedirect`/`ssoCallback`: login-or-create by email, auto-verifies email, persists `GoogleAccount`, routes to onboarding if no website. |
+| Google SSO | `app/Http/Controllers/GoogleOAuthController.php:17` | `ssoRedirect`/`ssoCallback`: login-or-create by email, auto-verifies email, **identity-only scopes** (persists `GoogleAccount` only if GSC/Analytics scopes granted), honours `?redirect=`, routes to onboarding if no website. Button on login/register + `partials/auth-modal`. |
 | Google connect (sync) | `app/Http/Controllers/GoogleOAuthController.php:112` | `redirect`/`callback`/`redirectMailScope`: add a data-source / Gmail-send account; returns to onboarding **or** settings via whitelisted `return`. |
 | Onboarding | `app/Livewire/Onboarding/ConnectGoogle.php:12` | 2-step wizard: connect Google → pick GA/GSC → `saveWebsite()` / `skipForNow()`. |
 | Connect-sources modal | `app/Livewire/ConnectSourcesModal.php:22` | App-wide "attach GA/GSC later" modal opened by the banner from any page. |
@@ -84,8 +84,25 @@ standard immediate-enforcement Laravel behaviour. Google SSO users are
 force-verified at creation so they never hit the window.
 
 **Google SSO** (`auth/google/sso`): login-or-create by lowercased email,
-**force-verifies** `email_verified_at` (SSO email is trusted), persists the
-`GoogleAccount`, then routes to `/onboarding` when `! hasAccessibleWebsites()`.
+**force-verifies** `email_verified_at` (SSO email is trusted), then routes to
+`/onboarding` when `! hasAccessibleWebsites()`.
+
+- **MINIMUM scopes (2026-07-24).** `ssoRedirect` requests `openid profile email`
+  ONLY — login never asks for Analytics/Search Console/indexing. Connecting
+  those data sources is a separate, explicit in-app step (`google.redirect` /
+  `ConnectGoogle`). `ssoCallback` therefore persists a `GoogleAccount` **only
+  when** the granted token scope actually includes `webmasters`/`analytics`
+  (guarded on `$googleUser->accessTokenResponseBody['scope']`) — an identity-only
+  login creates NO half-connected, token-less `GoogleAccount` row.
+- **Return-to.** `?redirect=<local-path>` is stashed (`google_sso.redirect`) and
+  honoured after login — so "Continue with Google" from a public-tool / report
+  teaser gate lands back on the result the visitor was viewing (parity with
+  password signup's `redirect` field). Local-path only (no open redirect).
+- **Surfaces.** The button lives on `auth/{login,register}.blade.php` and the
+  shared `partials/auth-modal.blade.php` (every tool-gate / report-teaser modal).
+  The `google.sso.callback` redirect URI is already registered in Google Cloud;
+  reducing scopes needs no console change (identity is a subset). Tests:
+  `GoogleSsoLoginTest`.
 
 **Onboarding** (`ConnectGoogle`): step 1 connects Google (bounces through
 `google.redirect`, stashing in-progress picks in session); step 2 lists pooled

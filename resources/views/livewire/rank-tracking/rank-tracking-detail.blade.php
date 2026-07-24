@@ -1,7 +1,7 @@
 <div>
     @if (! $keyword)
         <div class="rounded-xl border border-slate-200 bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900">
-            <svg class="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+            <x-nodus state="confused" :size="72" class="text-slate-400 dark:text-slate-500" />
             <p class="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-200">{{ __('Keyword not found') }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('It may have been deleted or belong to another website you don\'t have access to.') }}</p>
             <a href="{{ route('rank-tracking.index') }}" wire:navigate class="mt-4 inline-flex h-8 items-center gap-1 rounded-md bg-orange-600 px-3 text-xs font-semibold text-white hover:bg-orange-700">
@@ -328,7 +328,7 @@
                     </div>
                     @if ($snapshots->isEmpty())
                         <div class="px-4 py-10 text-center">
-                            <svg class="mx-auto h-8 w-8 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                            <x-nodus state="searching" :size="72" class="text-slate-400 dark:text-slate-500" />
                             <p class="mt-2 text-xs font-medium text-slate-500">{{ __('No checks yet') }}</p>
                             <p class="mt-1 text-[11px] text-slate-400">{{ __('Hit "Force re-check" to run the first one.') }}</p>
                         </div>

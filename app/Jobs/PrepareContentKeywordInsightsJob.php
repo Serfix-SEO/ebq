@@ -54,7 +54,11 @@ class PrepareContentKeywordInsightsJob implements ShouldQueue
         // wasted request. One fast flash call; failures never block research.
         $guard = app(CompetitorMentionGuard::class);
         try {
-            if (! $guard->assessed($plan)) {
+            // assessedEmpty: an assessment that raced ahead of SERP discovery
+            // (empty list) must not count; assessmentStale: the 30-day
+            // re-discovery swapped the list since the assessment ran. Both →
+            // re-run (the carmenperfumes races, 2026-07-23).
+            if (! $guard->assessed($plan) || $guard->assessedEmpty($plan) || $guard->assessmentStale($plan)) {
                 $guard->assess($plan);
                 $plan->refresh();
             }

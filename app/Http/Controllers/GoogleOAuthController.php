@@ -43,25 +43,22 @@ class GoogleOAuthController extends Controller
         $request->session()->put('google_sso.intent', (string) $request->query('intent', 'login'));
         $request->session()->put('google_sso.invite', (string) $request->query('invite', ''));
 
-        // No `include_granted_scopes` here — login is conceptually a
-        // fresh flow, and Google's behavior with that flag is to surface
-        // every previously-granted scope (including unrelated ones like
-        // gmail.send from the report-mail transport) on the consent
-        // screen. We explicitly list the scopes login should ask for.
+        // Return the visitor to the local path they came from (public-tool /
+        // report teaser gate). Local-path only — never an open redirect.
+        $return = (string) $request->query('redirect', '');
+        $request->session()->put(
+            'google_sso.redirect',
+            (str_starts_with($return, '/') && ! str_starts_with($return, '//')) ? $return : ''
+        );
+
+        // MINIMUM scopes: identity only (openid/profile/email). Signing in must
+        // NOT ask for Analytics/Search Console — connecting those is a separate,
+        // explicit in-app step (google.redirect / ConnectGoogle). Requesting
+        // only identity keeps the consent screen to name + email and avoids the
+        // offline-access refresh-token grant we don't need for login.
         return Socialite::driver('google')
             ->redirectUrl(route('google.sso.callback', absolute: true))
-            ->scopes([
-                'openid',
-                'profile',
-                'email',
-                'https://www.googleapis.com/auth/analytics.readonly',
-                'https://www.googleapis.com/auth/webmasters.readonly',
-                'https://www.googleapis.com/auth/indexing',
-            ])
-            ->with([
-                'access_type' => 'offline',
-                'prompt' => 'consent',
-            ])
+            ->scopes(['openid', 'profile', 'email'])
             ->redirect();
     }
 
@@ -123,7 +120,22 @@ class GoogleOAuthController extends Controller
             return $this->finishContentOnboarding($user);
         }
 
-        $oauthService->persistAccount($user, $googleUser);
+        // Only persist a Google DATA connection when the user actually granted
+        // Analytics / Search Console scopes. Login & registration request
+        // identity scopes only (minimum), so there is nothing to connect here —
+        // guard it so an identity-only token never creates a half-connected,
+        // token-less GoogleAccount row. (Future broad-scope flows still persist.)
+        $granted = (string) ($googleUser->accessTokenResponseBody['scope'] ?? '');
+        if (str_contains($granted, 'webmasters') || str_contains($granted, 'analytics')) {
+            $oauthService->persistAccount($user, $googleUser);
+        }
+
+        // Public-tool / teaser gate: return to the local path the visitor was
+        // viewing when they hit the signup wall (parity with password signup).
+        $return = (string) $request->session()->pull('google_sso.redirect', '');
+        if ($return !== '' && str_starts_with($return, '/') && ! str_starts_with($return, '//')) {
+            return redirect()->to($return);
+        }
 
         $websiteId = session('current_website_id');
         if (($websiteId === null || $websiteId === '')) {

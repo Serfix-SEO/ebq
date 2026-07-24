@@ -340,4 +340,17 @@ class GuestPageAuditTest extends TestCase
             'keyword' => 'best seo tools',
         ])->assertStatus(429);
     }
+
+    /** Security (2026-07-24): reCAPTCHA is now enforced server-side on submit. */
+    public function test_recaptcha_is_required_on_submit_when_enabled(): void
+    {
+        $this->actingAs(\App\Models\User::factory()->create());
+        config(['services.recaptcha.site_key' => 'sk', 'services.recaptcha.secret_key' => 'secret']);
+        Queue::fake();
+
+        $this->postJson(route('guest-audit.store'), ['url' => 'example.com/p', 'keyword' => 'best seo tools'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('g-recaptcha-response');
+        Queue::assertNothingPushed();
+    }
 }

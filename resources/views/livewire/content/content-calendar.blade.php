@@ -581,8 +581,12 @@
             </div>
         @endif
 
-        {{-- ── Insight: what your audience searches ─────────────────── --}}
-        @if (! empty($audience))
+        {{-- ── Insight: what your audience searches ───────────────────
+             $audienceSearches, NOT $audience: the component's public string
+             $audience (wizard step-1 "Who is this for?") wins Livewire's
+             view-data merge and shadowed the array → foreach-on-string 500
+             (prod 2026-07-23). --}}
+        @if (! empty($audienceSearches))
             <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center gap-2">
                     <svg class="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -590,7 +594,7 @@
                 </div>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Real search demand behind your planned articles.') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
-                    @foreach ($audience as $row)
+                    @foreach ($audienceSearches as $row)
                         <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                             {{ $row['keyword'] }}
                             @if ($row['volume'])<span class="text-xs font-semibold text-orange-600">{{ number_format($row['volume']) }}/mo</span>@endif

@@ -57,7 +57,7 @@
                  it's obvious work is happening and where the results will land. --}}
             <div class="flex items-start gap-4">
                 <div class="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300">
-                    <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                    <x-nodus state="analyzing" :size="36" class="text-orange-400 dark:text-orange-500" />
                 </div>
                 <div class="min-w-0 flex-1">
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-white">{{ __('Analysing the keyword gap…') }}</h3>
@@ -223,7 +223,7 @@
                     <div class="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
                         @if ($this->isFinding())
                             <span class="inline-flex items-center gap-2">
-                                <span class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-orange-500"></span>
+                                <x-nodus state="analyzing" :size="24" class="shrink-0 text-orange-400 dark:text-orange-500" />
                                 {{ __('Finding competitors for :d — this updates automatically.', ['d' => $targetDomain]) }}
                             </span>
                         @else
@@ -386,7 +386,7 @@
                 <div class="mt-3 rounded-xl border border-orange-200 bg-orange-50/70 p-4 dark:border-orange-500/30 dark:bg-orange-500/10">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <p class="flex items-center gap-2.5 text-sm font-bold text-orange-900 dark:text-orange-200">
-                            <svg class="h-4.5 w-4.5 h-5 w-5 animate-spin text-orange-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            <x-nodus state="analyzing" :size="72" class="text-orange-400 dark:text-orange-500" />
                             {{ __('Checking Google’s live results…') }}
                         </p>
                         <span class="text-sm font-bold tabular-nums text-orange-800 dark:text-orange-300">{{ number_format($vDone) }} / {{ number_format($vTotalRun) }} · {{ $vPct }}%</span>

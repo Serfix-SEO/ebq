@@ -32,6 +32,7 @@
         class="mb-4 flex items-start justify-between gap-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-100"
         role="status"
     >
+        <x-nodus state="searching" :size="40" class="mt-0.5 flex-none text-slate-400 dark:text-slate-500" />
         <div class="flex-1">
             <div class="font-semibold">{{ $bannerLead }}</div>
             <div class="mt-1">{{ __('You haven’t connected') }} {{ $missingLabel }} {{ __('for') }} <span class="font-medium">{{ $bannerWebsite->domain ?: __('this website') }}</span>. {{ __('Some sections stay empty until you do.') }}</div>

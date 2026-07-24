@@ -22,9 +22,7 @@
         {{-- Overlay upsell card --}}
         <div class="absolute inset-0 flex items-center justify-center overflow-y-auto bg-white/60 p-4 backdrop-blur-sm dark:bg-slate-900/60">
             <div class="my-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-                <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300">
-                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.256-1.011M21.75 6.75v5.25M21.75 6.75h-5.25"/></svg>
-                </span>
+                <x-nodus state="idle" :size="60" class="mx-auto text-orange-400 dark:text-orange-500" />
                 <h2 class="mt-4 text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Full SEO dashboard is a separate plan') }}</h2>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
                     {{ __('Your Content Autopilot subscription keeps writing and publishing articles. Site audits, backlinks, rank tracking and the rest of the SEO dashboard need a dashboard plan.') }}

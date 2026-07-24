@@ -266,7 +266,10 @@
                     <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ __('Last 90 days, ordered by impressions. 2+ rows = candidate for consolidation.') }}</p>
                 </div>
                 @if (empty($top_pages))
-                    <p class="px-5 py-6 text-center text-sm text-slate-500 dark:text-slate-400">{{ __('No pages of yours have served impressions for this query in the last 90 days.') }}</p>
+                    <div class="px-5 py-6 text-center">
+                        <x-nodus state="confused" :size="48" class="mx-auto mb-2 text-slate-400 dark:text-slate-500" />
+                        <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('No pages of yours have served impressions for this query in the last 90 days.') }}</p>
+                    </div>
                 @else
                     <div class="overflow-x-auto">
                         <table class="w-full text-xs">

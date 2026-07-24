@@ -28,7 +28,7 @@
                 <button type="button" wire:click="discover" wire:loading.attr="disabled" @if($this->isPolling()) disabled @endif
                     class="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500 disabled:opacity-50">
                     @if ($this->isPolling())
-                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                        <x-nodus state="analyzing" :size="20" class="text-white" />
                         {{ __('Discovering…') }}
                     @else
                         {{ __('Discover competitors') }}

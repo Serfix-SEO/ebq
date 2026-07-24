@@ -115,6 +115,7 @@
         </div>
     @else
         <div class="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center dark:border-slate-700 dark:bg-slate-900">
+            <x-nodus state="searching" :size="72" class="mb-3 text-slate-400 dark:text-slate-500" />
             <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('No sitemaps yet.') }}</p>
             <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">{{ __('Add one above') }}{{ $hasGsc ? ', ' . __('or sync from Google Search Console') : '' }}.</p>
         </div>

@@ -22,6 +22,8 @@
             'serp_api' => 'bg-orange-50 text-orange-700 border-orange-200',
             'mistral'  => 'bg-purple-50 text-purple-700 border-purple-200',
             'deepseek' => 'bg-sky-50 text-sky-700 border-sky-200',
+            'mistral:unmetered'  => 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+            'deepseek:unmetered' => 'bg-teal-50 text-teal-700 border-teal-200',
         ];
 
         // Build sparkline path for a series.

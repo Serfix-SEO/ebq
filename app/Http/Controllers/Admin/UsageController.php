@@ -36,6 +36,20 @@ class UsageController extends Controller
             'label' => 'DeepSeek',
             'unit' => 'tokens',
         ],
+        // Content Autopilot (and other __unmetered LLM callers) log their token
+        // spend under these ":unmetered" labels — deliberately OUTSIDE the
+        // capped mistral/deepseek pool so it never counts against a user's
+        // dashboard token quota (see OpenAiCompatibleClient / UsageMeter). Shown
+        // here for cost visibility only; the plan-window utilisation table below
+        // is cap-based and correctly omits them.
+        'mistral:unmetered' => [
+            'label' => 'Mistral AI (content)',
+            'unit' => 'tokens',
+        ],
+        'deepseek:unmetered' => [
+            'label' => 'DeepSeek (content)',
+            'unit' => 'tokens',
+        ],
     ];
 
     public function index(Request $request): View
@@ -200,6 +214,10 @@ class UsageController extends Controller
             // single per-token rate that errs on the conservative side.
             'mistral' => (float) config('services.mistral.cost_per_token_usd', 0.0000003),
             'deepseek' => (float) config('services.deepseek.cost_per_token_usd', 0.0000011),
+            // Same per-token cost as the pooled providers — content spend is
+            // just attributed to a non-capped label (see PROVIDERS).
+            'mistral:unmetered' => (float) config('services.mistral.cost_per_token_usd', 0.0000003),
+            'deepseek:unmetered' => (float) config('services.deepseek.cost_per_token_usd', 0.0000011),
         ];
     }
 

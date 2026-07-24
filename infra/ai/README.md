@@ -18,6 +18,22 @@ The **moat** is server-side: the plugin only ever receives the typed result. It
 never knows which model ran, what the prompt was, or which proprietary signals
 (GSC clusters, crawl intel, brand voice, network insight) were loaded.
 
+> **AI Studio is globally DISABLED in prod (beta kill-switch, 2026-07-23).**
+> `config('features.ai_studio')` (env `FEATURE_AI_STUDIO`, default **false**,
+> `config/features.php`) gates the whole dashboard surface — independent of the
+> per-team `feature:ai_studio` permission. When off: the `/ai-studio*` route
+> group 404s via the `feature.enabled:ai_studio` middleware
+> (`EnsureFeatureEnabled`), the sidebar entry is omitted
+> (`layouts/app.blade.php`), and `User::firstAccessibleRoute()` skips it so no
+> redirect lands there. Route NAMES stay registered even when off (so those
+> redirects never hit an unknown route) — the middleware just 404s the request.
+> The WordPress-plugin tool/writer surfaces are a SEPARATE path and unaffected.
+> Re-enable per box: set `FEATURE_AI_STUDIO=true`, then **rebuild the route
+> cache** (`php artisan route:cache`) — the middleware list is baked into
+> `bootstrap/cache/routes-v7.php`, so a stale cache silently keeps old behavior.
+> Tests: `AiStudioKillSwitchTest`; `WriterProjectAsyncGenerationTest` flips the
+> flag on in setUp because the writer routes live under the same gate.
+
 ## Read in this order
 
 | Doc | What it covers |

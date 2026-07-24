@@ -281,6 +281,16 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-07-23 (Nodus mascot site-wide)** — The Content-Autopilot mascot `<x-nodus>`
+  now fronts loading/empty/error/success states across the whole app (was only in the
+  content wizard). Added composed wrappers `<x-nodus.state>` / `<x-nodus.inline>`;
+  upgraded the shared `insights/empty-state` + `overview/processing-panel` in place
+  (prop contracts unchanged → all consumers auto-inherit the mascot); created custom
+  error pages `errors/{404,419,429,500,503}` + a standalone `errors/shell`; added a
+  Nodus hero to the guest auth layout. Rebuilt the Tailwind bundle (new `dark:orange`
+  variants) — class-based dark mode landmine. Tests: `NodusUiTest`. Full design-system
+  doc: [frontend/README.md](./frontend/README.md) § Nodus. Staging live + headless QA'd;
+  prod pending FPM restart (opcache).
 - **2026-07-22 (competitors step: SERP-first, giants filtered, SERP order,
   top-10)** — Owner decision. `ContentSetupInsights::build()` now takes
   SERP-discovered competitors as LAYER 1 (displayed in SERP tally order; the

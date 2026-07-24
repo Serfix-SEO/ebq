@@ -11,11 +11,9 @@
     <section id="start" class="relative overflow-hidden border-b border-slate-200 bg-gradient-to-b from-orange-50/70 via-white to-white">
         {{-- decorative glows --}}
         <div class="pointer-events-none absolute -top-24 start-1/2 h-72 w-[36rem] -translate-x-1/2 rounded-full bg-gradient-to-r from-orange-300 to-amber-200 opacity-40 blur-3xl"></div>
-        <div class="mx-auto max-w-4xl px-6 py-20 text-center lg:px-8 lg:py-28">
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-white/70 px-3.5 py-1 text-xs font-bold uppercase tracking-[0.15em] text-orange-600 shadow-sm backdrop-blur">
-                <span class="h-1.5 w-1.5 rounded-full bg-orange-500"></span>{{ __('Content Autopilot') }}
-            </span>
-            <h1 class="mx-auto mt-6 max-w-3xl text-balance text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+        <div class="mx-auto max-w-4xl px-6 pb-20 pt-6 text-center lg:px-8 lg:pb-28 lg:pt-12">
+            <x-nodus state="searching" :size="128" class="mx-auto mb-4 h-24 w-24 text-slate-400 sm:h-[128px] sm:w-[128px]"/>
+            <h1 class="mx-auto max-w-3xl text-balance text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
                 {{ __('Expert SEO articles,') }} <span class="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">{{ __('written & published for you') }}</span>
             </h1>
             <p class="mx-auto mt-6 max-w-2xl text-balance text-lg leading-8 text-slate-600">
@@ -23,7 +21,7 @@
             </p>
 
             {{-- Domain capture --}}
-            <form method="POST" action="{{ route('content.onboarding.begin') }}" class="mx-auto mt-9 max-w-xl">
+            <form method="POST" action="{{ route('content.onboarding.begin') }}" class="mx-auto mt-6 max-w-xl">
                 @csrf
                 <div class="flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/5 sm:flex-row sm:items-center sm:rounded-full sm:p-2">
                     <div class="flex flex-1 items-center gap-2.5 ps-3">

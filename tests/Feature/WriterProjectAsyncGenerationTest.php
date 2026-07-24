@@ -28,6 +28,9 @@ class WriterProjectAsyncGenerationTest extends TestCase
         // like prod's settings row does.
         $this->seed(\Database\Seeders\PlanSeeder::class);
         \App\Models\Setting::set('global_feature_flags', ['ai_writer' => true]);
+        // AI Studio ships disabled (beta kill-switch); the writer routes live
+        // under it, so enable it for this suite.
+        config(['features.ai_studio' => true]);
     }
 
     private function projectFor(User $user): array

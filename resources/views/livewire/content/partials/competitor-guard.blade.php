@@ -20,18 +20,24 @@
         </div>
 
         @if ($guard !== null && $guard['assessed'])
-            <button type="button" wire:click="toggleCompetitorGuard"
-                class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition {{ $guard['enabled'] ? 'bg-success' : 'bg-slate-300 dark:bg-slate-700' }}"
-                aria-label="{{ __('Competitor mention protection') }}">
-                <span class="inline-block h-5 w-5 rounded-full bg-white shadow transition {{ $guard['enabled'] ? 'translate-x-5' : 'translate-x-1' }}"></span>
+            {{-- Optimistic: knob flips instantly (Alpine), server persists in background.
+                 $guard['enabled'] is NOT a Livewire prop, so the local mirror is re-keyed
+                 by the server value — any server-side change (auto-enable, reassess, our
+                 own confirmed toggle) swaps the element and re-inits the mirror. --}}
+            <button type="button" wire:key="guard-switch-{{ $guard['enabled'] ? 'on' : 'off' }}"
+                x-data="{ on: @js((bool) $guard['enabled']) }"
+                x-on:click="on = ! on; $wire.toggleCompetitorGuard()"
+                class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition" :class="on ? 'bg-success' : 'bg-slate-300 dark:bg-slate-700'"
+                aria-label="{{ __('Competitor mention protection') }}" role="switch" :aria-checked="on ? 'true' : 'false'">
+                <span class="inline-block h-5 w-5 rounded-full bg-white shadow transition" :class="on ? 'translate-x-5' : 'translate-x-1'"></span>
             </button>
         @endif
     </div>
 
     @if ($guard === null || ! $guard['assessed'])
         {{-- Poll until the classification lands (the queued job is seconds away). --}}
-        <div wire:poll.4s class="mt-4 flex items-center gap-2.5 rounded-xl bg-slate-50 px-4 py-3 text-xs font-medium text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
-            <svg class="h-4 w-4 shrink-0 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+        <div wire:poll.4s class="mt-4 flex items-center gap-2.5 rounded-xl bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+            <x-nodus state="searching" :size="38" class="shrink-0 text-slate-400 dark:text-slate-500"/>
             {{ __('Checking which of your competitors could pull readers away…') }}
         </div>
     @else

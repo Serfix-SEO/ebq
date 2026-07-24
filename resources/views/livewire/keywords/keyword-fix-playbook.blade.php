@@ -35,10 +35,7 @@
         <div class="mt-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
             wire:poll.3s="pollAudit">
             <div class="flex items-center gap-3">
-                <svg class="h-5 w-5 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path>
-                </svg>
+                <x-nodus state="analyzing" :size="56" class="flex-none text-orange-400 dark:text-orange-500" />
                 <div>
                     <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ __('Analysing this page for “:keyword”…', ['keyword' => $keyword]) }}</p>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Running a keyword-aware audit and benchmarking the SERP. This usually takes under a minute.') }}</p>
@@ -118,7 +115,7 @@
                 </div>
             @else
                 <div wire:loading.flex wire:target="loadSnippetRewrites,regenerateIntent" class="mt-3 items-center gap-2 text-sm text-slate-500">
-                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
+                    <x-nodus state="analyzing" :size="40" class="flex-none text-orange-400 dark:text-orange-500" />
                     {{ __('Generating rewrites…') }}
                 </div>
                 <div wire:loading.remove wire:target="loadSnippetRewrites,regenerateIntent">
@@ -166,7 +163,7 @@
                 </div>
             @else
                 <div wire:loading.flex wire:target="loadBrief,generateBrief" class="mt-3 items-center gap-2 text-sm text-slate-500">
-                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
+                    <x-nodus state="analyzing" :size="40" class="flex-none text-orange-400 dark:text-orange-500" />
                     {{ __('Building brief…') }}
                 </div>
                 <div wire:loading.remove wire:target="loadBrief,generateBrief">

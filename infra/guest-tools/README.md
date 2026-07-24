@@ -100,6 +100,22 @@ the lead is marked converted on capture. `Lead::markConvertedFor($user)` fires f
   viewable by token).
 - **`tries=1` means no retry.** A transient provider blip on the single attempt → the run is marked
   failed and the user must resubmit (and burn another attempt/rate-limit slot).
+- **reCAPTCHA is enforced server-side on submit (2026-07-24).** All four `store()` methods validate
+  `g-recaptcha-response` (`new ValidRecaptcha`) whenever `Recaptcha::isEnabled()` (both keys set), placed
+  right after the `auth()->guest()` teaser short-circuit and before any rate-limit/paid work. The page
+  always rendered the widget + posted the token, but the controllers previously **ignored it** — a
+  scripted/replayed POST skipped the captcha entirely. NOT gated on `!auth()->check()`: the real run only
+  happens for signed-in users (guests short-circuit), so gating on guest would make the check inert.
+- **Keyword-volume job is provider-aware (2026-07-24).** `KeywordMetricsService::refresh()` is
+  **synchronous** for Keywords Everywhere but **asynchronous** for the self-hosted keyword finder — it
+  dispatches the node lookup and returns; the row lands in `keyword_metrics` later via the webhook. So
+  `RunGuestKeywordVolume` must NOT declare failure on the first cache miss: when
+  `KeywordProviderConfig::usingKeywordFinder()`, it kicks the lookup off on attempt 0 then re-queues
+  itself (`RETRY_SECONDS`=6, `MAX_ATTEMPTS`=20 ≈ 2 min) until the volume lands, only failing at the
+  deadline. Before this fix every public keyword check failed ~1s after submit (updated_at==created_at)
+  even though the node delivered the data 40-70s later. Tests: `test_async_provider_*` in
+  `GuestKeywordVolumeTest`. (The node's `/status` endpoint separately times out in logs — unrelated;
+  results still arrive via the webhook, which is what the poll reads.)
 
 ## Key files
 

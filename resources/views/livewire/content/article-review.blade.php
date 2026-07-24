@@ -145,7 +145,12 @@
                                     @else
                                         <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 8v4m0 4h.01"/></svg>
                                     @endif
-                                    {{ $check['label'] }}
+                                    <span class="min-w-0">
+                                        {{ $check['label'] }}
+                                        @if (! $check['passed'] && ! empty($check['hint']))
+                                            <span class="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">{{ $check['hint'] }}</span>
+                                        @endif
+                                    </span>
                                 </li>
                             @endforeach
                         </ul>
@@ -265,25 +270,156 @@
                         {!! $previewHtml !!}
                     </article>
                 @else
-                    {{-- Editable meta fields --}}
-                    <div class="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Headline (H1)') }}</label>
-                            <input type="text" wire:model.live.debounce.600ms="editH1"
-                                class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                    @php
+                        $fieldClass = 'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
+                        $labelClass = 'block text-xs font-semibold text-slate-600 dark:text-slate-400';
+                        // Preview fall-throughs mirror the plugin: SEO title → H1;
+                        // social title/desc → SEO title/meta description.
+                        $gTitle = trim($editMetaTitle) !== '' ? $editMetaTitle : $editH1;
+                        $gDesc = $editMetaDescription;
+                        $gUrl = trim($siteHost) !== '' ? $siteHost : __('your-site.com');
+                        $socialTitle = trim($editOgTitle) !== '' ? $editOgTitle : $gTitle;
+                        $socialDesc = trim($editOgDescription) !== '' ? $editOgDescription : $gDesc;
+                        // Social image: explicit OG → Twitter → the article's
+                        // generated featured image (so the card is never blank).
+                        $socialImg = trim($editOgImage) !== '' ? trim($editOgImage)
+                            : (trim($editTwitterImage) !== '' ? trim($editTwitterImage) : trim($socialImageFallback ?? ''));
+                        $len = fn ($s, $max) => mb_strlen(trim((string) $s)).'/'.$max;
+                        $countClass = fn ($s, $lo, $hi) => (mb_strlen(trim((string) $s)) >= $lo && mb_strlen(trim((string) $s)) <= $hi) ? 'text-emerald-600' : 'text-slate-400';
+                    @endphp
+                    {{-- ── Plugin-style SEO panel: live audit + per-article SEO fields.
+                         Collapsible + default COLLAPSED. Body uses x-show (not
+                         x-if) so the inputs stay in the DOM while collapsed and
+                         still submit with "Save changes". ── --}}
+                    <div class="mb-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+                         x-data="{ open: false, social: false, advanced: false }">
+                        <button type="button" @click="open = !open" class="flex w-full items-center gap-2 text-left">
+                            <x-nodus :size="22" class="shrink-0" />
+                            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">{{ __('SEO settings for this article') }}</h3>
+                            <span class="ms-auto rounded-full px-2 py-0.5 text-[11px] font-bold text-white" style="background: {{ $liveScore >= 85 ? '#059669' : ($liveScore >= 60 ? '#F26419' : '#e11d48') }};">{{ (int) $liveScore }}/100</span>
+                            <svg class="h-4 w-4 shrink-0 text-slate-400 transition" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+                        </button>
+
+                        <div x-show="open" x-cloak class="mt-4 space-y-4">
+                        {{-- Google snippet preview --}}
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                            <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Google preview') }}</p>
+                            <div class="truncate text-xs" style="color:#4d5156;">{{ $gUrl }} <span style="color:#5f6368;">&rsaquo; {{ Str::limit(trim($editSlug), 40) }}</span></div>
+                            <div class="truncate text-lg leading-snug" style="color:#1a0dab;">{{ $gTitle !== '' ? $gTitle : __('Your SEO title appears here') }}</div>
+                            <div class="text-xs leading-snug" style="color:#4d5156;">{{ Str::limit($gDesc !== '' ? $gDesc : __('Your meta description preview appears here — write 130–158 characters that earn the click.'), 160) }}</div>
                         </div>
-                        <div class="grid gap-3 sm:grid-cols-2">
+
+                        {{-- General fields --}}
+                        <div class="grid gap-3">
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('SEO title') }} <span class="font-normal text-slate-400">({{ mb_strlen($editMetaTitle) }}/60)</span></label>
-                                <input type="text" wire:model.live.debounce.600ms="editMetaTitle"
-                                    class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                                <label class="{{ $labelClass }}">{{ __('Focus keyphrase') }}</label>
+                                <input type="text" wire:model.live.debounce.600ms="editFocusKeyword" placeholder="{{ __('The main keyword this article targets') }}" class="{{ $fieldClass }}" />
+                                <p class="mt-1 text-[11px] text-slate-400">{{ __('The live audit scores against this. Defaults to the topic keyword.') }}</p>
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Meta description') }} <span class="font-normal text-slate-400">({{ mb_strlen($editMetaDescription) }}/158)</span></label>
-                                <input type="text" wire:model.live.debounce.600ms="editMetaDescription"
-                                    class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                                <label class="{{ $labelClass }}">{{ __('Headline (H1)') }}</label>
+                                <input type="text" wire:model.live.debounce.600ms="editH1" class="{{ $fieldClass }} font-semibold" />
+                            </div>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label class="{{ $labelClass }}">{{ __('SEO title') }} <span class="font-normal {{ $countClass($editMetaTitle, 40, 60) }}">({{ $len($editMetaTitle, 60) }})</span></label>
+                                    <input type="text" wire:model.live.debounce.600ms="editMetaTitle" class="{{ $fieldClass }}" />
+                                </div>
+                                <div>
+                                    <label class="{{ $labelClass }}">{{ __('URL slug') }}</label>
+                                    <input type="text" wire:model.live.debounce.600ms="editSlug" class="{{ $fieldClass }}" />
+                                </div>
+                            </div>
+                            <div>
+                                <label class="{{ $labelClass }}">{{ __('Meta description') }} <span class="font-normal {{ $countClass($editMetaDescription, 130, 158) }}">({{ $len($editMetaDescription, 158) }})</span></label>
+                                <textarea wire:model.live.debounce.600ms="editMetaDescription" rows="2" class="{{ $fieldClass }}"></textarea>
+                            </div>
+                            <div>
+                                <label class="{{ $labelClass }}">{{ __('Canonical URL') }} <span class="font-normal text-slate-400">({{ __('optional') }})</span></label>
+                                <input type="url" wire:model.live.debounce.600ms="editCanonical" placeholder="https://" class="{{ $fieldClass }}" />
                             </div>
                         </div>
+
+                        {{-- Social (OpenGraph + Twitter) — collapsible --}}
+                        <div class="rounded-lg border border-slate-200 dark:border-slate-700">
+                            <button type="button" @click="social = !social" class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-bold text-slate-700 dark:text-slate-200">
+                                <span>{{ __('Social preview (Facebook / X)') }}</span>
+                                <svg class="h-4 w-4 transition" :class="social && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+                            </button>
+                            <div x-show="social" class="space-y-3 border-t border-slate-200 p-3 dark:border-slate-700">
+                                {{-- Social card preview --}}
+                                <div class="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                                    @if ($socialImg !== '')
+                                        <img src="{{ $socialImg }}" alt="" class="h-32 w-full object-cover" onerror="this.style.display='none'" />
+                                    @else
+                                        <div class="flex h-24 w-full items-center justify-center bg-slate-100 text-[11px] text-slate-400 dark:bg-slate-800">{{ __('No social image set') }}</div>
+                                    @endif
+                                    <div class="bg-slate-50 p-2 dark:bg-slate-800/50">
+                                        <div class="text-[10px] uppercase text-slate-400">{{ $gUrl }}</div>
+                                        <div class="truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{{ $socialTitle !== '' ? $socialTitle : __('Social title') }}</div>
+                                        <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">{{ $socialDesc }}</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="{{ $labelClass }}">{{ __('Social image URL') }}</label>
+                                    <input type="url" wire:model.live.debounce.600ms="editOgImage" placeholder="https://" class="{{ $fieldClass }}" />
+                                </div>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <label class="{{ $labelClass }}">{{ __('OpenGraph title') }}</label>
+                                        <input type="text" wire:model.live.debounce.600ms="editOgTitle" placeholder="{{ __('Falls back to SEO title') }}" class="{{ $fieldClass }}" />
+                                    </div>
+                                    <div>
+                                        <label class="{{ $labelClass }}">{{ __('X (Twitter) title') }}</label>
+                                        <input type="text" wire:model.live.debounce.600ms="editTwitterTitle" placeholder="{{ __('Falls back to SEO title') }}" class="{{ $fieldClass }}" />
+                                    </div>
+                                </div>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <label class="{{ $labelClass }}">{{ __('OpenGraph description') }}</label>
+                                        <textarea wire:model.live.debounce.600ms="editOgDescription" rows="2" placeholder="{{ __('Falls back to meta description') }}" class="{{ $fieldClass }}"></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="{{ $labelClass }}">{{ __('X (Twitter) description') }}</label>
+                                        <textarea wire:model.live.debounce.600ms="editTwitterDescription" rows="2" placeholder="{{ __('Falls back to meta description') }}" class="{{ $fieldClass }}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <label class="{{ $labelClass }}">{{ __('X (Twitter) image URL') }}</label>
+                                        <input type="url" wire:model.live.debounce.600ms="editTwitterImage" placeholder="{{ __('Falls back to social image') }}" class="{{ $fieldClass }}" />
+                                    </div>
+                                    <div>
+                                        <label class="{{ $labelClass }}">{{ __('X (Twitter) card') }}</label>
+                                        <select wire:model.live="editTwitterCard" class="{{ $fieldClass }}">
+                                            <option value="summary_large_image">{{ __('Large image') }}</option>
+                                            <option value="summary">{{ __('Summary') }}</option>
+                                            <option value="app">{{ __('App') }}</option>
+                                            <option value="player">{{ __('Player') }}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Advanced (robots) — collapsible --}}
+                        <div class="rounded-lg border border-slate-200 dark:border-slate-700">
+                            <button type="button" @click="advanced = !advanced" class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-bold text-slate-700 dark:text-slate-200">
+                                <span>{{ __('Advanced (search engine directives)') }}</span>
+                                <svg class="h-4 w-4 transition" :class="advanced && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+                            </button>
+                            <div x-show="advanced" class="space-y-2 border-t border-slate-200 p-3 dark:border-slate-700">
+                                <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                    <input type="checkbox" wire:model.live="editNoindex" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500/30" />
+                                    {{ __('Noindex — ask search engines not to list this page') }}
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                    <input type="checkbox" wire:model.live="editNofollow" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500/30" />
+                                    {{ __('Nofollow — ask search engines not to follow links on this page') }}
+                                </label>
+                            </div>
+                        </div>
+                        </div>{{-- /x-show open --}}
                     </div>
 
                     {{-- Editor (Alpine-owned; wire:ignore so Livewire never clobbers the caret) --}}

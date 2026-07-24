@@ -60,7 +60,7 @@
             @if (($suggestions['status'] ?? '') === 'processing')
                 <div class="p-5">
                     <div class="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
-                        <span class="h-4 w-4 flex-none animate-spin rounded-full border-2 border-slate-200 border-t-orange-500 dark:border-slate-700"></span>
+                        <x-nodus state="analyzing" :size="40" class="flex-none text-orange-400 dark:text-orange-500" />
                         {{ __('Finding keyword ideas for your site — this updates automatically.') }}
                     </div>
                     <div class="mt-4 space-y-2" aria-hidden="true">
@@ -256,7 +256,7 @@
         <div class="mt-3">{{ $rows->links() }}</div>
     @elseif ($suggestions === null || ($suggestions['status'] ?? '') === 'unavailable')
         <div class="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 dark:border-slate-800 dark:bg-slate-900">
-            <svg class="h-12 w-12 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+            <x-nodus state="searching" :size="72" class="text-slate-400 dark:text-slate-500" />
             <p class="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('No keyword data yet') }}</p>
             <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">{{ __('Data will appear after the daily sync runs.') }}</p>
         </div>
