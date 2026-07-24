@@ -184,6 +184,11 @@ class ContentEntitlementsTest extends TestCase
         }
         // 4 generations across covered sites ≥ 3 → trial_limit for a new topic.
         $this->assertSame('trial_limit', $this->ent()->blockReason($topic->fresh()));
+
+        // An admin comp lifts the trial article cap — a comped client generates
+        // like a paying one (only the monthly per-site cap applies).
+        $user->forceFill(['content_comp_sites' => 1])->save();
+        $this->assertNull($this->ent()->blockReason($topic->fresh()));
     }
 
     public function test_is_content_only_when_dashboard_trial_expired(): void

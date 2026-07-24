@@ -281,7 +281,10 @@ class ContentEntitlements
         }
 
         // On trial (and not a paying subscriber): 3 generations across all sites.
-        if (! $this->hasContentSubscription($user) && $this->onContentTrial($user)) {
+        // An admin comp grant lifts this — a comped client should generate like a
+        // paid one (capped only by the monthly per-website limit below), not be
+        // stopped by the 3-article trial cap (prod 2026-07-24, daomarketing.com).
+        if (! $this->hasContentSubscription($user) && $this->onContentTrial($user) && $this->compSites($user) === 0) {
             if ($this->trialUsage($user, $topic->id) >= ContentAutopilotConfig::trialArticles()) {
                 return 'trial_limit';
             }
