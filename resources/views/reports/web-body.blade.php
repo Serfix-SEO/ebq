@@ -101,6 +101,102 @@
         @endforeach
     </div>
 
+    {{-- Organic traffic trend — Semrush-style: y-axis value ticks, dated x-axis,
+         1Y/2Y/All period selector, area+line, crosshair tooltip. Rendered in JS
+         (in-SVG so it stays crisp + responsive). Independent of GSC; visits only,
+         never a $ figure. Hidden when the domain has no organic traffic. --}}
+    @if (! empty($p['organic_traffic']) && count($p['organic_traffic']) > 1 && collect($p['organic_traffic'])->max('visits') > 0)
+        @php
+            $ot = collect($p['organic_traffic'])->filter(fn ($r) => isset($r['month']))->sortBy('month')->values();
+            $otSeries = $ot->map(fn ($r) => ['m' => $r['month'], 'v' => (int) $r['visits']])->all();
+            $otCur = (int) ($ot->last()['visits'] ?? 0);
+        @endphp
+        <div class="ot-card rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-6" data-ot-series='@json($otSeries)'>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ __('Organic traffic') }}</div>
+                    <div class="mt-1 flex items-center gap-2">
+                        <span class="ot-cur text-2xl font-bold leading-none text-slate-900">{{ number_format($otCur) }}</span>
+                        <span class="ot-delta"></span>
+                    </div>
+                    <div class="mt-0.5 text-xs text-slate-400">{{ __('Estimated monthly visits') }}</div>
+                </div>
+                <div class="ot-periods inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs font-semibold">
+                    <button type="button" data-m="12" class="rounded-md px-3 py-1 text-slate-500">1Y</button>
+                    <button type="button" data-m="24" class="rounded-md px-3 py-1 text-slate-500">2Y</button>
+                    <button type="button" data-m="0" class="rounded-md px-3 py-1 text-slate-500">{{ __('All') }}</button>
+                </div>
+            </div>
+            <div class="ot-canvas relative mt-4 select-none">
+                <svg class="ot-svg block w-full" style="height:230px" role="img" aria-label="{{ __('Organic traffic chart') }}"></svg>
+                <div class="ot-tip pointer-events-none absolute z-10 hidden whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs leading-tight text-white shadow-lg" style="background:#0f172a"></div>
+            </div>
+        </div>
+        <script>
+        (function () {
+            var MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            document.querySelectorAll('.ot-card[data-ot-series]').forEach(function (card) {
+                if (card._ot) return; card._ot = 1;
+                var all; try { all = JSON.parse(card.getAttribute('data-ot-series') || '[]'); } catch (e) { return; }
+                if (!all || all.length < 2) return;
+                var svg = card.querySelector('.ot-svg'), tip = card.querySelector('.ot-tip'),
+                    curEl = card.querySelector('.ot-cur'), deltaEl = card.querySelector('.ot-delta'),
+                    canvas = card.querySelector('.ot-canvas'), btns = card.querySelectorAll('.ot-periods button');
+                var period = 0, pts = [], vbw = 680, vbh = 230, hover, hx, hd;
+                function fmt(n) { n = +n; if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M'; if (n >= 1e3) return Math.round(n / 1e3) + 'K'; return '' + Math.round(n); }
+                function mlabel(m) { var a = (m || '').split('-'); return (MO[(+a[1]) - 1] || '') + " '" + (a[0] || '').slice(2); }
+                function niceMax(m) { var p = Math.pow(10, Math.floor(Math.log(m) / Math.LN10)); var f = m / p; var nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10; return nf * p; }
+                function data() { return period > 0 ? all.slice(Math.max(0, all.length - period)) : all; }
+                function render() {
+                    var d = data(), w = Math.max(320, canvas.clientWidth || 640), H = 230;
+                    var padL = 44, padR = 12, padT = 12, padB = 24, plotW = w - padL - padR, plotH = H - padT - padB;
+                    var max = Math.max.apply(null, d.map(function (o) { return o.v; })) || 1, ymax = niceMax(max), N = Math.max(1, d.length - 1);
+                    pts = d.map(function (o, i) { return { x: padL + i / N * plotW, y: padT + plotH * (1 - o.v / ymax), m: o.m, v: o.v }; });
+                    var line = pts.map(function (p) { return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ');
+                    var area = 'M ' + pts[0].x.toFixed(1) + ',' + (padT + plotH) + ' L ' + line + ' L ' + pts[pts.length - 1].x.toFixed(1) + ',' + (padT + plotH) + ' Z';
+                    var s = '<defs><linearGradient id="otg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ea580c" stop-opacity=".18"/><stop offset="1" stop-color="#ea580c" stop-opacity="0"/></linearGradient></defs>';
+                    for (var t = 0; t <= 3; t++) { var ry = padT + plotH * t / 3, val = ymax * (1 - t / 3);
+                        s += '<line x1="' + padL + '" y1="' + ry.toFixed(1) + '" x2="' + (w - padR) + '" y2="' + ry.toFixed(1) + '" stroke="#f1f5f9"/>';
+                        s += '<text x="' + (padL - 8) + '" y="' + (ry + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#94a3b8">' + (val > 0 ? fmt(val) : '0') + '</text>'; }
+                    s += '<path d="' + area + '" fill="url(#otg)"/>';
+                    s += '<polyline fill="none" stroke="#ea580c" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="' + line + '"/>';
+                    s += '<circle cx="' + pts[pts.length - 1].x.toFixed(1) + '" cy="' + pts[pts.length - 1].y.toFixed(1) + '" r="3" fill="#ea580c"/>';
+                    var ticks = Math.min(6, d.length);
+                    for (var k = 0; k < ticks; k++) { var idx = Math.round(k / Math.max(1, ticks - 1) * (d.length - 1)), px = pts[idx].x;
+                        var anch = k === 0 ? 'start' : (k === ticks - 1 ? 'end' : 'middle');
+                        s += '<text x="' + px.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="' + anch + '" font-size="10" fill="#94a3b8">' + mlabel(d[idx].m) + '</text>'; }
+                    s += '<g class="ot-hover" style="display:none"><line class="ot-hx" y1="' + padT + '" y2="' + (padT + plotH) + '" stroke="#fdba74"/><circle class="ot-hd" r="4" fill="#ea580c" stroke="#fff" stroke-width="2"/></g>';
+                    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + H); svg.innerHTML = s; vbw = w; vbh = H;
+                    hover = svg.querySelector('.ot-hover'); hx = svg.querySelector('.ot-hx'); hd = svg.querySelector('.ot-hd');
+                    curEl.textContent = (all[all.length - 1].v).toLocaleString();
+                    var first = null; for (var i = 0; i < d.length; i++) { if (d[i].v > 0) { first = d[i]; break; } }
+                    if (first && first.v > 0) { var dl = Math.round((d[d.length - 1].v - first.v) / first.v * 100);
+                        deltaEl.innerHTML = '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ' + (dl >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500') + '">' + (dl >= 0 ? '▲' : '▼') + ' ' + Math.abs(dl) + '%</span>'; }
+                    else deltaEl.innerHTML = '';
+                }
+                function moveHover(e) {
+                    if (!pts.length) return;
+                    var r = svg.getBoundingClientRect(), cx = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX) - r.left, vx = cx / r.width * vbw;
+                    var best = 0, bd = Infinity; for (var i = 0; i < pts.length; i++) { var dd = Math.abs(pts[i].x - vx); if (dd < bd) { bd = dd; best = i; } }
+                    var p = pts[best]; if (hover) { hover.style.display = ''; hx.setAttribute('x1', p.x); hx.setAttribute('x2', p.x); hd.setAttribute('cx', p.x); hd.setAttribute('cy', p.y); }
+                    var px = p.x / vbw * r.width, py = p.y / vbh * r.height;
+                    tip.innerHTML = '<span style="font-weight:600">' + p.v.toLocaleString() + '</span> <span style="opacity:.6">visits</span><br><span style="opacity:.6">' + mlabel(p.m) + '</span>';
+                    tip.classList.remove('hidden');
+                    tip.style.left = Math.max(0, Math.min(r.width - tip.offsetWidth, px - tip.offsetWidth / 2)) + 'px';
+                    tip.style.top = Math.max(0, py - tip.offsetHeight - 10) + 'px';
+                }
+                function leave() { if (hover) hover.style.display = 'none'; tip.classList.add('hidden'); }
+                svg.addEventListener('mousemove', moveHover); svg.addEventListener('mouseleave', leave);
+                svg.addEventListener('touchstart', moveHover, { passive: true }); svg.addEventListener('touchmove', moveHover, { passive: true }); svg.addEventListener('touchend', leave);
+                function setActive(b) { btns.forEach(function (x) { x.classList.remove('bg-white', 'shadow-sm', 'text-slate-900'); x.classList.add('text-slate-500'); }); b.classList.add('bg-white', 'shadow-sm', 'text-slate-900'); b.classList.remove('text-slate-500'); }
+                btns.forEach(function (b) { b.addEventListener('click', function () { period = +b.dataset.m || 0; setActive(b); render(); }); });
+                setActive(btns[btns.length - 1]); render();
+                var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(render, 150); });
+            });
+        })();
+        </script>
+    @endif
+
     {{-- Link risk — toxicity interpretation over the backlink profile --}}
     @include('reports.partials.link-risk', [
         'risk' => $p['link_risk'] ?? null,
@@ -235,7 +331,7 @@
                 <span class="text-base font-semibold text-slate-900">Backlinks</span>
                 @if (count($p['backlinks']) > 8)
                     <span class="flex items-center gap-2.5">
-                        <span class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium"><button type="button" data-rpt-group="rpt-backlinks" data-mode="all" class="rounded-md bg-white px-2.5 py-1 text-slate-900 shadow-sm">All links</button><button type="button" data-rpt-group="rpt-backlinks" data-mode="one" class="rounded-md px-2.5 py-1 text-slate-500">One per domain</button></span>
+                        <span class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium"><button type="button" data-rpt-group="rpt-backlinks" data-mode="all" class="rounded-md bg-white px-2.5 py-1 text-slate-900 shadow-sm">All links</button><button type="button" data-rpt-group="rpt-backlinks" data-mode="one" class="rounded-md px-3 py-1 text-slate-500">One per domain</button></span>
                         <input type="text" data-rpt-filter="rpt-backlinks" placeholder="Filter…"
                                class="w-36 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400">
                         <span class="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700">

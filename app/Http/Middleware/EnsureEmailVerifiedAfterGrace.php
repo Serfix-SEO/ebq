@@ -11,11 +11,13 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Grace-window variant of Laravel's built-in `EnsureEmailIsVerified`.
  *
- * A freshly registered user may use the app UNVERIFIED for
- * `config('auth.verification.grace_days')` days (default 3). Once that window
- * from `created_at` elapses, an unverified user is forced to the verify-email
- * screen until they confirm their address. Verified users always pass; guests
- * are left to the `auth` middleware.
+ * Forced verification is OFF by default (`auth.verification.enforce` = false):
+ * unverified users are never blocked — the dashboard shows an advisory banner
+ * instead. When enforcement is switched on, a freshly registered user may still
+ * use the app UNVERIFIED for `config('auth.verification.grace_days')` days
+ * (default 3); once that window from `created_at` elapses, an unverified user is
+ * forced to the verify-email screen until they confirm. Verified users always
+ * pass; guests are left to the `auth` middleware.
  *
  * Registered as the `verified` alias in bootstrap/app.php, so every route
  * already gated by `verified` gets grace semantics automatically.
@@ -29,6 +31,13 @@ class EnsureEmailVerifiedAfterGrace
         // No user (guest) → let `auth` handle it. Non-MustVerifyEmail models
         // and already-verified users pass straight through.
         if (! $user instanceof MustVerifyEmail || $user->hasVerifiedEmail()) {
+            return $next($request);
+        }
+
+        // Forced verification disabled (default) → never block; verification is
+        // advisory, surfaced by the dashboard banner. Flip
+        // EMAIL_VERIFICATION_ENFORCE=true to restore hard gating + grace window.
+        if (! config('auth.verification.enforce', false)) {
             return $next($request);
         }
 

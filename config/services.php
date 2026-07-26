@@ -366,6 +366,13 @@ return [
         'discovery_max_keywords' => (int) env('COMPETITIVE_DISCOVERY_MAX_KEYWORDS', 25),
         // Don't re-run discovery (re-bill SERP) within this window.
         'discovery_refresh_days' => (int) env('COMPETITIVE_DISCOVERY_REFRESH_DAYS', 14),
+        // Top-N discovered domains enriched with real DataForSEO/Moz authority
+        // (shared domain_metrics asset) + the cap for opt-in topical classify.
+        'discovery_enrich_max' => (int) env('COMPETITIVE_DISCOVERY_ENRICH_MAX', 10),
+        // How many months of history to request for the site's deep traffic chart
+        // (historical_rank_overview honours date_from; ~55 months of real data
+        // available for the same flat call price).
+        'traffic_history_months' => (int) env('COMPETITIVE_TRAFFIC_HISTORY_MONTHS', 48),
         // Max live SERP fetches per gap analysis for opportunity scoring.
         'opportunity_live_max' => (int) env('COMPETITIVE_OPPORTUNITY_LIVE_MAX', 20),
         // How many competitor URLs a single gap analysis accepts.

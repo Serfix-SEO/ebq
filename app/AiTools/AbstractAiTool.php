@@ -11,8 +11,10 @@ use App\AiTools\Prompts\BrandVoiceBlock;
 use App\AiTools\Prompts\Guardrails;
 use App\AiTools\Prompts\SeoAnalysisBlock;
 use App\Services\Ai\OutputNormalizer;
+use App\Services\AiWriterService;
 use App\Services\Llm\LlmClient;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Default execution skeleton for AI Studio tools.
@@ -34,8 +36,7 @@ abstract class AbstractAiTool implements AiTool
     public function __construct(
         protected readonly LlmClient $llm,
         protected readonly OutputNormalizer $normalizer,
-    ) {
-    }
+    ) {}
 
     abstract public function meta(): AiToolMeta;
 
@@ -65,10 +66,11 @@ abstract class AbstractAiTool implements AiTool
         if (str_ends_with($code, '_network_error')) {
             return 'Couldn\'t reach the AI provider. Check the server\'s outbound connection and retry.';
         }
+
         return match ($code) {
             'llm_not_configured' => 'The AI provider isn\'t configured. Contact an admin.',
-            'llm_failed'         => 'The model did not respond. Try again in a moment.',
-            default              => 'The model did not respond ('.$code.'). Try again in a moment.',
+            'llm_failed' => 'The model did not respond. Try again in a moment.',
+            default => 'The model did not respond ('.$code.'). Try again in a moment.',
         };
     }
 
@@ -92,12 +94,12 @@ abstract class AbstractAiTool implements AiTool
         // project got English meta tags and FAQs). User-supplied phrases
         // (focus keyword, keyword lists) stay verbatim; char-count limits
         // in tool prompts apply to the localized text.
-        $langName = \App\Services\AiWriterService::LANGUAGE_NAMES[strtolower(trim((string) ($input['language'] ?? '')))] ?? '';
+        $langName = AiWriterService::LANGUAGE_NAMES[strtolower(trim((string) ($input['language'] ?? '')))] ?? '';
         if ($langName !== '' && $langName !== 'English') {
             $system .= "\n\nOUTPUT LANGUAGE (HARD RULE): write every generated value in {$langName}. "
-                . "Translate any English context you were given rather than echoing it. Keep the focus "
-                . "keyword and other user-supplied phrases verbatim in their original language; proper "
-                . "nouns and brand names stay as-is. Character/length limits apply to the {$langName} text.";
+                .'Translate any English context you were given rather than echoing it. Keep the focus '
+                .'keyword and other user-supplied phrases verbatim in their original language; proper '
+                ."nouns and brand names stay as-is. Character/length limits apply to the {$langName} text.";
         }
 
         // When the plugin tells us which Gutenberg block the result
@@ -106,7 +108,7 @@ abstract class AbstractAiTool implements AiTool
         // prose that breaks the heading visually.
         $shape = BlockShape::from($input);
         if ($shape !== '') {
-            $system .= "\n\n" . $shape;
+            $system .= "\n\n".$shape;
         }
 
         $messages = [
@@ -114,17 +116,26 @@ abstract class AbstractAiTool implements AiTool
             ['role' => 'user', 'content' => $this->buildUserPrompt($input, $context)],
         ];
 
+        // Metering/telemetry passthrough: callers (e.g. the Content Autopilot
+        // article editor) inject `__llm_meta` — `__unmetered`, `__user_id`,
+        // `__source`, `__website_id` — so this LLM call is billed to THEIR meter
+        // (ContentLlmSpendMeter), not the reviewer's dashboard token pool. The
+        // LLM client reads these `__*` keys; prompts never see them.
         $options = $this->llmOptions();
+        if (isset($input['__llm_meta']) && is_array($input['__llm_meta'])) {
+            $options += $input['__llm_meta'];
+        }
         $response = $this->expectsJson()
             ? $this->llm->complete($messages, $options + ['json_object' => true])
             : $this->llm->complete($messages, $options);
 
         if (! is_array($response) || ($response['ok'] ?? false) !== true) {
             $errorCode = is_array($response) ? (string) ($response['error'] ?? 'llm_failed') : 'llm_failed';
-            \Illuminate\Support\Facades\Log::warning('AbstractAiTool: LLM call failed', [
-                'tool'  => $this->meta()->id ?? static::class,
+            Log::warning('AbstractAiTool: LLM call failed', [
+                'tool' => $this->meta()->id ?? static::class,
                 'error' => $errorCode,
             ]);
+
             return AiToolResult::fail(
                 error: $errorCode,
                 message: self::llmErrorMessage($errorCode),
@@ -233,7 +244,7 @@ abstract class AbstractAiTool implements AiTool
      * <h2>+<p> pairs into a sections array).
      *
      * @param  array<string, mixed>  $input
-     * @return mixed                                    null = parse failure
+     * @return mixed null = parse failure
      */
     protected function parseResponse(string $raw, array $input, ToolContext $context): mixed
     {
@@ -260,9 +271,6 @@ abstract class AbstractAiTool implements AiTool
      *
      * Recursive so it handles nested arrays (titles[], list items,
      * faq[].question/answer, table cells, schema strings, etc.).
-     *
-     * @param  mixed  $value
-     * @return mixed
      */
     private function stripDashes(mixed $value): mixed
     {
@@ -274,8 +282,10 @@ abstract class AbstractAiTool implements AiTool
             foreach ($value as $k => $v) {
                 $out[$k] = $this->stripDashes($v);
             }
+
             return $out;
         }
+
         return $value;
     }
 
@@ -298,6 +308,7 @@ abstract class AbstractAiTool implements AiTool
         $stash = function (string $text) use (&$placeholders): string {
             $token = '\x00EBQDASH'.count($placeholders).'\x00';
             $placeholders[$token] = $text;
+
             return $token;
         };
 
@@ -342,7 +353,6 @@ abstract class AbstractAiTool implements AiTool
      * structured outputs (lists, tables, faq) pass through.
      *
      * @param  array<string, mixed>  $input
-     * @return mixed
      */
     private function clipForBlockShape(mixed $value, array $input): mixed
     {
@@ -361,10 +371,11 @@ abstract class AbstractAiTool implements AiTool
                 }
                 // Hard cap — Gutenberg won't break on long, but readers will.
                 if (mb_strlen($v) > 100) {
-                    $v = mb_substr($v, 0, 97) . '…';
+                    $v = mb_substr($v, 0, 97).'…';
                 }
                 // Headings don't end with a period.
                 $v = rtrim($v, '.');
+
                 return $v;
 
             case 'core/button':
@@ -374,8 +385,9 @@ abstract class AbstractAiTool implements AiTool
                     $v = trim($m[1]);
                 }
                 if (mb_strlen($v) > 40) {
-                    $v = mb_substr($v, 0, 37) . '…';
+                    $v = mb_substr($v, 0, 37).'…';
                 }
+
                 return $v;
 
             case 'core/list-item':
@@ -385,6 +397,7 @@ abstract class AbstractAiTool implements AiTool
                 if (preg_match('/^(.+?)(?:\n|$)/u', $v, $m)) {
                     $v = trim($m[1]);
                 }
+
                 return $v;
 
             default:

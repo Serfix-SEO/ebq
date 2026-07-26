@@ -2,22 +2,33 @@
 
 namespace App\Livewire\Content;
 
+use App\Jobs\CheckTrackedKeywordSerpJob;
+use App\Jobs\GenerateInlineImageJob;
 use App\Jobs\ProduceContentArticleJob;
 use App\Jobs\PublishContentArticleJob;
 use App\Models\ContentArticle;
+use App\Models\ContentArticleFeedback;
 use App\Models\ContentImage;
 use App\Models\ContentIntegration;
+use App\Models\ContentPublication;
 use App\Models\ContentTopic;
+use App\Models\ContentTrackedKeyword;
 use App\Services\AiToolRunner;
 use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentEntitlements;
+use App\Services\Content\ContentKeywordTracker;
+use App\Services\Content\ContentLlmSpendMeter;
 use App\Services\Content\ContentSeoScorer;
 use App\Services\Content\HumanizerService;
+use App\Services\Content\IdeogramClient;
+use App\Services\Content\IdeogramSpendMeter;
+use App\Services\Content\KeywordTrackerQuota;
 use App\Support\ContentAutopilotConfig;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 /**
  * Review one topic's current article: rendered preview, SEO score, the
@@ -37,12 +48,17 @@ use Livewire\Component;
  */
 class ArticleReview extends Component
 {
+    use WithFileUploads;
+
     public string $topicId;
 
     // ── Editable state ──
     public bool $editing = false;
 
     public string $bodyHtml = '';
+
+    /** Transient upload holder for in-editor image insertion (WithFileUploads). */
+    public $inlineImage;
 
     public string $editH1 = '';
 
@@ -77,6 +93,20 @@ class ArticleReview extends Component
 
     public string $editTwitterCard = 'summary_large_image';
 
+    // ── Client feedback ("Do you like this article?") ──
+    public string $feedbackRating = '';
+
+    public string $feedbackComment = '';
+
+    public bool $feedbackSaved = false;
+
+    // ── Keyword Tracker CTA state ──
+    public bool $isTracked = false;
+
+    public int $trackerUsed = 0;
+
+    public int $trackerLimit = 0;
+
     /** @var list<array{code:string, passed:bool, label:string}> */
     public array $liveChecks = [];
 
@@ -90,6 +120,120 @@ class ArticleReview extends Component
         $this->topicId = $topicId;
         abort_unless($this->topic() !== null, 404);
         $this->hydrateFromArticle();
+        $this->loadFeedback();
+        $this->loadTrackerState();
+    }
+
+    /** Refresh the "are this article's keywords tracked?" CTA state. */
+    private function loadTrackerState(): void
+    {
+        $topic = $this->topic();
+        $website = $topic?->website;
+        if ($topic === null || $website === null) {
+            return;
+        }
+        $this->isTracked = ContentTrackedKeyword::query()
+            ->where('website_id', $website->id)
+            ->where('topic_id', $topic->id)
+            ->exists();
+        $quota = app(KeywordTrackerQuota::class);
+        $this->trackerUsed = $quota->used($website);
+        $this->trackerLimit = $quota->limitFor($website);
+    }
+
+    /** Track this article's targeted keywords (primary + secondaries). */
+    public function trackKeywords(): void
+    {
+        $topic = $this->topic();
+        $website = $topic?->website;
+        if ($topic === null || $website === null) {
+            return;
+        }
+        $tracker = app(ContentKeywordTracker::class);
+        $pageUrl = ContentPublication::query()
+            ->whereIn('article_id', $topic->articles()->select('id'))
+            ->whereNotNull('external_url')
+            ->latest('created_at')
+            ->value('external_url');
+        $result = $tracker->track(
+            website: $website,
+            keywords: $tracker->keywordsFor($topic),
+            topic: $topic,
+            source: ContentTrackedKeyword::SOURCE_MANUAL,
+            user: Auth::user(),
+            pageUrl: $pageUrl,
+        );
+        $this->loadTrackerState();
+        if ($result['added'] > 0) {
+            CheckTrackedKeywordSerpJob::dispatch($website->id);
+            session()->flash('review-status', trans_choice('{1}Added 1 keyword to your tracker.|[2,*]Added :count keywords to your tracker.', $result['added'], ['count' => $result['added']]));
+        } elseif ($result['capped']) {
+            session()->flash('review-status', __('Your tracker is full — remove a keyword in the Tracker to add these.'));
+        }
+    }
+
+    /** Stop tracking this article's keywords. */
+    public function untrackKeywords(): void
+    {
+        $topic = $this->topic();
+        $website = $topic?->website;
+        if ($topic === null || $website === null) {
+            return;
+        }
+        ContentTrackedKeyword::query()
+            ->where('website_id', $website->id)
+            ->where('topic_id', $topic->id)
+            ->delete();
+        $this->loadTrackerState();
+    }
+
+    private function loadFeedback(): void
+    {
+        $fb = ContentArticleFeedback::query()
+            ->where('topic_id', $this->topicId)
+            ->where('user_id', Auth::id())
+            ->first();
+        $this->feedbackRating = (string) ($fb?->rating ?? '');
+        $this->feedbackComment = (string) ($fb?->comment ?? '');
+    }
+
+    /** Client verdict on this article — one current row per (topic, user). */
+    public function rateArticle(string $rating): void
+    {
+        if (! in_array($rating, ContentArticleFeedback::RATINGS, true)) {
+            return;
+        }
+        $topic = $this->topic();
+        $userId = Auth::id();
+        if ($topic === null || $userId === null) {
+            return;
+        }
+        ContentArticleFeedback::updateOrCreate(
+            ['topic_id' => $topic->id, 'user_id' => $userId],
+            [
+                'article_id' => $topic->currentArticle?->id,
+                'website_id' => $topic->website_id,
+                'rating' => $rating,
+            ],
+        );
+        $this->feedbackRating = $rating;
+        $this->feedbackSaved = true;
+    }
+
+    /** Optional free-text note attached to the current verdict. */
+    public function saveFeedbackComment(): void
+    {
+        $topic = $this->topic();
+        $userId = Auth::id();
+        if ($topic === null || $userId === null || $this->feedbackRating === '') {
+            return;
+        }
+        ContentArticleFeedback::query()
+            ->where('topic_id', $topic->id)
+            ->where('user_id', $userId)
+            ->update(['comment' => mb_substr(trim($this->feedbackComment), 0, 2000)]);
+        $this->feedbackSaved = true;
+        session()->flash('review-status', __('Thanks — your feedback was sent to our team.'));
     }
 
     private function topic(): ?ContentTopic
@@ -239,14 +383,143 @@ class ArticleReview extends Component
             $input['target_tone'] = in_array($tone, ['formal', 'casual', 'empathetic', 'authoritative', 'playful', 'concise'], true) ? $tone : 'formal';
         }
 
-        $result = app(AiToolRunner::class)->run($tool, $website, Auth::id(), $input);
+        // Content Autopilot has its OWN AI meter (ContentLlmSpendMeter) — the
+        // same monthly circuit-breaker the writer/ideation calls use. Refuse when
+        // it's exhausted rather than falling through to the client's dashboard pool.
+        $meter = app(ContentLlmSpendMeter::class);
+        if ($meter->exhausted()) {
+            $this->dispatch('ai-edit-failed', message: __('The monthly AI limit for Content Autopilot has been reached. It resets next month.'));
+
+            return null;
+        }
+
+        // Content editor: the reviewer reached this page through the content
+        // access gate, so the inline AI tools are part of the Content Autopilot
+        // product they already pay for — bypass the SEO-plan `ai_writer` Pro-gate
+        // (content-product independence; otherwise these silently no-op for
+        // content-only customers). `__unmetered` + `__source` route the LLM spend
+        // to the CONTENT meter (below), NOT the reviewer's dashboard token pool.
+        $result = app(AiToolRunner::class)->run($tool, $website, Auth::id(), $input, allowWithoutPro: true, llmMeta: [
+            '__unmetered' => true,
+            '__user_id' => Auth::id(),
+            '__website_id' => $website->id,
+            '__source' => 'content_autopilot.edit',
+        ]);
         if (! $result->ok || ! is_string($result->value) || trim($result->value) === '') {
             $this->dispatch('ai-edit-failed', message: (string) ($result->message ?: __('The AI edit did not complete. Try again.')));
 
             return null;
         }
 
+        // Bill the Content Autopilot AI meter (cached results carry no fresh
+        // token cost, so only meter a genuine LLM run).
+        if (! $result->cached) {
+            $meter->add(ContentLlmSpendMeter::EST_EDIT_USD);
+        }
+
         return trim($result->value);
+    }
+
+    // ── In-editor images ────────────────────────────────────────────────
+
+    /**
+     * Store a device-uploaded image on the content images disk and return its
+     * public URL for the editor to insert as a <figure class="content-image">.
+     * Reuses ContentImage::disk() (one source of truth with the pipeline + WP
+     * sideload). storePublicly() so S3 objects are readable by the browser/WP.
+     *
+     * @return array{url:string, id:string}
+     */
+    public function uploadInlineImage(): array
+    {
+        $this->validate([
+            'inlineImage' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:5120'],
+        ]);
+        $topic = $this->topic();
+        $article = $topic?->currentArticle;
+        abort_if($topic === null || $article === null, 404);
+
+        $path = $this->inlineImage->storePublicly('content/images/inline/'.$topic->id, ContentImage::disk());
+
+        $image = ContentImage::query()->create([
+            'article_id' => $article->id,
+            'role' => ContentImage::ROLE_INLINE,
+            'disk_path' => $path,
+            'bytes' => (int) $this->inlineImage->getSize(),
+            'filename' => basename((string) $path),
+            'alt_text' => '',
+            'params' => ['source' => 'upload'],
+            'status' => ContentImage::STATUS_GENERATED,
+        ]);
+
+        $this->reset('inlineImage');
+
+        return ['url' => (string) $image->url(), 'id' => $image->id];
+    }
+
+    /**
+     * Kick off an on-demand Ideogram generation for an in-article image. Gated
+     * on the platform image kill-switch + a configured key + the monthly spend
+     * cap (a manual request ignores the per-plan AUTO toggle — the client is
+     * explicitly asking for this image). Returns the pending ContentImage id
+     * for the editor to poll, or null with a friendly notice.
+     */
+    public function requestInlineImage(string $prompt): ?string
+    {
+        $prompt = trim($prompt);
+        if ($prompt === '' || mb_strlen($prompt) > 500) {
+            return null;
+        }
+        $topic = $this->topic();
+        $article = $topic?->currentArticle;
+        if ($topic === null || $article === null) {
+            return null;
+        }
+        if (! ContentAutopilotConfig::imagesEnabled()
+            || ! app(IdeogramClient::class)->isConfigured()
+            || app(IdeogramSpendMeter::class)->exhausted()) {
+            $this->dispatch('ai-edit-failed', message: __('Image generation is unavailable right now.'));
+
+            return null;
+        }
+
+        $image = ContentImage::query()->create([
+            'article_id' => $article->id,
+            'role' => ContentImage::ROLE_INLINE,
+            'prompt' => mb_substr($prompt, 0, 500),
+            'params' => ['source' => 'editor-generate'],
+            'status' => ContentImage::STATUS_PENDING,
+        ]);
+        GenerateInlineImageJob::dispatch($image->id, $prompt);
+
+        return $image->id;
+    }
+
+    /**
+     * Poll a requested inline image. Returns ['url'=>...] once generated,
+     * ['failed'=>true] on failure/not-found (tenancy-checked), or null while
+     * still pending.
+     *
+     * @return array{url?:string, failed?:bool}|null
+     */
+    public function pollInlineImage(string $id): ?array
+    {
+        $topic = $this->topic();
+        if ($topic === null) {
+            return ['failed' => true];
+        }
+        $image = ContentImage::query()->whereKey($id)->with('article')->first();
+        if ($image === null || $image->article === null || $image->article->topic_id !== $topic->id) {
+            return ['failed' => true];
+        }
+        if ($image->status === ContentImage::STATUS_GENERATED && $image->disk_path) {
+            return ['url' => (string) $image->url()];
+        }
+        if ($image->status === ContentImage::STATUS_FAILED) {
+            return ['failed' => true];
+        }
+
+        return null; // still pending
     }
 
     public function approve(): void
@@ -689,7 +962,7 @@ class ArticleReview extends Component
         if ($article !== null) {
             $img = $article->images()
                 ->where('status', ContentImage::STATUS_GENERATED)
-                ->orderByRaw("CASE WHEN role = ? THEN 0 ELSE 1 END", [ContentImage::ROLE_FEATURED])
+                ->orderByRaw('CASE WHEN role = ? THEN 0 ELSE 1 END', [ContentImage::ROLE_FEATURED])
                 ->latest()
                 ->first();
             $socialImageFallback = (string) ($img?->url() ?? '');

@@ -10,7 +10,7 @@
     "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-DUCYLYxA.css",
+    "file": "assets/app-sP87UzVj.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -42,6 +42,12 @@
     "dynamicImports": [
       "node_modules/modern-screenshot/dist/index.mjs"
     ]
+  },
+  "resources/js/editor.js": {
+    "file": "assets/editor-DddPMj_j.js",
+    "name": "editor",
+    "src": "resources/js/editor.js",
+    "isEntry": true
   },
   "resources/js/marketing.js": {
     "file": "assets/marketing-DToKoowZ.js",

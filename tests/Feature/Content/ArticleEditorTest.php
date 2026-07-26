@@ -4,12 +4,19 @@ namespace Tests\Feature\Content;
 
 use App\Livewire\Content\ArticleReview;
 use App\Models\ContentArticle;
+use App\Models\ContentImage;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Content\ContentLlmSpendMeter;
+use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -20,7 +27,7 @@ class ArticleEditorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\PlanSeeder::class);
+        $this->seed(PlanSeeder::class);
     }
 
     private function reviewable(): array
@@ -210,7 +217,7 @@ class ArticleEditorTest extends TestCase
         // ai_writer is tier-gated; the seeded trial plan includes it but the
         // global kill-switch map defaults it FALSE on a fresh DB — flip on
         // like prod's settings row does.
-        \App\Models\Setting::set('global_feature_flags', ['ai_writer' => true]);
+        Setting::set('global_feature_flags', ['ai_writer' => true]);
         $this->actingAs($user);
 
         $component = new ArticleReview;
@@ -218,6 +225,67 @@ class ArticleEditorTest extends TestCase
         $out = $component->aiEdit('rewrite-content', 'A clunky sentence that needs work.');
 
         $this->assertSame('A tightened rewrite of the sentence.', $out);
+    }
+
+    public function test_ai_edit_works_without_ai_writer_flag(): void
+    {
+        // Content-only customers don't have the SEO `ai_writer` Pro flag. The
+        // content editor's inline AI must STILL run (content-product independence)
+        // — NOTE this test deliberately does NOT flip ai_writer on.
+        config(['services.mistral.key' => 'fake', 'services.ai.provider' => 'mistral']);
+        Http::fake([
+            '*' => Http::response(['choices' => [['message' => ['content' => 'A polished rewrite.']]], 'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 10, 'total_tokens' => 20]], 200),
+        ]);
+
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+
+        $component = new ArticleReview;
+        $component->topicId = $topic->id;
+        $out = $component->aiEdit('rewrite-content', 'A clunky sentence that needs work.');
+
+        $this->assertSame('A polished rewrite.', $out, 'inline AI must not be gated behind ai_writer for content customers');
+    }
+
+    public function test_ai_edit_bills_the_content_ai_meter(): void
+    {
+        // Inline edits meter the Content Autopilot AI meter (ContentLlmSpendMeter),
+        // NOT the reviewer's dashboard token pool.
+        config([
+            'services.mistral.key' => 'fake', 'services.ai.provider' => 'mistral',
+            'services.content_autopilot.llm_monthly_cap_usd' => 100,
+        ]);
+        Redis::del('content:llm:spend:'.now()->utc()->format('Y-m'));
+        Http::fake(['*' => Http::response(['choices' => [['message' => ['content' => 'A polished rewrite.']]], 'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 10, 'total_tokens' => 20]], 200)]);
+
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+        $meter = app(ContentLlmSpendMeter::class);
+        $before = $meter->spent();
+
+        $component = new ArticleReview;
+        $component->topicId = $topic->id;
+        $out = $component->aiEdit('rewrite-content', 'A clunky sentence that needs work.');
+
+        $this->assertSame('A polished rewrite.', $out);
+        $this->assertGreaterThan($before, app(ContentLlmSpendMeter::class)->spent(), 'content edit must bill the content AI meter');
+    }
+
+    public function test_ai_edit_refused_when_content_meter_exhausted(): void
+    {
+        config(['services.content_autopilot.llm_monthly_cap_usd' => 0.01]);
+        Redis::del('content:llm:spend:'.now()->utc()->format('Y-m'));
+        app(ContentLlmSpendMeter::class)->add(1.0); // over the 0.01 cap
+
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+        $component = new ArticleReview;
+        $component->topicId = $topic->id;
+
+        // Refused BEFORE any LLM call — no Http::fake needed.
+        $this->assertNull($component->aiEdit('rewrite-content', 'Some text to rewrite.'));
+
+        Redis::del('content:llm:spend:'.now()->utc()->format('Y-m'));
     }
 
     public function test_ai_edit_rejects_unknown_tool(): void
@@ -229,5 +297,125 @@ class ArticleEditorTest extends TestCase
         $component->topicId = $topic->id;
 
         $this->assertNull($component->aiEdit('delete-everything', 'text'));
+    }
+
+    // ── WYSIWYG editor: rich content preservation + in-editor images ──────
+
+    public function test_save_edits_preserves_table_and_figure(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+
+        $body = '<p>Intro with the pubg name generator phrase.</p>'
+            .'<figure class="content-image"><img src="https://cdn.example.com/x.png" alt="A name" loading="lazy" /></figure>'
+            .'<table><thead><tr><th>Name</th></tr></thead><tbody><tr><td>Cool</td></tr></tbody></table>'
+            .'<h2 id="a">Section</h2><p>More text about the pubg name generator here.</p>';
+
+        Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')
+            ->call('saveEdits', $body);
+
+        $html = $topic->fresh()->currentArticle->html;
+        $this->assertStringContainsString('<table>', $html);
+        $this->assertStringContainsString('<td>Cool</td>', $html);
+        $this->assertStringContainsString('figure class="content-image"', $html);
+    }
+
+    public function test_save_edits_preserves_code_hr_underline(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+
+        $body = '<p>Body about the pubg name generator.</p>'
+            .'<pre><code>echo 1;</code></pre><hr>'
+            .'<p><u>underlined</u> more pubg name generator text.</p>'
+            .'<h2 id="a">S</h2><p>x</p>';
+
+        Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')
+            ->call('saveEdits', $body);
+
+        $html = $topic->fresh()->currentArticle->html;
+        $this->assertStringContainsString('<pre>', $html);
+        $this->assertStringContainsString('<code>', $html);
+        $this->assertStringContainsString('<hr', $html);
+        $this->assertStringContainsString('<u>', $html);
+    }
+
+    public function test_upload_inline_image_stores_and_creates_row(): void
+    {
+        Storage::fake(ContentImage::disk());
+        [$user, , , $topic, $article] = $this->reviewable();
+        $this->actingAs($user);
+
+        Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')
+            ->set('inlineImage', UploadedFile::fake()->image('photo.png', 800, 600))
+            ->call('uploadInlineImage');
+
+        $image = ContentImage::query()->where('article_id', $article->id)->first();
+        $this->assertNotNull($image);
+        $this->assertSame(ContentImage::ROLE_INLINE, $image->role);
+        $this->assertSame(ContentImage::STATUS_GENERATED, $image->status);
+        $this->assertNotEmpty($image->disk_path);
+        Storage::disk(ContentImage::disk())->assertExists($image->disk_path);
+        $this->assertNotEmpty($image->url());
+    }
+
+    public function test_upload_inline_image_rejects_non_image(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+
+        Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')
+            ->set('inlineImage', UploadedFile::fake()->create('doc.pdf', 100, 'application/pdf'))
+            ->call('uploadInlineImage')
+            ->assertHasErrors('inlineImage');
+
+        $this->assertSame(0, ContentImage::query()->count());
+    }
+
+    public function test_request_inline_image_returns_null_when_unavailable(): void
+    {
+        // No Ideogram key configured → isConfigured() false → unavailable path.
+        config(['services.ideogram.key' => null]);
+        [$user, , , $topic] = $this->reviewable();
+        $this->actingAs($user);
+
+        Livewire::test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')
+            ->call('requestInlineImage', 'a friendly robot')
+            ->assertDispatched('ai-edit-failed');
+
+        // No pending row is left dangling when generation is unavailable.
+        $this->assertSame(0, ContentImage::query()->where('status', ContentImage::STATUS_PENDING)->count());
+    }
+
+    public function test_poll_inline_image_rejects_foreign_image(): void
+    {
+        Storage::fake(ContentImage::disk());
+        [$user, , , $topic, $article] = $this->reviewable();
+        // A second, unrelated topic/article/image (different owner).
+        [, , , , $otherArticle] = $this->reviewable();
+        $foreign = ContentImage::query()->create([
+            'article_id' => $otherArticle->id,
+            'role' => ContentImage::ROLE_INLINE,
+            'status' => ContentImage::STATUS_GENERATED,
+            'disk_path' => 'content/images/foreign.png',
+        ]);
+        $mine = ContentImage::query()->create([
+            'article_id' => $article->id,
+            'role' => ContentImage::ROLE_INLINE,
+            'status' => ContentImage::STATUS_GENERATED,
+            'disk_path' => 'content/images/mine.png',
+        ]);
+
+        $this->actingAs($user);
+        $component = new ArticleReview;
+        $component->topicId = $topic->id;
+
+        $this->assertSame(['failed' => true], $component->pollInlineImage($foreign->id));
+        $this->assertArrayHasKey('url', $component->pollInlineImage($mine->id));
     }
 }

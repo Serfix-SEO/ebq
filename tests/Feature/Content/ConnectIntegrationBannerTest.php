@@ -3,6 +3,7 @@
 namespace Tests\Feature\Content;
 
 use App\Livewire\Content\ContentCalendar;
+use App\Livewire\Content\PublishingSettings;
 use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\User;
@@ -89,5 +90,80 @@ class ConnectIntegrationBannerTest extends TestCase
 
         Livewire::test(ContentCalendar::class)
             ->assertSee('Connect a destination to publish');
+    }
+
+    // ── Auto-publish-with-no-destination warning ────────────────────────────
+    // Turning auto-publish ON while nothing is connected used to be silent — the
+    // toggle flips but articles can never publish. A prominent warning must fire.
+
+    private const WARN = 'Auto-publish is on, but no destination is connected';
+
+    public function test_settings_view_warns_when_auto_publish_on_but_nothing_connected(): void
+    {
+        [$user, $website] = $this->activePlanSite();
+        ContentPlan::where('website_id', $website->id)->update(['auto_publish' => true]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->assertSee(self::WARN);
+    }
+
+    public function test_settings_view_hides_warning_once_a_destination_is_connected(): void
+    {
+        [$user, $website] = $this->activePlanSite();
+        ContentPlan::where('website_id', $website->id)->update(['auto_publish' => true]);
+        ContentIntegration::query()->create([
+            'website_id' => $website->id,
+            'platform' => ContentIntegration::PLATFORM_WEBHOOK,
+            'status' => ContentIntegration::STATUS_CONNECTED,
+            'credentials' => [],
+        ]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->assertDontSee(self::WARN);
+    }
+
+    public function test_settings_view_no_warning_when_auto_publish_off(): void
+    {
+        [$user, $website] = $this->activePlanSite();
+        ContentPlan::where('website_id', $website->id)->update(['auto_publish' => false]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->assertDontSee(self::WARN);
+    }
+
+    public function test_publishing_settings_card_warns_when_auto_publish_on_but_only_errored_integration(): void
+    {
+        [$user, $website] = $this->activePlanSite();
+        ContentPlan::where('website_id', $website->id)->update(['auto_publish' => true]);
+        // An errored integration is NOT connected — the warning must still fire.
+        ContentIntegration::query()->create([
+            'website_id' => $website->id,
+            'platform' => ContentIntegration::PLATFORM_WEBHOOK,
+            'status' => ContentIntegration::STATUS_ERROR,
+            'credentials' => [],
+        ]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(PublishingSettings::class)
+            ->assertSee(self::WARN);
+    }
+
+    public function test_publishing_settings_card_hides_warning_when_connected(): void
+    {
+        [$user, $website] = $this->activePlanSite();
+        ContentPlan::where('website_id', $website->id)->update(['auto_publish' => true]);
+        ContentIntegration::query()->create([
+            'website_id' => $website->id,
+            'platform' => ContentIntegration::PLATFORM_WEBHOOK,
+            'status' => ContentIntegration::STATUS_CONNECTED,
+            'credentials' => [],
+        ]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(PublishingSettings::class)
+            ->assertDontSee(self::WARN);
     }
 }

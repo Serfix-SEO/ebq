@@ -140,6 +140,61 @@ class CompetitorDiscovery extends Component
             : 'No active tracked keywords to update (add keywords in Rank Tracking first).';
     }
 
+    /** Whether an opt-in topical classification is in flight (drives the poll). */
+    public bool $topicPending = false;
+
+    /**
+     * Opt-in: classify the discovered competitors' topics via the LLM. Gated
+     * behind this explicit click (never run during discovery) so the Site
+     * Explorer never racks up per-domain LLM spend automatically. Cached topics
+     * make a repeat click nearly free.
+     */
+    public function classifyTopics(): void
+    {
+        $this->reset(['errorMessage', 'notice']);
+
+        $website = $this->website();
+        if ($website === null) {
+            return;
+        }
+
+        $hasCompetitors = \App\Models\DiscoveredCompetitor::query()
+            ->forWebsite($website->id)->exists();
+        if (! $hasCompetitors) {
+            $this->notice = 'Run discovery first, then classify topics.';
+
+            return;
+        }
+
+        \App\Jobs\Competitive\ClassifyCompetitorTopicJob::dispatch($website->id);
+        $this->topicPending = true;
+        $this->notice = 'Classifying competitor topics — this updates in a moment.';
+    }
+
+    /** Poll target while a topical classification is running. */
+    public function refreshTopics(): void
+    {
+        if (! $this->topicPending) {
+            return;
+        }
+        $website = $this->website();
+        if ($website === null) {
+            $this->topicPending = false;
+
+            return;
+        }
+        // Cleared once any competitor has been tagged (or after the poll's own
+        // client-side attempts elapse — a failed LLM leaves the flag, but the
+        // notice already told the user, and a manual refresh clears it).
+        $tagged = \App\Models\DiscoveredCompetitor::query()
+            ->forWebsite($website->id)
+            ->whereNotNull('topic')
+            ->exists();
+        if ($tagged) {
+            $this->topicPending = false;
+        }
+    }
+
     /** @return list<string> */
     private function parseSeeds(string $raw): array
     {
@@ -170,28 +225,40 @@ class CompetitorDiscovery extends Component
 
         return response()->streamDownload(function () use ($rows): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Domain', 'Score', 'Appearances', 'Keywords sampled', 'Avg position', 'Best position', 'Domain authority']);
+            fputcsv($out, ['Domain', 'Score', 'Appearances', 'Keywords sampled', 'Avg position', 'Best position', 'Domain authority', 'Page authority', 'Referring domains', 'Backlinks', 'Topic']);
             foreach ($rows as $r) {
                 fputcsv($out, [
                     $r->competitor_domain, $r->score, $r->appearances, $r->keywords_sampled,
                     $r->avg_position, $r->best_position, $r->domain_authority,
+                    $r->page_authority, $r->referring_domains, $r->backlinks, $r->topic,
                 ]);
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
-    public function render(CompetitorDiscoveryService $service)
+    public function render(CompetitorDiscoveryService $service, \App\Services\Competitive\CompetitorEnricher $enricher)
     {
         $website = $this->website();
         $competitors = $website ? $service->resultsFor($website->id) : collect();
         $lastRun = $website ? $service->latestRun($website->id) : null;
+
+        // Organic-traffic chart: the site's own monthly series, plus the top-3
+        // competitors for optional overlay (all read from the shared cache — no
+        // API cost at render time).
+        $siteSeries = $website ? $enricher->trafficSeries((string) $website->domain) : [];
+        $competitorSeries = $competitors->take(3)
+            ->mapWithKeys(fn ($c) => [$c->competitor_domain => $enricher->trafficSeries($c->competitor_domain)])
+            ->filter(fn ($s) => $s !== [])
+            ->all();
 
         return view('livewire.competitive.competitor-discovery', [
             'website' => $website,
             'competitors' => $competitors,
             'lastRun' => $lastRun,
             'hasGsc' => (bool) $website?->hasGsc(),
+            'siteSeries' => $siteSeries,
+            'competitorSeries' => $competitorSeries,
         ]);
     }
 }

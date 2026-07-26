@@ -234,6 +234,25 @@
                     </button>
                 </div>
 
+                {{-- Auto-publish is ON but no destination is connected → articles can't
+                     go live. Surface this prominently right under the toggle so the
+                     setting doesn't silently do nothing. --}}
+                @if ($autoPublish && ! $publishConnected)
+                    <div class="mt-3 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3.5 dark:border-amber-800/60 dark:bg-amber-950/40">
+                        <svg class="mt-0.5 h-5 w-5 flex-none text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-amber-900 dark:text-amber-200">{{ __('Auto-publish is on, but no destination is connected') }}</p>
+                            <p class="mt-0.5 text-xs text-amber-800 dark:text-amber-300">{{ __('Approved articles will be held and won\'t go live until you connect a publishing destination — WordPress, Laravel, or a custom webhook.') }}</p>
+                            @if (\Illuminate\Support\Facades\Route::has('content.integrations'))
+                                <a href="{{ route('content.integrations') }}" class="mt-2 inline-flex items-center gap-1 text-xs font-bold text-amber-900 underline underline-offset-2 dark:text-amber-200">
+                                    {{ __('Connect a destination') }}
+                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Publish window: articles auto-publish only between these hours, in this timezone. --}}
                 <div class="mt-4 rounded-xl border border-slate-100 p-3 dark:border-slate-800">
                     <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ __('Publish window') }}</div>

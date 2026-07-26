@@ -7,9 +7,13 @@ use App\Jobs\CrawlWebsitePagesJob;
 use App\Models\CrawlRun;
 use App\Models\CrawlSite;
 use App\Models\Website;
+use App\Services\Content\ContentLlmSpendMeter;
+use App\Services\Content\IdeogramSpendMeter;
+use App\Services\Reports\DataForSeoSpendMeter;
 use App\Support\FailedJobAlertBuffer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
@@ -46,7 +50,7 @@ class OpsController extends Controller
                     'job' => $payload['displayName'] ?? 'unknown',
                     'queue' => $row->queue,
                     'connection' => $row->connection,
-                    'failed_at' => \Illuminate\Support\Carbon::parse($row->failed_at),
+                    'failed_at' => Carbon::parse($row->failed_at),
                     'exception_head' => mb_substr(explode("\n", (string) $row->exception, 2)[0], 0, 300),
                 ];
             });
@@ -97,8 +101,13 @@ class OpsController extends Controller
             }
         }
 
-        // ─── DataForSEO monthly spend vs circuit-breaker cap ────────────
-        $spendMeter = app(\App\Services\Reports\DataForSeoSpendMeter::class);
+        // ─── Monthly spend vs circuit-breaker caps ──────────────────────
+        $readMeter = static fn ($m) => [
+            'spent' => $m->spent(),
+            'cap' => $m->cap(),
+            'near' => $m->nearCap(),
+            'exhausted' => $m->exhausted(),
+        ];
 
         return view('admin.ops.index', [
             'failedGroups' => $failedGroups,
@@ -106,12 +115,11 @@ class OpsController extends Controller
             'stuckSites' => $stuckSites,
             'queues' => $queues,
             'alertBufferSize' => count(FailedJobAlertBuffer::peek()),
-            'dfsSpend' => [
-                'spent' => $spendMeter->spent(),
-                'cap' => $spendMeter->cap(),
-                'near' => $spendMeter->nearCap(),
-                'exhausted' => $spendMeter->exhausted(),
-            ],
+            'dfsSpend' => $readMeter(app(DataForSeoSpendMeter::class)),
+            // Content Autopilot's own AI/image meters (writer + inline edits +
+            // ideation share the LLM meter; images are separate).
+            'contentLlmSpend' => $readMeter(app(ContentLlmSpendMeter::class)),
+            'contentImageSpend' => $readMeter(app(IdeogramSpendMeter::class)),
         ]);
     }
 

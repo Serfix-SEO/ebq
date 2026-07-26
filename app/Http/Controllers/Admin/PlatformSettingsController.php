@@ -32,18 +32,18 @@ class PlatformSettingsController extends Controller
     public function edit(): View
     {
         return view('admin.settings.index', [
-            'llmProvider'                  => LlmProviderConfig::currentProvider(),
-            'llmProviders'                 => LlmProviderConfig::options(),
-            'mistralModels'                => AiModelConfig::listAvailableModels(LlmProviderConfig::PROVIDER_MISTRAL),
-            'deepseekModels'               => AiModelConfig::listAvailableModels(LlmProviderConfig::PROVIDER_DEEPSEEK),
-            'currentMistralModel'          => AiModelConfig::currentModel(LlmProviderConfig::PROVIDER_MISTRAL),
-            'currentDeepseekModel'         => AiModelConfig::currentModel(LlmProviderConfig::PROVIDER_DEEPSEEK),
-            'checkIntervalHours'           => RankTrackerConfig::checkIntervalHours(),
-            'defaultDepth'                 => RankTrackerConfig::DEFAULT_DEPTH,
+            'llmProvider' => LlmProviderConfig::currentProvider(),
+            'llmProviders' => LlmProviderConfig::options(),
+            'mistralModels' => AiModelConfig::listAvailableModels(LlmProviderConfig::PROVIDER_MISTRAL),
+            'deepseekModels' => AiModelConfig::listAvailableModels(LlmProviderConfig::PROVIDER_DEEPSEEK),
+            'currentMistralModel' => AiModelConfig::currentModel(LlmProviderConfig::PROVIDER_MISTRAL),
+            'currentDeepseekModel' => AiModelConfig::currentModel(LlmProviderConfig::PROVIDER_DEEPSEEK),
+            'checkIntervalHours' => RankTrackerConfig::checkIntervalHours(),
+            'defaultDepth' => RankTrackerConfig::DEFAULT_DEPTH,
             'competitorKeywordsEverywhere' => AuditConfig::competitorKeywordsEverywhereEnabled(),
-            'keywordProvider'              => KeywordProviderConfig::currentProvider(),
-            'keywordProviders'             => KeywordProviderConfig::options(),
-            'multilingualEnabled'          => LocaleConfig::multilingualEnabled(),
+            'keywordProvider' => KeywordProviderConfig::currentProvider(),
+            'keywordProviders' => KeywordProviderConfig::options(),
+            'multilingualEnabled' => LocaleConfig::multilingualEnabled(),
             'autopilot' => [
                 'stages' => ContentAutopilotConfig::STAGES,
                 'stage_models' => collect(ContentAutopilotConfig::STAGES)
@@ -78,13 +78,15 @@ class PlatformSettingsController extends Controller
                 'trial_articles' => ContentAutopilotConfig::trialArticles(),
                 'monthly_articles_per_website' => ContentAutopilotConfig::monthlyArticlesPerWebsite(),
                 'content_only_crawl_pages' => ContentAutopilotConfig::contentOnlyCrawlCap(),
+                'tracker_keywords' => ContentAutopilotConfig::trackerKeywords(),
+                'trial_tracker_keywords' => ContentAutopilotConfig::trialTrackerKeywords(),
             ],
             'banner' => [
-                'enabled'     => ((string) Setting::get('plugin.banner.enabled', '0')) === '1',
-                'type'        => (string) Setting::get('plugin.banner.type', 'image'),
-                'title'       => (string) Setting::get('plugin.banner.title', ''),
-                'image_url'   => (string) Setting::get('plugin.banner.image_url', ''),
-                'link_url'    => (string) Setting::get('plugin.banner.link_url', ''),
+                'enabled' => ((string) Setting::get('plugin.banner.enabled', '0')) === '1',
+                'type' => (string) Setting::get('plugin.banner.type', 'image'),
+                'title' => (string) Setting::get('plugin.banner.title', ''),
+                'image_url' => (string) Setting::get('plugin.banner.image_url', ''),
+                'link_url' => (string) Setting::get('plugin.banner.link_url', ''),
                 'youtube_url' => (string) Setting::get('plugin.banner.youtube_url', ''),
             ],
         ]);
@@ -144,6 +146,8 @@ class PlatformSettingsController extends Controller
             'content_trial_days' => ['required', 'integer', 'min:0', 'max:60'],
             'content_trial_articles' => ['required', 'integer', 'min:0', 'max:50'],
             'content_monthly_articles_per_website' => ['required', 'integer', 'min:1', 'max:1000'],
+            'content_tracker_keywords' => ['required', 'integer', 'min:0', 'max:100000'],
+            'content_trial_tracker_keywords' => ['required', 'integer', 'min:0', 'max:1000'],
             'content_only_crawl_pages' => ['required', 'integer', 'min:20', 'max:100000'],
             'banner_enabled' => ['nullable', 'boolean'],
             'banner_type' => ['required', 'string', Rule::in(['image', 'youtube'])],
@@ -215,6 +219,8 @@ class PlatformSettingsController extends Controller
         Setting::set('content.limits.trial_articles', (int) $data['content_trial_articles']);
         Setting::set('content.limits.monthly_articles_per_website', (int) $data['content_monthly_articles_per_website']);
         Setting::set('content.limits.content_only_crawl_pages', (int) $data['content_only_crawl_pages']);
+        Setting::set('content.limits.tracker_keywords', (int) $data['content_tracker_keywords']);
+        Setting::set('content.limits.trial_tracker_keywords', (int) $data['content_trial_tracker_keywords']);
 
         Setting::set('plugin.banner.enabled', $request->boolean('banner_enabled') ? '1' : '0');
         Setting::set('plugin.banner.type', (string) $data['banner_type']);

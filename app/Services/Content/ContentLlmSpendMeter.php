@@ -25,6 +25,9 @@ class ContentLlmSpendMeter extends MonthlySpendMeter
 
     public const EST_IDEATE_USD = 0.01;
 
+    /** One inline editor AI action (rewrite/simplify/…) — small, single call. */
+    public const EST_EDIT_USD = 0.01;
+
     protected function prefix(): string
     {
         return 'content:llm:spend:';

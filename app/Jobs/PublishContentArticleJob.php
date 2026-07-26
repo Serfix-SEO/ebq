@@ -2,9 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Models\ContentIntegration;
 use App\Models\ContentPublication;
 use App\Models\ContentTopic;
+use App\Models\ContentTrackedKeyword;
+use App\Services\Content\ContentKeywordTracker;
 use App\Services\Content\Publishing\PublishDriverFactory;
+use App\Services\Google\GoogleIndexingService;
 use App\Support\Audit\SafeHttpGuard;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
@@ -78,7 +82,7 @@ class PublishContentArticleJob implements ShouldQueue
         }
 
         $integrations = $topic->plan?->website?->contentIntegrations()
-            ->where('status', \App\Models\ContentIntegration::STATUS_CONNECTED)
+            ->where('status', ContentIntegration::STATUS_CONNECTED)
             ->get() ?? collect();
         if ($integrations->isEmpty()) {
             // Nothing connected: the article stays SCHEDULED so it publishes
@@ -167,6 +171,8 @@ class PublishContentArticleJob implements ShouldQueue
                 'last_error' => null,
             ])->save();
             $this->verifyLiveUrl($topic, $article, $liveUrl, $guard);
+            $this->submitToGoogleIndex($topic, $article, $liveUrl);
+            $this->addToKeywordTracker($topic, $liveUrl);
 
             return;
         }
@@ -187,6 +193,65 @@ class PublishContentArticleJob implements ShouldQueue
         ContentTopic::query()->whereKey($this->topicId)
             ->whereIn('status', [ContentTopic::STATUS_PUBLISHING, ContentTopic::STATUS_SCHEDULED])
             ->first()?->fail('Publishing error: '.$e->getMessage());
+    }
+
+    /**
+     * When the site has Google Search Console connected, submit the freshly
+     * published URL to the Google Indexing API for faster discovery. Best-effort:
+     * gated on Website::hasGsc() (no GSC → the review/settings UI shows the
+     * "connect Search Console" notice instead), never fails the publish.
+     */
+    private function submitToGoogleIndex(ContentTopic $topic, $article, ?string $liveUrl): void
+    {
+        $website = $topic->plan?->website;
+        if ($website === null || $article === null || ! $liveUrl || ! $website->hasGsc()) {
+            return;
+        }
+        try {
+            $result = app(GoogleIndexingService::class)->submitUrl($website, $liveUrl);
+            // Audit trail on the delivered publication(s).
+            ContentPublication::query()
+                ->where('article_id', $article->id)
+                ->where('external_url', $liveUrl)
+                ->get()
+                ->each(fn (ContentPublication $p) => $p->forceFill([
+                    'response' => ((array) $p->response) + ['indexing' => $result],
+                ])->save());
+            Log::info('content_autopilot.index_submit', ['topic_id' => $topic->id, 'status' => $result['status']]);
+        } catch (\Throwable $e) {
+            Log::warning('content_autopilot.index_submit_error', ['topic_id' => $topic->id, 'error' => mb_substr($e->getMessage(), 0, 300)]);
+        }
+    }
+
+    /**
+     * Auto-populate the Keyword Tracker with this article's targeted keywords
+     * (target + secondaries) on first publish. Best-effort — never fails the
+     * publish; respects the per-website capacity (overflow simply isn't added,
+     * and the Tracker page shows the delete-to-add banner).
+     */
+    private function addToKeywordTracker(ContentTopic $topic, ?string $liveUrl): void
+    {
+        $website = $topic->plan?->website;
+        if ($website === null) {
+            return;
+        }
+        try {
+            $tracker = app(ContentKeywordTracker::class);
+            $result = $tracker->track(
+                website: $website,
+                keywords: $tracker->keywordsFor($topic),
+                topic: $topic,
+                source: ContentTrackedKeyword::SOURCE_AUTO,
+                pageUrl: $liveUrl,
+            );
+            if (($result['added'] ?? 0) > 0) {
+                // Kick a live-SERP check so a position shows immediately (GSC lags days).
+                CheckTrackedKeywordSerpJob::dispatch($website->id);
+            }
+            Log::info('content_autopilot.tracker_autoadd', ['topic_id' => $topic->id] + $result);
+        } catch (\Throwable $e) {
+            Log::warning('content_autopilot.tracker_autoadd_error', ['topic_id' => $topic->id, 'error' => mb_substr($e->getMessage(), 0, 300)]);
+        }
     }
 
     /** Best-effort live check: 200 + title present + not noindexed → verified_at. */

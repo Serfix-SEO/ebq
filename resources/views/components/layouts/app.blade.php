@@ -79,6 +79,7 @@
                             : ($contentNavFull ? [
                             ['route' => 'content.index', 'feature' => 'content', 'label' => __('Content Calendar'), 'badge' => __('New'), 'icon' => 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5'],
                             ['route' => 'content.settings', 'feature' => 'content', 'label' => __('Settings'), 'icon' => 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z'],
+                            ['route' => 'content.tracker', 'feature' => 'content', 'label' => __('Tracker'), 'icon' => 'M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6'],
                             ['route' => 'content.integrations', 'feature' => 'content', 'label' => __('Integrations'), 'icon' => 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'],
                         ] : [
                             ['route' => 'content.get-started', 'feature' => 'content', 'label' => __('Content Autopilot'), 'badge' => __('New'), 'icon' => 'M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z'],
@@ -139,6 +140,7 @@
                         'label' => 'Ops',
                         'match_routes' => ['admin.ops.'],
                     ],
+                    ['route' => 'admin.content-feedback.index', 'label' => 'Content Feedback'],
                     [
                         'route' => 'admin.crawler.index',
                         'label' => 'Crawler',
@@ -462,7 +464,33 @@
                 </div>
             </header>
 
-            <main class="min-w-0 flex-1 overflow-x-hidden p-4 md:p-8">
+            {{-- overflow-x: clip (NOT hidden) — `overflow-x:hidden` silently makes
+                 overflow-y `auto`, turning <main> into a phantom scroll container
+                 that never actually scrolls (the window does), which BREAKS
+                 position:sticky for every descendant. `clip` clips the same way
+                 without establishing a scroll container, so sticky works. --}}
+            <main class="min-w-0 flex-1 p-4 md:p-8" style="overflow-x: clip">
+                @auth
+                    @if (auth()->user() instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! auth()->user()->hasVerifiedEmail())
+                        <div class="mb-4 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                            <div class="flex items-start gap-2">
+                                <svg class="mt-0.5 h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                                <span>
+                                    @if (session('status') === 'verification-link-sent')
+                                        {{ __('A new verification link has been sent to your email address.') }}
+                                    @else
+                                        {{ __('Please verify your email address to secure your account.') }}
+                                        <span class="font-medium opacity-80">{{ auth()->user()->email }}</span>
+                                    @endif
+                                </span>
+                            </div>
+                            <form method="POST" action="{{ route('verification.send') }}" class="shrink-0">
+                                @csrf
+                                <button type="submit" class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600">{{ __('Resend verification email') }}</button>
+                            </form>
+                        </div>
+                    @endif
+                @endauth
                 @if (session('impersonation_notice'))
                     <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ session('impersonation_notice') }}</div>
                 @endif

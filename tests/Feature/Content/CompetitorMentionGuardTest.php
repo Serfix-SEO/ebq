@@ -129,6 +129,48 @@ class CompetitorMentionGuardTest extends TestCase
         );
     }
 
+    /**
+     * A one-word alias that is an everyday word ("breathe" for "breathe
+     * maintenance") must NOT become a blocked prose term — it would flag
+     * ordinary sentences ("the air you breathe") and jam the revise loop.
+     * The multi-word brand, distinctive single-word brands, and the domain
+     * link block all survive.
+     */
+    public function test_terms_drops_bare_common_word_aliases_but_keeps_brand_and_domain(): void
+    {
+        [, , $plan] = $this->planWithGuard([
+            'assessed_at' => '2026-07-21T12:00:00+00:00',
+            'harmful' => true,
+            'auto' => [
+                ['brand' => 'breathe maintenance', 'domain' => 'breathemaintenance.com',
+                    'reason' => 'competitor', 'aliases' => ['breathe']],
+                ['brand' => 'fixperts', 'domain' => 'fixperts.ae', 'reason' => 'competitor'],
+            ],
+        ]);
+
+        $guard = app(CompetitorMentionGuard::class);
+        $terms = $guard->terms($plan);
+
+        $this->assertContains('breathe maintenance', $terms, 'multi-word brand kept');
+        $this->assertContains('fixperts', $terms, 'distinctive single-word brand kept');
+        $this->assertNotContains('breathe', $terms, 'bare common-word alias must be dropped');
+        // The DOMAIN link is still blocked — a real link to the rival is caught.
+        $this->assertContains('breathemaintenance.com', $guard->blockedDomains($plan));
+    }
+
+    /** A common word the CLIENT typed manually is deliberate — keep it. */
+    public function test_terms_keeps_a_manually_added_common_word(): void
+    {
+        [, , $plan] = $this->planWithGuard([
+            'assessed_at' => '2026-07-21T12:00:00+00:00',
+            'harmful' => true,
+            'auto' => [],
+            'manual' => ['cool'],
+        ]);
+
+        $this->assertContains('cool', app(CompetitorMentionGuard::class)->terms($plan));
+    }
+
     /** A topic literally ABOUT a competitor may name it — "semrush alternatives" is a real article. */
     public function test_a_topic_targeting_the_competitor_is_exempt(): void
     {

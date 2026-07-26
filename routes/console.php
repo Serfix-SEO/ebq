@@ -50,6 +50,15 @@ Schedule::command('ebq:failed-jobs-alert')->everyFifteenMinutes()->withoutOverla
 // dispatch due article productions (writes 48h ahead of each publish slot).
 Schedule::command('ebq:content-autopilot')->everyFifteenMinutes()->withoutOverlapping();
 
+// Keyword Tracker reporting: per-page GA traffic for content-entitled sites
+// (GSC per-page/query already lands via ebq:sync-daily-data above). Runs after
+// the main sync so ReportCache flushes are already settled.
+Schedule::command('ebq:sync-content-performance')->dailyAt('05:10')->withoutOverlapping();
+// Weekly live-SERP refresh (Serper) for tracked content keywords — the "real
+// SERP position" next to the GSC average. Per-keyword staleness is 7d, so this
+// is genuinely once a week per keyword.
+Schedule::command('ebq:check-tracked-serp')->weeklyOn(1, '06:20')->withoutOverlapping();
+
 // DataForSEO keyword-gap accumulation — DISABLED 2026-07-20. The keyword gap went
 // back to the self-hosted keyword server (1 competitor, see ContentKeywordInsights
 // MAX_COMPETITORS), so harvesting ranked_keywords would be pure spend for data

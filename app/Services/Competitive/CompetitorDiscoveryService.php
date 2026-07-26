@@ -30,6 +30,7 @@ class CompetitorDiscoveryService
     public function __construct(
         private SerpCache $serp,
         private OpenPageRankClient $opr,
+        private CompetitorEnricher $enricher,
     ) {
     }
 
@@ -213,7 +214,16 @@ class CompetitorDiscoveryService
         $run->forceFill(['serp_calls_made' => $serpCalls])->save();
         $run->markCompleted();
 
-        $this->enrichDomainAuthority($website, array_keys($tally));
+        $this->enrichCompetitors($website, array_keys($tally));
+
+        // Organic-traffic estimation for the site + every competitor in ONE
+        // flat-priced DataForSEO Labs call — powers the Site Explorer traffic
+        // chart and is cached 30 days on the shared domain_metrics asset.
+        $sandbox = (bool) $website->user?->is_admin;
+        $this->enricher->enrichTraffic(
+            array_merge([(string) $website->domain], array_keys($tally)),
+            $sandbox
+        );
     }
 
     /**
@@ -268,39 +278,71 @@ class CompetitorDiscoveryService
     }
 
     /**
-     * Queue a DA refresh for the top domains and copy any cached DA onto the
-     * stored rows (informational — DA is not part of the ranking score).
+     * Enrich the top discovered competitors from the shared {@see CompetitorEnricher}
+     * — the SAME real DataForSEO referring-domains/backlinks + Moz DA/PA the Content
+     * Autopilot analysis uses, all cached 30 days on the `domain_metrics` asset (so a
+     * domain enriched for one product is free for the other). This replaces the old
+     * OpenPageRank-only DA, which undercounts referring domains 10-100x.
+     *
+     * Informational only — none of these feed the ranking score. Capped at the top
+     * few domains, and paid providers self-throttle via their monthly spend breakers.
+     * OPR / historical CompetitorBacklink DA survive purely as a last-resort DA
+     * fallback when both DataForSEO and Moz are unavailable.
+     *
+     * Topical relevance is deliberately NOT run here (an LLM call per domain) — it is
+     * opt-in via {@see \App\Jobs\Competitive\ClassifyCompetitorTopicJob}.
      *
      * @param  list<string>  $domains
      */
-    private function enrichDomainAuthority(Website $website, array $domains): void
+    private function enrichCompetitors(Website $website, array $domains): void
     {
-        $top = array_slice($domains, 0, 10);
+        $top = array_slice($domains, 0, $this->enrichCap());
         if ($top === []) {
             return;
         }
 
-        // Authority from Open PageRank (free bulk endpoint) — replaced the
-        // paid KE backlink fetch (50 credits/domain) that used to warm the
-        // CompetitorBacklink cache purely to derive this number (2026-07-14).
-        // Falls back to any historically-cached CompetitorBacklink DA.
-        $metrics = $this->opr->metricsFor($top);
+        // Admin-owned sites route to the free mock host and are never persisted to
+        // the shared asset — same policy as ContentSetupInsights.
+        $sandbox = (bool) $website->user?->is_admin;
+
+        $oprMetrics = null; // lazily fetched only if a domain has no DFS/Moz authority
+
         foreach ($top as $domain) {
-            $score = $metrics[$domain]['score']
-                ?? ($metrics[OpenPageRankClient::registrable($domain)]['score'] ?? null);
-            $da = $score !== null
-                ? (int) min(100, round((float) $score * 10))
-                : CompetitorBacklink::query()
-                    ->forDomain($domain)
-                    ->whereNotNull('domain_authority')
-                    ->max('domain_authority');
-            if ($da !== null) {
-                DiscoveredCompetitor::query()
-                    ->where('website_id', $website->id)
-                    ->where('competitor_domain', $domain)
-                    ->update(['domain_authority' => (int) $da]);
+            $m = $this->enricher->enrich($domain, $sandbox);
+
+            // Authority preference: real Moz DA → DataForSEO domain rank (0-1000
+            // scaled to 0-100) → OpenPageRank → any historical CompetitorBacklink DA.
+            $da = $m['moz_da'];
+            if ($da === null && $m['dfs_rank'] !== null) {
+                $da = (int) min(100, round($m['dfs_rank'] / 10));
             }
+            if ($da === null) {
+                $oprMetrics ??= $this->opr->metricsFor($top);
+                $score = $oprMetrics[$domain]['score']
+                    ?? ($oprMetrics[OpenPageRankClient::registrable($domain)]['score'] ?? null);
+                $da = $score !== null
+                    ? (int) min(100, round((float) $score * 10))
+                    : CompetitorBacklink::query()
+                        ->forDomain($domain)
+                        ->whereNotNull('domain_authority')
+                        ->max('domain_authority');
+            }
+
+            DiscoveredCompetitor::query()
+                ->where('website_id', $website->id)
+                ->where('competitor_domain', $domain)
+                ->update([
+                    'domain_authority' => $da !== null ? (int) $da : null,
+                    'page_authority' => $m['moz_pa'],
+                    'referring_domains' => $m['referring_domains'],
+                    'backlinks' => $m['backlinks'],
+                ]);
         }
+    }
+
+    private function enrichCap(): int
+    {
+        return max(1, min(50, (int) config('services.competitive.discovery_enrich_max', 10)));
     }
 
     /**

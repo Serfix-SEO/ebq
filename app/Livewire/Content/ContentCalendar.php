@@ -1437,6 +1437,10 @@ class ContentCalendar extends Component
                 'plan' => $plan,
                 'guard' => $this->guardState($plan),
                 'countryOptions' => KeywordFinderLocations::countryOptions(),
+                // The Settings tab shows the auto-publish toggle + its
+                // "no destination connected" warning, so it needs the real
+                // connection state (emptyCalendarBindings defaults it false).
+                'publishConnected' => $this->hasPublishDestination(),
             ] + $this->emptyCalendarBindings());
         }
 

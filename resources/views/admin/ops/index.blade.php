@@ -41,6 +41,35 @@
             </div>
         @endif
 
+        {{-- Content Autopilot AI spend (writer + inline editor edits + ideation
+             all share this LLM meter, SEPARATE from clients' dashboard token pool). --}}
+        @if (($contentLlmSpend['cap'] ?? null) !== null)
+            <div class="rounded-lg border px-4 py-3 text-sm
+                {{ $contentLlmSpend['exhausted'] ? 'border-rose-200 bg-rose-50 text-rose-800' : ($contentLlmSpend['near'] ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-600') }}">
+                <span class="font-semibold">Content Autopilot AI spend this month:</span>
+                ${{ number_format($contentLlmSpend['spent'], 2) }} / ${{ number_format($contentLlmSpend['cap'], 2) }}
+                @if ($contentLlmSpend['exhausted'])
+                    — <span class="font-semibold">cap reached</span>: new topics stop being claimed and inline AI edits are refused until next month. Raise <code class="text-xs">CONTENT_LLM_MONTHLY_CAP_USD</code> to resume.
+                @elseif ($contentLlmSpend['near'])
+                    — approaching the cap (80%+).
+                @endif
+            </div>
+        @endif
+
+        {{-- Content Autopilot image spend (Ideogram) --}}
+        @if (($contentImageSpend['cap'] ?? null) !== null)
+            <div class="rounded-lg border px-4 py-3 text-sm
+                {{ $contentImageSpend['exhausted'] ? 'border-rose-200 bg-rose-50 text-rose-800' : ($contentImageSpend['near'] ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-600') }}">
+                <span class="font-semibold">Content Autopilot image spend this month:</span>
+                ${{ number_format($contentImageSpend['spent'], 2) }} / ${{ number_format($contentImageSpend['cap'], 2) }}
+                @if ($contentImageSpend['exhausted'])
+                    — <span class="font-semibold">cap reached</span>: articles publish without new images until next month.
+                @elseif ($contentImageSpend['near'])
+                    — approaching the cap (80%+).
+                @endif
+            </div>
+        @endif
+
         {{-- Queue depths --}}
         <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">

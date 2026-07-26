@@ -51,8 +51,24 @@ class EmailVerificationGraceTest extends TestCase
         $this->assertFalse($this->isForcedToVerify($user));
     }
 
+    public function test_forced_verification_disabled_by_default_never_blocks(): void
+    {
+        // Default (enforce=false): even a long-unverified user is let through —
+        // verification is advisory (dashboard banner), never a hard gate.
+        Config::set('auth.verification.enforce', false);
+        Config::set('auth.verification.grace_days', 3);
+
+        $user = new User;
+        $user->created_at = now()->subDays(30);
+        $user->email_verified_at = null;
+
+        $this->assertNotNull($this->pass($user));
+        $this->assertFalse($this->isForcedToVerify($user));
+    }
+
     public function test_unverified_user_past_grace_window_is_forced_to_verify(): void
     {
+        Config::set('auth.verification.enforce', true);
         Config::set('auth.verification.grace_days', 3);
 
         $user = new User;
@@ -76,6 +92,7 @@ class EmailVerificationGraceTest extends TestCase
 
     public function test_zero_grace_days_enforces_immediately(): void
     {
+        Config::set('auth.verification.enforce', true);
         Config::set('auth.verification.grace_days', 0);
 
         $user = new User;

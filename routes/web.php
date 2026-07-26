@@ -305,6 +305,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
         Route::view('/content', 'content.index')->middleware(['feature:content', 'content.access'])->name('content.index');
         Route::view('/content/settings', 'content.settings')->middleware(['feature:content', 'content.access'])->name('content.settings');
         Route::view('/content/integrations', 'content.integrations')->middleware(['feature:content', 'content.access'])->name('content.integrations');
+        Route::view('/content/tracker', 'content.tracker')->middleware(['feature:content', 'content.access'])->name('content.tracker');
         Route::get('/content/topics/{topic}', fn (string $topic) => view('content.review', ['topicId' => $topic]))
             ->middleware(['feature:content', 'content.access'])
             ->name('content.review');
@@ -422,6 +423,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Ops dashboard: failed jobs + never-crawled stuck sites + queue depths.
     // Companion to the ebq:failed-jobs-alert mailed digest (2026-07-06 incident).
     Route::get('/ops', [\App\Http\Controllers\Admin\OpsController::class, 'index'])->name('ops.index');
+    Route::get('/content-feedback', [\App\Http\Controllers\Admin\ContentFeedbackController::class, 'index'])->name('content-feedback.index');
     Route::post('/ops/retry', [\App\Http\Controllers\Admin\OpsController::class, 'retry'])->name('ops.retry');
     Route::post('/ops/forget', [\App\Http\Controllers\Admin\OpsController::class, 'forget'])->name('ops.forget');
     Route::post('/ops/crawl/{crawlSite}', [\App\Http\Controllers\Admin\OpsController::class, 'startCrawl'])->name('ops.start-crawl');

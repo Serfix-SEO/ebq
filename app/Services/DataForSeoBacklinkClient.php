@@ -249,6 +249,92 @@ class DataForSeoBacklinkClient
     }
 
     /**
+     * DataForSEO Labs "historical bulk traffic estimation" — ONE flat-priced task
+     * returns a MONTHLY organic/paid traffic time series for up to 1,000 targets at
+     * once. This is the source for the Site Explorer organic-traffic chart: the site
+     * plus every discovered competitor in a single billed call.
+     *
+     * Returns a map keyed by the bare domain → the raw per-target blob (an `items`
+     * list of monthly points, each with a year/month + organic/paid `metrics`). We
+     * store the whole thing ("save everything") and derive the compact chart series
+     * downstream. Domains DataForSEO has no data for are simply absent.
+     *
+     * @param  list<string>  $domains
+     * @return array<string, array<string, mixed>>
+     */
+    public function historicalBulkTrafficEstimation(array $domains): array
+    {
+        $targets = [];
+        foreach ($domains as $domain) {
+            if (! is_string($domain) || trim($domain) === '') {
+                continue;
+            }
+            $bare = $this->target($domain);
+            if ($bare !== '') {
+                $targets[$bare] = true;
+            }
+        }
+        $targets = array_slice(array_keys($targets), 0, 1000);
+        if ($targets === []) {
+            return [];
+        }
+
+        $result = $this->firstResult('/dataforseo_labs/google/historical_bulk_traffic_estimation/live', [
+            'targets' => $targets,
+            'language_name' => 'English',
+            'location_code' => 2840,
+            'item_types' => ['organic', 'paid'],
+        ]);
+
+        $items = $result['items'] ?? null;
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $target = $item['target'] ?? null;
+            if (! is_string($target) || $target === '') {
+                continue;
+            }
+            $blob = $item;
+            unset($blob['target']);
+            $out[$this->target($target)] = $blob;
+        }
+
+        return $out;
+    }
+
+    /**
+     * DataForSEO Labs "historical rank overview" — a SINGLE domain's MONTHLY
+     * organic/paid metric history (ETV, ranking-keyword count, position buckets,
+     * movement). Unlike the bulk endpoint (fixed ~12 months), this one honours
+     * `date_from`, so one flat-priced call returns YEARS of history (~55 months
+     * back to 2022 observed). Used for the site's own deep traffic chart; the raw
+     * `result` blob (with its `items` monthly list) is returned so the caller can
+     * store "whatever is provided".
+     *
+     * @return array<string, mixed>|null
+     */
+    public function historicalRankOverview(string $domain, ?string $dateFrom = null): ?array
+    {
+        $target = $this->target($domain);
+        if ($target === '') {
+            return null;
+        }
+
+        return $this->firstResult('/dataforseo_labs/google/historical_rank_overview/live', array_filter([
+            'target' => $target,
+            'language_name' => 'English',
+            'location_code' => 2840,
+            'date_from' => $dateFrom,
+        ]));
+    }
+
+    /**
      * DataForSEO Labs "keyword overview" — volume / competition / difficulty /
      * intent for an EXPLICIT keyword list (≤700/task; we send ≤50). Used to
      * price the offer-spine candidate queries so they can compete in the

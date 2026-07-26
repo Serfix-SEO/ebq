@@ -128,6 +128,12 @@ return [
     */
 
     'verification' => [
+        // Master switch for FORCED email verification. Default false: users are
+        // never blocked — the dashboard shows an advisory "verify your email"
+        // banner instead (EnsureEmailVerifiedAfterGrace passes through). Set
+        // EMAIL_VERIFICATION_ENFORCE=true to restore hard gating (then the
+        // grace window below applies).
+        'enforce' => filter_var(env('EMAIL_VERIFICATION_ENFORCE', false), FILTER_VALIDATE_BOOLEAN),
         'grace_days' => (int) env('EMAIL_VERIFICATION_GRACE_DAYS', 3),
     ],
 

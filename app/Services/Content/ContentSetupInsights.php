@@ -61,6 +61,7 @@ class ContentSetupInsights
         private readonly DataForSeoSpendMeter $dfsSpend,
         private readonly MozLinksClient $moz,
         private readonly MozSpendMeter $mozSpend,
+        private readonly \App\Services\Competitive\CompetitorEnricher $enricher,
     ) {}
 
     /**
@@ -363,60 +364,9 @@ class ContentSetupInsights
      */
     private function dfsMetrics(string $domain, bool $sandbox = false): array
     {
-        $empty = ['referring_domains' => null, 'backlinks' => null, 'rank' => null];
-
-        $host = $this->normalizeHost($domain);
-        if ($host === '') {
-            return $empty;
-        }
-
-        $existing = DomainMetric::query()->where('domain', $host)->first();
-        $fresh = $existing?->dfs_refreshed_at !== null
-            && $existing->dfs_refreshed_at->gt(now()->subDays(self::CACHE_TTL_DAYS));
-        if ($fresh) {
-            return ['referring_domains' => $existing->dfs_referring_domains, 'backlinks' => $existing->dfs_backlinks, 'rank' => $existing->dfs_rank];
-        }
-
-        $stale = $existing !== null
-            ? ['referring_domains' => $existing->dfs_referring_domains, 'backlinks' => $existing->dfs_backlinks, 'rank' => $existing->dfs_rank]
-            : $empty;
-
-        if (! $this->dfs->isConfigured() || (! $sandbox && $this->dfsSpend->exhausted())) {
-            return $stale;
-        }
-
-        $this->dfs->resetCost();
-        $summary = $this->dfs->useSandbox($sandbox)->summary($domain);
-        $this->dfs->useSandbox(false); // reset — this client instance may be reused elsewhere this request
-
-        $referring = isset($summary['referring_domains']) ? (int) $summary['referring_domains'] : null;
-        $backlinks = isset($summary['backlinks']) ? (int) $summary['backlinks'] : null;
-        // DataForSEO domain rank (0-1000) — the authority fallback when the
-        // Moz free-tier row cap is exhausted (2026-07-23: a whole competitor
-        // table rendered DA/PA "—" mid-month).
-        $rank = isset($summary['rank']) && is_numeric($summary['rank']) ? (int) $summary['rank'] : null;
-
-        if ($sandbox) {
-            return ['referring_domains' => $referring, 'backlinks' => $backlinks, 'rank' => $rank]; // mock data — never cached/billed
-        }
-
-        $this->dfsSpend->add($this->dfs->totalCost());
-
-        // Global asset — any subsystem touching this domain reads the same
-        // fresh DataForSEO value for 30 days instead of re-billing.
-        DomainMetric::query()->updateOrCreate(
-            ['domain' => $host],
-            [
-                'dfs_referring_domains' => $referring,
-                'dfs_backlinks' => $backlinks,
-                'dfs_rank' => $rank,
-                'dfs_refreshed_at' => now(),
-                'last_seen_at' => now(),
-                'first_seen_at' => $existing?->first_seen_at ?? now(),
-            ]
-        );
-
-        return ['referring_domains' => $referring, 'backlinks' => $backlinks, 'rank' => $rank];
+        // Delegated to the shared enricher (identical logic + same domain_metrics
+        // rows) so the SEO Site Explorer and this wizard can never drift.
+        return $this->enricher->dfsMetrics($domain, $sandbox);
     }
 
     /**
@@ -428,47 +378,10 @@ class ContentSetupInsights
      */
     private function mozMetrics(string $domain): array
     {
-        $empty = ['domain_authority' => null, 'page_authority' => null];
-
-        $host = $this->normalizeHost($domain);
-        if ($host === '') {
-            return $empty;
-        }
-
-        $existing = DomainMetric::query()->where('domain', $host)->first();
-        $fresh = $existing?->moz_refreshed_at !== null
-            && $existing->moz_refreshed_at->gt(now()->subDays(self::CACHE_TTL_DAYS));
-        if ($fresh) {
-            return ['domain_authority' => $existing->moz_da, 'page_authority' => $existing->moz_pa];
-        }
-
-        $stale = $existing !== null
-            ? ['domain_authority' => $existing->moz_da, 'page_authority' => $existing->moz_pa]
-            : $empty;
-
-        if (! $this->moz->isConfigured() || $this->mozSpend->exhausted()) {
-            return $stale; // better than nothing; don't record — retry later
-        }
-
-        $metrics = $this->moz->urlMetrics($domain) ?? [];
-        $this->mozSpend->add(1);
-        $da = $metrics['domain_authority'] ?? null;
-        $pa = $metrics['page_authority'] ?? null;
-
-        // Global asset (like domain_metrics' CC/OPR columns) — any subsystem
-        // touching this domain reads the same fresh Moz value for 30 days.
-        DomainMetric::query()->updateOrCreate(
-            ['domain' => $host],
-            [
-                'moz_da' => $da,
-                'moz_pa' => $pa,
-                'moz_refreshed_at' => now(),
-                'last_seen_at' => now(),
-                'first_seen_at' => $existing?->first_seen_at ?? now(),
-            ]
-        );
-
-        return ['domain_authority' => $da, 'page_authority' => $pa];
+        // Delegated to the shared enricher. `sandbox: false` preserves the prior
+        // behavior (content never sandboxed Moz — it billed real even for admin
+        // sites), so the content wizard's numbers are byte-identical.
+        return $this->enricher->mozMetrics($domain, false);
     }
 
     private function build(Website $website): ?array

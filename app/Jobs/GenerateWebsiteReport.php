@@ -221,6 +221,25 @@ class GenerateWebsiteReport implements ShouldBeUnique, ShouldQueue
 
             $payload = $service->assemble($normalized, $raw);
 
+            // Organic-traffic estimate for the CHART on the exploration report —
+            // one flat-priced DataForSEO Labs call, cached 30 days on the shared
+            // domain_metrics asset. Real even on admin/sandbox reports (operator
+            // decision 2026-07-24: admins must see real traffic); only a
+            // force-sandbox env (staging) skips the real call. Additive + guarded:
+            // an empty/failed series just leaves the chart absent.
+            try {
+                $trafficSandbox = (bool) config('services.dataforseo.force_sandbox');
+                $enricher = app(\App\Services\Competitive\CompetitorEnricher::class);
+                // DEEP history for the site's own chart (years, one flat call).
+                $enricher->enrichTrafficDeep($normalized, sandbox: $trafficSandbox);
+                $series = $enricher->trafficSeries($normalized);
+                if ($series !== []) {
+                    $payload['organic_traffic'] = $series;
+                }
+            } catch (Throwable $e) {
+                Log::warning('GenerateWebsiteReport: traffic enrich failed', ['domain' => $normalized, 'message' => $e->getMessage()]);
+            }
+
             // Stamp the topical-relevance section as pending BEFORE the
             // snapshot write, so the UI can show a progress card instead of
             // nothing while EnrichTopicalTrustJob (dispatched below) fetches

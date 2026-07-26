@@ -45,6 +45,23 @@
     // `Plan::ordered()` scope filters to active plans in display_order.
     $planRows = \App\Models\Plan::ordered()->get();
 
+    // Content Autopilot is a SEPARATELY-billed product (its own Stripe sub +
+    // per-website add-on). The product menu below lets a visitor flip the
+    // pricing grid between the SEO platform (above) and Content Autopilot.
+    // Numbers come from the same config the /content-autopilot landing uses,
+    // so the two pages can never drift.
+    $cfg               = \App\Support\ContentAutopilotConfig::class;
+    $contentLandingUrl = \Illuminate\Support\Facades\Route::has('content.landing') ? route('content.landing') : $registerUrl;
+    $contentPrices     = [
+        'monthly'       => $cfg::displayPrice('monthly'),
+        'annual'        => $cfg::displayPrice('annual'),
+        'first_month'   => $cfg::displayPrice('first_month'),
+        'addon_monthly' => $cfg::displayPrice('addon_monthly'),
+        'addon_annual'  => $cfg::displayPrice('addon_annual'),
+        'trial_days'    => $cfg::trialDays(),
+        'articles'      => $cfg::monthlyArticlesPerWebsite(),
+    ];
+
     // Display copy for the 8 plugin features. The pricing card's
     // "Includes:" list is auto-generated from `featureMap()` — every
     // checked flag emits its label here. Keys match Plan::FEATURE_KEYS.
@@ -384,11 +401,32 @@
         </section>
     @endif
 
-    {{-- ── Billing toggle + plan cards ─────────────────────────── --}}
-    <div x-data="{ billing: 'annual' }">
+    {{-- ── Product menu + billing toggle + plan cards ──────────── --}}
+    {{-- `product` picks which pricing grid shows: the SEO platform (5 tiers,
+         DB-driven) or the separately-billed Content Autopilot. Deep-linkable
+         via ?product=content (e.g. from the Content Autopilot landing). --}}
+    <div x-data="{ product: (new URLSearchParams(location.search).get('product') === 'content' ? 'content' : 'seo'), billing: 'annual' }">
 
-        {{-- Toggle --}}
-        <div class="bg-white pt-10 pb-4 text-center">
+        {{-- Product menu: SEO Platform ↔ Content Autopilot --}}
+        <div class="bg-white pt-10 text-center">
+            <div class="inline-flex rounded-full border border-slate-200 bg-slate-50/80 p-1 shadow-sm">
+                <button
+                    @click="product = 'seo'"
+                    :class="product === 'seo' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                    class="rounded-full px-6 py-2 text-sm font-semibold transition">
+                    {{ __('SEO Platform') }}
+                </button>
+                <button
+                    @click="product = 'content'"
+                    :class="product === 'content' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                    class="rounded-full px-6 py-2 text-sm font-semibold transition">
+                    {{ __('Content Autopilot') }}
+                </button>
+            </div>
+        </div>
+
+        {{-- Billing toggle (SEO grid only — Content Autopilot shows both terms side by side) --}}
+        <div x-show="product === 'seo'" class="bg-white pt-6 pb-4 text-center">
             <div class="inline-flex rounded-full border border-slate-200 bg-slate-50/80 p-1 shadow-sm">
                 <button
                     @click="billing = 'monthly'"
@@ -406,8 +444,8 @@
             </div>
         </div>
 
-        {{-- ── Plan cards ───────────────────────────────────────── --}}
-        <section id="plans" class="bg-white pb-16 pt-6 sm:pt-8">
+        {{-- ── SEO plan cards ───────────────────────────────────── --}}
+        <section id="plans" x-show="product === 'seo'" class="bg-white pb-16 pt-6 sm:pt-8">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 @if ($winbackActive)
                     <div class="mb-6 flex flex-col items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 px-6 py-4 text-white shadow-lg sm:flex-row">
@@ -518,6 +556,58 @@
             </div>
         </section>
 
+        {{-- ── Content Autopilot panel ──────────────────────────── --}}
+        {{-- Separately-billed product: its own Stripe sub + per-website add-on.
+             Both terms shown side by side (no billing toggle). Numbers from
+             ContentAutopilotConfig — single source of truth with the landing. --}}
+        <section x-show="product === 'content'" style="display:none" class="bg-white pb-16 pt-6 sm:pt-8">
+            <div class="mx-auto max-w-4xl px-6 lg:px-8">
+                <div class="text-center">
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('Content Autopilot') }}</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{{ __('Research-backed articles, written & published for you.') }}</h2>
+                    <p class="mx-auto mt-4 max-w-2xl text-balance text-[15px] leading-7 text-slate-600">
+                        {{ __('Start free for :days days — no card. Then one flat price per website. Add more sites anytime.', ['days' => $contentPrices['trial_days']]) }}
+                    </p>
+                </div>
+
+                <div class="mt-10 grid gap-5 sm:grid-cols-2">
+                    {{-- Monthly (with $1 first-month hook) --}}
+                    <div class="relative flex flex-col rounded-2xl border-2 border-orange-300 bg-gradient-to-b from-orange-50 to-white p-8 text-center shadow-lg shadow-orange-600/5">
+                        <span class="mx-auto inline-flex rounded-full bg-orange-600 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">{{ __('$:p first month', ['p' => $contentPrices['first_month']]) }}</span>
+                        <div class="mt-5 text-5xl font-semibold tracking-tight text-slate-900">${{ $contentPrices['monthly'] }}<span class="text-lg font-medium text-slate-500">{{ __('/mo') }}</span></div>
+                        <div class="mt-1 text-sm text-slate-500">{{ __('Billed monthly') }}</div>
+                        <a href="{{ $contentLandingUrl }}" class="mt-7 inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">{{ __('Start free trial') }}</a>
+                    </div>
+                    {{-- Annual (best value) --}}
+                    <div class="relative flex flex-col rounded-2xl border border-slate-200 bg-white p-8 text-center">
+                        <span class="mx-auto inline-flex rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700">{{ __('Best value') }}</span>
+                        <div class="mt-5 text-5xl font-semibold tracking-tight text-slate-900">${{ $contentPrices['annual'] }}<span class="text-lg font-medium text-slate-500">{{ __('/mo') }}</span></div>
+                        <div class="mt-1 text-sm text-slate-500">{{ __('Billed yearly') }}</div>
+                        <a href="{{ $contentLandingUrl }}" class="mt-7 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">{{ __('Start free trial') }}</a>
+                    </div>
+                </div>
+
+                <ul class="mx-auto mt-8 grid max-w-2xl gap-2.5 text-[13px] text-slate-700 sm:grid-cols-2">
+                    @foreach ([
+                        __('Up to :n articles per website / month', ['n' => $contentPrices['articles']]),
+                        __('Keyword research + competitor analysis'),
+                        __('Auto-publish to WordPress, Laravel or webhook'),
+                        __('AI images + on-page SEO built in'),
+                    ] as $bullet)
+                        <li class="flex justify-center gap-2.5 sm:justify-start">
+                            <svg class="mt-0.5 h-4 w-4 flex-none text-orange-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                            <span>{{ $bullet }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+
+                <p class="mt-8 text-center text-xs text-slate-500">
+                    {{ __('Each additional website: $:m/mo (or $:a/mo billed yearly). Content Autopilot is billed separately from the SEO platform.', ['m' => $contentPrices['addon_monthly'], 'a' => $contentPrices['addon_annual']]) }}
+                    <a href="{{ $contentLandingUrl }}" class="font-medium text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline">{{ __('See how it works') }}</a>.
+                </p>
+            </div>
+        </section>
+
     {{-- ── Trust strip ──────────────────────────────────────────── --}}
     <section class="border-y border-slate-200 bg-slate-50/60 py-10">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
@@ -540,7 +630,7 @@
     {{-- ── Feature comparison table (desktop/tablet only — the 6-column
          grid can't degrade usefully on phones; plan cards above carry the
          mobile story) ─────────────────────────────── --}}
-    <section class="hidden bg-white py-16 sm:py-20 md:block">
+    <section x-show="product === 'seo'" class="hidden bg-white py-16 sm:py-20 md:block">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mb-10 text-center">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('Full Comparison') }}</p>

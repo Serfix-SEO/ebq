@@ -130,6 +130,46 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   `register_post_meta(show_in_rest)` in `Ebq_Meta_Fields::KEYS`. Tests:
   `ArticleEditorTest` (save persists overrides, focus-override drives audit),
   `ContentPublishingTest` (WP meta + webhook payload mapping).
+  **2026-07-25 — full WYSIWYG editor (TipTap):** the body editor was upgraded
+  from a bare `contenteditable` + deprecated `document.execCommand` to a proper
+  ProseMirror/**TipTap v3** editor. Toolbar: H2/H3/H4, bold/italic/underline/
+  strike, blockquote, bullet+ordered lists, code block, HR, links, **tables**
+  (insert + add/del row/col), text-align, undo/redo, clear-formatting, and
+  **images** (upload / insert-by-URL / **AI-generate**). Packaged as a SEPARATE
+  Vite entrypoint `resources/js/editor.js` (added to `vite.config.js` input;
+  ~135 KB gz, loaded ONLY on the review route via an `@assets @vite … @endassets`
+  block so it never ships to other pages). Registered as an Alpine.data
+  component `tiptapEditor` on the `alpine:init` event — Alpine here is the
+  instance Livewire INJECTS (never `Alpine.start()`ed), so it must hook
+  `alpine:init`, not import its own Alpine. The mount stays inside `wire:ignore`
+  (init guards against double-mount; destroys on `livewire:navigating`); initial
+  HTML is seeded ONCE from `@js($previewHtml)`. Server contract is UNCHANGED —
+  body still round-trips as an HTML string via `$wire.rescore(getHTML())` /
+  `$wire.saveEdits(getHTML())`, and the selection AI menu still calls
+  `$wire.aiEdit(tool,text,tone)` (re-implemented against TipTap's
+  `coordsAtPos`/`insertContentAt`). A custom `ContentFigure` node serialises to
+  the pipeline's EXACT `<figure class="content-image"><img loading="lazy">`
+  markup (and `parseHTML` reads existing figures) so editor-inserted images match
+  `GenerateContentImagesJob` and the WP sideload convention. **Images backend**
+  (`ArticleReview`): `uploadInlineImage()` (WithFileUploads, `storePublicly()` to
+  `ContentImage::disk()`, creates a `role=inline status=generated` row, returns
+  its URL); `requestInlineImage($prompt)` → creates a `status=pending` row +
+  dispatches `GenerateInlineImageJob` (queue `content`, tries=1, one Ideogram
+  image, NEVER edits article HTML — the editor polls `pollInlineImage($id)` and
+  places the figure). AI-generate is gated on
+  `imagesEnabled() && IdeogramClient::isConfigured() && ! IdeogramSpendMeter::
+  exhausted()` — a manual request IGNORES the per-plan auto toggle (the client is
+  explicitly asking). **Landmines:** StarterKit v3 ALREADY bundles Link +
+  Underline + lists + HR + code-block + undo/redo — do NOT also import the
+  separate packages (duplicate-extension warning); the stock Image node would
+  emit a bare `<img>` and break `.content-image` (hence the custom node);
+  table/editor-chrome CSS is NOT in the prebuilt Tailwind bundle → it lives as
+  raw CSS in the scoped `<style>` block in the blade. `markdown` column goes
+  stale on HTML edits (pre-existing; publish uses `html`). Tests:
+  `ArticleEditorTest` (table/figure/code/hr/underline preserved through
+  `saveEdits`; inline-image upload stores + creates row; non-image rejected;
+  AI-generate unavailable path; poll tenancy). Sanitize needed NO change — it
+  strips only script/style/iframe/object/embed + `on*=`, never table/figure/img.
 - **Gating layers** (landmine, cost 3 test rounds): a new plan feature key
   must be added in FOUR places — `PlanSeeder plan_features`,
   `Plan::FEATURE_KEYS` (featureMap whitelist), `Website::FEATURE_KEYS`
@@ -308,6 +348,19 @@ Tests: `ContentPeerClassesTest` (3).
 - **Aliases** — the SAME classify call now returns ≤4 aliases per blocked
   brand ("uc" for Urban Company); stored on `auto[i].aliases`, merged into
   `terms()`, removed together with their parent brand. No extra LLM cost.
+  **Common-word alias landmine (fixed 2026-07-24).** An alias (or one-word
+  brand) that is an everyday English word poisons the whole pipeline: the
+  classifier gave "breathe maintenance" the alias `"breathe"`, which
+  word-boundary-matched ordinary prose ("the air you breathe", "breathe
+  cleaner air"). That kept `style_issues.competitor_mentions` permanently
+  dirty, so the revise loop could never clear it — the article burned all 3
+  revisions and shipped READY at a low score (75). Fix: `terms()` now drops
+  any bare single-token term in `COMMON_WORD_TERMS` (a curated everyday-word
+  list, HVAC/home-services-leaning). Multi-word brands ("breathe
+  maintenance"), distinctive single words ("semrush", "fixperts"), and
+  MANUAL adds (client typed it deliberately) are kept; the competitor's
+  DOMAIN link is still blocked via `blockedDomains()`. So a real named/linked
+  competitor is still caught — only the ambiguous bare word stops flagging.
 - **Value counter** — `guard['stats'].articles_checked/mentions_removed`,
   bumped by `ContentArticleProducer` after READY (checked when the guard was
   active; removed when an earlier version carried the `competitor_mentions`
@@ -323,8 +376,8 @@ Tests: `ContentPeerClassesTest` (3).
   (block-anyway button per chip → `blockReference()` on BOTH hosts, via the
   new public `brandForDomain()`), plus the counter line.
 
-Tests: `ContentGuardEvolutionTest` (7); the pre-existing
-`CompetitorMentionGuardTest` (24) is untouched and green.
+Tests: `ContentGuardEvolutionTest` (7); `CompetitorMentionGuardTest` (26 —
++2 for the common-word alias filter).
 
 ## Type-aware writing (Phase F, 2026-07-23)
 
@@ -749,6 +802,23 @@ min-16-char secret, integration contract described inline), live
 hands-off (auto_publish) toggle. Secrets go through the encrypted cast,
 are never echoed back, and never appear in plaintext in the DB (test-
 asserted). Status constants now on ContentIntegration/ContentPublication.
+
+**No-destination guard (2026-07-24).** `auto_publish` can be turned on from
+THREE surfaces — the calendar-view banner (`enableAutoPublish()`), the
+calendar Settings tab toggle (`$toggle('autoPublish')`), and the
+`PublishingSettings` card — and none of them require a connected
+integration (by design: a user may enable it, then connect). It used to do
+so silently, so the toggle looked effective while nothing could publish.
+Now a prominent amber warning ("Auto-publish is on, but no destination is
+connected") renders whenever `auto_publish` is on AND no integration is
+`STATUS_CONNECTED` — in both the Settings tab and the PublishingSettings
+card. Reactivity fix: the ContentCalendar **settings-view render branch**
+must pass `publishConnected => hasPublishDestination()` explicitly
+(`emptyCalendarBindings()` defaults it to `false`, which would keep the
+warning stuck on even after connecting). Tests:
+`ConnectIntegrationBannerTest` (settings-view + card, on/off/connected/
+errored-only). An errored/pending integration does NOT suppress the warning
+(only `connected` does).
 
 Deferred from the original Phase-3 spec: the WP-plugin v2.1
 `POST /wp-json/ebq/v1/content` receive endpoint + publish-secret minting in
@@ -1372,6 +1442,29 @@ blank result persists.
   to show every real SERP competitor, directories included; only research/
   harvesting call sites need the guard's rival-vs-reference judgment. Any NEW
   "pick the competitor(s)" call site must go through `rankAndFilter()`.
+
+## Keyword Tracker + GSC/GA performance reporting (2026-07-26, PROD)
+
+The "is my content working?" proof loop. A capacity-limited list of the keywords
+each published article targets, with daily GSC (position/clicks/impressions) and
+GA (pageviews/sessions) performance. **Data sources are GSC + GA only — no
+SERP/rank-API cost.** GSC per-query/per-page rows already sync daily into
+`search_console_data`; only GA per-page data is new.
+
+| Piece | File | Notes |
+|---|---|---|
+| Tables | `2026_07_26_140000_create_content_tracked_keywords_table`, `..._140100_create_content_page_analytics_table` | `content_tracked_keywords`: quota rows (`website_id`, nullable `topic_id`/`article_id` nullOnDelete, `keyword`, `normalized_keyword`, `page_url`, `is_primary`, `source` auto\|manual). UNIQUE(`website_id`,`normalized_keyword`) = dedupe + the quota unit. `content_page_analytics`: per-page daily GA (`date`,`page`,`pageviews`,`sessions`,`users`,`engagement_rate`), UNIQUE(`website_id`,`date`,`page`). Both DEFAULT connection; `SearchConsoleData` is TENANT-connection, so reads never join across — merge in PHP. `ContentPageAnalytics::setDateAttribute` stores plain Y-m-d (sqlite window-compare gotcha, mirrors `SearchConsoleData`). |
+| Quota (own meter) | `app/Services/Content/KeywordTrackerQuota.php` | **Isolated from the Redis MonthlySpendMeter family** — the DB row-count IS the meter (no drift, exact delete-to-add). Per-WEBSITE cap: paid/comped = `ContentAutopilotConfig::trackerKeywords()` (500), trial = `trialTrackerKeywords()` (3), no-access = 0. `used/remaining/exhausted/nearCap(≥80%)`. |
+| Add/remove | `app/Services/Content/ContentKeywordTracker.php` | `track()` normalizes → dedupes vs UNIQUE → inserts up to `remaining` (sets `capped` when it hits the ceiling; overflow just isn't added). `keywordsFor(topic)` = target + secondaries. `untrack()`, `isTracked()`. |
+| Read/reporting | `app/Services/Content/ContentPerformanceService.php` | Cached w/ `ReportCache::version` + `lastSafeReportDate()` (GSC-lag anchor), 6h TTL. `keywordSummaries()` (list rows: clicks/impr/latest position/spark from `search_console_data.query`), `keywordSeries()`, `pageSeries()` (GSC page + GA merged by date). Mirrors `TrafficChart::payload` pattern. GSC query match is exact-lowercase (`normalize()`). |
+| GA per-page fetch | `GoogleAnalyticsService::fetchPageTraffic()` | dims `[date,hostName,pagePath]` → rebuilds `https://host+path` + `UrlNormalizer::normalize` (the join key to `search_console_data.page`); buckets by (date,url) so the upsert key can't clash. |
+| Daily sync | `app/Jobs/SyncContentPageAnalytics.php` + `ebq:sync-content-performance` (`routes/console.php` `dailyAt('05:10')`) | GA-only; content-entitled + `hasGa()` sites; upsert + `ReportCache::flushWebsite`. GSC needs no new fetch. |
+| Auto-add on publish | `PublishContentArticleJob::addToKeywordTracker()` (inside `if($confirmed>0)`) | best-effort try/catch, never fails the publish, respects the cap. |
+| UI | `app/Livewire/Content/KeywordTracker.php` + `resources/views/livewire/content/keyword-tracker.blade.php`, route `content.tracker`, nav item in `layouts/app.blade.php` (`$contentNavFull`) | quota bar + delete-to-add banner at cap; `<x-content.connect-gsc>`/`<x-content.connect-ga>` notices; per-article inline SVG charts (prebuilt-Tailwind only). Client-copy invariant: no internal datasource names, no $ projections. |
+| Article-detail CTA | `ArticleReview::{trackKeywords,untrackKeywords,loadTrackerState}` + SEO-targets card footer | track / tracked+view / full states. |
+| Admin limits | `PlatformSettingsController` + `admin/settings/index.blade.php` Limits grid | `content.limits.tracker_keywords` (500), `content.limits.trial_tracker_keywords` (3). |
+
+Tests: `tests/Feature/Content/ContentTrackerTest.php`, `ContentPerformanceServiceTest.php`.
 
 ## Env (staging QA values 2026-07-17)
 

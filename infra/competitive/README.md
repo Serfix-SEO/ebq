@@ -41,7 +41,19 @@ audits enrich the shared caches the next user reads for free.
 | Tally | :199 | Count a domain **once per SERP at its best position**; skip own domain + `GIANT_DOMAINS` (wikipedia/youtube/reddit/etc, :36). |
 | Score | `score()` :272 | `100 × (0.65·frequency + 0.35·positionScore)`; frequency = appearances/sampled, positionScore from avg position 1→10. **DA is informational, not scored.** |
 | Persist + prune | `persist()` :236 | `updateOrCreate` per domain keyed `(website_id, competitor_domain)`; rows from older `run_id` deleted. |
-| DA enrich | `enrichDomainAuthority()` :288 | Background `queueRefresh` for top-10, then copies cached DA onto rows. |
+| Authority enrich | `enrichCompetitors()` | Top-N (`discovery_enrich_max`, 10) via the shared `CompetitorEnricher` — **real DataForSEO referring-domains/backlinks + Moz DA/PA on the `domain_metrics` asset** (30-day cache, spend-metered), denormalized onto `discovered_competitors` (`referring_domains`/`backlinks`/`domain_authority`/`page_authority`). DA preference: Moz DA → DataForSEO rank/10 → OpenPageRank → historical CompetitorBacklink DA. **DA/refdomains are informational, not scored.** |
+| Topical (opt-in) | `ClassifyCompetitorTopicJob` | LLM topic + niche-overlap flag, ONLY on the "Classify topics" click (never during discovery — the caveat: no per-domain LLM spend without intent). Reuses `EnrichTopicalTrustJob::TOPICS` + the platform-wide `domain_metrics.topic` cache; writes `discovered_competitors.topic`. |
+| Organic traffic | `CompetitorEnricher::enrichTraffic()` | ONE flat-priced DataForSEO Labs `historical_bulk_traffic_estimation` call for the site + ALL competitors → monthly organic-traffic series. Stores the compact series (`dfs_traffic_series`) AND the full raw blob (`dfs_traffic`, "save everything" — ranking buckets/movement/paid) on `domain_metrics`, 30-day cached. Powers the inline-SVG traffic chart (site + top-3 competitor overlay) at the top of the discovery UI. **Visits only, never a $ figure** (no-dollar-projections rule; the ETV/$ value is stored but not rendered). |
+
+**Shared enrichment (2026-07-24).** `App\Services\Competitive\CompetitorEnricher` is the single
+source for DataForSEO + Moz domain authority — extracted from `ContentSetupInsights` (which now
+delegates its `dfsMetrics()`/`mozMetrics()` to it, byte-identically) so the SEO Site Explorer and the
+Content Autopilot competitor analysis read/write the **same** `domain_metrics` rows and can never
+drift. Replaces the old OpenPageRank-only DA on the Site Explorer side (OPR undercounts referring
+domains 10-100×; kept only as a last-resort DA fallback). A domain enriched for one product is free
+for the other within the 30-day window; admin/sandbox sites hit the mock host and are never persisted.
+Tests: `CompetitorEnrichmentTest` (discovery enrich, no-topical-during-discovery, opt-in classify,
+cache reuse); the content refactor stays green under `ContentCompetitorsTest` (39).
 
 Dispatch is interactive-queue; the job is `tries=1` (a partial paid result beats re-running the
 whole fan-out) and `uniqueFor=1800` per `run_id`. UI: `app/Livewire/Competitive/CompetitorDiscovery.php`

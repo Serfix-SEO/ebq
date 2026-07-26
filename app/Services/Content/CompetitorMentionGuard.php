@@ -42,6 +42,34 @@ class CompetitorMentionGuard
     /** Rough flash-tier classify cost, mirroring the other EST_* meter charges. */
     private const EST_ASSESS_USD = 0.01;
 
+    /**
+     * Everyday English words that must NEVER be blocked as a bare, single-token
+     * competitor term in free prose. A one-word alias like "breathe" (for the
+     * competitor "breathe maintenance") — or a one-word brand that happens to be
+     * an ordinary word — otherwise word-boundary-matches normal writing
+     * ("breathe cleaner air", "the air you breathe") and keeps the style lint
+     * permanently dirty. The reviser can't strip the word without wrecking the
+     * sentence, so the article burns its whole revise budget and ships READY at
+     * a low score (prod 2026-07-24, "how to clean ac filter dubai" article).
+     * Multi-word brands ("breathe maintenance", "urban company") and distinctive
+     * single-word brands ("semrush", "fixperts") are unaffected, and a LINK to
+     * the competitor's domain is still blocked via {@see blockedDomains()}.
+     * HVAC/home-services prose is dense with these, so the list leans that way.
+     *
+     * @var list<string>
+     */
+    private const COMMON_WORD_TERMS = [
+        'breathe', 'air', 'cool', 'cooling', 'clean', 'cleaning', 'fresh', 'pure',
+        'comfort', 'energy', 'power', 'home', 'homes', 'care', 'fix', 'fixit',
+        'handy', 'help', 'save', 'green', 'water', 'heat', 'light', 'bright',
+        'shine', 'glow', 'quick', 'easy', 'simple', 'smart', 'safe', 'trust',
+        'value', 'quality', 'natural', 'healthy', 'happy', 'fast', 'rapid',
+        'prime', 'plus', 'star', 'first', 'best', 'top', 'active', 'life', 'live',
+        'sky', 'sun', 'calm', 'clear', 'deep', 'gentle', 'build', 'grow', 'boost',
+        'peak', 'flow', 'service', 'services', 'maintenance', 'repair', 'solution',
+        'solutions', 'expert', 'experts', 'master', 'pro', 'city', 'urban',
+    ];
+
     public function __construct(
         private readonly ContentSetupInsights $insights,
         private readonly CrawlFetcher $fetcher,
@@ -262,6 +290,19 @@ class CompetitorMentionGuard
             array_merge($auto, $manual),
             $removed
         )), static fn ($t) => $t !== '' && mb_strlen($t) >= 2));
+
+        // Never block a bare single-word term that is an everyday English word
+        // (see COMMON_WORD_TERMS) — it would match ordinary prose. Multi-word
+        // brands and distinctive single words pass through; domain-link blocking
+        // is unaffected. A MANUAL add is trusted as deliberate and kept even if
+        // it's a common word (the client explicitly typed it).
+        $manualSet = array_flip($manual);
+        $terms = array_values(array_filter(
+            $terms,
+            static fn (string $t): bool => str_contains($t, ' ')
+                || isset($manualSet[$t])
+                || ! in_array($t, self::COMMON_WORD_TERMS, true)
+        ));
 
         // Safety net: never block the client's OWN brand (a stale assessment
         // from before the own-brand competitor filter may still carry it).

@@ -257,6 +257,15 @@ class ClientReportTest extends TestCase
         $dfs->shouldReceive('labsCompetitors')->andReturn([]);
         $dfs->shouldReceive('backlinksSample')->andReturn([]);
         $dfs->shouldReceive('totalCost')->andReturn(0.4524);
+        // Deep organic-traffic history for the exploration chart (rank_overview
+        // items shape). Added 2026-07-24.
+        $dfs->shouldReceive('resetCost')->andReturnSelf();
+        $dfs->shouldReceive('historicalRankOverview')->andReturn([
+            'items' => [
+                ['year' => 2026, 'month' => 6, 'metrics' => ['organic' => ['etv' => 1000, 'count' => 200]]],
+                ['year' => 2026, 'month' => 7, 'metrics' => ['organic' => ['etv' => 1300, 'count' => 220]]],
+            ],
+        ]);
 
         $moz = Mockery::mock(MozLinksClient::class);
         $moz->shouldReceive('isConfigured')->andReturn(true);
@@ -284,6 +293,11 @@ class ClientReportTest extends TestCase
         $this->assertEquals(47, $snapshot->payload['gauges']['authority_score']);
         $this->assertEquals(1639043, $snapshot->payload['popularity']['rank']);
         $this->assertEquals(4.7, $snapshot->payload['popularity']['score']);
+
+        // Organic-traffic series merged onto the exploration payload for the chart.
+        $this->assertNotEmpty($snapshot->payload['organic_traffic']);
+        $this->assertSame(1300, $snapshot->payload['organic_traffic'][1]['visits']);
+        $this->assertSame('2026-06', $snapshot->payload['organic_traffic'][0]['month']);
     }
 
     public function test_generate_job_derives_aggregates_locally_when_sample_is_complete(): void

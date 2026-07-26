@@ -57,6 +57,20 @@ an "Estimated keywords" section from the self-hosted keyword fleet. Paid-owned
 domains are refreshed monthly by `ebq:refresh-paid-reports` (`RefreshPaidReports`,
 scheduled `dailyAt('04:15')`, mirrors the TrackRankings due-filter pattern).
 
+**Organic-traffic chart (2026-07-24):** after `assemble()`, `GenerateWebsiteReport`
+also fetches a DataForSEO Labs `historical_bulk_traffic_estimation` series via
+`CompetitorEnricher::enrichTraffic()` (one flat-priced call; cached 30 days on the
+shared `domain_metrics` asset) and merges it onto the payload as `organic_traffic`
+(`[{month,visits,keywords}]`). `_body.blade.php` renders it as an inline-SVG line
+chart (email/PDF-safe) — independent of GSC, so ANY explored domain shows a trend.
+**Visits only, never a $ figure** (no-dollar rule; the raw ETV/$ is stored in
+`domain_metrics.dfs_traffic`, not rendered). Additive + try/caught: an empty/failed
+series just omits the chart. Fetch is REAL even for admin/sandbox reports on prod
+(operator decision — admins must see real traffic); a force-sandbox env (staging)
+skips the real call. Tests: `ClientReportTest::test_generate_job_upserts_snapshot…`.
+The same series also drives the Competitor Discovery tab chart (see
+[../competitive/README.md](../competitive/README.md)).
+
 ## Rendering
 
 `App\Services\Reports\ClientReportService` builds ONE payload; `assemble()` is

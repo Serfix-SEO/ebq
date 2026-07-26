@@ -337,6 +337,37 @@
     {!! $renderKeywordTables() !!}
 @endif
 
+{{-- Organic traffic estimate (DataForSEO) — a monthly trend chart. Independent
+     of Search Console, so it shows for any explored domain. Visits only, never a
+     dollar figure. Inline-SVG so it survives the email/PDF render too. --}}
+@if (! empty($p['organic_traffic']) && count($p['organic_traffic']) > 1 && collect($p['organic_traffic'])->max('visits') > 0)
+    @php
+        $ot = collect($p['organic_traffic'])->filter(fn ($r) => isset($r['month']))->sortBy('month')->values();
+        $otMax = max(1, (int) $ot->max('visits'));
+        $otW = 640; $otH = 150; $otPadT = 8; $otPadB = 4; $otN = max(1, $ot->count() - 1);
+        $otPts = [];
+        foreach ($ot as $i => $r) {
+            $px = round($i / $otN * $otW, 1);
+            $py = round($otPadT + ($otH - $otPadT - $otPadB) * (1 - ((int) $r['visits']) / $otMax), 1);
+            $otPts[] = $px.','.$py;
+        }
+        $otLatest = (int) ($ot->last()['visits'] ?? 0);
+    @endphp
+    <div style="background: #f8fafc; border-radius: 12px; padding: 12px 14px; margin: 0 0 12px;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+            <span style="font-size: 12px; color: #94a3b8;">Organic traffic (estimated monthly visits)</span>
+            <span style="font-size: 12px; color: #64748b;">~{{ number_format($otLatest) }} visits/mo</span>
+        </div>
+        <svg viewBox="0 0 {{ $otW }} {{ $otH }}" style="width:100%; height:110px; display:block;" preserveAspectRatio="none">
+            <polyline fill="none" stroke="#ea580c" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="{{ implode(' ', $otPts) }}" />
+        </svg>
+        <div style="display:flex; justify-content:space-between; font-size:11px; color:#94a3b8; margin-top:2px;">
+            <span>{{ $ot->first()['month'] ?? '' }}</span>
+            <span>{{ $ot->last()['month'] ?? '' }}</span>
+        </div>
+    </div>
+@endif
+
 @if (! empty($p['traffic']))
     <div style="background: #f8fafc; border-radius: 12px; padding: 10px 14px; margin: 0 0 12px;">
         <div style="font-size: 12px; color: #94a3b8; margin-bottom: 6px;">Traffic &amp; keywords</div>

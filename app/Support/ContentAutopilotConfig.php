@@ -185,6 +185,18 @@ class ContentAutopilotConfig
         return max(1, (int) self::setting('content.limits.monthly_articles_per_website', 30));
     }
 
+    /** Keyword Tracker capacity for a PAID content website (delete-to-add). */
+    public static function trackerKeywords(): int
+    {
+        return max(0, (int) self::setting('content.limits.tracker_keywords', 500));
+    }
+
+    /** Keyword Tracker capacity for a TRIAL content website. */
+    public static function trialTrackerKeywords(): int
+    {
+        return max(0, (int) self::setting('content.limits.trial_tracker_keywords', 3));
+    }
+
     /**
      * Signal-based giant detection + entity-type demotion (2026-07-23 live
      * test). ON by default; instant revert without a deploy:

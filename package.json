@@ -17,6 +17,14 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
+        "@tiptap/core": "^3.29.0",
+        "@tiptap/extension-placeholder": "^3.29.0",
+        "@tiptap/extension-table": "^3.29.0",
+        "@tiptap/extension-table-cell": "^3.29.0",
+        "@tiptap/extension-table-header": "^3.29.0",
+        "@tiptap/extension-table-row": "^3.29.0",
+        "@tiptap/extension-text-align": "^3.29.0",
+        "@tiptap/starter-kit": "^3.29.0",
         "alpinejs": "^3.15.12",
         "modern-screenshot": "^4.7.0"
     }

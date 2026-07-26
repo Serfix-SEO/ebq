@@ -1,5 +1,8 @@
 <div>
     @if ($hasWebsite && $plan !== null)
+        <div class="mx-auto w-full max-w-6xl">
+            <x-content.connect-gsc />
+        </div>
         <div class="mx-auto mt-6 w-full max-w-6xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -31,6 +34,21 @@
                     <button type="button" @click="show = false" class="shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800" aria-label="{{ __('Dismiss') }}">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
+                </div>
+            @endif
+
+            {{-- Auto-publish is ON but nothing is connected (no integration at all,
+                 or every one is errored/pending). The setting silently does nothing
+                 until a destination verifies — say so prominently. --}}
+            @if ($plan->auto_publish && $integrations->where('status', 'connected')->isEmpty())
+                <div class="mt-4 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-950/40">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-amber-900 dark:text-amber-200">{{ __('Auto-publish is on, but no destination is connected') }}</p>
+                        <p class="mt-0.5 text-sm text-amber-800 dark:text-amber-300">{{ __('Approved articles will be held and won\'t go live until you connect a publishing destination below — WordPress, Laravel, or a custom webhook.') }}</p>
+                    </div>
                 </div>
             @endif
 

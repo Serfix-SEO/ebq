@@ -48,7 +48,12 @@
         </div>
 
         <div>
-            <label for="password" class="mb-1.5 block text-xs font-medium text-slate-700">{{ __('Password') }}</label>
+            <div class="mb-1.5 flex items-center justify-between">
+                <label for="password" class="block text-xs font-medium text-slate-700">{{ __('Password') }}</label>
+                @if (Route::has('password.request'))
+                    <a href="{{ route('password.request') }}" class="text-xs font-medium text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline">{{ __('Forgot your password?') }}</a>
+                @endif
+            </div>
             <input id="password" name="password" type="password" required autocomplete="current-password"
                 class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
             @error('password')

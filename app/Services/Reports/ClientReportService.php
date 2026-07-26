@@ -223,6 +223,7 @@ class ClientReportService
             'competitors' => $this->competitorRows(is_array($raw['competitors'] ?? null) ? $raw['competitors'] : [], $domain, $opr),
             'profile_details' => $this->profileDetails($summary),
             'traffic' => null,
+            'organic_traffic' => null,
             'meta' => ['schema' => self::PAYLOAD_SCHEMA],
         ]);
     }
@@ -340,6 +341,7 @@ class ClientReportService
             'competitors' => $competitors,
             'profile_details' => null,
             'traffic' => null,
+            'organic_traffic' => null,
             'keywords' => array_values(array_filter($raw['keywords'] ?? [], 'is_array')),
             'keyword_opportunities' => array_values(array_filter($raw['keyword_opportunities'] ?? [], 'is_array')),
             'meta' => [
@@ -403,6 +405,7 @@ class ClientReportService
                 ['domain' => 'competitor-two.com', 'intersections' => 312, 'avg_position' => 12.1, 'popularity_rank' => 1204553, 'opr_score' => 5.1],
             ],
             'traffic' => null,
+            'organic_traffic' => null,
         ];
     }
 

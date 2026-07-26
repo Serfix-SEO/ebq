@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\AiTools\Contracts\AiTool;
 use App\AiTools\Contracts\AiToolMeta;
 use App\AiTools\Contracts\AiToolResult;
 use App\AiTools\Contracts\InputField;
@@ -41,15 +40,21 @@ class AiToolRunner
         private readonly AiToolRegistry $registry,
         private readonly ContextBuilder $context,
         private readonly ClientActivityLogger $activity,
-    ) {
-    }
+    ) {}
 
     /**
      * Public entry point.
      *
      * @param  array<string, mixed>  $input
      */
-    public function run(string $toolId, Website $website, ?string $userId, array $input): AiToolResult
+    /**
+     * @param  array<string, mixed>  $llmMeta  Metering/telemetry passthrough
+     *                                         forwarded into the tool's LLM call (e.g. `__unmetered`, `__source`,
+     *                                         `__user_id`) so content-editor edits bill the content meter, not the
+     *                                         dashboard token pool. Injected as `__llm_meta` after the cache key is
+     *                                         computed, so it never affects caching.
+     */
+    public function run(string $toolId, Website $website, ?string $userId, array $input, bool $allowWithoutPro = false, array $llmMeta = []): AiToolResult
     {
         $tool = $this->registry->find($toolId);
         if (! $tool) {
@@ -63,7 +68,13 @@ class AiToolRunner
         // The controller decorates the failure response with the
         // tier/required_tier/feature triple so the WP plugin can render
         // a contextual "Upgrade to <plan>" CTA.
-        if ($meta->requiresPro) {
+        //
+        // $allowWithoutPro bypasses this SEO-plan gate for callers that are
+        // entitled through a DIFFERENT product — e.g. the Content Autopilot
+        // article editor's inline AI (rewrite/simplify/…), reached only via the
+        // content.access middleware. Content customers must NOT need the SEO
+        // `ai_writer` flag to edit their own articles (content-product independence).
+        if ($meta->requiresPro && ! $allowWithoutPro) {
             $effective = $website->effectiveFeatureFlags();
             if (($effective['ai_writer'] ?? false) !== true) {
                 return AiToolResult::fail(
@@ -87,6 +98,7 @@ class AiToolRunner
             $cached = Cache::get($cacheKey);
             if ($cached instanceof AiToolResult) {
                 $this->logCredits($website, $userId, $toolId, $cached, true);
+
                 return new AiToolResult(
                     ok: $cached->ok,
                     outputType: $cached->outputType,
@@ -102,6 +114,12 @@ class AiToolRunner
 
         $context = $this->context->build($meta, $website, $userId, $validated);
 
+        // Inject AFTER the cache key + context are built, so metering meta never
+        // pollutes the cache key or the prompt (the LLM client reads `__*` keys).
+        if ($llmMeta !== []) {
+            $validated['__llm_meta'] = $llmMeta;
+        }
+
         try {
             $result = $tool->execute($validated, $context);
         } catch (\Throwable $e) {
@@ -110,6 +128,7 @@ class AiToolRunner
                 'website_id' => $website->id,
                 'msg' => $e->getMessage(),
             ]);
+
             return AiToolResult::fail('execution_error', 'The tool failed unexpectedly. Try again.', $meta->outputType);
         }
 
@@ -124,7 +143,7 @@ class AiToolRunner
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array<string, mixed>|AiToolResult           validated input or a fail result
+     * @return array<string, mixed>|AiToolResult validated input or a fail result
      */
     private function validate(AiToolMeta $meta, array $input): array|AiToolResult
     {
@@ -144,6 +163,7 @@ class AiToolRunner
                 if ($field->default !== null) {
                     $out[$field->key] = $field->default;
                 }
+
                 continue;
             }
 
@@ -195,6 +215,7 @@ class AiToolRunner
         if (! is_array($raw)) {
             return [];
         }
+
         return array_values(array_filter(array_map(
             static fn ($v) => is_string($v) ? trim($v) : '',
             $raw,
@@ -207,6 +228,7 @@ class AiToolRunner
     private function cacheKey(Website $website, string $toolId, array $input): string
     {
         $hash = hash('xxh3', json_encode($input) ?: '');
+
         // v2 namespace (2026-07-11): `language` was always part of the
         // input hash, but tools IGNORED it until the AbstractAiTool
         // output-language rule — so English outputs sat cached under
@@ -229,7 +251,7 @@ class AiToolRunner
             return;
         }
 
-        $type = 'credit_usage.ai_tool.' . $toolId;
+        $type = 'credit_usage.ai_tool.'.$toolId;
 
         $this->activity->log(
             type: $type,

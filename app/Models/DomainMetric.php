@@ -26,6 +26,9 @@ class DomainMetric extends Model
             'dfs_refreshed_at' => 'datetime',
             'dfs_metrics' => 'array',
             'dfs_metrics_refreshed_at' => 'datetime',
+            'dfs_traffic_series' => 'array',
+            'dfs_traffic' => 'array',
+            'dfs_traffic_refreshed_at' => 'datetime',
             'opr_score' => 'float',
         ];
     }

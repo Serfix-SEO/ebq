@@ -558,7 +558,11 @@
       "WebSearch",
       "Bash(sed -i \"s/'Nickfinder'/'Example Anchor'/; s|nickfinder\\\\.com|competitor-example.com|g\" tests/Feature/CompetitorBacklinkServiceTest.php)",
       "Bash(sed -i 's/nickfinder\\\\.com: OPR said 90, DataForSEO says ~5,800/one real competitor: OPR said 90, DataForSEO says ~5,800/' app/Services/Content/ContentSetupInsights.php)",
-      "Bash(APP_ENV=testing php -d memory_limit=512M vendor/bin/phpunit -c phpunit.xml --filter CompetitorBacklinkServiceTest)"
+      "Bash(APP_ENV=testing php -d memory_limit=512M vendor/bin/phpunit -c phpunit.xml --filter CompetitorBacklinkServiceTest)",
+      "Bash(echo \"=== content_publications + content_articles columns ===\" && sed -n '/content_publications/,/}\\);/p;/content_articles/,/}\\);/p' database/migrations/2026_07_17_120000_create_content_autopilot_tables.php | grep -n \"table->\\\\|Schema::create\" | head -80)",
+      "Bash(awk '/Schema::create\\\\\\(.content_topics/,/^        }\\\\\\);/' database/migrations/2026_07_17_120000_create_content_autopilot_tables.php)",
+      "Bash(awk '/Schema::create\\\\\\(.content_publications/,/^        }\\\\\\);/' database/migrations/2026_07_17_120000_create_content_autopilot_tables.php)",
+      "Bash(awk '/Schema::create\\\\\\(.content_integrations/,/^        }\\\\\\);/' database/migrations/2026_07_17_120000_create_content_autopilot_tables.php)"
     ]
   },
   "enableAllProjectMcpServers": true,
