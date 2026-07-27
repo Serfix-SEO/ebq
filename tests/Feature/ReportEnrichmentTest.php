@@ -5,10 +5,13 @@ namespace Tests\Feature;
 use App\Jobs\EnrichEmptyReportJob;
 use App\Jobs\FinalizeReportEnrichmentJob;
 use App\Jobs\GenerateWebsiteReport;
+use App\Models\GoogleAccount;
 use App\Models\KeywordApiRequest;
 use App\Models\User;
 use App\Models\Website;
 use App\Models\WebsiteReportSnapshot;
+use App\Services\ClientActivityLogger;
+use App\Services\Competitive\CompetitorDiscoveryService;
 use App\Services\Competitive\SerpCache;
 use App\Services\Crawler\CrawlFetcher;
 use App\Services\DataForSeoBacklinkClient;
@@ -17,10 +20,14 @@ use App\Services\Llm\LlmClient;
 use App\Services\MozLinksClient;
 use App\Services\OpenPageRankClient;
 use App\Services\ReportFreshnessGate;
+use App\Services\Reports\ClientReportService;
 use App\Services\Reports\ReportEnrichmentService;
+use App\Services\WebsiteTabStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Mockery;
 use Tests\TestCase;
 
@@ -82,7 +89,7 @@ class ReportEnrichmentTest extends TestCase
             )->byDefault();
             $m->shouldReceive('dispatchIdeas')->andReturnUsing(function () {
                 return KeywordApiRequest::create([
-                    'request_id' => (string) \Illuminate\Support\Str::uuid(),
+                    'request_id' => (string) Str::uuid(),
                     'type' => KeywordApiRequest::TYPE_IDEAS,
                     'mode' => 'website',
                     'payload' => [],
@@ -104,8 +111,8 @@ class ReportEnrichmentTest extends TestCase
 
         return new ReportEnrichmentService(
             $opr, $moz, $fetcher, $pool, $serp, $llm,
-            app(\App\Services\Reports\ClientReportService::class),
-            app(\App\Services\Competitive\CompetitorDiscoveryService::class),
+            app(ClientReportService::class),
+            app(CompetitorDiscoveryService::class),
         );
     }
 
@@ -126,8 +133,8 @@ class ReportEnrichmentTest extends TestCase
         (new GenerateWebsiteReport('newsite.com'))->handle(
             $this->app->make(DataForSeoBacklinkClient::class),
             app(MozLinksClient::class), app(OpenPageRankClient::class),
-            app(ReportFreshnessGate::class), app(\App\Services\Reports\ClientReportService::class),
-            app(\App\Services\ClientActivityLogger::class),
+            app(ReportFreshnessGate::class), app(ClientReportService::class),
+            app(ClientActivityLogger::class),
         );
 
         $snapshot = WebsiteReportSnapshot::forDomain('newsite.com');
@@ -145,8 +152,8 @@ class ReportEnrichmentTest extends TestCase
         (new GenerateWebsiteReport('newsite.com'))->handle(
             $this->app->make(DataForSeoBacklinkClient::class),
             app(MozLinksClient::class), app(OpenPageRankClient::class),
-            app(ReportFreshnessGate::class), app(\App\Services\Reports\ClientReportService::class),
-            app(\App\Services\ClientActivityLogger::class),
+            app(ReportFreshnessGate::class), app(ClientReportService::class),
+            app(ClientActivityLogger::class),
         );
 
         $this->assertEquals('no_data', WebsiteReportSnapshot::forDomain('newsite.com')->status);
@@ -183,7 +190,7 @@ class ReportEnrichmentTest extends TestCase
         $pool->shouldReceive('buildIdeasPayload')->andReturn(['website', ['url' => 'https://newsite.com', 'scope' => 'site', 'location' => 'us', 'language' => 'en']]);
         $pool->shouldReceive('dispatchIdeas')->andReturnUsing(function () {
             $req = KeywordApiRequest::create([
-                'request_id' => (string) \Illuminate\Support\Str::uuid(),
+                'request_id' => (string) Str::uuid(),
                 'type' => KeywordApiRequest::TYPE_IDEAS, 'mode' => 'website',
                 'payload' => [], 'status' => KeywordApiRequest::STATUS_QUEUED,
             ]);
@@ -214,7 +221,9 @@ class ReportEnrichmentTest extends TestCase
             'queries' => ['oak dining table', 'custom oak furniture austin'],
         ]);
         $serp = Mockery::mock(SerpCache::class);
-        $serp->shouldReceive('organic')->times(2)->andReturn(['organic' => [
+        // 2 queries × 2 SERP pages: only 1 rival (bigoak) surfaces on page 1, so
+        // the <3-rivals page-2 widening fires → 4 organic() calls in total.
+        $serp->shouldReceive('organic')->times(4)->andReturn(['organic' => [
             ['position' => 1, 'link' => 'https://bigoak.com/tables'],
             ['position' => 2, 'link' => 'https://newsite.com/tables'], // self — excluded
         ]]);
@@ -267,7 +276,9 @@ class ReportEnrichmentTest extends TestCase
         ]);
 
         $serp = Mockery::mock(SerpCache::class);
-        $serp->shouldReceive('organic')->times(3)->andReturn(['organic' => [
+        // 3 queries × 2 SERP pages: only 2 rivals surface on page 1 (<3), so the
+        // page-2 widening fires → 6 organic() calls.
+        $serp->shouldReceive('organic')->times(6)->andReturn(['organic' => [
             ['position' => 1, 'link' => 'https://bigoak.com/tables', 'domain' => 'bigoak.com'],
             ['position' => 2, 'link' => 'https://www.wikipedia.org/wiki/Oak', 'domain' => 'wikipedia.org'], // giant — excluded
             ['position' => 3, 'link' => 'https://newsite.com/about', 'domain' => 'newsite.com'],           // self — excluded
@@ -330,7 +341,7 @@ class ReportEnrichmentTest extends TestCase
                 'stage' => 'await_own_keywords',
                 'started_at' => now()->subHours(2)->toIso8601String(),
                 'attempts' => 5,
-                'own_request' => ['id' => (string) \Illuminate\Support\Str::uuid(), 'cache_key' => ''],
+                'own_request' => ['id' => (string) Str::uuid(), 'cache_key' => ''],
                 'popularity' => ['rank' => 5400000, 'score' => 1.2, 'history' => []],
             ],
         ]);
@@ -360,7 +371,7 @@ class ReportEnrichmentTest extends TestCase
     public function test_partial_report_renders_banner_badges_and_keyword_sections(): void
     {
         $user = User::factory()->create();
-        $payload = app(\App\Services\Reports\ClientReportService::class)->assemblePartial('newsite.com', [
+        $payload = app(ClientReportService::class)->assemblePartial('newsite.com', [
             'opr' => ['rank' => 5400000, 'score' => 1.2, 'history' => []],
             'moz' => ['domain_authority' => 3, 'page_authority' => 5, 'spam_score' => 1],
             'keywords' => [['keyword' => 'oak dining table', 'volume' => 4400, 'cpc' => 1.8, 'competition' => 'High']],
@@ -500,7 +511,7 @@ class ReportEnrichmentTest extends TestCase
         WebsiteReportSnapshot::create([
             'normalized_domain' => 'newschema.com', 'status' => 'ready',
             'payload' => ['domain' => 'newschema.com', 'gauges' => [], 'totals' => [],
-                'meta' => ['schema' => \App\Services\Reports\ClientReportService::PAYLOAD_SCHEMA]],
+                'meta' => ['schema' => ClientReportService::PAYLOAD_SCHEMA]],
             'fetched_at' => now()->subDay(),
         ]);
 
@@ -512,19 +523,19 @@ class ReportEnrichmentTest extends TestCase
     public function test_gsc_connected_site_gets_real_queries_instead_of_estimates(): void
     {
         $user = User::factory()->create();
-        $account = \App\Models\GoogleAccount::factory()->create(['user_id' => $user->id]);
+        $account = GoogleAccount::factory()->create(['user_id' => $user->id]);
         $website = Website::create([
             'user_id' => $user->id, 'domain' => 'established.com',
             'ga_property_id' => '', 'ga_google_account_id' => null,
             'gsc_site_url' => 'https://established.com/', 'gsc_google_account_id' => $account->id,
         ]);
-        \Illuminate\Support\Facades\DB::table('search_console_data')->insert([
-            ['id' => (string) \Illuminate\Support\Str::ulid(), 'website_id' => $website->id, 'date' => now()->subDays(3)->toDateString(), 'query' => 'real brand shoes', 'clicks' => 40, 'impressions' => 900, 'position' => 3.2, 'page' => '', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => (string) \Illuminate\Support\Str::ulid(), 'website_id' => $website->id, 'date' => now()->subDays(2)->toDateString(), 'query' => 'real brand shoes', 'clicks' => 25, 'impressions' => 600, 'position' => 2.8, 'page' => '', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => (string) \Illuminate\Support\Str::ulid(), 'website_id' => $website->id, 'date' => now()->subDays(2)->toDateString(), 'query' => 'buy shoes online', 'clicks' => 5, 'impressions' => 300, 'position' => 9.1, 'page' => '', 'created_at' => now(), 'updated_at' => now()],
+        DB::table('search_console_data')->insert([
+            ['id' => (string) Str::ulid(), 'website_id' => $website->id, 'date' => now()->subDays(3)->toDateString(), 'query' => 'real brand shoes', 'clicks' => 40, 'impressions' => 900, 'position' => 3.2, 'page' => '', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => (string) Str::ulid(), 'website_id' => $website->id, 'date' => now()->subDays(2)->toDateString(), 'query' => 'real brand shoes', 'clicks' => 25, 'impressions' => 600, 'position' => 2.8, 'page' => '', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => (string) Str::ulid(), 'website_id' => $website->id, 'date' => now()->subDays(2)->toDateString(), 'query' => 'buy shoes online', 'clicks' => 5, 'impressions' => 300, 'position' => 9.1, 'page' => '', 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        $payload = app(\App\Services\Reports\ClientReportService::class)->withTraffic([
+        $payload = app(ClientReportService::class)->withTraffic([
             'domain' => 'established.com',
             'keywords' => [['keyword' => 'planner estimate', 'volume' => 100, 'cpc' => 1.0, 'competition' => 'Low']],
             'meta' => ['sources' => ['keywords' => 'estimated']],
@@ -537,7 +548,7 @@ class ReportEnrichmentTest extends TestCase
         $this->assertEquals(1500, $payload['keywords'][0]['impressions']);
 
         // No GSC → estimates untouched.
-        $noGsc = app(\App\Services\Reports\ClientReportService::class)->withTraffic([
+        $noGsc = app(ClientReportService::class)->withTraffic([
             'keywords' => [['keyword' => 'planner estimate', 'volume' => 100]],
             'meta' => ['sources' => ['keywords' => 'estimated']],
         ], null);
@@ -588,7 +599,8 @@ class ReportEnrichmentTest extends TestCase
         $fetcher = Mockery::mock(CrawlFetcher::class);
         $fetcher->shouldReceive('fetch')->never(); // must not crawl
         $serp = Mockery::mock(SerpCache::class);
-        $serp->shouldReceive('organic')->times(2)->andReturn(['organic' => [
+        // 2 queries × 2 SERP pages (1 rival < 3 → page-2 widening) = 4 calls.
+        $serp->shouldReceive('organic')->times(4)->andReturn(['organic' => [
             ['position' => 1, 'link' => 'https://rival.com/x'],
         ]]);
         $opr = Mockery::mock(OpenPageRankClient::class);
@@ -619,7 +631,8 @@ class ReportEnrichmentTest extends TestCase
             'ok' => true, 'status' => 200, 'body' => '<html><body><h1>Oak furniture</h1></body></html>', 'content_type' => 'text/html',
         ]);
         $serp = Mockery::mock(SerpCache::class);
-        $serp->shouldReceive('organic')->once()->andReturn(['organic' => [['position' => 1, 'link' => 'https://bigoak.com/']]]);
+        // 1 derived query × 2 SERP pages (1 rival < 3 → page-2 widening) = 2 calls.
+        $serp->shouldReceive('organic')->times(2)->andReturn(['organic' => [['position' => 1, 'link' => 'https://bigoak.com/']]]);
         $opr = Mockery::mock(OpenPageRankClient::class);
         $opr->shouldReceive('metricsFor')->andReturn(['bigoak.com' => ['rank' => 90, 'score' => 6.0, 'history' => []]]);
 
@@ -649,8 +662,9 @@ class ReportEnrichmentTest extends TestCase
         $fetcher = Mockery::mock(CrawlFetcher::class);
         $fetcher->shouldReceive('fetch')->never();
         $serp = Mockery::mock(SerpCache::class);
+        // 1 query × 2 SERP pages (1 rival < 3 → page-2 widening); both carry gl 'ae'.
         $serp->shouldReceive('organic')
-            ->once()
+            ->twice()
             ->withArgs(fn ($query, $gl) => $gl === 'ae')
             ->andReturn(['organic' => [['position' => 1, 'link' => 'https://rival.ae/x']]]);
         $opr = Mockery::mock(OpenPageRankClient::class);
@@ -678,13 +692,13 @@ class ReportEnrichmentTest extends TestCase
             'enrichment_state' => ['stage' => 'bootstrap'], 'fetched_at' => now(),
         ]);
         $this->actingAs($user);
-        $status = app(\App\Services\WebsiteTabStatus::class)->forWebsite($website)['explorer'];
+        $status = app(WebsiteTabStatus::class)->forWebsite($website)['explorer'];
         $this->assertEquals('processing', $status['state']);
 
         WebsiteReportSnapshot::forDomain('newsite.com')->forceFill([
             'status' => 'partial', 'payload' => ['domain' => 'newsite.com'], 'enrichment_state' => null,
         ])->save();
-        $status = app(\App\Services\WebsiteTabStatus::class)->forWebsite($website)['explorer'];
+        $status = app(WebsiteTabStatus::class)->forWebsite($website)['explorer'];
         $this->assertEquals('ready', $status['state']);
     }
 }

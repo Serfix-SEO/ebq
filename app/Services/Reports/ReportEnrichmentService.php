@@ -2,6 +2,7 @@
 
 namespace App\Services\Reports;
 
+use App\Jobs\FinalizeReportEnrichmentJob;
 use App\Models\KeywordApiRequest;
 use App\Models\Website;
 use App\Models\WebsiteReportSnapshot;
@@ -10,11 +11,13 @@ use App\Services\Competitive\SerpCache;
 use App\Services\Crawler\CrawlFetcher;
 use App\Services\KeywordFinder\KeywordFinderPool;
 use App\Services\KeywordFinder\KeywordIdeasMonthlyCache;
+use App\Services\LinkGraph\EdgeRecorder;
 use App\Services\Llm\LlmClient;
 use App\Services\MozLinksClient;
 use App\Services\OpenPageRankClient;
 use App\Support\Audit\HtmlAuditor;
 use App\Support\GiantDomains;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -58,8 +61,7 @@ class ReportEnrichmentService
         private LlmClient $llm,
         private ClientReportService $reports,
         private CompetitorDiscoveryService $discovery,
-    ) {
-    }
+    ) {}
 
     // ─── Public entry points for the standalone Competitor Discovery tool ───
 
@@ -215,7 +217,7 @@ class ReportEnrichmentService
 
             $state['stage'] = 'await_own_keywords';
             $this->saveState($snapshot, $state);
-            \App\Jobs\FinalizeReportEnrichmentJob::dispatch($domain)
+            FinalizeReportEnrichmentJob::dispatch($domain)
                 ->delay(now()->addSeconds($this->pollSeconds()));
         } catch (Throwable $e) {
             Log::warning('ReportEnrichment bootstrap failed', ['domain' => $domain, 'message' => $e->getMessage()]);
@@ -300,7 +302,7 @@ class ReportEnrichmentService
                         'requests' => $pending,
                     ],
                 ])->save();
-                \App\Jobs\FinalizeReportEnrichmentJob::dispatch($domain)
+                FinalizeReportEnrichmentJob::dispatch($domain)
                     ->delay(now()->addSeconds($this->pollSeconds()));
             }
         } catch (Throwable $e) {
@@ -327,7 +329,7 @@ class ReportEnrichmentService
         $state['attempts'] = (int) ($state['attempts'] ?? 0) + 1;
         $this->saveState($snapshot, $state);
 
-        $started = isset($state['started_at']) ? \Illuminate\Support\Carbon::parse($state['started_at']) : now();
+        $started = isset($state['started_at']) ? Carbon::parse($state['started_at']) : now();
         $budgetExceeded = $state['attempts'] > 40
             || $started->lt(now()->subMinutes($this->ideasTimeoutMinutes() * 2));
 
@@ -647,10 +649,10 @@ class ReportEnrichmentService
         // Tier-1 link-graph harvest — free byproduct of a fetch that already
         // happened (EdgeRecorder never throws).
         if (! empty($links['external'])) {
-            app(\App\Services\LinkGraph\EdgeRecorder::class)->record(
+            app(EdgeRecorder::class)->record(
                 'https://'.$domain.'/',
                 $links['external'],
-                \App\Services\LinkGraph\EdgeRecorder::SOURCE_ENRICHMENT,
+                EdgeRecorder::SOURCE_ENRICHMENT,
             );
         }
 
@@ -767,39 +769,54 @@ class ReportEnrichmentService
         $tally = [];
         $sampled = 0;
 
-        foreach ($queries as $query) {
-            try {
-                $serp = $this->serp->organic($query, $gl, $owner?->id, $owner?->user_id ?? $billedUserId, 'report_enrichment');
-            } catch (Throwable) {
-                break; // quota exceeded / hard failure — use what we have
-            }
-            $organic = is_array($serp['organic'] ?? null) ? $serp['organic'] : [];
-            if ($organic === []) {
-                continue;
-            }
-            $sampled++;
+        // Tally one SERP page across every query. $sampled counts unique queries
+        // (page 1 only) so appearance ratios stay honest when the page-2 pass
+        // re-runs the same queries.
+        $tallyPage = function (int $page) use (&$tally, &$sampled, $queries, $gl, $owner, $billedUserId, $domain): void {
+            foreach ($queries as $query) {
+                try {
+                    $serp = $this->serp->organic($query, $gl, $owner?->id, $owner?->user_id ?? $billedUserId, 'report_enrichment', $page);
+                } catch (Throwable) {
+                    break; // quota exceeded / hard failure — use what we have
+                }
+                $organic = is_array($serp['organic'] ?? null) ? $serp['organic'] : [];
+                if ($organic === []) {
+                    continue;
+                }
+                if ($page === 1) {
+                    $sampled++;
+                }
 
-            $seenThisSerp = [];
-            foreach ($organic as $idx => $result) {
-                if (! is_array($result)) {
-                    continue;
-                }
-                $link = (string) ($result['link'] ?? ($result['url'] ?? ''));
-                $host = strtolower((string) parse_url($link, PHP_URL_HOST));
-                $host = preg_replace('/^www\./', '', $host) ?? $host;
-                if ($host === '' || $host === $domain || str_ends_with($host, '.'.$domain) || GiantDomains::isGiant($host)) {
-                    continue;
-                }
-                if (isset($seenThisSerp[$host])) {
-                    continue;
-                }
-                $seenThisSerp[$host] = true;
+                $seenThisSerp = [];
+                foreach ($organic as $idx => $result) {
+                    if (! is_array($result)) {
+                        continue;
+                    }
+                    $link = (string) ($result['link'] ?? ($result['url'] ?? ''));
+                    $host = strtolower((string) parse_url($link, PHP_URL_HOST));
+                    $host = preg_replace('/^www\./', '', $host) ?? $host;
+                    if ($host === '' || $host === $domain || str_ends_with($host, '.'.$domain) || GiantDomains::isGiant($host)) {
+                        continue;
+                    }
+                    if (isset($seenThisSerp[$host])) {
+                        continue;
+                    }
+                    $seenThisSerp[$host] = true;
 
-                $pos = (int) ($result['position'] ?? ($idx + 1));
-                $tally[$host] ??= ['appearances' => 0, 'positions' => []];
-                $tally[$host]['appearances']++;
-                $tally[$host]['positions'][] = $pos;
+                    $pos = (int) ($result['position'] ?? ($idx + 1));
+                    $tally[$host] ??= ['appearances' => 0, 'positions' => []];
+                    $tally[$host]['appearances']++;
+                    $tally[$host]['positions'][] = $pos;
+                }
             }
+        };
+
+        $tallyPage(1);
+        // Thin first-page SERP → widen to page 2 (positions 11-20) so
+        // low-competition niches still surface enough rivals (owner request
+        // 2026-07-27). Extra SERP spend only in the rare thin case.
+        if (count($tally) < 3) {
+            $tallyPage(2);
         }
 
         if ($tally === []) {

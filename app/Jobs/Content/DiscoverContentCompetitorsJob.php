@@ -2,11 +2,15 @@
 
 namespace App\Jobs\Content;
 
+use App\Jobs\AssessCompetitorGuardJob;
 use App\Models\ContentPlan;
 use App\Models\Website;
+use App\Services\Content\CompetitorMentionGuard;
+use App\Services\Content\ContentSetupInsights;
 use App\Services\Llm\LlmClientFactory;
 use App\Services\Reports\ReportEnrichmentService;
 use App\Support\ContentAutopilotConfig;
+use App\Support\KeywordFinderLocations;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -24,7 +28,7 @@ use Illuminate\Support\Facades\Cache;
  *
  * Runs ASYNC so it never blocks the wizard render / re-bills on the 5s poll.
  * Result is cached under `content:serp-competitors:<websiteId>` (read by
- * {@see \App\Services\Content\ContentSetupInsights::build()}); the
+ * {@see ContentSetupInsights::build()}); the
  * `content:serp-comp:<websiteId>` flag (set by ensureGenerating) is cleared here
  * so the wizard stops showing the "generating" state.
  */
@@ -69,7 +73,7 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
             // admins sandbox. billedUserId scopes the metered usage.
             $billedUserId = $website->user?->is_admin ? null : $website->user_id;
 
-            $gl = \App\Support\KeywordFinderLocations::serperGl((string) ($plan->country ?: 'us'));
+            $gl = KeywordFinderLocations::serperGl((string) ($plan->country ?: 'us'));
             $result = $enrichment->discoverCompetitorsFor((string) $domain, $keywords, $billedUserId, $gl);
             $competitors = array_values(array_filter((array) ($result['competitors'] ?? []), 'is_array'));
 
@@ -81,10 +85,10 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
                 // carmenperfumes race, 2026-07-23). Real competitors now
                 // exist: force a real assessment.
                 try {
-                    $guard = app(\App\Services\Content\CompetitorMentionGuard::class);
+                    $guard = app(CompetitorMentionGuard::class);
                     if ($plan !== null && ($guard->assessedEmpty($plan) || $guard->assessmentStale($plan))) {
                         $guard->invalidate($plan);
-                        \App\Jobs\AssessCompetitorGuardJob::dispatch($plan->id);
+                        AssessCompetitorGuardJob::dispatch($plan->id);
                     }
                 } catch (\Throwable) {
                     // belt-and-braces reassess also lives in PrepareContentKeywordInsightsJob
@@ -122,7 +126,19 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
             ->values()
             ->all();
 
-        $queries = array_merge($this->llmSuggestedQueries($plan, $domain), $planKw);
+        // The site's own offering phrases anchor discovery to its REAL niche —
+        // they always carry the distinguishing product noun (e.g. "nickname
+        // generator", "fancy text and symbols"), so a tool whose generic word
+        // ("name") would otherwise drift into a different vertical (baby names)
+        // still surfaces true rivals. Sampled first (before LLM queries, which
+        // can drift), parentheticals stripped, long-tail only.
+        $offeringQueries = collect((array) ($plan->offerings['sell'] ?? []))
+            ->map(static fn ($o) => trim((string) preg_replace('/\([^)]*\)/', '', (string) $o)))
+            ->filter(static fn ($o) => str_word_count($o) >= 3)
+            ->take(6)
+            ->all();
+
+        $queries = array_merge($offeringQueries, $this->llmSuggestedQueries($plan, $domain), $planKw);
 
         // Dedupe case-insensitively, keep order (LLM suggestions first).
         $seen = [];
@@ -163,10 +179,19 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
                 What it offers: {$offer}
                 About: {$desc}
 
-                List 10 LONG-TAIL, buyer-intent Google search queries (each 4–8 words) a
-                real customer would type to find and choose a business like this one.
-                Include location/qualifier modifiers where natural. Do NOT return short
-                1–3 word generic head terms — only specific, intent-rich phrases.
+                List 10 Google search queries (each 3–7 words) a real user would type to
+                find THIS website or a direct alternative to it.
+
+                RULES:
+                - Every query MUST include the site's own distinguishing product/tool words
+                  (the specific thing it makes or does — e.g. "nickname generator", "fancy
+                  text symbols"). NEVER a bare generic head word (like "names", "fonts",
+                  "quotes") that also matches a totally different industry — that returns the
+                  wrong niche's results.
+                - Match how the site itself would be searched for, not a sales pitch. These
+                  are free tools/content as often as paid businesses — do not assume a buyer.
+                - Only add a location when the business is clearly local (a physical
+                  service area); global tools/sites get none.
 
                 Return JSON: {"queries": ["...", "..."]}
                 PROMPT],

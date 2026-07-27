@@ -22,9 +22,7 @@ use Illuminate\Support\Carbon;
  */
 class SerpCache
 {
-    public function __construct(private SerperSearchClient $serper)
-    {
-    }
+    public function __construct(private SerperSearchClient $serper) {}
 
     /**
      * Fresh cached SERP for a keyword, or null — NEVER calls Serper. Lets
@@ -81,14 +79,17 @@ class SerpCache
      *
      * @return array<string, mixed>|null
      */
-    public function organic(string $keyword, string $gl, ?string $websiteId = null, ?string $ownerUserId = null, string $source = 'serp_cache'): ?array
+    public function organic(string $keyword, string $gl, ?string $websiteId = null, ?string $ownerUserId = null, string $source = 'serp_cache', int $page = 1): ?array
     {
         $kw = trim($keyword);
         if ($kw === '') {
             return null;
         }
         $gl = strtolower(trim($gl)) ?: 'us';
-        $hash = SerpCacheEntry::hash($kw, $gl);
+        $page = max(1, $page);
+        // Page 2+ is cached under a distinct key so it never collides with the
+        // top-10 (page-1 key stays exactly as before — backward compatible).
+        $hash = SerpCacheEntry::hash($page > 1 ? $kw.'#p'.$page : $kw, $gl);
 
         $row = SerpCacheEntry::query()->where('query_hash', $hash)->where('gl', $gl)->first();
         if ($row !== null && $row->isFresh()) {
@@ -100,6 +101,7 @@ class SerpCache
             'type' => 'organic',
             'gl' => $gl,
             'num' => 10,
+            ...($page > 1 ? ['page' => $page] : []),
             '__website_id' => $websiteId,
             '__owner_user_id' => $ownerUserId,
             '__source' => $source,
