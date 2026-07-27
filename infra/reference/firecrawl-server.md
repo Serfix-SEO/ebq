@@ -54,18 +54,32 @@ with `Authorization: Bearer <TEST_API_KEY>`. All requests egress through the res
   **retry-on-5xx** clears it (all retries succeeded). ⚠️ Self-host has **no Fire-engine** (CF's own
   anti-bot layer is cloud-only), so harder targets may still fail; the residential IP is what carried this one.
 
-## App integration (Phase 6 — PENDING, not yet wired)
+## App integration (Phase 6 — DONE 2026-07-27, commit ca62760)
 
-- New `App\Services\Crawler\FirecrawlClient` → `POST {FIRECRAWL_URL}/v1/scrape`
-  (`services.firecrawl.{url,key,enabled,timeout}`; `FIRECRAWL_URL=http://10.0.0.4:3002`,
-  `FIRECRAWL_API_KEY=<box .env TEST_API_KEY>` on box A/B `.env`). Run `SafeHttpGuard::check($targetUrl)`
-  **before** calling (we hand it client URLs). Retry once on 5xx (transient 520).
-- Wire as a **render fallback**, gated per-site, at the seams:
-  `CrawlFetcher::fetch` (`app/Services/Crawler/CrawlFetcher.php:37/84`) and
-  `SiteProfileExtractor::fetchFollowingRedirects` (`app/Services/Content/SiteProfileExtractor.php:313`)
-  — escalate to Firecrawl only when HTTP returns a Cloudflare challenge (`403` + `Just a moment` /
-  `cf-mitigated: challenge` / `/cdn-cgi/challenge-platform`) or a thin body; cache the "needs render"
-  decision on `crawl_sites` (also set `crawl_protection='cloudflare'`).
+- `App\Services\Crawler\FirecrawlClient::html($url)` → `POST {FIRECRAWL_URL}/v1/scrape`
+  (`services.firecrawl.{enabled,url,key,timeout_s}`). SSRF-guards the target first; retries once on
+  upstream 5xx (transient CF 520); off unless `FIRECRAWL_ENABLED=true` + `FIRECRAWL_URL` set.
+  **Env live on box A + box B** `.env` (`FIRECRAWL_ENABLED=true`, `FIRECRAWL_URL=http://10.0.0.4:3002`,
+  `FIRECRAWL_API_KEY=<box .env TEST_API_KEY>`).
+- `App\Support\Crawler\RenderGate::isChallenge()` — narrow Cloudflare-challenge detector
+  (`cf-mitigated: challenge`, `/cdn-cgi/challenge-platform`, `window._cf_chl`, "just a moment" on a
+  block-ish status).
+- Wired as a render fallback at two seams:
+  - **Wizard** — `SiteProfileExtractor::fetchFollowingRedirects` (both-UAs-blocked → Firecrawl). This is
+    what fixes the content-onboarding auto-detect on CF-protected sites.
+  - **Crawl** — `PageCrawlProcessor::fetchWithPolicy` (after the proxy retry, if `RenderGate::isChallenge`
+    → Firecrawl → synthesized 200 so the pipeline extracts title/terms/links normally).
+- **Prod-verified 2026-07-27**: gpsmarketing.agency wizard now returns site_type=`local_service`,
+  a real description, audience, and services (SEO/PPC/social/web/content) — the three previously-blank
+  fields. Tests: `tests/Feature/Content/FirecrawlRenderFallbackTest.php`.
+
+## Follow-ups (not built)
+
+- Fleet ephemeral crawl workers run the old snapshot without `FIRECRAWL_*` env, so the crawl-path
+  fallback is a no-op there (fires on box A/B + pinned box only). Add to `.env.worker` / rebuild the
+  snapshot if fleet crawls need it.
+- Consider caching a per-`crawl_sites` "needs render" flag + setting `crawl_protection='cloudflare'`
+  so challenged sites skip the wasted direct/proxy attempts and go straight to render.
 
 ## Caveats
 
