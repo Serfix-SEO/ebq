@@ -1,69 +1,15 @@
-# Staging environment (built 2026-07-17)
+# Staging environment — RETIRED 2026-07-27
 
-One Hetzner cloud box mirroring the whole app in miniature, so changes get QA'd
-WITHOUT touching production. Prod boxes: web A `10.0.0.2` + worker B `10.0.0.3`.
+The staging box (`10.0.0.4`, Hetzner id 151872820) was **repurposed into the self-hosted
+Firecrawl render server**. See **[firecrawl-server.md](./firecrawl-server.md)**.
 
-## The box
+There is **no staging environment anymore**. Consequences:
+- `scripts/deploy-staging.sh` is retired (neutered to a no-op).
+- `staging.serfix.io` no longer serves the app (DNS record can be removed in Cloudflare;
+  the box has no web server now).
+- The "staging-first" deploy workflow no longer applies — deploys go straight to prod
+  (box A `10.0.0.2` + box B `10.0.0.3`), which had already become the working pattern.
+- `config/horizon.php` still defines a `staging` env pool; it is inert (no box runs
+  `APP_ENV=staging`) and left in place harmlessly.
 
-| | |
-|---|---|
-| Server | `ebq-staging` (Hetzner cx33, 4 vCPU / 8 GB, fsn1), id 151872820 |
-| IPs | private `10.0.0.4` (same 10.0.0.0/24 network), public 178.105.24.246 (unused — traffic goes via box A) |
-| Stack | Ubuntu 24.04, Apache + php8.3-fpm, local MariaDB (`ebq_staging` db/user), local Redis (`REDIS_PREFIX=ebq_staging_`) |
-| Processes | supervisor: `ebq-horizon` (APP_ENV=staging pools: web×2, crawl×2, heavy×1 — see `config/horizon.php` `staging` env) + `ebq-schedule`. **No fleet queue** |
-| Access | `ssh -i /root/.ssh/id_ed25519_worker root@10.0.0.4` from box A |
-| Web | `https://staging.serfix.io` → DNS A record points DIRECTLY at the staging box's public IP (178.105.24.246; Cloudflare DNS-only). Let's Encrypt cert via certbot (auto-renews), http→https redirect. Basic auth ON THE STAGING BOX (`/etc/apache2/.htpasswd-staging`, user `serfix`). `X-Robots-Tag: noindex`. Public 80/443 opened by dedicated Hetzner firewall `ebq-staging-web` (id 11323177) — the shared worker firewall is untouched. (The original box-A reverse-proxy vhost is retired/disabled.) |
-| Login | `admin@staging.serfix.io` (admin; password given to operator at build time) |
-
-## Isolation guarantees (why staging can't disturb prod)
-
-- **Own DB + own Redis** — different creds, different host; no prod connection
-  strings exist in staging's `.env`.
-- **Mail = REAL sending via prod Postal relay** (changed 2026-07-17 on operator
-  request — verification emails needed for QA): `POSTAL_SMTP_HOST=10.0.0.2:25`
-  over the private net, sender `"[Staging] Serfix" <noreply@serfix.io>` so every
-  staging mail is visibly prefixed. Risk accepted: staging CAN email real
-  addresses — only register test accounts with your own inboxes there.
-- **DataForSEO forced sandbox** (`DATAFORSEO_FORCE_SANDBOX=true`) + spend cap $1
-  — every report call hits the free mock host.
-- **Absent on purpose**: Stripe keys (add TEST keys only if billing QA needed),
-  Serper, Lighthouse, Keywords Everywhere, Mistral/DeepSeek, Google OAuth,
-  Sentry, reCAPTCHA, Postal SMTP, and **HCLOUD_*** (staging must never be able
-  to provision fleet boxes). Features degrade gracefully.
-- Crawlers: `LINK_CRAWL_ENABLED=false`, proxies off.
-- CC sidecar (`cc-domain-ranks.sqlite`, ~7 GB) not copied — `CcDomainRanks`
-  returns null and score weights renormalize.
-
-## Workflow — STAGING-FIRST IS MANDATORY (operator decision 2026-07-17)
-
-**Every change ships to staging first; production only after the operator
-explicitly approves.** No exceptions for "trivial" fixes — prod is the
-approval gate, not the test bench.
-
-1. Make changes on box A working tree **on the `staging` branch** (created
-   2026-07-17): `git checkout staging`, commit work there. `main` receives a
-   merge only after QA + approval (step 5) — so `main`'s tip is always
-   what production runs.
-2. `sudo bash scripts/deploy-staging.sh` — rsyncs code, migrates, restarts
-   staging FPM + Horizon. Never touches staging `.env`.
-3. QA at `https://staging.serfix.io` (basic auth). Site-explorer lookups return
-   DataForSEO sandbox mock data instantly — good test fixtures. Mail sends for
-   real (Postal relay, "[Staging] Serfix" sender).
-4. **Present the result to the operator and WAIT for approval.**
-5. Only after approval: commit → push → prod deploy (box A FPM/Horizon restart
-   + box B rsync + Horizon restart per
-   [deployment-and-queues.md](../deployment-and-queues.md)).
-
-## Gotchas
-
-- `ebq:demo-data` does NOT work on staging: `DemoDataSeeder::DEMO_USER_ID = 1`
-  is an int from the pre-ULID era; staging users are ULIDs. Use sandbox
-  lookups to generate data instead.
-- Same opcache rules as prod: web-visible PHP changes need
-  `systemctl restart php8.3-fpm` on the STAGING box (deploy script does it).
-- The staging `.env` is hand-maintained ON the box (not in the repo). If you
-  add a new required env var, add it there too.
-- TLS: DONE (2026-07-17) — DNS `staging` → A 178.105.24.246 (staging box direct),
-  certbot cert on the staging box, auto-renew via certbot.timer.
-- Monthly cost: ~€16 (cx33). Drop the box anytime; rebuild takes ~30 min with
-  this doc.
+Historical detail on the old staging stack lives in git history prior to this commit.
