@@ -525,7 +525,7 @@
                             // Rank ladder incl. the client's own row ("YOU"), by referring
                             // domains where known.
                             if (! $fresh) {
-                                $mainRows[] = ['domain' => '__you__', 'referring_domains' => (int) $ins['my_referring_domains'], 'backlinks' => null, 'da' => $ins['my_authority'], 'pa' => null, 'class' => 'you'];
+                                $mainRows[] = ['domain' => '__you__', 'referring_domains' => (int) $ins['my_referring_domains'], 'backlinks' => $ins['my_backlinks'] ?? null, 'da' => $ins['my_da'] ?? $ins['my_authority'], 'pa' => $ins['my_pa'] ?? null, 'class' => 'you'];
                                 usort($mainRows, fn ($a, $b) => (int) ($b['referring_domains'] ?? -1) <=> (int) ($a['referring_domains'] ?? -1));
                             }
                         @endphp
@@ -577,9 +577,9 @@
                                                 </td>
                                                 @if ($showCompMetrics)
                                                     <td class="px-4 py-3 text-end font-bold text-slate-900 dark:text-slate-100">{{ number_format($c['referring_domains']) }}</td>
-                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">—</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ isset($c['backlinks']) && $c['backlinks'] !== null ? number_format($c['backlinks']) : '—' }}</td>
                                                     <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['da'] ?? '—' }}</td>
-                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">—</td>
+                                                    <td class="px-4 py-3 text-end text-slate-500 dark:text-slate-400">{{ $c['pa'] ?? '—' }}</td>
                                                 @endif
                                                 <td class="px-2 py-3"></td>
                                             </tr>

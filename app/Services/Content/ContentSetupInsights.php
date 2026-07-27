@@ -467,13 +467,19 @@ class ContentSetupInsights
         // (no wasted spend).
         $fresh = $myReferring < 1;
 
-        // The CLIENT's own Moz DA too (one row per site per 30d): the peer
-        // banding (withPeerClasses) prefers DA-vs-DA when both sides are
-        // known — without this, the client side stayed null and banding fell
-        // back to the referring-domains ratio even with full competitor DA.
+        // The CLIENT's OWN table metrics (same DataForSEO + Moz sources as the
+        // competitor rows) so the YOU row shows Backlinks + DA/PA too — not blanks.
+        // Also feeds peer banding (withPeerClasses prefers DA-vs-DA when both
+        // sides are known).
+        $ownDfs = ['referring_domains' => null, 'backlinks' => null, 'rank' => null];
+        $ownMoz = ['domain_authority' => null, 'page_authority' => null];
         if (! $fresh) {
-            $this->mozMetrics($domain);
+            $ownDfs = $this->dfsMetrics($domain, $sandbox);
+            $ownMoz = $this->mozMetrics($domain);
         }
+        $myBacklinks = $ownDfs['backlinks'] ?? null;
+        $myDa = $ownMoz['domain_authority'] ?? null;
+        $myPa = $ownMoz['page_authority'] ?? null;
 
         $competitors = [];
         foreach ($competitorRows as $c) {
@@ -524,6 +530,9 @@ class ContentSetupInsights
         return [
             'my_referring_domains' => $myReferring,
             'my_authority' => $myAuthority,
+            'my_backlinks' => $myBacklinks,
+            'my_da' => $myDa,
+            'my_pa' => $myPa,
             'competitors' => $competitors,
             'median' => $median,
             'gap' => $gap,
