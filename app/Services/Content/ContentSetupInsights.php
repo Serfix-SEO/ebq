@@ -426,19 +426,19 @@ class ContentSetupInsights
             'is_array'
         ));
         if ($competitorRows === []) {
-            // Content-specific discovery hasn't produced rivals yet. While it is
-            // still RUNNING, do NOT fall back to the backlink report's broad SERP
-            // scrape — for tool/name sites that list is directories/dictionaries
-            // (baby-name sites for "nickfinder"), not real rivals, and caching it
-            // strands the user on the wrong list. Return null so the wizard shows
-            // the "analyzing" state and polls until DiscoverContentCompetitorsJob
-            // lands. Only once discovery has FINISHED (flag cleared) with nothing
-            // do we last-resort to the report rows.
-            if (Cache::has('content:serp-comp:'.$website->id)) {
+            // NEVER fall back to the backlink report's broad SERP scrape — for
+            // tool/name sites that list is directories/dictionaries/media (baby-name
+            // sites for "nickfinder"), not real rivals. Worse, returning it here is
+            // non-null, so competitorAuthority() never triggers ensureGenerating() →
+            // discovery never runs → the site is STRANDED on the wrong list for the
+            // whole 30-day TTL. Instead: until content discovery has FINISHED (the
+            // done-marker), return null so competitorAuthority()===null →
+            // ensureGenerating() dispatches DiscoverContentCompetitorsJob and the
+            // wizard shows "analyzing" + polls. Once discovery is done we surface
+            // exactly what it found on-niche (possibly none) — never the report list.
+            if (! Cache::has('content:serp-comp-done:'.$website->id)) {
                 return null;
             }
-            $competitorRows = array_values(array_filter((array) ($payload['competitors'] ?? []), 'is_array'));
-            usort($competitorRows, fn ($a, $b) => (int) ($b['shared_keywords'] ?? 0) <=> (int) ($a['shared_keywords'] ?? 0));
         }
 
         // Mega-platforms (amazon, netflix, wikipedia…) rank for everything

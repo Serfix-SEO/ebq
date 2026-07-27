@@ -105,6 +105,10 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
         } catch (\Throwable) {
             // Fail soft — the step falls back to its empty state.
         } finally {
+            // Mark discovery as DONE (even if it found nothing) so build() stops
+            // returning null / the wizard stops polling and shows whatever was
+            // found on-niche — it never falls back to the report snapshot.
+            Cache::put('content:serp-comp-done:'.$this->websiteId, 1, now()->addDays(30));
             // Let the wizard re-read (build() picks up the new competitors) and
             // stop polling.
             Cache::forget('content:setup-insights:v1:'.$this->websiteId);
