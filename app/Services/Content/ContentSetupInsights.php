@@ -444,12 +444,11 @@ class ContentSetupInsights
         // Mega-platforms (amazon, netflix, wikipedia…) rank for everything
         // but are nobody's logical competitor — filter BOTH sources (the
         // SERP tally already filters, but report-snapshot rows did not).
-        $competitorRows = array_values(array_filter(
-            $competitorRows,
-            static fn ($c) => ! GiantDomains::isGiant(
-                strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))))
-            )
-        ));
+        // Giants/high-authority platforms are KEPT in the competitor list
+        // (owner 2026-07-27: "keep the giants in the list, don't hide them").
+        // Mega-platform noise is already filtered upstream at the SERP tally
+        // (ReportEnrichmentService::tallyCompetitors); whatever survives that is
+        // shown as-is.
 
         // Still nothing AND no own referring domains → signal "generate".
         if ($competitorRows === [] && $myReferring === 0) {
