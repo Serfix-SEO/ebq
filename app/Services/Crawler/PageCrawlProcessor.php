@@ -5,9 +5,14 @@ namespace App\Services\Crawler;
 use App\Models\CrawlSite;
 use App\Models\WebsiteInternalLink;
 use App\Models\WebsitePage;
+use App\Services\LinkGraph\EdgeRecorder;
 use App\Support\Crawler\BlockDetector;
+use App\Support\Crawler\FrontierUrl;
 use App\Support\Crawler\PageAnalyzer;
+use App\Support\Crawler\RenderGate;
 use App\Support\Crawler\SimHash;
+use App\Support\Crawler\TermExtractor;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -43,7 +48,7 @@ class PageCrawlProcessor
         // parameter variant we no longer track separately. Soft-remove it from
         // the inventory (excluded from due-crawl, findings, and the graph) so
         // existing ?name=…/?nick=… rows self-prune on the next crawl.
-        if (\App\Support\Crawler\FrontierUrl::collapse($page->url) !== $page->url) {
+        if (FrontierUrl::collapse($page->url) !== $page->url) {
             $page->forceFill(['removed_at' => now(), 'is_indexable' => false, 'next_crawl_at' => null])->save();
 
             return 'removed';
@@ -189,7 +194,7 @@ class PageCrawlProcessor
             // Compact language-agnostic term candidates (drives the link suggester;
             // lets body_text be pruned post-analysis).
             'content_terms' => json_encode(
-                app(\App\Support\Crawler\TermExtractor::class)->candidates(
+                app(TermExtractor::class)->candidates(
                     (string) $analysis['title'],
                     (string) $analysis['body_text'],
                     (string) $page->url,
@@ -215,10 +220,10 @@ class PageCrawlProcessor
         // into the append-only edge store (free byproduct of a fetch that
         // already happened; EdgeRecorder never throws).
         if (! empty($analysis['external_links'])) {
-            app(\App\Services\LinkGraph\EdgeRecorder::class)->record(
+            app(EdgeRecorder::class)->record(
                 (string) $page->url,
                 $analysis['external_links'],
-                \App\Services\LinkGraph\EdgeRecorder::SOURCE_OWN_CRAWL,
+                EdgeRecorder::SOURCE_OWN_CRAWL,
             );
         }
 
@@ -236,7 +241,7 @@ class PageCrawlProcessor
         return max($min, min($max, (int) $days));
     }
 
-    private function adaptiveNext(WebsitePage $page, int $consecutiveUnchanged): \Illuminate\Support\Carbon
+    private function adaptiveNext(WebsitePage $page, int $consecutiveUnchanged): Carbon
     {
         return $this->scheduleNext($page, $this->adaptiveIntervalDays($consecutiveUnchanged));
     }
@@ -333,9 +338,25 @@ class PageCrawlProcessor
             $this->pool->markFailure($proxy);
         }
 
-        // Still blocked after the retry — return as-is. The run-level rollup in
-        // AnalyzeSiteJob decides whether the SITE is blocking us (and owns the
-        // crawl_protection flag), so a single blocked page never trips the banner.
+        // Still blocked after the retry. If it's a bot CHALLENGE our IP/proxies
+        // can't pass (Cloudflare "Just a moment" et al.), try the headless render
+        // server (Firecrawl) as a last resort — it runs a real browser through a
+        // residential IP. No-op unless Firecrawl is configured. Success returns a
+        // synthesized 200 with the rendered HTML so the rest of the pipeline
+        // (title/terms/links) processes it normally.
+        if (RenderGate::isChallenge((int) $res['status'], $res['headers'] ?? [], (string) $res['body'])) {
+            $fc = app(FirecrawlClient::class);
+            if ($fc->enabled()) {
+                $html = $fc->html($page->url);
+                if ($html !== null && trim($html) !== '') {
+                    return array_merge($res, ['ok' => true, 'status' => 200, 'blocked' => false, 'body' => $html, 'rendered' => true]);
+                }
+            }
+        }
+
+        // The run-level rollup in AnalyzeSiteJob decides whether the SITE is
+        // blocking us (and owns the crawl_protection flag), so a single blocked
+        // page never trips the banner.
         return $res;
     }
 
@@ -354,7 +375,7 @@ class PageCrawlProcessor
             if ($href === '' || ! preg_match('#^https?://#i', $href)) {
                 continue;
             }
-            $href = \App\Support\Crawler\FrontierUrl::collapse($href);
+            $href = FrontierUrl::collapse($href);
             $hash = WebsitePage::hashUrl($href);
             if ($hash === $page->url_hash || isset($targets[$hash])) {
                 continue; // skip self-links + dupes
@@ -461,7 +482,7 @@ class PageCrawlProcessor
         ];
     }
 
-    private function scheduleNext(WebsitePage $page, int $days): \Illuminate\Support\Carbon
+    private function scheduleNext(WebsitePage $page, int $days): Carbon
     {
         // Deterministic per-page jitter (0–23h) spreads load without randomness.
         // ULID ids aren't numeric, so derive the jitter from a stable hash.

@@ -4,10 +4,11 @@ namespace App\Services\Content;
 
 use App\Models\ContentPlan;
 use App\Models\Website;
+use App\Services\Crawler\FirecrawlClient;
+use App\Services\Llm\LlmClientFactory;
 use App\Support\Audit\SafeHttpGuard;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentSiteTypeProfiles;
-use App\Services\Llm\LlmClientFactory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -47,33 +48,33 @@ class SiteProfileExtractor
         // completed crawl self-heals; only a populated profile earns 7 days.
         // Crawl finalize also invalidates the key — see CrawlFinalizer.
         $profile = (function () use ($website, $empty): array {
-                // Prefer crawled pages; but a freshly-added site (e.g. anonymous
-                // onboarding) has no crawl yet — fall back to a live homepage
-                // fetch so the wizard still pre-fills immediately.
-                $signals = $this->crawlSignals($website);
-                if ($signals === []) {
-                    $signals = $this->liveSignals($website);
-                }
-                if ($signals === []) {
-                    return $empty;
-                }
+            // Prefer crawled pages; but a freshly-added site (e.g. anonymous
+            // onboarding) has no crawl yet — fall back to a live homepage
+            // fetch so the wizard still pre-fills immediately.
+            $signals = $this->crawlSignals($website);
+            if ($signals === []) {
+                $signals = $this->liveSignals($website);
+            }
+            if ($signals === []) {
+                return $empty;
+            }
 
-                $llm = LlmClientFactory::make(ContentAutopilotConfig::modelFor('ideate')['provider']);
-                if (! $llm->isAvailable()) {
-                    // No LLM (e.g. staging) — still seed a plain description from
-                    // the homepage title/meta so step 1 isn't blank.
-                    return $this->rawProfile($signals, $empty);
-                }
+            $llm = LlmClientFactory::make(ContentAutopilotConfig::modelFor('ideate')['provider']);
+            if (! $llm->isAvailable()) {
+                // No LLM (e.g. staging) — still seed a plain description from
+                // the homepage title/meta so step 1 isn't blank.
+                return $this->rawProfile($signals, $empty);
+            }
 
-                $pagesBlock = implode("\n", array_map(
-                    static fn ($p) => '- '.$p['title'].($p['meta'] !== '' ? ' — '.$p['meta'] : ''),
-                    $signals
-                ));
+            $pagesBlock = implode("\n", array_map(
+                static fn ($p) => '- '.$p['title'].($p['meta'] !== '' ? ' — '.$p['meta'] : ''),
+                $signals
+            ));
 
-                $typeList = implode('|', ContentSiteTypeProfiles::TYPES);
-                $response = $llm->completeJson([
-                    ['role' => 'system', 'content' => 'You analyze websites for a content-marketing tool. Respond with valid JSON only.'],
-                    ['role' => 'user', 'content' => <<<PROMPT
+            $typeList = implode('|', ContentSiteTypeProfiles::TYPES);
+            $response = $llm->completeJson([
+                ['role' => 'system', 'content' => 'You analyze websites for a content-marketing tool. Respond with valid JSON only.'],
+                ['role' => 'user', 'content' => <<<PROMPT
                     Based ONLY on these real pages from {$website->domain}, describe the business.
 
                     PAGES (title — meta description):
@@ -90,36 +91,36 @@ class SiteProfileExtractor
                     }
                     Be specific to THIS site. Never invent offerings the pages don't support.
                     PROMPT],
-                ], [
-                    'temperature' => 0.3,
-                    'max_tokens' => 900,
-                    'timeout' => 45,
-                    '__source' => 'content_autopilot.site_profile',
-                    '__unmetered' => true,
-                ]);
-                app(ContentLlmSpendMeter::class)->add(ContentLlmSpendMeter::EST_IDEATE_USD);
+            ], [
+                'temperature' => 0.3,
+                'max_tokens' => 900,
+                'timeout' => 45,
+                '__source' => 'content_autopilot.site_profile',
+                '__unmetered' => true,
+            ]);
+            app(ContentLlmSpendMeter::class)->add(ContentLlmSpendMeter::EST_IDEATE_USD);
 
-                if (! is_array($response)) {
-                    return $empty;
-                }
+            if (! is_array($response)) {
+                return $empty;
+            }
 
-                $clean = static fn ($list) => array_slice(array_values(array_filter(array_map(
-                    static fn ($v) => trim((string) $v),
-                    is_array($list) ? $list : []
-                ))), 0, 8);
+            $clean = static fn ($list) => array_slice(array_values(array_filter(array_map(
+                static fn ($v) => trim((string) $v),
+                is_array($list) ? $list : []
+            ))), 0, 8);
 
-                $siteType = is_string($response['site_type'] ?? null) ? strtolower(trim($response['site_type'])) : null;
+            $siteType = is_string($response['site_type'] ?? null) ? strtolower(trim($response['site_type'])) : null;
 
-                return [
-                    'description' => is_string($response['description'] ?? null)
-                        ? mb_substr(trim($response['description']), 0, 1000) : null,
-                    'sell' => $clean($response['sell'] ?? []),
-                    'dont_sell' => $clean($response['dont_sell'] ?? []),
-                    'site_type' => ContentSiteTypeProfiles::isValid($siteType) ? $siteType : null,
-                    'audience' => is_string($response['audience'] ?? null)
-                        ? mb_substr(trim($response['audience']), 0, 500) : null,
-                    'ymyl' => is_bool($response['ymyl'] ?? null) ? $response['ymyl'] : null,
-                ];
+            return [
+                'description' => is_string($response['description'] ?? null)
+                    ? mb_substr(trim($response['description']), 0, 1000) : null,
+                'sell' => $clean($response['sell'] ?? []),
+                'dont_sell' => $clean($response['dont_sell'] ?? []),
+                'site_type' => ContentSiteTypeProfiles::isValid($siteType) ? $siteType : null,
+                'audience' => is_string($response['audience'] ?? null)
+                    ? mb_substr(trim($response['audience']), 0, 500) : null,
+                'ymyl' => is_bool($response['ymyl'] ?? null) ? $response['ymyl'] : null,
+            ];
         })();
 
         Cache::put(
@@ -358,7 +359,12 @@ class SiteProfileExtractor
             }
         }
 
-        return null;
+        // Both UAs blocked (e.g. Cloudflare "Just a moment" challenge). Last
+        // resort: render it through the self-hosted Firecrawl server (headless
+        // browser + residential proxy). No-op unless Firecrawl is configured.
+        $rendered = app(FirecrawlClient::class)->html($url);
+
+        return ($rendered !== null && trim($rendered) !== '') ? $rendered : null;
     }
 
     /** Strip tags/entities/whitespace from an HTML fragment. */

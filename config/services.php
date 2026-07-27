@@ -455,4 +455,15 @@ return [
         'db_firewall_id' => env('HCLOUD_DB_FIREWALL_ID'),
     ],
 
+    // Self-hosted Firecrawl render server (infra/reference/firecrawl-server.md).
+    // Render fallback for JS/Cloudflare-challenged sites the HTTP crawler can't read.
+    // PRIVATE endpoint on the ex-staging box (10.0.0.4:3002). Off unless enabled +
+    // url set, so the crawler/wizard behave exactly as before where it's not configured.
+    'firecrawl' => [
+        'enabled' => filter_var(env('FIRECRAWL_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'url' => env('FIRECRAWL_URL'),            // e.g. http://10.0.0.4:3002
+        'key' => env('FIRECRAWL_API_KEY'),        // bearer (box .env TEST_API_KEY)
+        'timeout_s' => (int) env('FIRECRAWL_TIMEOUT_S', 45),
+    ],
+
 ];
