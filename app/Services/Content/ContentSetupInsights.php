@@ -2,15 +2,20 @@
 
 namespace App\Services\Content;
 
+use App\Jobs\Content\DiscoverContentCompetitorsJob;
+use App\Jobs\Content\EnrichCompetitorDomainMetricsJob;
 use App\Jobs\GenerateWebsiteReport;
 use App\Models\ContentPlan;
 use App\Models\DomainMetric;
 use App\Models\Website;
 use App\Models\WebsiteReportSnapshot;
+use App\Services\Competitive\CompetitorEnricher;
 use App\Services\DataForSeoBacklinkClient;
 use App\Services\MozLinksClient;
 use App\Services\Reports\ClientReportService;
 use App\Services\Reports\DataForSeoSpendMeter;
+use App\Support\ContentAutopilotConfig;
+use App\Support\GiantDomains;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -61,7 +66,7 @@ class ContentSetupInsights
         private readonly DataForSeoSpendMeter $dfsSpend,
         private readonly MozLinksClient $moz,
         private readonly MozSpendMeter $mozSpend,
-        private readonly \App\Services\Competitive\CompetitorEnricher $enricher,
+        private readonly CompetitorEnricher $enricher,
     ) {}
 
     /**
@@ -117,7 +122,7 @@ class ContentSetupInsights
         // actually ranks for the plan's real searches, in SERP order. Async so
         // it never blocks the wizard render; the flag drives the polling state.
         if (Cache::add('content:serp-comp:'.$website->id, 1, now()->addMinutes(30))) {
-            \App\Jobs\Content\DiscoverContentCompetitorsJob::dispatch($website->id);
+            DiscoverContentCompetitorsJob::dispatch($website->id);
         }
 
         // (2) Backlink report — powers the AUTHORITY comparison (your referring
@@ -248,7 +253,7 @@ class ContentSetupInsights
             $host = $plan->website !== null
                 ? $normalize((string) ($plan->website->normalized_domain ?: $plan->website->domain)) : '';
             if ($host !== '') {
-                $ownDa = \App\Models\DomainMetric::query()->where('domain', $host)->value('moz_da');
+                $ownDa = DomainMetric::query()->where('domain', $host)->value('moz_da');
                 if (is_numeric($ownDa)) {
                     $myDa = (int) $ownDa;
                 }
@@ -263,7 +268,7 @@ class ContentSetupInsights
         // or scale (shared metrics) and group them with references instead of
         // the rival ladder. Flag off → exact prior behavior.
         $guardSvc = null;
-        $signalsOn = \App\Support\ContentAutopilotConfig::giantSignalsEnabled();
+        $signalsOn = ContentAutopilotConfig::giantSignalsEnabled();
         if ($signalsOn) {
             try {
                 $guardSvc = app(CompetitorMentionGuard::class);
@@ -421,6 +426,17 @@ class ContentSetupInsights
             'is_array'
         ));
         if ($competitorRows === []) {
+            // Content-specific discovery hasn't produced rivals yet. While it is
+            // still RUNNING, do NOT fall back to the backlink report's broad SERP
+            // scrape — for tool/name sites that list is directories/dictionaries
+            // (baby-name sites for "nickfinder"), not real rivals, and caching it
+            // strands the user on the wrong list. Return null so the wizard shows
+            // the "analyzing" state and polls until DiscoverContentCompetitorsJob
+            // lands. Only once discovery has FINISHED (flag cleared) with nothing
+            // do we last-resort to the report rows.
+            if (Cache::has('content:serp-comp:'.$website->id)) {
+                return null;
+            }
             $competitorRows = array_values(array_filter((array) ($payload['competitors'] ?? []), 'is_array'));
             usort($competitorRows, fn ($a, $b) => (int) ($b['shared_keywords'] ?? 0) <=> (int) ($a['shared_keywords'] ?? 0));
         }
@@ -430,7 +446,7 @@ class ContentSetupInsights
         // SERP tally already filters, but report-snapshot rows did not).
         $competitorRows = array_values(array_filter(
             $competitorRows,
-            static fn ($c) => ! \App\Support\GiantDomains::isGiant(
+            static fn ($c) => ! GiantDomains::isGiant(
                 strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))))
             )
         ));
@@ -488,7 +504,7 @@ class ContentSetupInsights
             static fn ($c) => (string) ($c['domain'] ?? ''), $competitors
         )));
         if ($competitorDomains !== []) {
-            \App\Jobs\Content\EnrichCompetitorDomainMetricsJob::dispatch($website->id, $competitorDomains);
+            EnrichCompetitorDomainMetricsJob::dispatch($website->id, $competitorDomains);
         }
 
         // Display follows the SERP order (owner decision 2026-07-22) — no

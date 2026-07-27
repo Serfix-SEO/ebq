@@ -77,6 +77,14 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
             $result = $enrichment->discoverCompetitorsFor((string) $domain, $keywords, $billedUserId, $gl);
             $competitors = array_values(array_filter((array) ($result['competitors'] ?? []), 'is_array'));
 
+            // Final relevance gate (correct-at-any-cost): a SERP tally still lets
+            // off-niche domains through when a query word is ambiguous ("names"
+            // → baby-name sites for a gaming nickname tool). An LLM keeps ONLY
+            // genuine same-business competitors and drops directories / dictionaries
+            // / media / unrelated industries. Fails OPEN (keeps the raw list) so an
+            // LLM outage never empties discovery.
+            $competitors = $this->filterRelevantCompetitors($competitors, $plan, (string) $domain);
+
             if ($competitors !== []) {
                 Cache::put('content:serp-competitors:'.$this->websiteId, $competitors, now()->addDays(30));
 
@@ -101,6 +109,87 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
             // stop polling.
             Cache::forget('content:setup-insights:v1:'.$this->websiteId);
             Cache::forget($flag);
+        }
+    }
+
+    /**
+     * LLM topical-relevance gate over the discovered competitor domains: keep
+     * ONLY genuine same-business rivals, drop off-niche domains a SERP tally
+     * surfaces when a query word is ambiguous (baby-name / dictionary / media /
+     * directory / marketplace / unrelated industry). Preserves the input order
+     * and row data. Fails OPEN — LLM unavailable or errored → the raw list is
+     * returned unchanged, never emptied.
+     *
+     * @param  list<array<string, mixed>>  $competitors
+     * @return list<array<string, mixed>>
+     */
+    private function filterRelevantCompetitors(array $competitors, ContentPlan $plan, string $domain): array
+    {
+        if (count($competitors) < 2) {
+            return $competitors; // nothing to prune
+        }
+        try {
+            $model = ContentAutopilotConfig::modelFor('ideate');
+            $llm = LlmClientFactory::make($model['provider']);
+            if (! $llm->isAvailable()) {
+                return $competitors;
+            }
+
+            $offer = implode(', ', array_slice((array) ($plan->offerings['sell'] ?? []), 0, 10));
+            $desc = mb_substr((string) $plan->business_description, 0, 600);
+            $domains = array_values(array_filter(array_map(
+                static fn ($c) => strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? '')))),
+                $competitors,
+            )));
+            $list = implode("\n", $domains);
+
+            $response = $llm->completeJson([
+                ['role' => 'system', 'content' => 'You are an SEO competitive analyst. Respond with valid JSON only.'],
+                ['role' => 'user', 'content' => <<<PROMPT
+                Client website: {$domain}
+                What the client offers: {$offer}
+                About the client: {$desc}
+
+                Below are domains found ranking in the client's search results. Return ONLY
+                the ones that are GENUINE COMPETITORS — sites offering the SAME kind of
+                product, tool, content, or service to the SAME audience as the client.
+
+                REMOVE anything that is:
+                - a different industry or topic that merely shares a search word (e.g. a
+                  baby-name or parenting site when the client is a GAMING nickname tool),
+                - a general dictionary, encyclopedia, thesaurus, directory, marketplace,
+                  news/media/blog, or social/video platform,
+                - an unrelated tool or brand.
+
+                Domains:
+                {$list}
+
+                Return JSON: {"competitors": ["domain", ...]} using the EXACT domains above.
+                PROMPT],
+            ], [
+                'temperature' => 0.1,
+                'max_tokens' => 800,
+                'timeout' => 40,
+                '__source' => 'content_autopilot.competitor_relevance',
+                '__unmetered' => true,
+            ]);
+
+            $keep = [];
+            foreach ((array) ($response['competitors'] ?? []) as $d) {
+                $keep[strtolower(preg_replace('/^www\./', '', trim((string) $d)))] = true;
+            }
+            if ($keep === []) {
+                return $competitors; // fail open — never empty on a bad/empty reply
+            }
+
+            $filtered = array_values(array_filter(
+                $competitors,
+                static fn ($c) => isset($keep[strtolower(preg_replace('/^www\./', '', trim((string) ($c['domain'] ?? ''))))])
+            ));
+
+            return $filtered === [] ? $competitors : $filtered;
+        } catch (\Throwable) {
+            return $competitors; // fail open
         }
     }
 
