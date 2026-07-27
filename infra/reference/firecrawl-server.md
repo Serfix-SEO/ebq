@@ -29,9 +29,22 @@ Replaces the old staging environment (same Hetzner instance, clean OS rebuild �
   **FoundationDB skipped** (`foundationdb`/`-init` not started; `NUQ_BACKEND` unset → Postgres).
 - `.env` (root): `PORT=3002`, `USE_DB_AUTHENTICATION=false`, concurrency capped for 8 GB
   (`NUM_WORKERS_PER_QUEUE=2`, `MAX_CONCURRENT_JOBS=2`, `BROWSER_POOL_SIZE=2`,
-  `CRAWL_CONCURRENT_REQUESTS=2`), `PROXY_SERVER=http://<residential-ip>:12323` +
-  `PROXY_USERNAME`/`PROXY_PASSWORD` (from box A `proxylist.txt` line 1 — the Webshare residential pool).
+  `CRAWL_CONCURRENT_REQUESTS=2`).
 - 4 GB swap added as a Chromium OOM cushion. Idle footprint ≈ 3.9 GB used / 7.6 GB.
+
+### Proxy rotation + stealth (2026-07-27, free — proxies already owned)
+- **IP rotation** across all **4** Webshare residential IPs. `playwright-service` is a **patched local build**
+  (compose reverted `image:`→`build: apps/playwright-service-ts`): `buildUpstreamProxyUrl()` picks a random
+  IP from **`PROXY_POOL`** (`.env`, comma-sep `host:port:user:pass` ×4) per request. Each origin CONNECT
+  is sticky to one IP for its lifetime (main document stays on one IP); scrapes spread across the pool.
+  Verified: 6 scrapes → all 4 exit IPs. (`PROXY_POOL` passthrough added to the compose `environment:`.)
+- **Stealth** via **`playwright-extra` + `puppeteer-extra-plugin-stealth`** (OSS) — `api.ts` swaps
+  `chromium`→`addExtra(chromium).use(StealthPlugin())` + `--disable-blink-features=AutomationControlled`.
+  Fingerprint stealth only; self-host still has **no Fire-engine / Turnstile solver**, so the residential IP
+  is still what carries Cloudflare (a CAPTCHA-solver would cost money and is not wired).
+- **Rebuild note:** `playwright-service` is now source-built. After a Firecrawl `git pull`, re-apply the patch
+  (backups on box: `apps/playwright-service-ts/api.ts.orig` + `package.json.orig`) and
+  `docker compose build playwright-service`. Dockerfile uses `pnpm install --no-frozen-lockfile`.
 
 ## Ops
 
