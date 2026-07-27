@@ -442,10 +442,10 @@
                                      class="mb-1 rounded-lg border p-1.5 {{ $overCap ? 'border-error/60 bg-error/5 dark:border-error/50' : ($cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800') }} {{ $canDrag ? 'cursor-grab active:cursor-grabbing' : '' }}">
                                     @if ($topic->currentArticle || $cellInFlight)
                                         <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80">
-                                            <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
+                                            <span class="break-words text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
                                         </a>
                                     @else
-                                        <span class="line-clamp-2 text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
+                                        <span class="break-words text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
                                     @endif
                                     <div class="mt-1 flex items-center justify-between gap-1">
                                         @php $chipColor = $imgPending ? 'amber' : $p['color']; @endphp
@@ -535,7 +535,7 @@
                                 $inFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true);
                             @endphp
                             <div class="min-w-0 flex-1">
-                                <div class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</div>
+                                <div class="break-words text-sm font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</div>
                                 <div class="flex flex-wrap items-center gap-x-2 text-xs text-slate-500 dark:text-slate-400">
                                     <span>{{ $topic->target_keyword }}@if($topic->keyword_volume) · {{ number_format($topic->keyword_volume) }} {{ __('searches/mo') }}@endif</span>
                                     @if ($traffic)
@@ -653,7 +653,7 @@
                                 @foreach (array_slice($topics, 0, 6) as $topic)
                                     <li class="flex items-center gap-2 px-3.5 py-2">
                                         <span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background: {{ $statusColor[$topic['status']] ?? '#94A3B8' }}"></span>
-                                        <span class="truncate text-xs text-slate-600 dark:text-slate-300">{{ \Illuminate\Support\Str::limit($topic['title'], 46) }}</span>
+                                        <span class="break-words text-xs text-slate-600 dark:text-slate-300">{{ $topic['title'] }}</span>
                                     </li>
                                 @endforeach
                                 @if ($extra > 0)
