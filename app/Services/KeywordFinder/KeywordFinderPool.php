@@ -2,9 +2,14 @@
 
 namespace App\Services\KeywordFinder;
 
+use App\Exceptions\QuotaExceededException;
 use App\Models\KeywordApiRequest;
 use App\Models\KeywordApiServer;
+use App\Models\User;
+use App\Services\ClientActivityLogger;
+use App\Services\Usage\UsageMeter;
 use App\Support\KeywordFinderLocations;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -134,6 +139,15 @@ class KeywordFinderPool
             $payload['country_key'] = $countryKey;
         }
 
+        // Internal-only marker (also stripped in dispatch()): when set, the
+        // webhook additionally upserts this site-scope run's keywords into
+        // domain_keyword_rankings so the Content Autopilot competitor-gap
+        // classifier can use the free keyword server instead of DataForSEO.
+        if (! empty($opts['content_rank_harvest'])) {
+            $payload['content_rank_harvest'] = true;
+            $payload['harvest_country'] = $countryKey ?? 'global';
+        }
+
         return [$mode, $payload];
     }
 
@@ -164,8 +178,8 @@ class KeywordFinderPool
             $billed = $this->billedUser($userId, $websiteId);
             if ($billed !== null) {
                 try {
-                    app(\App\Services\Usage\UsageMeter::class)->assertCanSpend($billed, 'keyword_finder', 1);
-                } catch (\App\Exceptions\QuotaExceededException $e) {
+                    app(UsageMeter::class)->assertCanSpend($billed, 'keyword_finder', 1);
+                } catch (QuotaExceededException $e) {
                     $request->markFailed($e->userMessage);
 
                     return $request;
@@ -193,8 +207,8 @@ class KeywordFinderPool
                 'request_id' => $request->request_id,
                 'webhook_url' => $webhookUrl,
             ]);
-            // Don't leak our internal cache key to the API.
-            unset($body['country_key']);
+            // Don't leak our internal cache key / harvest markers to the API.
+            unset($body['country_key'], $body['content_rank_harvest'], $body['harvest_country']);
 
             $this->lastRequestBody = $body;
             $this->lastEndpoint = $server->baseUrl().$endpoint;
@@ -214,7 +228,7 @@ class KeywordFinderPool
 
                 if ($billed !== null) {
                     // Records the spend AND releases the assertCanSpend reservation.
-                    app(\App\Services\ClientActivityLogger::class)->log(
+                    app(ClientActivityLogger::class)->log(
                         'keyword_finder.dispatch',
                         userId: $billed->id,
                         websiteId: $websiteId,
@@ -256,16 +270,16 @@ class KeywordFinderPool
      * website is attached (team members spend the owner's quota, mirroring
      * SerperSearchClient), else the acting user.
      */
-    private function billedUser(?string $userId, ?string $websiteId): ?\App\Models\User
+    private function billedUser(?string $userId, ?string $websiteId): ?User
     {
         if ($websiteId !== null && $websiteId !== '') {
-            $ownerId = \Illuminate\Support\Facades\DB::table('websites')->where('id', $websiteId)->value('user_id');
+            $ownerId = DB::table('websites')->where('id', $websiteId)->value('user_id');
             if ($ownerId !== null) {
-                return \App\Models\User::find($ownerId);
+                return User::find($ownerId);
             }
         }
 
-        return $userId ? \App\Models\User::find($userId) : null;
+        return $userId ? User::find($userId) : null;
     }
 
     /**

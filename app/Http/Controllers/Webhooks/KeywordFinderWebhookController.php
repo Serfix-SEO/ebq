@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Models\DomainKeywordHarvest;
 use App\Models\KeywordApiRequest;
+use App\Models\KeywordMetric;
 use App\Services\KeywordMetricsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -96,6 +99,20 @@ class KeywordFinderWebhookController extends Controller
             $countryKey = (string) ($apiRequest->payload['country_key'] ?? 'global');
             $written = $metrics->ingestFinderResults($rows, $countryKey);
             $result['_cached_rows'] = $written;
+
+            // Content Autopilot competitor-gap harvest: also record this site's
+            // keywords as domain rankings so ClassifyPlanKeywordsJob can build the
+            // competitor gap from the FREE keyword server (no DataForSEO). Only
+            // for tagged site-scope harvests; best-effort, never fails the webhook.
+            if (($apiRequest->payload['content_rank_harvest'] ?? false) === true) {
+                try {
+                    $this->recordDomainRankings($apiRequest, $rows);
+                } catch (\Throwable $e) {
+                    Log::warning('KeywordFinder rank-harvest write failed', [
+                        'request_id' => $apiRequest->request_id, 'error' => mb_substr($e->getMessage(), 0, 200),
+                    ]);
+                }
+            }
         }
 
         $apiRequest->markCompleted($result);
@@ -111,6 +128,79 @@ class KeywordFinderWebhookController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Upsert a tagged site-scope harvest's keywords into `domain_keyword_rankings`
+     * (keyed [domain, keyword_hash, country]) so ClassifyPlanKeywordsJob can build
+     * the competitor gap from the keyword server. The server returns keyword +
+     * volume only (no SERP position), so rank_absolute stays null — which is fine:
+     * the classifier reads only keyword/keyword_hash/search_volume.
+     *
+     * @param  list<array<string,mixed>>  $rows
+     */
+    private function recordDomainRankings(KeywordApiRequest $apiRequest, array $rows): void
+    {
+        $url = (string) ($apiRequest->payload['url'] ?? '');
+        $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: ''));
+        $domain = preg_replace('/^www\./', '', $host) ?? $host;
+        if ($domain === '') {
+            return;
+        }
+        $country = (string) ($apiRequest->payload['harvest_country'] ?? $apiRequest->payload['country_key'] ?? 'global');
+        $now = now();
+
+        $dkr = [];
+        $seen = [];
+        foreach ($rows as $r) {
+            $kw = trim((string) ($r['keyword'] ?? ''));
+            if ($kw === '') {
+                continue;
+            }
+            $hash = KeywordMetric::hashKeyword($kw);
+            if (isset($seen[$hash])) {
+                continue;
+            }
+            $seen[$hash] = true;
+            $vol = (int) ($r['avgMonthlySearches'] ?? $r['search_volume'] ?? 0);
+            $dkr[] = [
+                'domain' => $domain,
+                'keyword_hash' => $hash,
+                'keyword' => mb_substr($kw, 0, 255),
+                'country' => $country,
+                'rank_absolute' => null, // keyword server gives no SERP position
+                'se_type' => 'organic',
+                'page_url' => null,
+                'etv' => null,
+                'search_volume' => $vol,
+                'previous_rank' => null,
+                'is_new' => false,
+                'is_up' => false,
+                'is_down' => false,
+                'is_lost' => false,
+                'fetched_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        if ($dkr === []) {
+            return;
+        }
+        foreach (array_chunk($dkr, 500) as $chunk) {
+            DB::table('domain_keyword_rankings')->upsert(
+                $chunk,
+                ['domain', 'keyword_hash', 'country'],
+                ['keyword', 'search_volume', 'fetched_at', 'updated_at'],
+            );
+        }
+
+        // Monthly bookkeeping — matches the DataForSEO harvest's gating so the
+        // dispatcher's guard ("harvested this month") works uniformly. The server
+        // returns the domain's set in one shot, so mark exhausted.
+        DomainKeywordHarvest::query()->updateOrCreate(
+            ['domain' => $domain, 'country' => $country],
+            ['last_run_at' => $now, 'keywords_fetched' => count($dkr), 'exhausted' => true],
+        );
     }
 
     /**
@@ -130,6 +220,7 @@ class KeywordFinderWebhookController extends Controller
             if (is_string($message) && trim($message) !== '') {
                 return trim($message);
             }
+
             // An empty array / object means "no error".
             return $error === [] ? null : 'The keyword lookup failed on the server.';
         }

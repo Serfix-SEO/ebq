@@ -8,8 +8,11 @@ use App\Jobs\PublishContentArticleJob;
 use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
+use App\Services\Content\ContentEntitlements;
+use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentLlmSpendMeter;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -62,6 +65,7 @@ class ContentAutopilotDispatcher extends Command
         $this->claimedTopicIds = [];
         $reaped = $this->reapStuck();
         $topped = $this->topUpThinCalendars();
+        $researched = $this->advanceKeywordResearch();
         $claimed = $meter->exhausted() ? 0 : $this->claimDueTopics((int) $this->option('claim-limit'));
         // Safety net: guarantee anything due within 24h is generated even if the
         // per-tick claim limit / one-per-site throttle skipped it above.
@@ -72,9 +76,38 @@ class ContentAutopilotDispatcher extends Command
             Log::warning('content_autopilot.llm_cap_exhausted', ['spent' => $meter->spent(), 'cap' => $meter->cap()]);
         }
 
-        $this->info("reaped={$reaped} topup_plans={$topped} claimed={$claimed} rushed={$rushed} published={$published}");
+        $this->info("reaped={$reaped} topup_plans={$topped} kw_research={$researched} claimed={$claimed} rushed={$rushed} published={$published}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Advance DB-backed competitor-keyword research for active, not-yet-classified
+     * plans: kick the free keyword-server ranking harvest (own + top-3 competitors
+     * → domain_keyword_rankings) and, once all competitors have landed, classify
+     * the gap. Both idempotent + monthly-guarded, so this is a cheap no-op most
+     * ticks. Replaces the disabled DataForSEO ebq:content-keyword-harvest trigger.
+     */
+    private function advanceKeywordResearch(): int
+    {
+        $insights = app(ContentKeywordInsights::class);
+        $n = 0;
+        ContentPlan::query()
+            ->where('status', ContentPlan::STATUS_ACTIVE)
+            ->whereNull('keywords_classified_at')
+            ->get()
+            ->each(function (ContentPlan $plan) use ($insights, &$n): void {
+                try {
+                    $insights->ensureCompetitorResearch($plan);
+                    $n++;
+                } catch (\Throwable $e) {
+                    Log::warning('content_autopilot.kw_research_error', [
+                        'plan_id' => $plan->id, 'error' => mb_substr($e->getMessage(), 0, 200),
+                    ]);
+                }
+            });
+
+        return $n;
     }
 
     private function reapStuck(): int
@@ -137,7 +170,7 @@ class ContentAutopilotDispatcher extends Command
         // Skip topics whose website can't generate right now (no content
         // access/coverage, trial or monthly cap) so blocked sites aren't
         // re-claimed and re-dispatched every tick. The job re-checks anyway.
-        $entitlements = app(\App\Services\Content\ContentEntitlements::class);
+        $entitlements = app(ContentEntitlements::class);
         $count = 0;
         foreach ($due as $topic) {
             if ($entitlements->blockReason($topic) !== null) {
@@ -178,7 +211,7 @@ class ContentAutopilotDispatcher extends Command
             ->orderBy('scheduled_for')
             ->get();
 
-        $entitlements = app(\App\Services\Content\ContentEntitlements::class);
+        $entitlements = app(ContentEntitlements::class);
         $count = 0;
         foreach ($imminent as $topic) {
             if ($entitlements->blockReason($topic) !== null) {
@@ -261,7 +294,7 @@ class ContentAutopilotDispatcher extends Command
     }
 
     /** Whether today (plan tz) is an allowed publish weekday (empty = every day). */
-    private function isPublishDay(ContentPlan $plan, \Illuminate\Support\Carbon $now): bool
+    private function isPublishDay(ContentPlan $plan, Carbon $now): bool
     {
         $days = array_map('intval', (array) ($plan->publish_days ?? []));
 
@@ -282,6 +315,7 @@ class ContentAutopilotDispatcher extends Command
         if ($start === $end) {
             return $now->hour === $start;
         }
+
         // Wrapping bands (22..2) supported.
         return $start < $end
             ? ($now->hour >= $start && $now->hour <= $end)

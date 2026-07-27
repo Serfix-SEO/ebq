@@ -13,14 +13,17 @@ use App\Models\KeywordApiRequest;
 use App\Models\KeywordMetric;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
+use App\Services\DataForSeoBacklinkClient;
 use App\Services\KeywordFinder\KeywordFinderPool;
 use App\Services\KeywordResearch\AiKeywordClusterService;
 use App\Services\KeywordResearch\KeywordIntentClassifier;
 use App\Services\KeywordResearch\KeywordTermGrouper;
 use App\Services\KeywordsEverywhereClient;
 use App\Services\Llm\LlmClientFactory;
+use App\Services\Reports\DataForSeoSpendMeter;
 use App\Services\SerperSearchClient;
 use App\Support\ContentAutopilotConfig;
+use App\Support\ContentSiteTypeProfiles;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -69,6 +72,12 @@ class ContentKeywordInsights
      *  The wizard says so plainly — deeper competitor research continues in the
      *  background per-article after onboarding. */
     private const MAX_COMPETITORS = 1;
+
+    /** Competitors mined for the DB-backed gap (domain_keyword_rankings → classify →
+     *  topics). Unlike the wizard's live preview (MAX_COMPETITORS=1, latency-bound),
+     *  the background ranking harvest + classify run async off the heartbeat, so we
+     *  mine the top 3 — matching ClassifyPlanKeywordsJob::MAX_COMPETITORS. */
+    private const RESEARCH_COMPETITORS = 3;
 
     /** Give the (concurrency-1, minutes-per-job) server this long before falling back. */
     private const PENDING_GRACE_MINUTES = 15;
@@ -120,6 +129,80 @@ class ContentKeywordInsights
         foreach ($this->topCompetitorDomains($plan, $plan->website, self::MAX_COMPETITORS) as $i => $domain) {
             $this->ensureSiteRequest($plan, $this->competitorRequestKey($plan, $i), fn () => $domain);
         }
+
+        // Background: harvest own + top-3 competitor keywords into
+        // domain_keyword_rankings (via the free keyword server) so the DB-backed
+        // competitor gap → topics chain can run (the DataForSEO harvest is off).
+        $this->ensureRankingHarvest($plan);
+    }
+
+    /**
+     * Advance the DB-backed competitor-keyword research for a plan: (1) harvest
+     * own + top-3 competitor keywords into domain_keyword_rankings via the free
+     * keyword server, (2) classify the gap once all competitors have landed.
+     * Both idempotent + guarded — safe to call every heartbeat for active plans.
+     */
+    public function ensureCompetitorResearch(ContentPlan $plan): void
+    {
+        $this->ensureRankingHarvest($plan);
+        $this->ensureClassify($plan);
+    }
+
+    /**
+     * Free competitor-keyword harvest via the self-hosted keyword server: dispatch
+     * a TAGGED site-scope request for the client's own domain + top competitors so
+     * the webhook writes each domain's keywords into domain_keyword_rankings — the
+     * input ClassifyPlanKeywordsJob needs (the DataForSEO ranked-keyword harvest
+     * was disabled 2026-07-20). Guarded once per (domain, country) per calendar
+     * month via DomainKeywordHarvest (same bookkeeping the DFS harvest used).
+     */
+    private function ensureRankingHarvest(ContentPlan $plan): void
+    {
+        $website = $plan->website;
+        if ($website === null) {
+            return;
+        }
+        $country = $this->planCountry($plan);
+        $own = strtolower((string) preg_replace('/^www\./', '', (string) ($website->normalized_domain ?: $website->domain)));
+
+        $domains = [];
+        if ($own !== '') {
+            $domains[$own] = true;
+        }
+        foreach ($this->topCompetitorDomains($plan, $website, self::RESEARCH_COMPETITORS) as $d) {
+            $domains[$d] = true;
+        }
+
+        $month = now()->format('Y-m');
+        $language = match (mb_strtolower(trim((string) $plan->language))) {
+            '', 'en' => null,
+            'ar' => 'Arabic',
+            default => (string) $plan->language,
+        };
+
+        foreach (array_keys($domains) as $domain) {
+            $h = DomainKeywordHarvest::query()->where('domain', $domain)->where('country', $country)->first();
+            if ($h !== null && $h->last_run_at !== null && $h->last_run_at->format('Y-m') === $month) {
+                continue; // already harvested this month
+            }
+            // Short transient guard so a slow webhook doesn't cause re-dispatch storms.
+            if (! Cache::add('content:rank-harvest:'.$domain.':'.$country, 1, now()->addMinutes(30))) {
+                continue;
+            }
+            try {
+                $this->pool->dispatchIdeas(
+                    ['url' => 'https://'.$domain, 'scope' => 'site', 'language' => $language, 'content_rank_harvest' => true],
+                    $website->user_id,
+                    $website->id,
+                    countryKey: $country,
+                    meter: false,
+                );
+            } catch (\Throwable $e) {
+                Log::warning('ContentKeywordInsights rank harvest failed', [
+                    'plan_id' => $plan->id, 'domain' => $domain, 'message' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**
@@ -135,7 +218,7 @@ class ContentKeywordInsights
             //         is driven by ebq:content-keyword-harvest.
         }
         $country = $this->planCountry($plan);
-        $competitors = $this->topCompetitorDomains($plan, $website, self::MAX_COMPETITORS);
+        $competitors = $this->topCompetitorDomains($plan, $website, self::RESEARCH_COMPETITORS);
         if ($competitors === []) {
             return; // competitors not discovered yet
         }
@@ -1080,14 +1163,14 @@ class ContentKeywordInsights
                 return;
             }
 
-            $dfs = app(\App\Services\DataForSeoBacklinkClient::class);
-            $meter = app(\App\Services\Reports\DataForSeoSpendMeter::class);
+            $dfs = app(DataForSeoBacklinkClient::class);
+            $meter = app(DataForSeoSpendMeter::class);
             if (! $dfs->isConfigured() || $meter->exhausted()) {
                 return;
             }
 
             $country = strtolower((string) ($plan->country ?: 'global'));
-            [$location, $language] = \App\Services\DataForSeoBacklinkClient::labsGeo($country);
+            [$location, $language] = DataForSeoBacklinkClient::labsGeo($country);
             $sandbox = (bool) $plan->website?->user?->is_admin;
 
             $rows = $dfs->useSandbox($sandbox)->resetCost()->keywordOverview($missing, [
@@ -1165,14 +1248,14 @@ class ContentKeywordInsights
                 return;
             }
 
-            $dfs = app(\App\Services\DataForSeoBacklinkClient::class);
-            $meter = app(\App\Services\Reports\DataForSeoSpendMeter::class);
+            $dfs = app(DataForSeoBacklinkClient::class);
+            $meter = app(DataForSeoSpendMeter::class);
             if (! $dfs->isConfigured() || $meter->exhausted()) {
                 return;
             }
 
             $country = strtolower((string) ($plan->country ?: 'global'));
-            [$location, $language] = \App\Services\DataForSeoBacklinkClient::labsGeo($country);
+            [$location, $language] = DataForSeoBacklinkClient::labsGeo($country);
             $sandbox = (bool) $plan->website?->user?->is_admin;
 
             $candidates = [];
@@ -1874,7 +1957,7 @@ class ContentKeywordInsights
         // can never win just because they carry volume. Each pick also carries
         // its offer lineage ("because you sell: X") when attribution is
         // confident.
-        $profile = \App\Support\ContentSiteTypeProfiles::profile($plan->site_type);
+        $profile = ContentSiteTypeProfiles::profile($plan->site_type);
         $intentWeights = $profile['intent_weights'] + ['other' => 0.5];
         $avoidPatterns = (array) ($profile['avoid_patterns'] ?? []);
         $ownDa = null;

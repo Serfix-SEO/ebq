@@ -6,6 +6,7 @@ use App\Models\ContentPlan;
 use App\Models\ContentPlanKeyword;
 use App\Models\DomainKeywordRanking;
 use App\Models\KeywordMetric;
+use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentSetupInsights;
 use App\Services\Llm\LlmClientFactory;
 use App\Support\ContentAutopilotConfig;
@@ -79,7 +80,7 @@ class ClassifyPlanKeywordsJob implements ShouldQueue
             }
         }
         $competitors = array_slice(
-            app(\App\Services\Content\CompetitorMentionGuard::class)->rankAndFilter($plan, $candidates),
+            app(CompetitorMentionGuard::class)->rankAndFilter($plan, $candidates),
             0,
             self::MAX_COMPETITORS
         );
@@ -150,9 +151,14 @@ class ClassifyPlanKeywordsJob implements ShouldQueue
         $minVolume = min(array_map(static fn ($c) => $c['volume'], $seen));
         $relevantHashes = $this->bulkRelevant($seen, $plan);
 
+        // Metric facts: prefer DataForSEO Labs, else the keyword server ('gkp')
+        // volumes now feed the harvest (the DFS ranked-keyword harvest is off).
+        // orderBy fetched_at so keyBy keeps the freshest per keyword.
         $facts = KeywordMetric::query()
-            ->where('country', $country)->where('data_source', 'dfs_labs')
+            ->where('country', $country)
+            ->whereIn('data_source', ['dfs_labs', 'gkp'])
             ->whereIn('keyword_hash', array_keys($seen))
+            ->orderBy('fetched_at')
             ->get(['keyword_hash', 'competition', 'keyword_difficulty', 'search_intent'])
             ->keyBy('keyword_hash');
 
