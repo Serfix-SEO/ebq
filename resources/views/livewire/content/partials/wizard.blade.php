@@ -517,12 +517,15 @@
                             $peerMedian = $ins['peer_median'] ?? $ins['median'];
                             $peerGap = $ins['peer_gap'] ?? $ins['gap'];
                             $peerBehind = $ins['peer_behind'] ?? $ins['behind'];
-                            // Guard-classified references/giants STAY in the main table
-                            // (user-requested 2026-07-23: classification must not make rows
-                            // vanish) — they're badged "Not a rival" instead, and the peer
-                            // math above already excludes them, so the gap stays honest.
-                            $mainRows = $ins['competitors'];
+                            // Directories/platforms/giants are NOT rivals — they live in the
+                            // "Also on your results pages" section below, never the ladder.
                             $refRows = array_values(array_filter($ins['competitors'], fn ($c) => in_array($c['class'] ?? null, ['reference', 'giant'], true)));
+                            $rivals = array_values(array_filter($ins['competitors'], fn ($c) => ! in_array($c['class'] ?? null, ['reference', 'giant'], true)));
+                            // Show only rivals AHEAD of the client (more authority). When none
+                            // are ahead — or a fresh site with no authority split to rank on —
+                            // fall back to every rival so the ladder is never empty.
+                            $ahead = array_values(array_filter($rivals, fn ($c) => ($c['class'] ?? null) === 'aspirational'));
+                            $mainRows = $ahead !== [] ? $ahead : $rivals;
                             // Rank ladder incl. the client's own row ("YOU"), by referring
                             // domains where known.
                             if (! $fresh) {
