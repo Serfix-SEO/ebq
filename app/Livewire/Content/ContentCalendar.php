@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Content;
 
+use App\Exceptions\QuotaExceededException;
 use App\Jobs\AssessCompetitorGuardJob;
+use App\Jobs\Content\EnrichCompetitorDomainMetricsJob;
 use App\Jobs\PlanContentTopicsJob;
 use App\Jobs\PrepareContentKeywordInsightsJob;
 use App\Jobs\ProduceContentArticleJob;
@@ -18,6 +20,7 @@ use App\Services\Content\ContentSetupInsights;
 use App\Services\Content\SiteProfileExtractor;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentImageStyles;
+use App\Support\ContentSiteTypeProfiles;
 use App\Support\KeywordFinderLocations;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -278,7 +281,7 @@ class ContentCalendar extends Component
         // (prod 2026-07-22, a quota-exhausted account stuck on step 1).
         try {
             $profile = app(SiteProfileExtractor::class)->extract($website);
-        } catch (\App\Exceptions\QuotaExceededException) {
+        } catch (QuotaExceededException) {
             $profile = [];
         }
 
@@ -293,7 +296,7 @@ class ContentCalendar extends Component
         }
         // A user's chip click always outranks re-detection.
         if ($this->siteTypeSource !== 'user' && $this->siteType === ''
-            && \App\Support\ContentSiteTypeProfiles::isValid($profile['site_type'] ?? null)) {
+            && ContentSiteTypeProfiles::isValid($profile['site_type'] ?? null)) {
             $this->siteType = (string) $profile['site_type'];
             $this->siteTypeSource = 'auto';
         }
@@ -320,7 +323,7 @@ class ContentCalendar extends Component
     /** Step-1 site-type chip click — an explicit human decision. */
     public function selectSiteType(string $type): void
     {
-        if (! \App\Support\ContentSiteTypeProfiles::isValid($type)) {
+        if (! ContentSiteTypeProfiles::isValid($type)) {
             return;
         }
         $this->siteType = $type;
@@ -467,7 +470,7 @@ class ContentCalendar extends Component
                 ),
                 'business_description' => $this->businessDescription,
                 'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
-                'site_type' => \App\Support\ContentSiteTypeProfiles::isValid($this->siteType) ? $this->siteType : null,
+                'site_type' => ContentSiteTypeProfiles::isValid($this->siteType) ? $this->siteType : null,
                 'site_type_source' => $this->siteType !== '' ? ($this->siteTypeSource ?: 'auto') : null,
                 'audience' => $this->audience !== '' ? mb_substr($this->audience, 0, 500) : null,
                 'ymyl' => $this->ymylFlag,
@@ -655,7 +658,7 @@ class ContentCalendar extends Component
         // batched EnrichCompetitorDomainMetricsJob dispatch). Without this, a
         // manually-added competitor sat with those two columns blank forever
         // (prod 2026-07-22). Idempotent/cheap — skips if already fresh.
-        \App\Jobs\Content\EnrichCompetitorDomainMetricsJob::dispatch($plan->website_id, [$domain]);
+        EnrichCompetitorDomainMetricsJob::dispatch($plan->website_id, [$domain]);
     }
 
     /** Remove a competitor (auto-discovered or manually added) from the step-4 table. */
@@ -881,7 +884,7 @@ class ContentCalendar extends Component
         $plan->update([
             'business_description' => $this->businessDescription,
             'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
-            'site_type' => \App\Support\ContentSiteTypeProfiles::isValid($this->siteType) ? $this->siteType : null,
+            'site_type' => ContentSiteTypeProfiles::isValid($this->siteType) ? $this->siteType : null,
             'site_type_source' => $this->siteType !== '' ? ($this->siteTypeSource ?: 'auto') : null,
             'audience' => $this->audience !== '' ? mb_substr($this->audience, 0, 500) : null,
             'ymyl' => $this->ymylFlag,

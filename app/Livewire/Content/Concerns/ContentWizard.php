@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Content\Concerns;
 
+use App\Exceptions\QuotaExceededException;
 use App\Jobs\AssessCompetitorGuardJob;
+use App\Jobs\Content\EnrichCompetitorDomainMetricsJob;
 use App\Jobs\PlanContentTopicsJob;
 use App\Jobs\PrepareContentKeywordInsightsJob;
+use App\Livewire\Content\ContentCalendar;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\Website;
@@ -13,8 +16,12 @@ use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentSetupInsights;
 use App\Services\Content\SiteProfileExtractor;
 use App\Support\ContentImageStyles;
+use App\Support\ContentSiteTypeProfiles;
+use App\Support\KeywordFinderLocations;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 /**
  * Shared 7-step Content Autopilot wizard (business → offerings → how-it-works →
@@ -31,7 +38,9 @@ trait ContentWizard
 {
     // ── Wizard state ──
     public int $wizardStep = 1;
+
     public ?string $draftPlanId = null;
+
     public bool $analyzing = false;
 
     /** Poll attempts made while waiting for the crawl to land pages to profile. */
@@ -41,30 +50,43 @@ trait ContentWizard
     private const MAX_PROFILE_ATTEMPTS = 15;
 
     public string $brandName = '';
+
     public string $language = 'English';
+
     public string $country = 'global';
+
     public string $businessDescription = '';
+
     // Site type drives the whole offer-spine (intent weights, guard posture,
     // CTA framing). '' = unclassified => pipeline behaves type-blind.
     public string $siteType = '';
+
     public string $siteTypeSource = '';
+
     public string $audience = '';
+
     // Classifier-assessed, type-independent YMYL flag (null = unknown). No
     // UI — silently drives the writer's conservative-claims rule.
     public ?bool $ymylFlag = null;
 
     /** @var list<string> */
     public array $sellItems = [];
+
     /** @var list<string> */
     public array $dontSellItems = [];
+
     public string $newSell = '';
+
     public string $newDont = '';
+
     public string $newCompetitorDomain = '';
+
     public string $newBlockedTerm = '';
 
     public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true, 'featured_image' => true];
 
     public bool $imagesEnabled = true;
+
     public string $imageStyle = 'photographic';
 
     /** Resume wizard state from an existing (provisional) plan, if any. */
@@ -125,7 +147,7 @@ trait ContentWizard
         // copy, prod 2026-07-22 — see infra/content-autopilot/README.md).
         try {
             $profile = app(SiteProfileExtractor::class)->extract($website);
-        } catch (\App\Exceptions\QuotaExceededException) {
+        } catch (QuotaExceededException) {
             $profile = [];
         }
 
@@ -140,7 +162,7 @@ trait ContentWizard
         }
         // A user's chip click always outranks re-detection.
         if ($this->siteTypeSource !== 'user' && $this->siteType === ''
-            && \App\Support\ContentSiteTypeProfiles::isValid($profile['site_type'] ?? null)) {
+            && ContentSiteTypeProfiles::isValid($profile['site_type'] ?? null)) {
             $this->siteType = (string) $profile['site_type'];
             $this->siteTypeSource = 'auto';
         }
@@ -176,7 +198,7 @@ trait ContentWizard
         }
     }
 
-    /** @see \App\Livewire\Content\ContentCalendar::detectCountryFromDomain() (kept in sync — see infra doc) */
+    /** @see ContentCalendar::detectCountryFromDomain() (kept in sync — see infra doc) */
     private function detectCountryFromDomain(Website $website): ?string
     {
         $host = strtolower(trim((string) ($website->normalized_domain ?: $website->domain)));
@@ -193,7 +215,7 @@ trait ContentWizard
             return null;
         }
 
-        return array_key_exists($tld, \App\Support\KeywordFinderLocations::COUNTRIES) ? $tld : null;
+        return array_key_exists($tld, KeywordFinderLocations::COUNTRIES) ? $tld : null;
     }
 
     public function goToStep(int $step): void
@@ -205,7 +227,7 @@ trait ContentWizard
     /** Step-1 site-type chip click — an explicit human decision. */
     public function selectSiteType(string $type): void
     {
-        if (! \App\Support\ContentSiteTypeProfiles::isValid($type)) {
+        if (! ContentSiteTypeProfiles::isValid($type)) {
             return;
         }
         $this->siteType = $type;
@@ -220,7 +242,7 @@ trait ContentWizard
     {
         $this->validate([
             'businessDescription' => 'required|string|min:30|max:1000',
-            'country' => ['required', 'string', \Illuminate\Validation\Rule::in(array_keys(\App\Support\KeywordFinderLocations::countryOptions()))],
+            'country' => ['required', 'string', Rule::in(array_keys(KeywordFinderLocations::countryOptions()))],
         ], [], ['businessDescription' => __('business description'), 'country' => __('target country')]);
 
         $this->wizardStep = 2;
@@ -248,6 +270,22 @@ trait ContentWizard
     {
         unset($this->sellItems[$i]);
         $this->sellItems = array_values($this->sellItems);
+    }
+
+    /**
+     * Drag-and-drop reorder: move the item at $from to sit at $to. Lives on the
+     * shared trait so BOTH the in-app wizard (ContentCalendar) and the anonymous
+     * PublicOnboarding twin have it — otherwise the public offerings-reorder
+     * drop calls a missing method → Livewire MethodNotFoundException (500).
+     */
+    public function reorderSell(int $from, int $to): void
+    {
+        if (! isset($this->sellItems[$from]) || $from === $to || $to < 0 || $to >= count($this->sellItems)) {
+            return;
+        }
+        $item = $this->sellItems[$from];
+        array_splice($this->sellItems, $from, 1);
+        array_splice($this->sellItems, $to, 0, [$item]);
     }
 
     public function removeDont(int $i): void
@@ -304,7 +342,7 @@ trait ContentWizard
                 ),
                 'business_description' => $this->businessDescription,
                 'offerings' => ['sell' => array_slice($sell, 0, 12), 'dont_sell' => array_slice($dont, 0, 12)],
-                'site_type' => \App\Support\ContentSiteTypeProfiles::isValid($this->siteType) ? $this->siteType : null,
+                'site_type' => ContentSiteTypeProfiles::isValid($this->siteType) ? $this->siteType : null,
                 'site_type_source' => $this->siteType !== '' ? ($this->siteTypeSource ?: 'auto') : null,
                 'audience' => $this->audience !== '' ? mb_substr($this->audience, 0, 500) : null,
                 'ymyl' => $this->ymylFlag,
@@ -444,7 +482,7 @@ trait ContentWizard
         // "Est. traffic/mo" / "Organic keywords" come from DomainMetric.dfs_metrics,
         // otherwise ONLY populated for auto-discovered competitors (see the
         // ContentCalendar twin of this method). Idempotent/cheap.
-        \App\Jobs\Content\EnrichCompetitorDomainMetricsJob::dispatch($plan->website_id, [$domain]);
+        EnrichCompetitorDomainMetricsJob::dispatch($plan->website_id, [$domain]);
     }
 
     public function removeCompetitor(string $domain): void
@@ -564,7 +602,7 @@ trait ContentWizard
         // (throttled) so a competitor request that wasn't ready at step-6 entry
         // still fires once competitors land.
         if (($plan = $this->plan()) !== null
-            && \Illuminate\Support\Facades\Cache::add('content:kw-redispatch:'.$plan->id, 1, 20)) {
+            && Cache::add('content:kw-redispatch:'.$plan->id, 1, 20)) {
             PrepareContentKeywordInsightsJob::dispatch($plan->id);
         }
     }
