@@ -119,6 +119,14 @@ function registerTiptap() {
         // the view never attaches to the DOM. Keeping it out of reactivity is the
         // fix. Only plain UI flags below stay reactive (busy/menu/selTick).
         let editor = null
+        // The editor's OWN serialization of the initial content. TipTap parses
+        // the stored HTML into its schema then re-serializes on getHTML(), which
+        // is not byte-identical to the stored HTML (headings/figure/table nodes
+        // normalize). Captured right after mount so we can ignore the no-op
+        // onUpdate TipTap emits while normalizing on load — otherwise it would
+        // rescore the identical baseline and make the score visibly change the
+        // instant the editor mounts, before any real edit (prod 2026-07-28).
+        let baselineHtml = null
         const debounce = { t: null }
 
         return {
@@ -149,7 +157,13 @@ function registerTiptap() {
                         this.selTick++
                         clearTimeout(debounce.t)
                         debounce.t = setTimeout(() => {
-                            if (editor) this.$wire.rescore(editor.getHTML())
+                            if (!editor) return
+                            const html = editor.getHTML()
+                            // Ignore the initial normalization update — only rescore
+                            // once the content genuinely differs from the editor's own
+                            // baseline, so opening the editor never moves the score.
+                            if (html === baselineHtml) return
+                            this.$wire.rescore(html)
                         }, 800)
                     },
                     () => {
@@ -158,6 +172,10 @@ function registerTiptap() {
                     },
                     this.i18n.placeholder || '',
                 )
+                // Baseline = the editor's OWN serialization of the initial content,
+                // so the load-time normalization update is recognised as a no-op and
+                // never rescored (keeps the score stable until a real edit).
+                baselineHtml = editor.getHTML()
                 // Tear down cleanly if Livewire ever removes the node.
                 this.$el.addEventListener('livewire:navigating', () => this.destroy())
             },
