@@ -11,6 +11,7 @@ use App\Services\AiContentBriefService;
 use App\Services\AiWriterService;
 use App\Services\Llm\LlmClientFactory;
 use App\Support\ContentAutopilotConfig;
+use App\Support\ContentSiteTypeProfiles;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -376,21 +377,41 @@ class ContentArticleProducer
             return '<'.$tag.$attrs.' id="'.$slug.'">'.$inner.'</'.$tag.'>';
         }, $html) ?? $html;
 
+        // Enforce ordering deterministically (never trust the LLM to comply):
+        // the keyphrase-led OPENING PARAGRAPH must come first, THEN the "Key
+        // takeaways" box, THEN the "In this article" TOC. LLMs sometimes lead
+        // with the takeaways box (before any <p>), which buries the opener and
+        // makes the on-page analyzer read the summary bullets as the intro /
+        // first-100-words — the article then fails keyphrase checks and stalls
+        // ~71 (prod 2026-07-28). If a takeaways box precedes the first <p>,
+        // pull it out for re-insertion after the opener.
+        $takeaways = '';
+        if (preg_match('/<div\b[^>]*class="[^"]*key-takeaways[^"]*"[^>]*>[\s\S]*?<\/div>/i', $html, $tm, PREG_OFFSET_CAPTURE)) {
+            $firstP = preg_match('/<p\b/i', $html, $pm, PREG_OFFSET_CAPTURE) ? $pm[0][1] : PHP_INT_MAX;
+            if ($tm[0][1] < $firstP) {
+                $takeaways = $tm[0][0];
+                $html = substr($html, 0, $tm[0][1]).substr($html, $tm[0][1] + strlen($tm[0][0]));
+            }
+        }
+
+        // Compose what goes right after the opening paragraph: takeaways then TOC.
+        // buildToc() runs on the html with the takeaways box already pulled, so
+        // its "Key takeaways" H2 is not listed in the TOC.
+        $afterOpener = $takeaways !== '' ? "\n".$takeaways : '';
         if ($withToc) {
             $toc = $this->buildToc($html);
             if ($toc !== '') {
-                // The "In this article" TOC sits AFTER the opening paragraph,
-                // never before it (owner 2026-07-18): the opener carries the
-                // focus keyphrase and the on-page analyzer reads the first
-                // <p> as the intro — a leading TOC would bury both. Insert
-                // right after the first closing </p>; if the draft opens with
-                // no paragraph, fall back to prepending.
-                if (preg_match('/<\/p>/i', $html, $m, PREG_OFFSET_CAPTURE)) {
-                    $at = $m[0][1] + strlen($m[0][0]);
-                    $html = substr($html, 0, $at)."\n".$toc.substr($html, $at);
-                } else {
-                    $html = $toc.$html;
-                }
+                $afterOpener .= "\n".$toc;
+            }
+        }
+        if ($afterOpener !== '') {
+            // Insert right after the first closing </p>; if the draft opens with
+            // no paragraph at all, fall back to prepending.
+            if (preg_match('/<\/p>/i', $html, $m, PREG_OFFSET_CAPTURE)) {
+                $at = $m[0][1] + strlen($m[0][0]);
+                $html = substr($html, 0, $at).$afterOpener.substr($html, $at);
+            } else {
+                $html = $afterOpener.$html;
             }
         }
 
@@ -793,14 +814,14 @@ class ContentArticleProducer
      */
     private function siteTypeRules(ContentPlan $plan): array
     {
-        if (! \App\Support\ContentSiteTypeProfiles::isValid($plan->site_type)) {
+        if (! ContentSiteTypeProfiles::isValid($plan->site_type)) {
             // Type-blind plans still get the care rule when the classifier
             // flagged the SUBJECT as YMYL — safety is type-independent.
             return $plan->ymyl === true
                 ? ['CARE: this topic area affects readers\' money, health or legal standing. Make only claims you can support, avoid absolute promises, and recommend consulting a qualified professional where a decision has real consequences.']
                 : [];
         }
-        $profile = \App\Support\ContentSiteTypeProfiles::profile($plan->site_type);
+        $profile = ContentSiteTypeProfiles::profile($plan->site_type);
 
         $rules = [];
         $voice = match ($profile['voice']) {
@@ -830,11 +851,11 @@ class ContentArticleProducer
     /** Type-appropriate framing appended to the CTA rule (Phase F). */
     private function ctaFraming(ContentPlan $plan): string
     {
-        if (! \App\Support\ContentSiteTypeProfiles::isValid($plan->site_type)) {
+        if (! ContentSiteTypeProfiles::isValid($plan->site_type)) {
             return '';
         }
 
-        return match (\App\Support\ContentSiteTypeProfiles::profile($plan->site_type)['cta_style']) {
+        return match (ContentSiteTypeProfiles::profile($plan->site_type)['cta_style']) {
             'product' => ' — invite the reader to explore the relevant product or collection there',
             'category' => ' — point the reader to the matching product category there',
             'contact' => ' — invite the reader to request a quote or book a visit there',

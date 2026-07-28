@@ -12,7 +12,7 @@ class ContentSeoScorerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->scorer = new ContentSeoScorer();
+        $this->scorer = new ContentSeoScorer;
     }
 
     /** A deliberately strong article against its context. */
@@ -198,5 +198,82 @@ class ContentSeoScorerTest extends TestCase
         $result = $this->scorer->score($a['html'], $title, $a['meta_description'], $a['h1'], $a['slug'], $a['context']);
 
         $this->assertNotContains('meta_title_length', array_column($result['issues'], 'code'), 'len='.mb_strlen($title));
+    }
+
+    /** A long-tail article: keyphrase = 7 words. */
+    private function longTailArticle(string $opener, string $prefix = ''): array
+    {
+        $kw = 'long lasting arabic perfumes for men uae';
+        $section = static fn (string $h) => "<h2>{$h}</h2><p>"
+            .str_repeat('Long lasting Arabic perfumes for men UAE buyers love endure the heat with concrete, useful detail. ', 10).'</p>';
+        $html = $prefix.'<p>'.$opener.'</p>'
+            .$section('Why long lasting Arabic perfumes for men UAE matter')
+            .$section('Our top picks')
+            .$section('How to apply for all-day wear')
+            .$section('Where to buy authentic bottles');
+
+        return [
+            'html' => $html,
+            'meta_title' => 'Long Lasting Arabic Perfumes for Men UAE: Best Picks',
+            'meta_description' => 'Discover long lasting Arabic perfumes for men UAE that endure heat and humidity with rich oud and amber notes for confident all-day wear.',
+            'h1' => 'Long Lasting Arabic Perfumes for Men UAE',
+            'slug' => 'long-lasting-arabic-perfumes-for-men-uae',
+            'context' => [
+                'target_keyword' => $kw,
+                'secondary_keywords' => [],
+                'article_length' => 2000,
+                'toggles' => ['key_takeaways' => true],
+                'style_issues' => [],
+            ],
+        ];
+    }
+
+    /**
+     * A NATURALLY-worded opener that contains all the keyphrase words (but not
+     * the exact contiguous 7-word string) must satisfy the intro + first-words
+     * checks — long-tail keyphrases are token-matched (Yoast-style), not exact.
+     */
+    public function test_long_tail_keyphrase_passes_with_natural_opener(): void
+    {
+        $a = $this->longTailArticle('Finding long-lasting Arabic perfumes for men in the UAE means choosing high-oil attars that endure the desert heat all day long.');
+
+        $codes = array_column($this->scorer->score($a['html'], $a['meta_title'], $a['meta_description'], $a['h1'], $a['slug'], $a['context'])['issues'], 'code');
+
+        $this->assertNotContains('kw_in_intro', $codes);
+        $this->assertNotContains('kw_in_first_words', $codes);
+    }
+
+    /**
+     * The "Key takeaways" box renders at the very top but is NOT the article's
+     * opening — it must be stripped before measuring the intro / first-100-words,
+     * so a keyphrase-less summary box never hijacks those checks.
+     */
+    public function test_key_takeaways_box_does_not_hijack_intro_checks(): void
+    {
+        $box = '<div class="key-takeaways"><h2>Key takeaways</h2><ul>'
+            .'<li>Oud and amber last the longest.</li><li>Apply to pulse points after a shower.</li>'
+            .'<li>Same-day delivery is common in the region.</li></ul></div>';
+        // Body opener DOES carry the keyphrase words; the box (first in the DOM) does not.
+        $a = $this->longTailArticle('Long-lasting Arabic perfumes for men in the UAE rely on rich oud and amber to endure the relentless heat.', $box);
+
+        $codes = array_column($this->scorer->score($a['html'], $a['meta_title'], $a['meta_description'], $a['h1'], $a['slug'], $a['context'])['issues'], 'code');
+
+        $this->assertNotContains('kw_in_first_words', $codes);
+        $this->assertNotContains('kw_in_intro', $codes);
+    }
+
+    /** Length band upper bound is 2× target: listicles/pillar pages run long. */
+    public function test_word_count_upper_bound_is_two_x_target(): void
+    {
+        $ctx = ['target_keyword' => 'pubg name generator', 'article_length' => 1000, 'toggles' => [], 'style_issues' => []];
+        $mk = static fn (int $words) => '<p>pubg name generator '.str_repeat('word ', $words).'</p>';
+
+        // 1.8× (1800 words) is inside the 0.7×–2× band → not flagged.
+        $codes18 = array_column($this->scorer->score($mk(1800), 't', 'd', 'h', 's', $ctx)['issues'], 'code');
+        $this->assertNotContains('word_count', $codes18);
+
+        // 2.5× (2500 words) is genuinely bloated → flagged.
+        $codes25 = array_column($this->scorer->score($mk(2500), 't', 'd', 'h', 's', $ctx)['issues'], 'code');
+        $this->assertContains('word_count', $codes25);
     }
 }

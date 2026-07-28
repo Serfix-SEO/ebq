@@ -48,6 +48,13 @@ class ContentSeoScorer
         $text = $this->toText($html);
         $lowerText = mb_strtolower($text);
         $wordCount = str_word_count($text);
+        // Intro + first-100-words are measured from the BODY only. The "Key
+        // takeaways" box and the "In this article" TOC render at the very top
+        // but are widgets, not the article's opening — counting them makes the
+        // analyzer read summary bullets as the intro and fail keyphrase checks
+        // even on well-optimized articles (prod 2026-07-28, score stuck ~71).
+        $bodyHtml = $this->stripAsideBoxes($html);
+        $bodyText = $this->toText($bodyHtml);
 
         $checks = [];
         $issues = [];
@@ -97,8 +104,12 @@ class ContentSeoScorer
             "Include the keyword \"{$keyword}\" (all its words) in the meta description.");
         $add('meta_description_length', 4, mb_strlen($metaDescription) >= 130 && mb_strlen($metaDescription) <= 155,
             'Rewrite the meta description to 130-155 characters (currently '.mb_strlen($metaDescription).').');
-        $add('kw_in_first_words', 6, $kwIn(implode(' ', array_slice(explode(' ', $text), 0, 100))),
-            "Use the exact keyword \"{$keyword}\" within the first 100 words.");
+        // Body opener only (aside boxes stripped), and phrase-length-aware:
+        // long-tail keyphrases pass when all their words appear (Yoast-style),
+        // so a naturally-worded opener isn't punished for not repeating the
+        // exact 6-word string.
+        $add('kw_in_first_words', 6, $this->keyphrasePresent(mb_strtolower(implode(' ', array_slice(explode(' ', $bodyText), 0, 100))), $keyword),
+            "Use the keyword \"{$keyword}\" (all its words) within the first 100 words of the article body.");
         $add('kw_in_slug', 3, $slug !== '' && str_contains($slug, $this->slugify($keyword)),
             'Use the keyword in the URL slug (lowercase, hyphenated).');
 
@@ -110,10 +121,12 @@ class ContentSeoScorer
         $h3sOrphaned = $this->hasOrphanH3($html);
         $targetWords = (int) ($context['article_length'] ?? 2500);
 
-        // Tolerant band (0.7×–1.5×): chunked AI drafts routinely land short of
-        // the exact target; only flag genuinely thin or bloated articles.
+        // Tolerant band (0.7×–2×): chunked AI drafts land short of the exact
+        // target, while listicles / pillar pages legitimately run long — only
+        // flag genuinely thin or truly bloated articles (upper bound widened
+        // 1.5×→2× 2026-07-28: a 3.4k-word "top 10" for a 2k target is fine).
         $add('word_count', 8,
-            $wordCount >= (int) floor($targetWords * 0.7) && $wordCount <= (int) ceil($targetWords * 1.5),
+            $wordCount >= (int) floor($targetWords * 0.7) && $wordCount <= (int) ceil($targetWords * 2.0),
             "Adjust length to roughly {$targetWords} words (currently {$wordCount}). Expand thin sections rather than padding.");
         $add('h2_count', 6, count($h2s) >= 4,
             'Structure the article with at least 4 H2 sections.');
@@ -161,7 +174,7 @@ class ContentSeoScorer
             $add('kw_density', 6, $density >= 0.5 && $density <= 2.5,
                 $density < 0.5
                     ? "Use the exact phrase \"{$keyword}\" a little more often (currently only {$occurrences} times) — spread it naturally through the article."
-                    : "The keyword \"{$keyword}\" is over-used (density ".round($density, 1)."%); trim some mentions.");
+                    : "The keyword \"{$keyword}\" is over-used (density ".round($density, 1).'%); trim some mentions.');
 
             if ($wordCount >= 300) {
                 $words = preg_split('/\s+/', trim($lowerText)) ?: [];
@@ -188,9 +201,12 @@ class ContentSeoScorer
         // <p> as the intro, so check that specifically (not just first 100
         // words of stripped text).
         if ($keyword !== '') {
-            $intro = mb_strtolower($this->firstParagraph($html));
-            $add('kw_in_intro', 10, $intro !== '' && str_contains($intro, $keyword),
-                "Put the exact phrase \"{$keyword}\" in the opening paragraph (the first <p>).");
+            // Opener = the first <p> of the BODY (Key-takeaways/TOC boxes stripped
+            // so a leading summary widget never counts as the intro). Phrase-length
+            // aware so a naturally-worded long-tail opener passes.
+            $intro = mb_strtolower($this->firstParagraph($bodyHtml));
+            $add('kw_in_intro', 10, $intro !== '' && $this->keyphrasePresent($intro, $keyword),
+                "Put the focus keyphrase \"{$keyword}\" (all its words) in the opening paragraph (the first <p>).");
         }
 
         $secondary = array_values(array_filter(array_map(
@@ -304,6 +320,19 @@ class ContentSeoScorer
         $text = html_entity_decode(strip_tags($html));
 
         return trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+    }
+
+    /**
+     * HTML with the "Key takeaways" box and the "In this article" TOC removed,
+     * so the intro / first-100-words are measured against the real article body
+     * rather than the summary widgets that render at the top.
+     */
+    private function stripAsideBoxes(string $html): string
+    {
+        $html = preg_replace('/<div\b[^>]*class="[^"]*key-takeaways[^"]*"[^>]*>[\s\S]*?<\/div>/i', ' ', $html) ?? $html;
+        $html = preg_replace('/<nav\b[^>]*class="[^"]*content-toc[^"]*"[^>]*>[\s\S]*?<\/nav>/i', ' ', $html) ?? $html;
+
+        return $html;
     }
 
     /** The first <p>…</p>'s text — what on-page analyzers treat as the intro. */
