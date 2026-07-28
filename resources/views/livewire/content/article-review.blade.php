@@ -239,11 +239,16 @@
                 @else
                     <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                         <div class="flex items-center gap-4">
+                            {{-- Use the live-recomputed score (same scorer + view-time
+                                 context the edit ring uses) so the non-edit and edit
+                                 rings ALWAYS agree. The stored $article->seo_score is a
+                                 generation-time snapshot and can drift by a point as the
+                                 site's crawl/context changes (prod 2026-07-28). --}}
                             @include('reports.charts.ring', [
-                                'value' => (float) ($article->seo_score ?? 0),
-                                'display' => (int) ($article->seo_score ?? 0),
+                                'value' => (float) $liveScore,
+                                'display' => (int) $liveScore,
                                 'label' => __('Content quality'),
-                                'color' => ($article->seo_score ?? 0) >= 85 ? '#059669' : (($article->seo_score ?? 0) >= 60 ? '#F26419' : '#e11d48'),
+                                'color' => $liveScore >= 85 ? '#059669' : ($liveScore >= 60 ? '#F26419' : '#e11d48'),
                                 'size' => 84,
                             ])
                             <div>
