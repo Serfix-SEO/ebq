@@ -246,7 +246,9 @@
                                  render right after generation, before currentArticle has
                                  loaded, where scoreCurrent() returns 0 (prod 2026-07-28).
                                  The stored score can drift ~1 pt as crawl/context changes. --}}
-                            @php($nonEditScore = $liveScore > 0 ? $liveScore : (int) ($article->seo_score ?? 0))
+                            @php
+                                $nonEditScore = $liveScore > 0 ? $liveScore : (int) ($article->seo_score ?? 0);
+                            @endphp
                             @include('reports.charts.ring', [
                                 'value' => (float) $nonEditScore,
                                 'display' => (int) $nonEditScore,
