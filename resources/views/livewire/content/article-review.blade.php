@@ -239,16 +239,19 @@
                 @else
                     <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                         <div class="flex items-center gap-4">
-                            {{-- Use the live-recomputed score (same scorer + view-time
-                                 context the edit ring uses) so the non-edit and edit
-                                 rings ALWAYS agree. The stored $article->seo_score is a
-                                 generation-time snapshot and can drift by a point as the
-                                 site's crawl/context changes (prod 2026-07-28). --}}
+                            {{-- Prefer the live-recomputed score (same scorer + view-time
+                                 context the edit ring uses) so non-edit and edit rings
+                                 agree. Fall back to the stored generation-time score when
+                                 the live score isn't computed yet — e.g. the very first
+                                 render right after generation, before currentArticle has
+                                 loaded, where scoreCurrent() returns 0 (prod 2026-07-28).
+                                 The stored score can drift ~1 pt as crawl/context changes. --}}
+                            @php($nonEditScore = $liveScore > 0 ? $liveScore : (int) ($article->seo_score ?? 0))
                             @include('reports.charts.ring', [
-                                'value' => (float) $liveScore,
-                                'display' => (int) $liveScore,
+                                'value' => (float) $nonEditScore,
+                                'display' => (int) $nonEditScore,
                                 'label' => __('Content quality'),
-                                'color' => $liveScore >= 85 ? '#059669' : ($liveScore >= 60 ? '#F26419' : '#e11d48'),
+                                'color' => $nonEditScore >= 85 ? '#059669' : ($nonEditScore >= 60 ? '#F26419' : '#e11d48'),
                                 'size' => 84,
                             ])
                             <div>
