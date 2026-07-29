@@ -1570,3 +1570,29 @@ prod) + `IDEOGRAM_API_KEY`, with `CONTENT_LLM_MONTHLY_CAP_USD=1` and
 `IDEOGRAM_MONTHLY_CAP_USD=1`. Production values land at prod-deploy time
 (cap proposals: LLM $25, images $30). Both boxes + staging must carry the vars
 (worker-box env-drift landmine).
+
+### ⚠️ `is_current` moves when you SAVE, not when you decide (2026-07-29)
+
+`ContentArticle::storeVersion()` (and therefore `ContentArticleProducer::storeScoredVersion()`)
+flips `is_current` onto the new row as a side effect of writing it. So any
+"store a candidate, then decide whether to keep it" flow must put the crown back
+explicitly — reverting the local `$article` variable changes nothing in the DB.
+
+The final **de-AI cleanup** pass did exactly that: it stores its candidate, then
+keeps it only if the score didn't regress (`>= preClean - 1` and `>= publishFloor`).
+On rejection it reassigned `$article` and moved on, leaving prod serving the
+version it had just thrown away. Two symptoms, one cause:
+
+1. The client read the **lower-scoring** draft, and the stored `seo_score` on the
+   current row disagreed with the `content_autopilot.produced` log line.
+2. **No images at all.** The producer dispatched `GenerateContentImagesJob` with
+   the KEPT version's id; that job starts with `if (! $article->is_current) return;`
+   → silent early exit, no images, no error, topic still `ready`
+   (namesforfreefire.com, v4 score 99 kept / v5 score 97 current, 0 images).
+
+Fixes: `ContentArticleProducer::makeCurrent()` restores the kept version on
+rejection, and `ProduceContentArticleJob::dispatchImages()` re-reads
+`$topic->currentArticle()` instead of trusting the producer's handle — so a future
+divergence degrades to "images for the live version", never to nothing. One live
+article was repaired (is_current flipped back, images regenerated).
+Tests: `tests/Feature/Content/ContentArticleVersionCurrencyTest.php`.
