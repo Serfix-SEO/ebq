@@ -603,6 +603,20 @@ peer median 66 / 3.1× intact.
      total, shared with the client report's own-domain gauge call), so this
      must stay small. Not configured / cap exhausted → renders "—", zero
      HTTP calls (never blocks the page).
+   - ⚠️ **Cache version — bump it with every build() logic change** (2026-07-29):
+     the payload is cached 30 days at `ContentSetupInsights::cacheKey($websiteId)`
+     = `content:setup-insights:{CACHE_VERSION}:{id}`, and a **non-null hit
+     short-circuits `ensureGenerating()`**, so a stale entry ALSO prevents
+     competitor discovery from ever re-running — the site cannot self-heal.
+     The 2026-07-27 no-fallback fix (321cb3b) therefore only helped sites cached
+     after it: **41 of 55 live sites** were still serving backlink-report
+     lookalike lists (falik.com, a UAE food-delivery app, showed `flaik.com`,
+     `about.me`, `pipersandler.com`). Fixed by bumping `CACHE_VERSION` v1 → v2
+     (c99d540), which orphans every pre-fix payload at once; the 55 dead v1 keys
+     were then deleted from Redis. **Rule: any change to what `build()` returns
+     must bump `CACHE_VERSION` in the same commit.** The key is spelled ONLY in
+     `cacheKey()` (`DiscoverContentCompetitorsJob` + tests call it), pinned by
+     `ContentCompetitorsTest::test_insights_cache_key_is_versioned_through_the_helper`.
    - **Manual add/remove** (2026-07-18): `ContentPlan.competitor_overrides`
      (`{added:[], removed:[]}`) is merged on top of the cached snapshot by
      `ContentSetupInsights::withOverrides()` at render time — never written
