@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Content;
 
+use App\Livewire\WebsiteSelector;
 use App\Models\ContentPlan;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\ContentEntitlements;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -127,5 +129,57 @@ class ContentWebsitePreferenceTest extends TestCase
             ->withSession(['current_website_id' => $stale->id])
             ->get('/content/settings')
             ->assertRedirect(route('content.get-started'));
+    }
+
+    /**
+     * …but a pin the USER made from the website dropdown is not an accident.
+     * Silently swapping it back made the selector revert on every refresh —
+     * pick pubgnamegenerator.net, reload, and you were on the other site again
+     * (prod 2026-07-29). A deliberate choice is honoured: they land on Get
+     * started for THAT site, where they can activate it.
+     */
+    public function test_a_deliberate_pin_from_the_website_dropdown_is_not_swapped(): void
+    {
+        [$user, $chosen] = $this->userWithUncoveredThenCoveredSite();
+
+        $this->actingAs($user)
+            ->withSession([
+                'current_website_id' => $chosen->id,
+                WebsiteSelector::EXPLICIT_PIN_KEY => true,
+            ])
+            ->get('/content/settings')
+            ->assertRedirect(route('content.get-started'));
+
+        $this->assertSame($chosen->id, session('current_website_id'), 'the user\'s choice survives');
+    }
+
+    /** Choosing a site in the dropdown marks the pin as deliberate. */
+    public function test_the_selector_marks_the_pin_as_user_made(): void
+    {
+        [$user, $stale, $active] = $this->userWithUncoveredThenCoveredSite();
+
+        Livewire::actingAs($user)
+            ->test(WebsiteSelector::class)
+            ->set('websiteId', $stale->id);
+
+        $this->assertSame($stale->id, session('current_website_id'));
+        $this->assertTrue(session(WebsiteSelector::EXPLICIT_PIN_KEY));
+    }
+
+    /** An alphabetical auto-pin clears the flag, so correction still works later. */
+    public function test_the_automatic_alphabetical_pin_clears_the_user_made_flag(): void
+    {
+        [$user, $stale, $active] = $this->userWithUncoveredThenCoveredSite();
+
+        $this->actingAs($user)
+            ->withSession([
+                'current_website_id' => 'deleted-site-id',   // stale pin, no longer accessible
+                WebsiteSelector::EXPLICIT_PIN_KEY => true,
+            ])
+            ->get('/content/settings')
+            ->assertOk();
+
+        $this->assertFalse((bool) session(WebsiteSelector::EXPLICIT_PIN_KEY));
+        $this->assertSame($active->id, session('current_website_id'));
     }
 }

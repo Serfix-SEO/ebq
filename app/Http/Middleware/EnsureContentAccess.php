@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Livewire\WebsiteSelector;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Services\Content\ContentEntitlements;
@@ -64,11 +65,18 @@ class EnsureContentAccess
         // never a content site and cannot be what the user meant. A site whose
         // plan merely lapsed is a deliberate choice (they may want to resubscribe
         // for it), so that still shows Get started for THAT site.
+        // …but ONLY when the pin really was an accident. When the user picked
+        // this site from the website dropdown themselves, silently swapping it
+        // back made the selection revert on every refresh (prod 2026-07-29) —
+        // the dropdown looked broken. A deliberate choice is honoured: they
+        // fall through to Get started for THAT site, where they can activate it.
+        $explicitPin = (bool) $request->session()->get(WebsiteSelector::EXPLICIT_PIN_KEY, false);
+
         $pinnedIsNotAContentSite = ! ContentPlan::query()
             ->where('website_id', $website->id)
             ->exists();
 
-        if ($pinnedIsNotAContentSite) {
+        if (! $explicitPin && $pinnedIsNotAContentSite) {
             $preferred = $ent->preferredWebsite($user);
             if ($preferred !== null
                 && $preferred->id !== $website->id

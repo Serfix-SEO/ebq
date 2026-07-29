@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Livewire\WebsiteSelector;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -45,7 +46,11 @@ class EnsureFeatureAccess
             $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
             $websiteId = $first ? (string) $first->id : 0;
             if (($websiteId !== null && $websiteId !== '')) {
+                // Purely alphabetical, i.e. NOT the user's choice — drop any
+                // stale "the user picked this" flag so EnsureContentAccess is
+                // free to correct this accident (see WebsiteSelector).
                 session(['current_website_id' => $websiteId]);
+                session()->forget(WebsiteSelector::EXPLICIT_PIN_KEY);
             }
         }
 
