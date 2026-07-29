@@ -26,6 +26,20 @@ class PasswordResetTest extends TestCase
         $this->get(route('password.request'))->assertOk();
     }
 
+    /**
+     * The tool-gate / report-teaser modal is a full login surface, so it needs
+     * the recovery path too — it shipped without one until 2026-07-29.
+     */
+    public function test_auth_modal_signin_offers_the_reset_link(): void
+    {
+        // Rendered through a real request: the modal's partials rely on the
+        // session-shared $errors bag that a bare view()->render() lacks.
+        $this->get(route('tools.audit'))
+            ->assertOk()
+            ->assertSee(route('password.request'))
+            ->assertSee('Forgot your password?');
+    }
+
     public function test_reset_link_can_be_requested(): void
     {
         Notification::fake();

@@ -51,7 +51,9 @@
             <div class="mb-1.5 flex items-center justify-between">
                 <label for="password" class="block text-xs font-medium text-slate-700">{{ __('Password') }}</label>
                 @if (Route::has('password.request'))
-                    <a href="{{ route('password.request') }}" class="text-xs font-medium text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline">{{ __('Forgot your password?') }}</a>
+                    {{-- Brand-coloured, not muted grey: this is the recovery path,
+                         and clients were reporting it as missing entirely. --}}
+                    <a href="{{ route('password.request') }}" class="text-xs font-semibold text-orange-600 underline-offset-2 hover:text-orange-700 hover:underline">{{ __('Forgot your password?') }}</a>
                 @endif
             </div>
             <input id="password" name="password" type="password" required autocomplete="current-password"
@@ -83,7 +85,16 @@
         </button>
     </form>
 
-    <p class="mt-8 text-center text-sm text-slate-600">
+    @if (Route::has('password.request'))
+        {{-- Second entry point: someone who can't sign in scans the bottom of
+             the form, not the label row above the password field. --}}
+        <p class="mt-6 text-center text-sm text-slate-600">
+            {{ __('Can\'t sign in?') }}
+            <a href="{{ route('password.request') }}" class="font-semibold text-orange-600 underline-offset-2 hover:underline">{{ __('Reset your password') }}</a>
+        </p>
+    @endif
+
+    <p class="mt-3 text-center text-sm text-slate-600">
         {{ __('Don\'t have an account?') }}
         <a href="{{ route('register') }}" class="font-semibold text-slate-900 underline-offset-2 hover:underline">{{ __('Create one') }}</a>
     </p>

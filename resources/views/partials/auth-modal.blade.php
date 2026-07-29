@@ -63,7 +63,12 @@
             <input type="hidden" name="redirect" value="{{ $redirect }}">
             <input type="email" name="email" required placeholder="Email address" autocomplete="email" class="block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
             <input type="password" name="password" required placeholder="Password" autocomplete="current-password" class="block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
-            <label class="flex items-center gap-2 text-xs text-slate-500"><input type="checkbox" name="remember" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500/30"> Remember me</label>
+            <div class="flex items-center justify-between gap-3">
+                <label class="flex items-center gap-2 text-xs text-slate-500"><input type="checkbox" name="remember" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500/30"> Remember me</label>
+                {{-- The modal is a full login surface for tool gates / report
+                     teasers, so it needs the recovery path too. --}}
+                <a href="{{ route('password.request') }}" class="text-xs font-semibold text-orange-600 hover:underline">Forgot your password?</a>
+            </div>
             @if (\App\Support\Recaptcha::isEnabled())
                 <div class="flex justify-center"><div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div></div>
             @endif
