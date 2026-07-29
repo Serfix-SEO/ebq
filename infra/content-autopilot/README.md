@@ -1596,3 +1596,11 @@ rejection, and `ProduceContentArticleJob::dispatchImages()` re-reads
 divergence degrades to "images for the live version", never to nothing. One live
 article was repaired (is_current flipped back, images regenerated).
 Tests: `tests/Feature/Content/ContentArticleVersionCurrencyTest.php`.
+
+⚠️ **Restoring `is_current` must be a query-builder UPDATE, not a model save.** The first
+version of `makeCurrent()` used `$article->forceFill(['is_current' => true])->save()`. The
+producer's handle still carries `is_current = true` in memory (only the row was flipped), so
+nothing was dirty and no UPDATE ran: the demotion landed, the promotion did not, and the topic
+ended with ZERO current versions — publish failed with "No current article version to publish",
+the article could not be opened, and no publish CTA rendered. Regression tests for this must
+pass the UNREFRESHED handle; a `->fresh()` model hides the bug entirely.
