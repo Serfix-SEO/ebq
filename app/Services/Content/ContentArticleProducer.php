@@ -246,6 +246,17 @@ class ContentArticleProducer
                 if ($candidate->seo_score >= $preCleanScore - 1
                     && $candidate->seo_score >= ContentAutopilotConfig::publishFloor()) {
                     $article = $candidate;
+                } else {
+                    // REJECTED — but storeScoredVersion() already wrote the
+                    // candidate and moved `is_current` onto it, so reverting
+                    // only the local variable left the DB serving the version
+                    // we just threw away (prod 2026-07-29: v5 score 97 current,
+                    // v4 score 99 kept in memory). Two consequences: the client
+                    // read the WORSE draft, and images never generated at all —
+                    // the producer dispatched GenerateContentImagesJob with v4's
+                    // id and that job drops anything not `is_current`.
+                    // Put the crown back on the version we actually kept.
+                    $this->makeCurrent($article);
                 }
             }
         }
@@ -594,6 +605,24 @@ class ContentArticleProducer
     }
 
     /** Score + persist as the next version, folding in the style lint. */
+    /**
+     * Make $article the topic's current version again, demoting every other
+     * one. Needed whenever a stored candidate is rejected AFTER the write:
+     * ContentArticle::storeVersion() moves `is_current` as a side effect of
+     * saving, so "keep the previous version" has to be an explicit action, not
+     * just a local reassignment. Everything downstream — the review page, the
+     * publisher, GenerateContentImagesJob — keys off `is_current`.
+     */
+    private function makeCurrent(ContentArticle $article): void
+    {
+        ContentArticle::query()
+            ->where('topic_id', $article->topic_id)
+            ->whereKeyNot($article->getKey())
+            ->update(['is_current' => false]);
+
+        $article->forceFill(['is_current' => true])->save();
+    }
+
     private function storeScoredVersion(ContentTopic $topic, array $context, array $attributes): ContentArticle
     {
         $topic->enterStage(ContentTopic::STATUS_SCORING);

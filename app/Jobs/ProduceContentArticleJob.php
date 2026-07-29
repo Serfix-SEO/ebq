@@ -2,8 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Models\ContentArticle;
 use App\Models\ContentTopic;
 use App\Services\Content\ContentArticleProducer;
+use App\Services\Content\ContentEntitlements;
+use App\Support\ContentAutopilotConfig;
 use App\Support\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -11,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -22,7 +26,7 @@ use Illuminate\Support\Facades\Log;
  * surfaced on the topic row and the ops digest, and the client can requeue
  * from the review UI. timeout 1800 < redis-long retry_after 3900.
  */
-class ProduceContentArticleJob implements ShouldQueue, ShouldBeUnique
+class ProduceContentArticleJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -62,14 +66,14 @@ class ProduceContentArticleJob implements ShouldQueue, ShouldBeUnique
         // 3-article cap, or the monthly 60/website cap. The topic stays
         // APPROVED so it's producible again after upgrade / next month.
         // Publishing is never gated here.
-        $reason = app(\App\Services\Content\ContentEntitlements::class)->blockReason($topic);
+        $reason = app(ContentEntitlements::class)->blockReason($topic);
         if ($reason !== null) {
             Log::info('content_autopilot.generation_blocked', [
                 'topic_id' => $topic->id, 'website_id' => $topic->website_id, 'reason' => $reason,
             ]);
             // Clear the "generation started" marker so the review/calendar overlay
             // doesn't sit on "Researching your topic…" for a run that never happens.
-            \Illuminate\Support\Facades\Cache::forget('content:gen-start:'.$topic->id);
+            Cache::forget('content:gen-start:'.$topic->id);
 
             return;
         }
@@ -88,13 +92,32 @@ class ProduceContentArticleJob implements ShouldQueue, ShouldBeUnique
         // publish; the job self-gates on the images toggle + Ideogram config
         // + spend cap). Only when production actually succeeded.
         if ($article !== null && $topic->fresh()->status === ContentTopic::STATUS_READY
-            && \App\Support\ContentAutopilotConfig::imagesEnabled()) {
-            // Mark images pending BEFORE dispatch so the calendar shows
-            // "Finalizing images…" (not "Ready for review") with no queue-latency
-            // gap. GenerateContentImagesJob clears it on every exit path.
-            \Illuminate\Support\Facades\Cache::put('content:images:pending:'.$article->id, 1, now()->addMinutes(15));
-            GenerateContentImagesJob::dispatch($article->id);
+            && ContentAutopilotConfig::imagesEnabled()) {
+            $this->dispatchImages($topic, $article);
         }
+    }
+
+    /**
+     * Queue image generation for the topic's CURRENT article.
+     *
+     * Deliberately re-reads the current version instead of trusting the
+     * producer's local handle: GenerateContentImagesJob drops any article that
+     * isn't current, so a version stored after the producer captured $article
+     * silently cost the client every image, with no error anywhere (prod
+     * 2026-07-29 — a rejected de-AI cleanup left the wrong row current). The
+     * producer now keeps the two in sync; this re-read means any future
+     * divergence degrades to "images for the live version" rather than "no
+     * images at all".
+     */
+    private function dispatchImages(ContentTopic $topic, ContentArticle $article): void
+    {
+        $target = $topic->currentArticle()->first() ?? $article;
+
+        // Mark images pending BEFORE dispatch so the calendar shows
+        // "Finalizing images…" (not "Ready for review") with no queue-latency
+        // gap. GenerateContentImagesJob clears it on every exit path.
+        Cache::put('content:images:pending:'.$target->id, 1, now()->addMinutes(15));
+        GenerateContentImagesJob::dispatch($target->id);
     }
 
     public function failed(\Throwable $e): void
