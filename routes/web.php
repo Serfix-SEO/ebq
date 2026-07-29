@@ -37,6 +37,10 @@ Route::view('/wordpress-plugin', 'wordpress-plugin')->name('wordpress-plugin');
 Route::view('/pricing', 'pricing')->name('pricing');
 Route::view('/trust-score', 'trust-score')->name('trust-score');
 Route::view('/content-autopilot', 'content-landing')->name('content.landing');
+// Content AI Autopilot is a separately-billed product, so it gets its own
+// pricing page — /pricing prices the SEO platform only (they used to share
+// one grid behind a toggle nobody noticed).
+Route::view('/content-autopilot/pricing', 'content-pricing')->name('content.pricing');
 // Landing form posts here: verify + create the provisional site, then hand off
 // to the wizard (Business step). Keeps the domain question on the landing only.
 Route::post('/content-autopilot/start', \App\Http\Controllers\Content\PublicOnboardingStartController::class)

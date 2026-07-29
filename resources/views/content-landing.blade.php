@@ -135,6 +135,12 @@
             <p class="mt-6 text-center text-sm text-slate-500">
                 {{ __('Up to :n articles per website each month. Each additional website: $:m/mo (or $:a/mo billed yearly).', ['n' => $cfg::monthlyArticlesPerWebsite(), 'm' => $cfg::displayPrice('addon_monthly'), 'a' => $cfg::displayPrice('addon_annual')]) }}
             </p>
+            <p class="mt-6 text-center">
+                <a href="{{ route('content.pricing') }}" class="inline-flex items-center gap-1.5 text-sm font-bold text-orange-600 underline-offset-4 hover:underline">
+                    {{ __('See full Content AI pricing and everything included') }}
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                </a>
+            </p>
         </div>
     </section>
 
