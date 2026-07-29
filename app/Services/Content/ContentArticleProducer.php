@@ -615,12 +615,26 @@ class ContentArticleProducer
      */
     private function makeCurrent(ContentArticle $article): void
     {
+        // BOTH sides are query-builder updates, deliberately. `$article` was
+        // loaded (or created) while it was still current, so its in-memory
+        // `is_current` is already true even though storeVersion() has since
+        // flipped the ROW to false. `forceFill(['is_current' => true])->save()`
+        // therefore marks nothing dirty and emits no UPDATE — the demotion
+        // below lands, the promotion doesn't, and the topic ends up with ZERO
+        // current versions: "No current article version to publish", an
+        // unopenable article, no publish button (prod 2026-07-29, the first
+        // article produced after this method shipped). Never trust model
+        // dirtiness to restore a flag another write already changed underneath.
         ContentArticle::query()
             ->where('topic_id', $article->topic_id)
             ->whereKeyNot($article->getKey())
             ->update(['is_current' => false]);
 
-        $article->forceFill(['is_current' => true])->save();
+        ContentArticle::query()
+            ->whereKey($article->getKey())
+            ->update(['is_current' => true]);
+
+        $article->setAttribute('is_current', true)->syncOriginal();
     }
 
     private function storeScoredVersion(ContentTopic $topic, array $context, array $attributes): ContentArticle

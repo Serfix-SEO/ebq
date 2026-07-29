@@ -60,7 +60,11 @@ class ContentArticleVersionCurrencyTest extends TestCase
             'generation_meta' => ['stage' => 'de_ai_cleanup'],
         ]);
 
-        return [$topic, $kept->fresh(), $rejected->fresh()];
+        // NOTE: $kept is returned UNREFRESHED on purpose — that is the handle
+        // the producer holds, and its in-memory is_current is still true even
+        // though storing the candidate flipped the row to false. A makeCurrent()
+        // that relies on model dirtiness writes nothing here.
+        return [$topic, $kept, $rejected->fresh()];
     }
 
     public function test_rejecting_the_cleanup_restores_the_kept_version_as_current(): void
@@ -81,6 +85,13 @@ class ContentArticleVersionCurrencyTest extends TestCase
             'exactly one current version per topic',
         );
         $this->assertSame(99, $topic->currentArticle()->first()->seo_score);
+        // The exact prod failure: zero current versions → "No current article
+        // version to publish", an article that cannot be opened, no publish CTA.
+        $this->assertNotSame(
+            0,
+            $topic->articles()->where('is_current', true)->count(),
+            'a topic must never end up with NO current version',
+        );
     }
 
     /**
