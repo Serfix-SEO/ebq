@@ -55,6 +55,40 @@ class PricingPagesTest extends TestCase
         $response->assertSee(route('pricing'));
     }
 
+    /**
+     * The content pricing page must sell the OUTCOME, never the machinery: no
+     * data vendor, model or infrastructure name belongs on a public page.
+     * (Client-owned integrations — their WordPress, their Search Console, their
+     * Analytics — are the exception: those are part of what they connect.)
+     */
+    public function test_public_pages_never_name_our_suppliers(): void
+    {
+        $forbidden = [
+            'DataForSEO', 'Moz', 'Serper', 'Ideogram', 'DeepSeek', 'Mistral',
+            'OpenAI', 'GPT-', 'Anthropic', 'Firecrawl', 'OpenPageRank',
+            'Keywords Everywhere', 'Common Crawl', 'Stripe', 'Horizon', 'Redis',
+        ];
+
+        foreach ([route('content.pricing'), route('pricing'), route('content.landing')] as $url) {
+            $html = $this->get($url)->assertOk()->getContent();
+            // Strip the asset/manifest URLs — hashed build filenames are noise here.
+            $visible = preg_replace('/<script[^>]*>.*?<\/script>/s', '', $html) ?? $html;
+            foreach ($forbidden as $needle) {
+                $this->assertStringNotContainsStringIgnoringCase(
+                    $needle, $visible, "$needle must not appear on $url",
+                );
+            }
+        }
+    }
+
+    public function test_content_pricing_page_states_the_schema_markup_it_generates(): void
+    {
+        $this->get(route('content.pricing'))
+            ->assertOk()
+            ->assertSee('Automatic schema markup + full meta control')
+            ->assertSee('Do the articles include schema markup?');
+    }
+
     public function test_both_pricing_pages_are_reachable_from_the_marketing_nav(): void
     {
         foreach ([route('landing'), route('content.landing')] as $url) {

@@ -30,16 +30,26 @@
     $startUrl = $authed ? route('content.get-started') : route('content.landing');
 
     // ── What you actually get, grouped the way a buyer evaluates it ────────
+    // Client-facing copy rules: name the OUTCOME, never the machinery. No data
+    // vendors, no model names, no internal service or pipeline detail — the
+    // client is buying the result, and our supply chain is not part of it.
     $featureGroups = [
         [
             'title' => __('Research'),
             'blurb' => __('Every article starts from evidence, not a blank prompt.'),
             'items' => [
-                __('Your site is crawled and profiled — what you sell, who you serve, how you talk'),
-                __('Real competitors discovered from the searches you actually compete in'),
+                __('Your site is read and profiled — what you sell, who you serve, how you talk'),
+                __('Your business type is detected, so a shop is not written like a law firm'),
+                __('Real competitors identified from the searches you actually compete in'),
+                __('Directories and marketplaces separated from genuine rivals'),
+                __('Authority comparison: where you stand against them today'),
                 __('Keyword gap analysis: what they rank for and you don\'t'),
-                __('Search volumes and intent for every planned topic'),
-                __('A month of topics planned in advance, ordered by opportunity'),
+                __('Search volume, intent and difficulty for every planned topic'),
+                __('Keywords grounded in what you actually offer — not vanity terms'),
+                __('Country and language targeting for local or multi-market sites'),
+                __('A month of topics planned in advance, ordered by winnability'),
+                __('Topics grouped into themes so your site builds real topical depth'),
+                __('Duplicate and overlapping topics filtered before anything is written'),
             ],
         ],
         [
@@ -47,22 +57,32 @@
             'blurb' => __('Long-form drafts that read like a person wrote them.'),
             'items' => [
                 __(':n articles per website every month', ['n' => $articles]),
-                __('Full-length drafts with headings, key takeaways, FAQ and internal links'),
-                __('Written against a brief built from your offerings and your audience'),
+                __('Full-length drafts written to a brief, not a one-line prompt'),
+                __('Headings, key takeaways, table of contents and FAQ — each one optional'),
+                __('Written in your voice, with your tone and your rules'),
                 __('Humanising pass that strips the tells of machine writing'),
-                __('Competitor mentions blocked automatically'),
-                __('Your rules honoured — tone, banned phrases, things you don\'t sell'),
+                __('Competitor names blocked automatically'),
+                __('Things you don\'t sell are never claimed'),
+                __('Internal links to your own relevant pages'),
+                __('Original images generated and placed inside the article'),
+                __('Alt text written for every image'),
+                __('English and Arabic'),
             ],
         ],
         [
             'title' => __('Optimisation'),
             'blurb' => __('Scored and revised before you ever see it.'),
             'items' => [
-                __('On-page SEO score with 30+ weighted checks'),
+                __('On-page SEO score built from 30+ weighted checks'),
                 __('Automatic revision loop until the draft clears the quality bar'),
+                __('Focus keyphrase placement checked across title, intro, headings and body'),
+                __('Supporting keyphrases covered without stuffing'),
+                __('Readability checks on sentence and paragraph length'),
                 __('Meta title, description, slug, canonical and robots per article'),
-                __('Open Graph and Twitter cards with live Google and social previews'),
-                __('Original images generated and placed inside the article'),
+                __('Open Graph and Twitter cards, with live Google and social previews'),
+                __('Schema markup added automatically — article and FAQ structured data, so search engines can show rich results'),
+                __('Titles checked against your existing pages so articles don\'t compete with each other'),
+                __('Full editor: rewrite any passage with AI, and watch the score update live'),
             ],
         ],
         [
@@ -70,10 +90,14 @@
             'blurb' => __('From draft to live page without a copy-paste step.'),
             'items' => [
                 __('Publishes straight to WordPress, or any site via webhook'),
-                __('Scheduled inside a publishing window you choose'),
+                __('You choose the days and the time window it goes live'),
                 __('Review-first or fully automatic — your call, changeable anytime'),
-                __('Images uploaded to your media library, not hotlinked'),
-                __('New URLs submitted to Google for indexing when Search Console is connected'),
+                __('Images uploaded to your own media library, not hotlinked'),
+                __('SEO fields and schema carried across with the post'),
+                __('New URLs submitted for indexing when your Search Console is connected'),
+                __('Every publish verified live — the page loads, the title is right, nothing is blocked'),
+                __('Regenerating an article updates the existing post instead of duplicating it'),
+                __('An email when an article goes live'),
             ],
         ],
         [
@@ -81,10 +105,26 @@
             'blurb' => __('The part most AI writers leave out.'),
             'items' => [
                 __('Up to :n tracked keywords per website', ['n' => number_format($trackerKeywords)]),
+                __('Keywords added to the tracker automatically the moment you publish'),
                 __('Live Google position checks, kept as history you can chart'),
                 __('Search Console clicks, impressions and average position per article'),
                 __('Analytics visitors per published article, day by day'),
+                __('A realistic traffic estimate for every article before it ships'),
                 __('Email alert when your rankings move up'),
+            ],
+        ],
+        [
+            'title' => __('Your control'),
+            'blurb' => __('Nothing happens that you can\'t change.'),
+            'items' => [
+                __('Approve, edit, reorder, reschedule or skip any topic'),
+                __('Write any article on demand instead of waiting for its slot'),
+                __('Ask for a fresh draft when one misses the mark'),
+                __('Rate every article so the next ones land closer'),
+                __('Set how long you get to review before anything auto-publishes'),
+                __('Add your own competitors, or remove ones we found'),
+                __('Ban phrases and add instructions the writer must follow'),
+                __('Pause or cancel anytime — published articles stay yours'),
             ],
         ],
     ];
@@ -102,6 +142,7 @@
         ['q' => __('Do I need the SEO platform to use this?'), 'a' => __('No. Content AI Autopilot works entirely on its own, including the keyword tracking and performance reporting for the articles it publishes.')],
         ['q' => __('What does the free trial include?'), 'a' => __(':d days and :n articles on one website, with no card required. You see the research, the drafts and the scores before you decide.', ['d' => $trialDays, 'n' => $trialArticles])],
         ['q' => __('Can I edit articles before they publish?'), 'a' => __('Yes. Every draft opens in a full editor with the live SEO score, AI edits on selected text, image tools and the complete set of meta fields. Turn auto-publish off and nothing goes live without your approval.')],
+        ['q' => __('Do the articles include schema markup?'), 'a' => __('Yes, automatically. Every article ships with article structured data, and any article with an FAQ section also gets FAQ structured data — the markup search engines read to show rich results. You don\'t configure anything, and you don\'t need a separate SEO plugin to add it.')],
         ['q' => __('Where do the articles publish to?'), 'a' => __('WordPress via a secure application password, or any platform that accepts a webhook. Images are uploaded to your own media library.')],
         ['q' => __('What if the writing does not sound like us?'), 'a' => __('You set the tone, the things you never want mentioned, and phrases to avoid. There is also a thumbs-up/rewrite control on every article, and a fresh draft is one click away.')],
         ['q' => __('How many websites can I run?'), 'a' => __('One website is included. Add as many as you like at $:m/mo each (or $:a/mo billed yearly).', ['m' => $addonM, 'a' => $addonA])],
@@ -203,6 +244,7 @@
                         <li class="flex gap-2"><span class="text-success">✓</span><strong>{{ __(':n articles / month', ['n' => $articles]) }}</strong></li>
                         <li class="flex gap-2"><span class="text-success">✓</span>{{ __('Market + competitor research every month') }}</li>
                         <li class="flex gap-2"><span class="text-success">✓</span>{{ __('Images generated and placed for you') }}</li>
+                        <li class="flex gap-2"><span class="text-success">✓</span>{{ __('Automatic schema markup + full meta control') }}</li>
                         <li class="flex gap-2"><span class="text-success">✓</span>{{ __('Auto-publishing to WordPress or webhook') }}</li>
                         <li class="flex gap-2"><span class="text-success">✓</span>{{ __(':n tracked keywords + rank history', ['n' => number_format($trackerKeywords)]) }}</li>
                         <li class="flex gap-2"><span class="text-success">✓</span>{{ __('Search Console + Analytics reporting') }}</li>
