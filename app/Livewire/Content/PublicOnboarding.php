@@ -8,8 +8,10 @@ use App\Models\ContentPlan;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\ContentOnboardingConverter;
+use App\Support\KeywordFinderLocations;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -34,21 +36,44 @@ class PublicOnboarding extends Component
     use ContentWizard;
 
     public ?string $websiteId = null;
+
     public string $domain = '';
+
     public ?string $token = null;
 
     public string $name = '';
+
     public string $email = '';
+
     public string $dialCode = '+1';
+
     public string $phone = '';
+
     public string $password = '';
+
     public string $password_confirmation = '';
 
-    public function mount()
+    public function mount(ContentOnboardingConverter $converter)
     {
-        // Signed-in users don't need the public flow — send them to the in-app
-        // Get started (trial / activate / buy).
+        // Signed-in users don't need the ACCOUNT step — but they may well have
+        // just captured a domain on the public landing page. Bouncing them
+        // straight to Get started dropped that domain on the floor and judged
+        // some other (preferred) website instead. Convert the pending session
+        // for them here, so the site they actually asked for is attached and
+        // covered (subscription, comped free slot, or trial) before routing.
         if (Auth::check()) {
+            $pending = $this->pendingSession();
+            if ($pending !== null) {
+                $result = $converter->convert($pending, Auth::user(), []);
+                session(['current_website_id' => $result['website']->id]);
+                session()->forget('content_onboarding_token');
+
+                return $this->redirectRoute(
+                    $result['covered'] ? 'content.index' : 'content.get-started',
+                    navigate: false,
+                );
+            }
+
             return $this->redirectRoute('content.get-started', navigate: false);
         }
 
@@ -137,7 +162,7 @@ class PublicOnboarding extends Component
                 'name' => 'required|string|max:120',
                 'email' => 'required|email|max:190',
                 'phone' => 'nullable|string|max:40',
-                'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
+                'password' => ['required', 'confirmed', Password::defaults()],
             ]);
             $user = User::query()->create([
                 'name' => $data['name'],
@@ -179,12 +204,24 @@ class PublicOnboarding extends Component
             : ContentOnboardingSession::query()->where('token', $this->token)->first();
     }
 
+    /** The unconverted onboarding session this browser is carrying, if any. */
+    private function pendingSession(): ?ContentOnboardingSession
+    {
+        $token = (string) session('content_onboarding_token', '');
+
+        return $token === '' ? null : ContentOnboardingSession::query()
+            ->where('token', $token)
+            ->whereNull('converted_at')
+            ->whereNotNull('website_id')
+            ->first();
+    }
+
     public function render()
     {
         return view('livewire.content.public-onboarding', [
             'publicOnboarding' => true,
             'wizard' => $this->websiteId !== null ? $this->wizardViewData() : [],
-            'countryOptions' => \App\Support\KeywordFinderLocations::countryOptions(),
+            'countryOptions' => KeywordFinderLocations::countryOptions(),
         ]);
     }
 }

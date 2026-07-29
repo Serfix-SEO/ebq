@@ -44,8 +44,11 @@
             <p class="mt-4 text-xs text-slate-400">{{ __('Each additional website: $:m/mo (or $:a/mo billed yearly).', ['m' => $prices['addon_monthly'], 'a' => $prices['addon_annual']]) }}</p>
 
         @elseif ($state === 'activate')
+            {{-- Source-neutral: the slot may come from a subscription OR from
+                 free sites granted by an operator, and the client-facing copy
+                 must not claim a subscription they don't have. --}}
             <div class="mx-auto mt-6 max-w-md rounded-xl bg-success/10 p-4 text-sm text-success">
-                {{ __('Your content subscription has a free website slot.') }}
+                {{ trans_choice('{1}You have 1 free website slot available.|[2,*]You have :count free website slots available.', $freeSlots, ['count' => $freeSlots]) }}
             </div>
             <button wire:click="activate" wire:loading.attr="disabled"
                 class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">

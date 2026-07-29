@@ -3435,6 +3435,7 @@
   "{1} :count article/week|[2,*] :count articles/week": "{1} :count article/week|[2,*] :count articles/week",
   "{1}A keyword just moved up on :domain|[2,*]:count keywords just moved up on :domain": "{1}A keyword just moved up on :domain|[2,*]:count keywords just moved up on :domain",
   "{1}Up :count place|[2,*]Up :count places": "{1}Up :count place|[2,*]Up :count places",
+  "{1}You have 1 free website slot available.|[2,*]You have :count free website slots available.": "{1}You have 1 free website slot available.|[2,*]You have :count free website slots available.",
   "© 2012 Smith & Co Plumbing Ltd · Manchester": "© 2012 Smith & Co Plumbing Ltd · Manchester",
   "· not yet tracked": "· not yet tracked",
   "Δ": "Δ",

@@ -2,17 +2,23 @@
 
 namespace Tests\Feature\Content;
 
+use App\Jobs\AssessCompetitorGuardJob;
+use App\Jobs\Content\EnrichCompetitorDomainMetricsJob;
 use App\Jobs\PlanContentTopicsJob;
+use App\Livewire\Content\GetStarted;
 use App\Livewire\Content\PublicOnboarding;
 use App\Models\ContentOnboardingSession;
 use App\Models\ContentPlan;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentEntitlements;
 use App\Services\Content\ContentOnboardingConverter;
+use App\Services\Llm\LlmClient;
 use App\Support\Audit\SafeHttpGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -217,6 +223,74 @@ class ContentPublicOnboardingTest extends TestCase
             ->assertDontSee(route('onboarding'));
     }
 
+    /**
+     * Comped clients (admin-granted free content sites, no Stripe subscription)
+     * were sent to the PAYMENT page: GetStarted computed its "free slot" state
+     * from hasContentSubscription() alone, so a comped user whose trial was
+     * already spent fell through to 'pricing' while holding unused free slots.
+     * Prod 2026-07-29 — all 4 comped clients were affected.
+     */
+    public function test_comped_client_is_offered_activation_not_the_payment_page(): void
+    {
+        $user = User::factory()->create([
+            'content_comp_sites' => 5,
+            'content_comp_until' => null,
+            'content_trial_started_at' => now()->subDays(30), // trial already spent
+        ]);
+        $website = Website::factory()->for($user)->create();
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(GetStarted::class)
+            ->assertViewHas('state', 'activate')
+            ->assertViewHas('freeSlots', 5)
+            ->call('activate');
+
+        $this->assertTrue(
+            app(ContentEntitlements::class)->hasContentAccessFor($user->fresh(), $website),
+            'activating a comped free slot must cover the website',
+        );
+    }
+
+    /** A comped client with every free slot used still gets the paid path. */
+    public function test_comped_client_with_no_slots_left_still_sees_pricing(): void
+    {
+        $user = User::factory()->create([
+            'content_comp_sites' => 1,
+            'content_trial_started_at' => now()->subDays(30),
+        ]);
+        $covered = Website::factory()->for($user)->create();
+        app(ContentEntitlements::class)->coverWebsite($covered);
+        $another = Website::factory()->for($user)->create();
+        $this->actingAs($user)->withSession(['current_website_id' => $another->id]);
+
+        Livewire::test(GetStarted::class)
+            ->assertViewHas('state', 'pricing');
+    }
+
+    /**
+     * A logged-in visitor who captured a domain on the public landing page used
+     * to be bounced to Get started with the session dropped — so the site they
+     * just asked for was never attached and the screen judged some other website.
+     */
+    public function test_authed_visitor_with_a_captured_domain_gets_that_site_attached_and_covered(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create([
+            'content_comp_sites' => 2,
+            'content_trial_started_at' => now()->subDays(30),
+        ]);
+
+        $this->post(route('content.onboarding.begin'), ['domain' => 'captured-site.com']);
+        $token = ContentOnboardingSession::query()->latest('id')->first()->token;
+
+        $this->actingAs($user)->withSession(['content_onboarding_token' => $token]);
+        Livewire::test(PublicOnboarding::class)->assertRedirect(route('content.index'));
+
+        $site = $user->fresh()->websites()->where('normalized_domain', 'captured-site.com')->first();
+        $this->assertNotNull($site, 'the captured domain must be attached to the signed-in user');
+        $this->assertTrue(app(ContentEntitlements::class)->hasContentAccessFor($user->fresh(), $site));
+    }
+
     /** The public "Start" entry for an already-authed user lands on content.get-started. */
     public function test_authed_start_entry_redirects_to_content_get_started(): void
     {
@@ -361,17 +435,32 @@ class ContentPublicOnboardingTest extends TestCase
 
     public function test_guard_state_is_computed_on_the_keyword_research_step(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         $component = $this->toStep6();
 
         $session = ContentOnboardingSession::query()->first();
         $plan = ContentPlan::query()->where('website_id', $session->website_id)->first();
-        app(\App\Services\Content\CompetitorMentionGuard::class)->assess($plan, new class implements \App\Services\Llm\LlmClient
+        app(CompetitorMentionGuard::class)->assess($plan, new class implements LlmClient
         {
-            public function isAvailable(): bool { return false; }
-            public function complete(array $messages, array $options = []): array { return ['ok' => false, 'content' => '', 'model' => '', 'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0]]; }
-            public function completeJson(array $messages, array $options = []): ?array { return null; }
-            public function completeWithTools(array $messages, array $tools, callable $dispatcher, array $options = []): array { return ['ok' => false, 'decoded' => null, 'content' => '', 'model' => '', 'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0], 'tool_calls' => []]; }
+            public function isAvailable(): bool
+            {
+                return false;
+            }
+
+            public function complete(array $messages, array $options = []): array
+            {
+                return ['ok' => false, 'content' => '', 'model' => '', 'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0]];
+            }
+
+            public function completeJson(array $messages, array $options = []): ?array
+            {
+                return null;
+            }
+
+            public function completeWithTools(array $messages, array $tools, callable $dispatcher, array $options = []): array
+            {
+                return ['ok' => false, 'decoded' => null, 'content' => '', 'model' => '', 'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0], 'tool_calls' => []];
+            }
         });
 
         $component->set('wizardStep', 6)
@@ -381,13 +470,13 @@ class ContentPublicOnboardingTest extends TestCase
 
     public function test_loading_competitors_dispatches_the_guard_job_when_unassessed(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         $component = $this->toStep6()->call('loadCompetitors');
 
         $session = ContentOnboardingSession::query()->first();
         $plan = ContentPlan::query()->where('website_id', $session->website_id)->first();
-        \Illuminate\Support\Facades\Queue::assertPushed(
-            \App\Jobs\AssessCompetitorGuardJob::class,
+        Queue::assertPushed(
+            AssessCompetitorGuardJob::class,
             fn ($job) => $job->planId === $plan->id
         );
     }
@@ -399,7 +488,7 @@ class ContentPublicOnboardingTest extends TestCase
         $plan = ContentPlan::query()->where('website_id', $session->website_id)->first();
         $plan->update([
             'competitor_guard' => ['assessed_at' => now()->toIso8601String(), 'harmful' => true, 'reason' => '', 'auto' => [['brand' => 'rival', 'domain' => 'rival.com']], 'references' => []],
-            'toggles' => [\App\Services\Content\CompetitorMentionGuard::TOGGLE => true],
+            'toggles' => [CompetitorMentionGuard::TOGGLE => true],
         ]);
 
         $component->set('wizardStep', 6)
@@ -408,7 +497,7 @@ class ContentPublicOnboardingTest extends TestCase
             ->call('removeBlockedTerm', 'rival')
             ->call('toggleCompetitorGuard');
 
-        $guard = app(\App\Services\Content\CompetitorMentionGuard::class);
+        $guard = app(CompetitorMentionGuard::class);
         $terms = $guard->terms($plan->refresh());
         $this->assertContains('other brand', $terms);
         $this->assertNotContains('rival', $terms);
@@ -422,31 +511,31 @@ class ContentPublicOnboardingTest extends TestCase
      */
     public function test_begin_caches_the_entered_url_when_it_carries_a_path(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         $this->post(route('content.onboarding.begin'), ['domain' => 'kayali.com/en-ae'])
             ->assertRedirect(route('content.onboarding'));
 
         $session = ContentOnboardingSession::query()->latest('id')->first();
         $this->assertSame(
             'https://kayali.com/en-ae',
-            \Illuminate\Support\Facades\Cache::get('content:entered-url:'.$session->website_id)
+            Cache::get('content:entered-url:'.$session->website_id)
         );
 
         // A bare domain caches nothing — the default host fetch handles it.
         $this->post(route('content.onboarding.begin'), ['domain' => 'plain.com'])->assertRedirect();
         $plain = ContentOnboardingSession::query()->latest('id')->first();
-        $this->assertNull(\Illuminate\Support\Facades\Cache::get('content:entered-url:'.$plain->website_id));
+        $this->assertNull(Cache::get('content:entered-url:'.$plain->website_id));
     }
 
     public function test_manually_adding_a_competitor_dispatches_domain_metric_enrichment(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         $this->toStep6()
             ->set('newCompetitorDomain', 'freshrival.com')
             ->call('addCompetitor');
 
-        \Illuminate\Support\Facades\Queue::assertPushed(
-            \App\Jobs\Content\EnrichCompetitorDomainMetricsJob::class,
+        Queue::assertPushed(
+            EnrichCompetitorDomainMetricsJob::class,
             fn ($job) => in_array('freshrival.com', $job->domains, true)
         );
     }

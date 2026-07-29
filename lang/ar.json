@@ -3915,5 +3915,6 @@
     ":count keywords moved up on :domain — \":keyword\" is now #:position": "ارتفعت :count كلمات على :domain — \":keyword\" الآن في المركز :position",
     "{1}A keyword just moved up on :domain|[2,*]:count keywords just moved up on :domain": "{1}ارتفعت كلمة مفتاحية على :domain|[2,*]ارتفعت :count كلمات مفتاحية على :domain",
     "{1}Up :count place|[2,*]Up :count places": "{1}تقدّم بمركز واحد|[2,*]تقدّم بـ :count مراكز",
-    "Can't sign in?": "لا تستطيع تسجيل الدخول؟"
+    "Can't sign in?": "لا تستطيع تسجيل الدخول؟",
+    "{1}You have 1 free website slot available.|[2,*]You have :count free website slots available.": "{1}لديك مساحة موقع مجانية واحدة متاحة.|[2,*]لديك :count مساحات مواقع مجانية متاحة."
 }
