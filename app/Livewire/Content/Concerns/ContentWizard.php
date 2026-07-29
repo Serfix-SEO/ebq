@@ -708,6 +708,18 @@ trait ContentWizard
             $keywords = $kwSvc->get($plan);
             if ($keywords === null) {
                 $keywordStatus = $kwSvc->researchStatus($plan);
+                // Re-arm the research while the loader is up. The dispatch only
+                // ran on step ENTRY, so a competitor discovered AFTER that (SERP
+                // discovery finishes minutes later) never got its keyword
+                // request — and get() waits for every expected competitor, so
+                // the step spun forever (prod 2026-07-29, pubgnamegenerator.net:
+                // seed + own-site completed in 60s, the rival was never asked
+                // for). ensureStarted() is idempotent — cached request ids and
+                // per-key locks make a repeat a no-op — and the job is throttled
+                // to one dispatch a minute per plan so polling can't flood it.
+                if (Cache::add('content:kw-insights:poll:'.$plan->id, 1, now()->addMinute())) {
+                    PrepareContentKeywordInsightsJob::dispatch($plan->id);
+                }
             }
             // Competitor-mention guard card — shown here, not on the
             // competitors step, same reasoning as ContentCalendar (see

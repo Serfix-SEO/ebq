@@ -425,4 +425,40 @@ class ContentKeywordInsightsTest extends TestCase
         $this->assertSame('German', $captured['opts']['language']);
         $this->assertFalse($captured['meter'], 'platform prefill is unmetered');
     }
+
+    /**
+     * Prod 2026-07-29 (pubgnamegenerator.net): keyword research is dispatched on
+     * step ENTRY only. SERP competitor discovery finishes minutes later, so the
+     * competitor discovered afterwards never got its keyword request — and get()
+     * waits for every expected competitor, leaving "Researching live search
+     * data…" spinning forever. The poll now re-arms the research.
+     */
+    public function test_the_keyword_step_re_arms_research_while_the_loader_is_up(): void
+    {
+        Queue::fake();
+        [$user, $website, $plan] = $this->userWithPlan();
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 6)
+            ->assertOk();
+
+        Queue::assertPushed(PrepareContentKeywordInsightsJob::class);
+    }
+
+    /** …but polling every few seconds must not flood the queue. */
+    public function test_the_re_arm_is_throttled_to_one_dispatch_per_minute(): void
+    {
+        Queue::fake();
+        [$user, $website, $plan] = $this->userWithPlan();
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        foreach (range(1, 4) as $poll) {
+            Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+                ->set('wizardStep', 6)
+                ->assertOk();
+        }
+
+        Queue::assertPushed(PrepareContentKeywordInsightsJob::class, 1);
+    }
 }

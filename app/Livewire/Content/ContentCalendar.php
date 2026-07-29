@@ -1471,6 +1471,13 @@ class ContentCalendar extends Component
                 $keywords = $kwSvc->get($anyPlan);
                 if ($keywords === null) {
                     $keywordStatus = $kwSvc->researchStatus($anyPlan);
+                    // Same re-arm as the public wizard (ContentWizard trait):
+                    // research is dispatched on step ENTRY only, so a competitor
+                    // discovered later never gets its keyword request and the
+                    // step spins forever. Idempotent + throttled to 1/min/plan.
+                    if (Cache::add('content:kw-insights:poll:'.$anyPlan->id, 1, now()->addMinute())) {
+                        PrepareContentKeywordInsightsJob::dispatch($anyPlan->id);
+                    }
                 }
             }
             // Competitor-mention guard card state — shown on the keyword-research
