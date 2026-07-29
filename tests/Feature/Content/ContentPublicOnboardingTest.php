@@ -291,14 +291,60 @@ class ContentPublicOnboardingTest extends TestCase
         $this->assertTrue(app(ContentEntitlements::class)->hasContentAccessFor($user->fresh(), $site));
     }
 
-    /** The public "Start" entry for an already-authed user lands on content.get-started. */
-    public function test_authed_start_entry_redirects_to_content_get_started(): void
+    /**
+     * Prod 2026-07-29: a client who DELETED their website and then used the
+     * public Content Autopilot funnel got bounced to Get started with the
+     * domain they typed thrown away — leaving a "Activate on this website"
+     * button with no website behind it, which silently did nothing on click.
+     */
+    public function test_authed_visitor_with_no_websites_gets_the_domain_they_typed(): void
     {
-        $user = User::factory()->create();
+        Queue::fake();
+        $user = User::factory()->create(['content_comp_sites' => 5]);
+        $this->assertSame(0, $user->websites()->count());
+
+        $this->actingAs($user)
+            ->post(route('content.onboarding.begin'), ['domain' => 'rebuilt-site.com'])
+            ->assertRedirect(route('content.index'));
+
+        $site = $user->fresh()->websites()->where('normalized_domain', 'rebuilt-site.com')->first();
+        $this->assertNotNull($site, 'the entered domain must become their website');
+        $this->assertTrue(app(ContentEntitlements::class)->hasContentAccessFor($user->fresh(), $site));
+    }
+
+    /** With no website there is nothing to activate — ask for one instead of a dead button. */
+    public function test_get_started_asks_for_a_website_instead_of_offering_a_dead_activate(): void
+    {
+        $user = User::factory()->create(['content_comp_sites' => 5]);
+
+        Livewire::actingAs($user)
+            ->test(GetStarted::class)
+            ->assertViewHas('state', 'no_website')
+            ->assertSee('Add your website')
+            ->assertDontSee('Activate on');
+    }
+
+    /**
+     * The public "Start" entry for an already-authed user no longer discards
+     * the domain (it used to redirect to Get started and drop it). An
+     * uncovered user still lands on Get started — but WITH the site attached,
+     * so the CTA there has something to act on.
+     */
+    public function test_authed_start_entry_attaches_the_site_then_routes_by_coverage(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create([
+            'content_trial_started_at' => now()->subDays(30), // trial spent, no slots
+        ]);
 
         $this->actingAs($user)
             ->post(route('content.onboarding.begin'), ['domain' => 'example.com'])
             ->assertRedirect(route('content.get-started'));
+
+        $this->assertNotNull(
+            $user->fresh()->websites()->where('normalized_domain', 'example.com')->first(),
+            'even an uncovered user keeps the site they entered',
+        );
     }
 
     /**

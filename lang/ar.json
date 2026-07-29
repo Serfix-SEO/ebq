@@ -4026,5 +4026,8 @@
     "You choose the days and the time window it goes live": "أنت تختار الأيام ونافذة الوقت للنشر",
     "Your business type is detected, so a shop is not written like a law firm": "نحدد نوع نشاطك، فلا يُكتب المتجر بأسلوب مكتب محاماة",
     "Your control": "تحكمك الكامل",
-    "Your site is read and profiled — what you sell, who you serve, how you talk": "نقرأ موقعك ونحلله: ماذا تبيع، ومن تخدم، وبأي أسلوب تتحدث"
+    "Your site is read and profiled — what you sell, who you serve, how you talk": "نقرأ موقعك ونحلله: ماذا تبيع، ومن تخدم، وبأي أسلوب تتحدث",
+    "Add a website first, then activate Content Autopilot on it.": "أضف موقعاً أولاً، ثم فعّل Content Autopilot عليه.",
+    "Add a website to get started with Content Autopilot.": "أضف موقعاً للبدء مع Content Autopilot.",
+    "{1}You have 1 free website slot ready — add a website to use it.|[2,*]You have :count free website slots ready — add a website to use them.": "{1}لديك مساحة موقع مجانية جاهزة — أضف موقعاً لاستخدامها.|[2,*]لديك :count مساحات مواقع مجانية جاهزة — أضف موقعاً لاستخدامها."
 }

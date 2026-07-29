@@ -76,7 +76,15 @@ class GetStarted extends Component
         // free sites count too (ContentEntitlements::sitesAllowed() has always
         // added them). Gating on hasContentSubscription() alone left comped
         // clients unable to activate at all.
-        if ($website === null || ! $this->hasSlotSource($user)) {
+        if ($website === null) {
+            // Defensive: the UI renders the 'no_website' state instead of this
+            // button, so reaching here means a stale page. Say so rather than
+            // dying silently — a dead button is the worst possible feedback.
+            session()->flash('error', __('Add a website first, then activate Content Autopilot on it.'));
+
+            return;
+        }
+        if (! $this->hasSlotSource($user)) {
             return;
         }
         if ($ent->sitesCovered($user) >= $ent->sitesAllowed($user)) {
@@ -102,6 +110,10 @@ class GetStarted extends Component
             && $ent->sitesCovered($user) < $ent->sitesAllowed($user);
 
         $state = match (true) {
+            // No website at all (a client who deleted theirs) — every other
+            // state's CTA acts ON a website, so offering them silently did
+            // nothing when clicked. Ask for the site first.
+            $website === null => 'no_website',
             $slotFree => 'activate',
             $hasSub => 'add_website',
             $neverTrialed => 'trial',

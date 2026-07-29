@@ -12,6 +12,7 @@ use App\Support\Recaptcha;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
@@ -25,9 +26,13 @@ class PublicOnboardingStartController extends Controller
 {
     public function __invoke(Request $request, SafeHttpGuard $guard, ContentOnboardingConverter $converter): RedirectResponse
     {
-        if (Auth::check()) {
-            return redirect()->route('content.get-started');
-        }
+        // NOTE: signed-in visitors are NOT bounced away here. They used to be
+        // redirected straight to Get started, which threw away the domain they
+        // had just typed — so a client who had deleted their website landed on
+        // a screen offering "Activate on this website" with no website at all,
+        // and the button silently did nothing (prod 2026-07-29). Instead the
+        // normal flow runs below: the site is created, then converted onto
+        // their account at the end of this method.
 
         // reCAPTCHA (standard form field g-recaptcha-response).
         if (Recaptcha::isEnabled()) {
@@ -76,11 +81,23 @@ class PublicOnboardingStartController extends Controller
         // real content lives under the entered path. SSRF-guarded above.
         $path = trim((string) parse_url($raw, PHP_URL_PATH), '/');
         if ($path !== '' && $session->website_id) {
-            \Illuminate\Support\Facades\Cache::put(
+            Cache::put(
                 'content:entered-url:'.$session->website_id,
                 $raw,
                 now()->addDays(30)
             );
+        }
+
+        // A signed-in visitor doesn't need the account step at the end, and
+        // must not be left with an unattached provisional site: convert now so
+        // the domain they entered becomes THEIR website, covered by a free
+        // slot / subscription / trial where they're entitled to one.
+        if (Auth::check()) {
+            $result = $converter->convert($session, Auth::user(), []);
+            session(['current_website_id' => $result['website']->id]);
+            session()->forget('content_onboarding_token');
+
+            return redirect()->route($result['covered'] ? 'content.index' : 'content.get-started');
         }
 
         // Straight into the wizard (Business step) — no second domain prompt.

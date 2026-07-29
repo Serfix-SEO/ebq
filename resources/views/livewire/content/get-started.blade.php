@@ -12,7 +12,23 @@
             {{ __('An expert SEO article for :site — written, optimized, illustrated and published for you, on autopilot.', ['site' => $website?->domain ?? __('your website')]) }}
         </p>
 
-        @if ($state === 'trial')
+        @if ($state === 'no_website')
+            {{-- Nothing to activate ON. Every other CTA here operates on a
+                 website, so without one the button did nothing at all. --}}
+            <div class="mx-auto mt-6 max-w-md rounded-xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                @if ($freeSlots > 0)
+                    {{ trans_choice('{1}You have 1 free website slot ready — add a website to use it.|[2,*]You have :count free website slots ready — add a website to use them.', $freeSlots, ['count' => $freeSlots]) }}
+                @else
+                    {{ __('Add a website to get started with Content Autopilot.') }}
+                @endif
+            </div>
+            <a href="{{ route('websites.index') }}" wire:navigate
+                class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                {{ __('Add your website') }}
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </a>
+
+        @elseif ($state === 'trial')
             <div class="mx-auto mt-6 max-w-md rounded-xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
                 {{ __(':days-day free trial · :n free articles · no card required', ['days' => $trialDays, 'n' => $trialArticles]) }}
             </div>
