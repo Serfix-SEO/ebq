@@ -199,13 +199,15 @@
                                             @endif
                                         </div>
 
-                                        {{-- SERP: live Google rank (Serper), refreshed weekly --}}
-                                        <div class="w-14 text-center" title="{{ __('Live Google rank') }}">
+                                        {{-- SERP: live Google rank (Serper), refreshed weekly. The
+                                             position doubles as the entry point to the rank history. --}}
+                                        <a href="{{ route('content.keyword-history', $kw->id) }}" wire:navigate
+                                            class="w-14 text-center" title="{{ __('Live Google rank — open rank history') }}">
                                             <div class="text-xs text-slate-400">{{ __('SERP') }}</div>
-                                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                            <div class="text-sm font-bold text-slate-900 hover:text-orange-600 dark:text-slate-100 dark:hover:text-orange-400">
                                                 @if ($kw->serp_position)#{{ $kw->serp_position }}@elseif ($kw->serp_checked_at)100+@else<span class="text-slate-300 dark:text-slate-600">…</span>@endif
                                             </div>
-                                        </div>
+                                        </a>
                                         {{-- GSC: Search Console average position --}}
                                         <div class="w-14 text-center" title="{{ __('Search Console average position') }}">
                                             <div class="text-xs text-slate-400">{{ __('GSC') }}</div>
@@ -231,6 +233,13 @@
                                                 <div class="text-center text-xs text-slate-300 dark:text-slate-600">—</div>
                                             @endif
                                         </div>
+
+                                        {{-- Rank history: the row's own detail page (position over time). --}}
+                                        <a href="{{ route('content.keyword-history', $kw->id) }}" wire:navigate
+                                            class="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-500/10 dark:hover:text-orange-400"
+                                            title="{{ __('View rank history') }}" aria-label="{{ __('View rank history') }}">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+                                        </a>
 
                                         <button type="button" wire:click="untrack('{{ $kw->id }}')" wire:confirm="{{ __('Remove this keyword from your tracker?') }}"
                                             class="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950"

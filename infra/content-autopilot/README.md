@@ -1486,6 +1486,42 @@ SERP/rank-API cost.** GSC per-query/per-page rows already sync daily into
 
 Tests: `tests/Feature/Content/ContentTrackerTest.php`, `ContentPerformanceServiceTest.php`.
 
+### Rank history (2026-07-29, PROD)
+
+`ContentSerpChecker` used to OVERWRITE `content_tracked_keywords.serp_position`
+on every weekly run — only "today" existed, so a keyword's climb was
+unrecoverable. Now every check is also appended to **`content_keyword_rank_history`**
+(`2026_07_29_120000_…`): `website_id`, nullable `tracked_keyword_id` (nullOnDelete),
+`normalized_keyword`, `checked_on` (DATE), `position` (**null = checked but outside
+the top 100**, distinct from "no row" = not checked that day), `url`, `source='serp'`.
+UNIQUE(`website_id`,`normalized_keyword`,`checked_on`,`source`) → a same-day re-check
+corrects the point instead of duplicating it.
+
+- **Keyed by (website, keyword), not by the tracker row**, so history SURVIVES the
+  quota's delete-to-add churn: untrack nulls the FK, re-track picks the series back up.
+- `ContentKeywordRankHistory::setCheckedOnAttribute` stores a bare `Y-m-d` — the
+  `date` cast writes `Y-m-d 00:00:00`, which MySQL truncates for a DATE column but
+  SQLite keeps, breaking the day-keyed lookup + `whereBetween` (same landmine as
+  `ContentPageAnalytics`/`SearchConsoleData`).
+- The migration backfills one point per already-checked keyword so existing clients'
+  charts aren't empty (29 rows on prod at deploy).
+- **`ContentRankHistoryService::series()`** merges the weekly live-rank points with the
+  DAILY GSC series (`ContentPerformanceService::keywordSeries`) onto one calendar +
+  computes stats (current/best/worst/movement/checks/top3/top10). `RANGES = 30/90/180/365`.
+- **UI**: `App\Livewire\Content\KeywordRankHistory` + `livewire/content/keyword-rank-history.blade.php`,
+  route **`content.keyword-history`** (`/content/tracker/{keyword}`). Entry points on every
+  tracker row: a chart icon **and** the SERP position itself. Inline SVG (no chart lib):
+  inverted **log-scaled** rank axis (#1 top, gridlines 1/3/10/30/100), consecutive weekly
+  checks JOIN across unchecked days (only an out-of-top-100 check breaks the line and
+  draws a hollow floor marker), dashed GSC average line, impressions volume behind.
+  "Check rank now" dispatches `CheckTrackedKeywordSerpJob` (weekly staleness gate makes
+  it a cheap no-op). Authorization is by the keyword's website via
+  `accessibleWebsitesQuery` (deep-linkable; a stale session website must not 404 it).
+- ⚠️ **Route cache**: prod runs `bootstrap/cache/routes-v7.php` — a new route needs
+  `php artisan route:cache` on box A (and box B) or `route()` throws "not defined".
+
+Tests: `tests/Feature/Content/ContentRankHistoryTest.php`.
+
 ## Env (staging QA values 2026-07-17)
 
 Staging `.env` gained real `DEEPSEEK_API_KEY`/`MISTRAL_API_KEY` (copied from

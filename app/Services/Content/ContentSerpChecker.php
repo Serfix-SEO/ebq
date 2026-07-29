@@ -2,6 +2,7 @@
 
 namespace App\Services\Content;
 
+use App\Models\ContentKeywordRankHistory;
 use App\Models\ContentPlan;
 use App\Models\ContentTrackedKeyword;
 use App\Models\Website;
@@ -61,6 +62,32 @@ class ContentSerpChecker
             'serp_url' => $url ? mb_substr($url, 0, 600) : null,
             'serp_checked_at' => now(),
         ])->save();
+
+        $this->recordHistory($kw, $position, $url);
+    }
+
+    /**
+     * Append the check to the keyword's rank history. The row on
+     * content_tracked_keywords only ever holds the LATEST position, so without
+     * this the climb is unrecoverable. Keyed by (website, keyword, day) so a
+     * same-day re-check corrects the point instead of duplicating it, and so
+     * history survives untrack → re-track (see the migration's note).
+     */
+    private function recordHistory(ContentTrackedKeyword $kw, ?int $position, ?string $url): void
+    {
+        ContentKeywordRankHistory::query()->updateOrCreate(
+            [
+                'website_id' => $kw->website_id,
+                'normalized_keyword' => $kw->normalized_keyword,
+                'checked_on' => now()->toDateString(),
+                'source' => ContentKeywordRankHistory::SOURCE_SERP,
+            ],
+            [
+                'tracked_keyword_id' => $kw->id,
+                'position' => $position,
+                'url' => $url ? mb_substr($url, 0, 600) : null,
+            ],
+        );
     }
 
     /** @return array{0:?int,1:?string} [position, url] of the first result on $domain */

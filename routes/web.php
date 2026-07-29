@@ -306,6 +306,9 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
         Route::view('/content/settings', 'content.settings')->middleware(['feature:content', 'content.access'])->name('content.settings');
         Route::view('/content/integrations', 'content.integrations')->middleware(['feature:content', 'content.access'])->name('content.integrations');
         Route::view('/content/tracker', 'content.tracker')->middleware(['feature:content', 'content.access'])->name('content.tracker');
+        Route::get('/content/tracker/{keyword}', fn (string $keyword) => view('content.keyword-history', ['keywordId' => $keyword]))
+            ->middleware(['feature:content', 'content.access'])
+            ->name('content.keyword-history');
         Route::get('/content/topics/{topic}', fn (string $topic) => view('content.review', ['topicId' => $topic]))
             ->middleware(['feature:content', 'content.access'])
             ->name('content.review');
