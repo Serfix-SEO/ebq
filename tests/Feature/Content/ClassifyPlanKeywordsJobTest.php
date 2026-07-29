@@ -31,7 +31,7 @@ class ClassifyPlanKeywordsJobTest extends TestCase
             'business_description' => 'Stylish name generator.',
         ]);
 
-        Cache::put('content:setup-insights:v1:'.$website->id, [
+        Cache::put(ContentSetupInsights::cacheKey($website->id), [
             'my_referring_domains' => 10, 'my_authority' => null,
             'competitors' => [['domain' => 'rival.com']],
             'median' => null, 'gap' => null, 'behind' => false,
@@ -82,7 +82,7 @@ class ClassifyPlanKeywordsJobTest extends TestCase
         ]);
 
         // Directory ranks by raw authority ahead of the real rival.
-        Cache::put('content:setup-insights:v1:'.$website->id, [
+        Cache::put(ContentSetupInsights::cacheKey($website->id), [
             'my_referring_domains' => 10, 'my_authority' => null,
             'competitors' => [['domain' => 'directory.com'], ['domain' => 'mollymaid.com']],
             'median' => null, 'gap' => null, 'behind' => false,
@@ -106,7 +106,7 @@ class ClassifyPlanKeywordsJobTest extends TestCase
             'website_id' => $website->id, 'country' => 'US', 'status' => ContentPlan::STATUS_DRAFT,
             'offerings' => ['sell' => ['name generator']], 'business_description' => 'Name generator.',
         ]);
-        Cache::put('content:setup-insights:v1:'.$website->id, [
+        Cache::put(ContentSetupInsights::cacheKey($website->id), [
             'my_referring_domains' => 10, 'my_authority' => null,
             'competitors' => [['domain' => 'rival.com']], 'median' => null, 'gap' => null, 'behind' => false,
         ], now()->addDay());

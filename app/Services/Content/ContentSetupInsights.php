@@ -57,8 +57,29 @@ class ContentSetupInsights
 {
     private const CACHE_TTL_DAYS = 30;
 
+    /**
+     * Bump this whenever a change alters what build() WOULD return — the 30-day
+     * TTL otherwise keeps serving payloads produced by the old logic, and there
+     * is no self-healing: a non-null cached value makes competitorAuthority()
+     * short-circuit ensureGenerating(), so discovery never re-runs either.
+     *
+     * v1 → v2 (2026-07-29): the 2026-07-27 fix (321cb3b) stopped falling back
+     * to the backlink report's competitor rows, but 41 of 55 live sites stayed
+     * stranded on lists cached BEFORE it — e.g. falik.com (a UAE food-delivery
+     * app) showing flaik.com / about.me / pipersandler.com, name-lookalikes from
+     * the link graph rather than SERP rivals. Bumping the version orphans every
+     * pre-fix payload at once so build() re-runs and discovery dispatches.
+     */
+    public const CACHE_VERSION = 'v2';
+
     // Owner decision 2026-07-22: show up to 10 on the competitors step.
     private const MAX_COMPETITORS = 10;
+
+    /** The one place the insights cache key is spelled — see CACHE_VERSION. */
+    public static function cacheKey(string $websiteId): string
+    {
+        return 'content:setup-insights:'.self::CACHE_VERSION.':'.$websiteId;
+    }
 
     public function __construct(
         private readonly ClientReportService $reports,
@@ -79,7 +100,7 @@ class ContentSetupInsights
     public function competitorAuthority(Website $website): ?array
     {
         return Cache::remember(
-            'content:setup-insights:v1:'.$website->id,
+            self::cacheKey($website->id),
             now()->addDays(self::CACHE_TTL_DAYS),
             fn () => $this->build($website)
         );
@@ -141,7 +162,7 @@ class ContentSetupInsights
     /** Clear the cache so a fresh snapshot is re-read (called after generation). */
     public function forget(Website $website): void
     {
-        Cache::forget('content:setup-insights:v1:'.$website->id);
+        Cache::forget(self::cacheKey($website->id));
     }
 
     /**

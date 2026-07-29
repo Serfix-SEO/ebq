@@ -10,6 +10,7 @@ use App\Models\Website;
 use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentArticleProducer;
 use App\Services\Content\ContentKeywordInsights;
+use App\Services\Content\ContentSetupInsights;
 use App\Services\Content\HumanizerService;
 use App\Services\Crawler\CrawlFetcher;
 use App\Services\Llm\LlmClient;
@@ -73,7 +74,7 @@ class CompetitorMentionGuardTest extends TestCase
     {
         return new class($verdict) implements LlmClient
         {
-            /** @var list<array> every $messages array completeJson received */
+            /** @var list<array> every array completeJson received */
             public array $captured = [];
 
             public function __construct(private readonly ?array $verdict) {}
@@ -522,7 +523,7 @@ class CompetitorMentionGuardTest extends TestCase
     /** @param list<string> $domains */
     private function seedCompetitorCache(Website $website, array $domains): void
     {
-        Cache::put('content:setup-insights:v1:'.$website->id, [
+        Cache::put(ContentSetupInsights::cacheKey($website->id), [
             'my_referring_domains' => 0, 'my_authority' => null,
             'competitors' => array_map(static fn ($d) => [
                 'domain' => $d, 'referring_domains' => null, 'backlinks' => null,

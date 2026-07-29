@@ -8,6 +8,8 @@ use App\Models\DomainMetric;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\ContentSetupInsights;
+use Database\Seeders\PlanSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -15,12 +17,42 @@ use Tests\TestCase;
 
 class ContentCompetitorsTest extends TestCase
 {
-    use \Illuminate\Foundation\Testing\RefreshDatabase;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\PlanSeeder::class);
+        $this->seed(PlanSeeder::class);
+    }
+
+    /**
+     * The insights payload is cached for 30 DAYS and a non-null hit short-circuits
+     * ensureGenerating(), so a logic change that isn't paired with a version bump
+     * leaves live sites serving pre-change competitor lists with no way to
+     * self-heal (2026-07-29: 41 of 55 sites were stranded that way, e.g.
+     * falik.com showing name-lookalike domains). Every caller must go through
+     * cacheKey() so one bump invalidates them all.
+     */
+    public function test_insights_cache_key_is_versioned_through_the_helper(): void
+    {
+        $this->assertSame(
+            'content:setup-insights:'.ContentSetupInsights::CACHE_VERSION.':abc',
+            ContentSetupInsights::cacheKey('abc'),
+        );
+
+        // The literal may appear exactly once — inside cacheKey() itself.
+        $this->assertSame(
+            1,
+            substr_count((string) file_get_contents(app_path('Services/Content/ContentSetupInsights.php')), "'content:setup-insights:"),
+            'the insights cache key must be spelled only in cacheKey()',
+        );
+
+        // Every other caller goes through the helper, so one bump reaches them all.
+        $this->assertStringNotContainsString(
+            "'content:setup-insights:",
+            (string) file_get_contents(app_path('Jobs/Content/DiscoverContentCompetitorsJob.php')),
+            'DiscoverContentCompetitorsJob must build the key via ContentSetupInsights::cacheKey()',
+        );
     }
 
     private function userWithPlan(): array
@@ -190,7 +222,7 @@ class ContentCompetitorsTest extends TestCase
             ],
             'median' => 35, 'gap' => 3.5, 'behind' => true,
         ];
-        Cache::put('content:setup-insights:v1:'.$website->id, $insights, now()->addDay());
+        Cache::put(ContentSetupInsights::cacheKey($website->id), $insights, now()->addDay());
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
@@ -262,7 +294,7 @@ class ContentCompetitorsTest extends TestCase
     public function test_removing_every_competitor_shows_reset_prompt_and_reset_restores_them(): void
     {
         [$user, $website, $plan] = $this->userWithPlan();
-        Cache::put('content:setup-insights:v1:'.$website->id, [
+        Cache::put(ContentSetupInsights::cacheKey($website->id), [
             'my_referring_domains' => 10, 'my_authority' => 40,
             'competitors' => [
                 ['domain' => 'only-a.com', 'referring_domains' => 5, 'authority' => 5, 'da' => null, 'pa' => null],

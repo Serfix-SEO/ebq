@@ -6,13 +6,19 @@ use App\Jobs\PrepareContentKeywordInsightsJob;
 use App\Livewire\Content\ContentCalendar;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
+use App\Models\DomainMetric;
 use App\Models\KeywordApiRequest;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\ContentKeywordInsights;
+use App\Services\Content\ContentSetupInsights;
+use App\Services\KeywordFinder\KeywordFinderPool;
+use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -23,7 +29,7 @@ class ContentKeywordInsightsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\PlanSeeder::class);
+        $this->seed(PlanSeeder::class);
     }
 
     private function userWithPlan(array $planAttrs = []): array
@@ -42,7 +48,7 @@ class ContentKeywordInsightsTest extends TestCase
     private function storeCompletedRequest(ContentPlan $plan, array $results): KeywordApiRequest
     {
         $request = KeywordApiRequest::query()->create([
-            'request_id' => (string) \Illuminate\Support\Str::uuid(),
+            'request_id' => (string) Str::uuid(),
             'type' => KeywordApiRequest::TYPE_IDEAS,
             'mode' => 'keywords',
             'payload' => ['seeds' => ['test']],
@@ -89,7 +95,7 @@ class ContentKeywordInsightsTest extends TestCase
             ['keyword' => 'sweet vanilla parfum', 'avgMonthlySearches' => 400, 'competitionIndex' => 20],
         ]);
 
-        $kw = app(\App\Services\Content\ContentKeywordInsights::class)->get($plan);
+        $kw = app(ContentKeywordInsights::class)->get($plan);
 
         $this->assertNotNull($kw);
         $keywords = array_column($kw['opportunities'], 'keyword');
@@ -140,7 +146,7 @@ class ContentKeywordInsightsTest extends TestCase
         [, $website, $plan] = $this->userWithPlan();
 
         // competitorAuthority() is read from its cache — inject one competitor.
-        \Illuminate\Support\Facades\Cache::put('content:setup-insights:v1:'.$website->id, [
+        Cache::put(ContentSetupInsights::cacheKey($website->id), [
             'my_referring_domains' => 0, 'my_authority' => null,
             'competitors' => [[
                 'domain' => 'rival.com', 'referring_domains' => null, 'backlinks' => null,
@@ -150,7 +156,7 @@ class ContentKeywordInsightsTest extends TestCase
         ], now()->addDay());
 
         // Batched DFS enrichment already stored the rival's organic ETV.
-        \App\Models\DomainMetric::query()->create([
+        DomainMetric::query()->create([
             'domain' => 'rival.com',
             'dfs_metrics' => ['metrics' => ['organic' => ['etv' => 4200.0, 'count' => 310]]],
             'dfs_metrics_refreshed_at' => now(),
@@ -161,13 +167,13 @@ class ContentKeywordInsightsTest extends TestCase
             ['keyword' => 'name generator', 'avgMonthlySearches' => 1000, 'competitionIndex' => 10],
         ]);
         $compReq = KeywordApiRequest::query()->create([
-            'request_id' => (string) \Illuminate\Support\Str::uuid(),
+            'request_id' => (string) Str::uuid(),
             'type' => KeywordApiRequest::TYPE_IDEAS, 'mode' => 'keywords',
             'payload' => [], 'status' => KeywordApiRequest::STATUS_COMPLETED,
             'result' => ['results' => [['keyword' => 'best name maker', 'avgMonthlySearches' => 500, 'competitionIndex' => 20]]],
             'website_id' => $plan->website_id,
         ]);
-        \Illuminate\Support\Facades\Cache::put('content:kw-insights:comp-req:'.$plan->id.':0', $compReq->id, now()->addHours(2));
+        Cache::put('content:kw-insights:comp-req:'.$plan->id.':0', $compReq->id, now()->addHours(2));
 
         $insights = app(ContentKeywordInsights::class)->get($plan);
 
@@ -195,7 +201,7 @@ class ContentKeywordInsightsTest extends TestCase
             'competitor_overrides' => ['added' => [], 'removed' => ['thryv.com']],
         ]);
 
-        Cache::put('content:setup-insights:v1:'.$website->id, [
+        Cache::put(ContentSetupInsights::cacheKey($website->id), [
             'my_referring_domains' => 0, 'my_authority' => null,
             'competitors' => [
                 ['domain' => 'thryv.com', 'referring_domains' => null, 'backlinks' => null, 'authority' => null, 'da' => null, 'pa' => null],
@@ -208,7 +214,7 @@ class ContentKeywordInsightsTest extends TestCase
             ['keyword' => 'cleaning tips', 'avgMonthlySearches' => 1000, 'competitionIndex' => 10],
         ]);
         $compReq = KeywordApiRequest::query()->create([
-            'request_id' => (string) \Illuminate\Support\Str::uuid(),
+            'request_id' => (string) Str::uuid(),
             'type' => KeywordApiRequest::TYPE_IDEAS, 'mode' => 'keywords',
             'payload' => [], 'status' => KeywordApiRequest::STATUS_COMPLETED,
             'result' => ['results' => [['keyword' => 'residential deep clean', 'avgMonthlySearches' => 500, 'competitionIndex' => 20]]],
@@ -229,7 +235,7 @@ class ContentKeywordInsightsTest extends TestCase
         [, $website, $plan] = $this->userWithPlan();
 
         // One discovered competitor (MAX_COMPETITORS = 1).
-        Cache::put('content:setup-insights:v1:'.$website->id, [
+        Cache::put(ContentSetupInsights::cacheKey($website->id), [
             'my_referring_domains' => 0, 'my_authority' => null,
             'competitors' => [['domain' => 'rival.com']],
             'median' => null, 'gap' => null, 'behind' => false,
@@ -241,7 +247,7 @@ class ContentKeywordInsightsTest extends TestCase
         ]);
         // Competitor's keywords: one the client already targets, one they don't.
         $comp = KeywordApiRequest::query()->create([
-            'request_id' => (string) \Illuminate\Support\Str::uuid(),
+            'request_id' => (string) Str::uuid(),
             'type' => KeywordApiRequest::TYPE_IDEAS, 'mode' => 'keywords',
             'payload' => [], 'status' => KeywordApiRequest::STATUS_COMPLETED,
             'result' => ['results' => [
@@ -322,8 +328,8 @@ class ContentKeywordInsightsTest extends TestCase
     public function test_fallback_fills_volumes_from_keywords_everywhere_when_configured(): void
     {
         config(['services.keywords_everywhere.key' => 'fake-ke-key']);
-        \Illuminate\Support\Facades\Http::fake([
-            'api.keywordseverywhere.com/*' => \Illuminate\Support\Facades\Http::response([
+        Http::fake([
+            'api.keywordseverywhere.com/*' => Http::response([
                 'data' => [
                     ['keyword' => 'how to change pubg name', 'vol' => 8000, 'competition' => 0.2],
                 ],
@@ -397,7 +403,7 @@ class ContentKeywordInsightsTest extends TestCase
         ]);
 
         $captured = [];
-        $mock = \Mockery::mock(\App\Services\KeywordFinder\KeywordFinderPool::class);
+        $mock = \Mockery::mock(KeywordFinderPool::class);
         // Multiple research angles now dispatch (offering seeds + the client's own
         // domain + top competitor); each must carry the plan's geo/language.
         $mock->shouldReceive('dispatchIdeas')
@@ -406,13 +412,13 @@ class ContentKeywordInsightsTest extends TestCase
                 $captured = compact('opts', 'countryKey', 'meter');
 
                 return KeywordApiRequest::query()->create([
-                    'request_id' => (string) \Illuminate\Support\Str::uuid(),
+                    'request_id' => (string) Str::uuid(),
                     'type' => KeywordApiRequest::TYPE_IDEAS, 'mode' => 'keywords',
                     'status' => KeywordApiRequest::STATUS_QUEUED, 'payload' => [], 'website_id' => $websiteId,
                 ]);
             });
 
-        $this->app->instance(\App\Services\KeywordFinder\KeywordFinderPool::class, $mock);
+        $this->app->instance(KeywordFinderPool::class, $mock);
         app(ContentKeywordInsights::class)->ensureStarted($plan);
 
         $this->assertSame('de', $captured['countryKey'], 'research must geo-target the plan country');

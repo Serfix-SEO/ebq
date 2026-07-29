@@ -111,7 +111,7 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
             Cache::put('content:serp-comp-done:'.$this->websiteId, 1, now()->addDays(30));
             // Let the wizard re-read (build() picks up the new competitors) and
             // stop polling.
-            Cache::forget('content:setup-insights:v1:'.$this->websiteId);
+            Cache::forget(ContentSetupInsights::cacheKey($this->websiteId));
             Cache::forget($flag);
         }
     }
