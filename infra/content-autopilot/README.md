@@ -773,6 +773,26 @@ WAITS in SCHEDULED** (not a failure) and flushes automatically after
 connect. Post-publish verify: SSRF-guarded GET of the live URL, 200 + H1 +
 no noindex → `verified_at` (best-effort).
 
+**Publish notification (2026-07-29).** On the confirmed path the job also calls
+`notifyPublished()` → queues `App\Mail\ContentArticlePublishedMail` to the
+**website owner** (`emails/content-article-published.blade.php`): featured image
+hero, live-URL + "open in app" CTAs, at-a-glance stats (SEO score/words/read
+time/H2 sections/images), target + secondary keywords with monthly volume, a
+Google-SERP style preview of the published meta title/description, and a
+"what happens next" list (indexing submit state, tracker auto-add, GSC reporting
+lag). Whitelabel branding comes from `ReportBrandingResolver` — with the same
+`getSerializedPropertyValue` override GrowthReportMail needs (the unsaved
+`ReportBranding::ebqDefault()` would otherwise throw ModelNotFound on the worker).
+Everything rendered is **snapshotted into `$facts` in the constructor** so a later
+revision can't change what the recipient was told shipped. Sent **once per topic**
+— stamped in `topics.meta.published_notified_at`, so a regenerated version
+re-publishing the same post does not re-announce it — and fully best-effort
+(a mail failure never fails the publish, and leaves the stamp unset).
+Preview/QA without touching the topic:
+`php artisan ebq:content-published-test-mail <email> [--topic=ID]`
+(`App\Console\Commands\SendContentPublishedTestMail`). Tests:
+`tests/Feature/Content/ContentPublishNotificationTest.php`.
+
 **Dispatcher block 4** (`ContentAutopilotDispatcher::claimPublishable()`):
 active plans with ≥1 CONNECTED integration, inside the plan's publish window
 (`publish_days` ISO weekdays + `publish_hour_start..end` band, wrapping

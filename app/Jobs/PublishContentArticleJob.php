@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Mail\ContentArticlePublishedMail;
 use App\Models\ContentIntegration;
 use App\Models\ContentPublication;
 use App\Models\ContentTopic;
@@ -16,8 +17,10 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Content Autopilot Phase 3: push one scheduled article to every connected
@@ -173,6 +176,7 @@ class PublishContentArticleJob implements ShouldQueue
             $this->verifyLiveUrl($topic, $article, $liveUrl, $guard);
             $this->submitToGoogleIndex($topic, $article, $liveUrl);
             $this->addToKeywordTracker($topic, $liveUrl);
+            $this->notifyPublished($topic, $article, $liveUrl, $integrations);
 
             return;
         }
@@ -220,6 +224,51 @@ class PublishContentArticleJob implements ShouldQueue
             Log::info('content_autopilot.index_submit', ['topic_id' => $topic->id, 'status' => $result['status']]);
         } catch (\Throwable $e) {
             Log::warning('content_autopilot.index_submit_error', ['topic_id' => $topic->id, 'error' => mb_substr($e->getMessage(), 0, 300)]);
+        }
+    }
+
+    /**
+     * Tell the site owner their article is live. Best-effort — never fails the
+     * publish. Sent once per topic (stamped in `meta.published_notified_at`) so
+     * a regenerated version re-publishing the same post doesn't re-announce it.
+     *
+     * @param  Collection<int, ContentIntegration>  $integrations
+     */
+    private function notifyPublished(ContentTopic $topic, $article, ?string $liveUrl, $integrations): void
+    {
+        $website = $topic->plan?->website;
+        $owner = $website?->owner;
+        if ($website === null || $owner === null || ! $owner->email) {
+            return;
+        }
+        $meta = (array) ($topic->meta ?? []);
+        if (! empty($meta['published_notified_at'])) {
+            return;
+        }
+
+        try {
+            $platforms = $integrations
+                ->filter(fn (ContentIntegration $i) => ContentPublication::query()
+                    ->where('article_id', $article->id)
+                    ->where('integration_id', $i->id)
+                    ->where('status', ContentPublication::STATUS_CONFIRMED)
+                    ->exists())
+                ->map(fn (ContentIntegration $i) => $i->platformLabel())
+                ->values()->all();
+
+            Mail::to($owner->email)->queue(new ContentArticlePublishedMail(
+                user: $owner,
+                website: $website,
+                topic: $topic,
+                article: $article,
+                liveUrl: $liveUrl,
+                platforms: $platforms,
+            ));
+
+            $topic->forceFill(['meta' => $meta + ['published_notified_at' => now()->toIso8601String()]])->save();
+            Log::info('content_autopilot.publish_notified', ['topic_id' => $topic->id, 'to' => $owner->email]);
+        } catch (\Throwable $e) {
+            Log::warning('content_autopilot.publish_notify_error', ['topic_id' => $topic->id, 'error' => mb_substr($e->getMessage(), 0, 300)]);
         }
     }
 

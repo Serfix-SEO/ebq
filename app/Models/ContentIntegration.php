@@ -52,4 +52,15 @@ class ContentIntegration extends Model
     {
         return $this->status === self::STATUS_CONNECTED;
     }
+
+    /** Client-facing platform name (both WordPress connection types read "WordPress"). */
+    public function platformLabel(): string
+    {
+        return match ($this->platform) {
+            self::PLATFORM_WORDPRESS, self::PLATFORM_WORDPRESS_APP_PASSWORD => 'WordPress',
+            self::PLATFORM_SHOPIFY => 'Shopify',
+            self::PLATFORM_WEBHOOK => __('Custom integration'),
+            default => ucfirst((string) $this->platform),
+        };
+    }
 }
