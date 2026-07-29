@@ -198,6 +198,26 @@ class ContentAutopilotConfig
     }
 
     /**
+     * "Your rankings moved up" digest after a weekly rank check. Kill switch
+     * without a deploy: Setting::set('content.rank_alerts.enabled', false)
+     * (mind the Setting cache-bust).
+     */
+    public static function rankAlertsEnabled(): bool
+    {
+        return (bool) self::setting('content.rank_alerts.enabled', true);
+    }
+
+    /**
+     * Minimum places gained before a move is worth an email. Below this it's
+     * SERP noise — except milestone crossings (top 10 / top 3 / #1 / first
+     * time ranking), which always qualify.
+     */
+    public static function rankAlertMinGain(): int
+    {
+        return max(1, (int) self::setting('content.rank_alerts.min_gain', 3));
+    }
+
+    /**
      * Signal-based giant detection + entity-type demotion (2026-07-23 live
      * test). ON by default; instant revert without a deploy:
      *   Setting::set('content.giant_signals.enabled', false)

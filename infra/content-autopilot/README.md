@@ -1522,6 +1522,33 @@ corrects the point instead of duplicating it.
 
 Tests: `tests/Feature/Content/ContentRankHistoryTest.php`.
 
+### "Your rankings moved up" digest (2026-07-29, PROD)
+
+`ContentSerpChecker::check()` now RETURNS the movement when a keyword improved
+enough to tell the client about (else null); `CheckTrackedKeywordSerpJob` batches the
+run's movements and queues ONE `App\Mail\ContentRankGainsMail`
+(`emails/content-rank-gains.blade.php`) to the website owner.
+
+- **Digest, never per-keyword** — a weekly check moves many keywords at once.
+- **What qualifies** (`ContentSerpChecker::notableGain()`): a climb of ≥
+  `ContentAutopilotConfig::rankAlertMinGain()` (default 3, Setting
+  `content.rank_alerts.min_gain`), OR any milestone crossing regardless of size —
+  `page_1` (≤10), `top_3`, `number_one`, `now_ranking` (first time in the top 100).
+  Drops and sub-floor wiggles never mail. `previousPosition()` reads the last history
+  row from a day BEFORE today, so a same-day re-check can't compare against itself.
+- **Throttle**: `Cache::add('content:rank_gains_mail:{website}:{Y-m-d}')` until end of
+  day — both the daily schedule and the tracker's "Check rank now" button dispatch this
+  job, so without it a client could be mailed twice for one run. A mail failure forgets
+  the key so the next run retries; it never fails the (already billed) SERP check.
+- **Kill switch, no deploy**: `Setting::set('content.rank_alerts.enabled', false)`
+  (mind the Setting cache-bust).
+- Presentation: biggest win first (milestone rank, then places gained), hero card with
+  `#old → #new`, milestone pills, up to 12 more rows each linking to that keyword's
+  rank-history page, "+N more" overflow line. Branding via `ReportBrandingResolver`
+  (+ the unsaved-default `getSerializedPropertyValue` override).
+
+Tests: `tests/Feature/Content/ContentRankGainAlertTest.php`.
+
 ## Env (staging QA values 2026-07-17)
 
 Staging `.env` gained real `DEEPSEEK_API_KEY`/`MISTRAL_API_KEY` (copied from

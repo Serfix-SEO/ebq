@@ -7,6 +7,7 @@ use App\Models\ContentPlan;
 use App\Models\ContentTrackedKeyword;
 use App\Models\Website;
 use App\Services\SerperSearchClient;
+use App\Support\ContentAutopilotConfig;
 
 /**
  * Live Google SERP position for a tracked keyword, via the Serper API — the
@@ -26,13 +27,19 @@ class ContentSerpChecker
      * Query Serper for the keyword and record the website's organic position.
      * On a transient failure (no key / API down) it does NOT stamp, so the row
      * stays stale and is retried next run instead of being blanked for a week.
+     *
+     * Returns the movement against the previous recorded check when the keyword
+     * IMPROVED enough to tell the client about (see isNotableGain) — the caller
+     * batches those into one digest email. Null = no move worth reporting.
+     *
+     * @return array{keyword_id:string,keyword:string,previous:?int,current:int,gain:?int,milestone:?string}|null
      */
-    public function check(ContentTrackedKeyword $kw): void
+    public function check(ContentTrackedKeyword $kw): ?array
     {
         $website = $kw->website;
         $domain = $website?->normalized_domain;
         if ($website === null || ! $domain) {
-            return;
+            return null;
         }
 
         [$gl, $hl] = $this->locale($website);
@@ -51,10 +58,14 @@ class ContentSerpChecker
         // Not an array = no API key or a hard failure → leave the row untouched
         // (still stale) so the next run retries.
         if (! is_array($json)) {
-            return;
+            return null;
         }
 
         [$position, $url] = $this->findDomain($json['organic'] ?? [], $domain);
+
+        // Read the previous recorded position BEFORE writing today's row —
+        // otherwise a same-day re-check would compare against itself.
+        $previous = $this->previousPosition($kw);
 
         // Valid response (even if the site isn't in the top 100 → null) → stamp.
         $kw->forceFill([
@@ -64,6 +75,58 @@ class ContentSerpChecker
         ])->save();
 
         $this->recordHistory($kw, $position, $url);
+
+        return $this->notableGain($kw, $previous, $position);
+    }
+
+    /** Latest recorded position from a day BEFORE today, or null if none. */
+    private function previousPosition(ContentTrackedKeyword $kw): ?int
+    {
+        return ContentKeywordRankHistory::query()
+            ->where('website_id', $kw->website_id)
+            ->where('normalized_keyword', $kw->normalized_keyword)
+            ->where('checked_on', '<', now()->toDateString())
+            ->orderByDesc('checked_on')
+            ->value('position');
+    }
+
+    /**
+     * Is this move worth emailing the client about? A plain climb must clear
+     * the noise floor (rankAlertMinGain, default 3 places), but crossing a
+     * milestone — onto page 1, into the top 3, to #1, or ranking at all for the
+     * first time — always counts even if it's a single place.
+     *
+     * @return array{keyword_id:string,keyword:string,previous:?int,current:int,gain:?int,milestone:?string}|null
+     */
+    private function notableGain(ContentTrackedKeyword $kw, ?int $previous, ?int $current): ?array
+    {
+        if ($current === null) {
+            return null; // dropped out of / still outside the top 100
+        }
+
+        $milestone = match (true) {
+            $current === 1 && $previous !== 1 => 'number_one',
+            $current <= 3 && ($previous === null || $previous > 3) => 'top_3',
+            $current <= 10 && ($previous === null || $previous > 10) => 'page_1',
+            $previous === null => 'now_ranking',
+            default => null,
+        };
+
+        $gain = $previous !== null ? $previous - $current : null;
+        $clearsFloor = $gain !== null && $gain >= ContentAutopilotConfig::rankAlertMinGain();
+
+        if ($milestone === null && ! $clearsFloor) {
+            return null;
+        }
+
+        return [
+            'keyword_id' => (string) $kw->id,
+            'keyword' => (string) $kw->keyword,
+            'previous' => $previous,
+            'current' => $current,
+            'gain' => $gain,
+            'milestone' => $milestone,
+        ];
     }
 
     /**

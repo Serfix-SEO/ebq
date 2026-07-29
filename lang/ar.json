@@ -3899,5 +3899,20 @@
     "Every check": "كل الفحوصات",
     "Ranking page": "الصفحة المُرتّبة",
     "Live Google rank — open rank history": "الترتيب المباشر في جوجل — افتح سجل الترتيب",
-    "This is the first recorded check — the trend line builds as the weekly checks come in.": "هذا أول فحص مسجّل — يتكوّن خط الاتجاه مع توالي الفحوصات الأسبوعية."
+    "This is the first recorded check — the trend line builds as the weekly checks come in.": "هذا أول فحص مسجّل — يتكوّن خط الاتجاه مع توالي الفحوصات الأسبوعية.",
+    "Ranking up": "تحسّن في الترتيب",
+    "Hi :name, here is what changed in Google since the last check.": "مرحباً :name، إليك ما تغيّر في جوجل منذ آخر فحص.",
+    "Now ranking #1": "في المركز الأول الآن",
+    "Broke into the top 3": "دخلت أفضل 3 نتائج",
+    "Reached page 1": "وصلت إلى الصفحة الأولى",
+    "Ranking for the first time": "تظهر في النتائج لأول مرة",
+    "Also moved up": "تحسّنت أيضاً",
+    "See the full tracker": "عرض المتتبع كاملاً",
+    "Positions come from a live Google check run every week. Open any keyword to see its full history.": "تُؤخذ المراكز من فحص مباشر لجوجل يُجرى أسبوعياً. افتح أي كلمة لعرض سجلها الكامل.",
+    "You are receiving this because :domain is tracking keywords with :app.": "تصلك هذه الرسالة لأن :domain يتتبع كلمات مفتاحية عبر :app.",
+    "+ :count more in your tracker.": "و:count أخرى في المتتبع.",
+    "\":keyword\" moved up to #:position on :domain": "\":keyword\" ارتفعت إلى المركز :position على :domain",
+    ":count keywords moved up on :domain — \":keyword\" is now #:position": "ارتفعت :count كلمات على :domain — \":keyword\" الآن في المركز :position",
+    "{1}A keyword just moved up on :domain|[2,*]:count keywords just moved up on :domain": "{1}ارتفعت كلمة مفتاحية على :domain|[2,*]ارتفعت :count كلمات مفتاحية على :domain",
+    "{1}Up :count place|[2,*]Up :count places": "{1}تقدّم بمركز واحد|[2,*]تقدّم بـ :count مراكز"
 }
