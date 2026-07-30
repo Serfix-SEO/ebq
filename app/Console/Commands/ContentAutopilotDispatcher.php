@@ -107,6 +107,22 @@ class ContentAutopilotDispatcher extends Command
                 }
             });
 
+        // Already-classified plans: monthly library growth (Research page feed).
+        // Guards inside make this a cheap no-op except once a month per plan.
+        ContentPlan::query()
+            ->where('status', ContentPlan::STATUS_ACTIVE)
+            ->whereNotNull('keywords_classified_at')
+            ->get()
+            ->each(function (ContentPlan $plan) use ($insights): void {
+                try {
+                    $insights->ensureMonthlyRefresh($plan);
+                } catch (\Throwable $e) {
+                    Log::warning('content_autopilot.kw_refresh_error', [
+                        'plan_id' => $plan->id, 'error' => mb_substr($e->getMessage(), 0, 200),
+                    ]);
+                }
+            });
+
         return $n;
     }
 

@@ -149,6 +149,32 @@ class ContentKeywordInsights
     }
 
     /**
+     * Monthly keyword-library growth for plans that already classified once
+     * (the Research page's "new keywords keep appearing" promise). Re-runs the
+     * harvest (per-domain monthly guard inside; the keyword server's month-keyed
+     * cache returns fresh data each calendar month) and re-dispatches the
+     * classifier — keywords_classify_cursor continues the volume band where the
+     * last run stopped, so each month adds the next band of vetted keywords.
+     * First-run semantics (ensureClassify) are untouched.
+     */
+    public function ensureMonthlyRefresh(ContentPlan $plan): void
+    {
+        if ($plan->keywords_classified_at === null) {
+            return; // first classification is the onboarding/heartbeat path
+        }
+        if ($plan->keywords_classified_at->format('Y-m') === now()->format('Y-m')) {
+            return; // already grown this month
+        }
+        $this->ensureRankingHarvest($plan);
+        // Weekly cache guard: harvest webhooks land minutes later, so retrying
+        // across ticks is wanted — but not every 15 minutes.
+        if (! Cache::add('content:kw-reclassify:'.$plan->id, 1, now()->addWeek())) {
+            return;
+        }
+        ClassifyPlanKeywordsJob::dispatch($plan->id);
+    }
+
+    /**
      * Free competitor-keyword harvest via the self-hosted keyword server: dispatch
      * a TAGGED site-scope request for the client's own domain + top competitors so
      * the webhook writes each domain's keywords into domain_keyword_rankings — the

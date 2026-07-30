@@ -9,8 +9,11 @@ use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Llm\LlmClient;
 use App\Support\ContentAutopilotConfig;
+use App\Support\ContentSiteTypeProfiles;
+use App\Support\KeywordFinderLocations;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Evidence-driven topic ideation for Content Autopilot.
@@ -62,7 +65,7 @@ class ContentTopicPlanner
         // being written. Replenishment happens only as topics leave the pool
         // (published): each publish drops the pool below cap and the dispatcher's
         // top-up adds exactly the shortfall back.
-        $cap = \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $cap = ContentAutopilotConfig::monthlyArticlesPerWebsite();
         $existingActive = $plan->topics()
             ->whereNotIn('status', [ContentTopic::STATUS_PUBLISHED, ContentTopic::STATUS_SKIPPED])
             ->count();
@@ -127,7 +130,7 @@ class ContentTopicPlanner
                 ))), 0, 8),
                 'intent' => in_array($candidate['intent'] ?? null, ['informational', 'commercial', 'transactional', 'navigational'], true)
                     ? $candidate['intent'] : 'informational',
-                'source' => in_array($candidate['source'] ?? null, ['gsc_gap', 'gap', 'keywords', 'competitor', 'llm'], true)
+                'source' => in_array($candidate['source'] ?? null, ['gsc_gap', 'gap', 'keywords', 'competitor', 'llm', 'research'], true)
                     ? $candidate['source'] : 'llm',
                 'status' => ContentTopic::STATUS_APPROVED,
                 'scheduled_for' => $dates[count($created)] ?? null,
@@ -171,7 +174,7 @@ class ContentTopicPlanner
             ->map(static fn ($k) => mb_strtolower(trim((string) $k)))
             ->flip();
 
-        $cap = \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $cap = ContentAutopilotConfig::monthlyArticlesPerWebsite();
         $created = [];
 
         foreach ($terms as $term) {
@@ -232,7 +235,7 @@ class ContentTopicPlanner
      */
     private function confirmedTitle(string $keyword, string $intent): string
     {
-        $title = (string) \Illuminate\Support\Str::title($keyword);
+        $title = (string) Str::title($keyword);
 
         // Question-shaped terms already read as titles.
         if (preg_match('/^(how|what|why|when|where|which|who|can|should|is|are|do|does)\b/i', $keyword)) {
@@ -360,7 +363,7 @@ class ContentTopicPlanner
 
     /**
      * @param  list<string>  $keywords
-     * @return list<string>|null  lowercased on-topic keywords; null on LLM unavailable/error
+     * @return list<string>|null lowercased on-topic keywords; null on LLM unavailable/error
      */
     private function llmRelevant(array $keywords, string $offer, string $desc, string $exclude = ''): ?array
     {
@@ -425,8 +428,8 @@ class ContentTopicPlanner
 
         // Pre-vetted GAP keywords (competitors rank, the client doesn't; already
         // classified as topically relevant) — strong, on-topic target candidates.
-        $gapKeywords = \App\Models\ContentPlanKeyword::query()
-            ->where('plan_id', $plan->id)->where('type', \App\Models\ContentPlanKeyword::TYPE_GAP)
+        $gapKeywords = ContentPlanKeyword::query()
+            ->where('plan_id', $plan->id)->where('type', ContentPlanKeyword::TYPE_GAP)
             ->orderByDesc('search_volume')->limit(40)->pluck('keyword')->all();
         $gapBlock = $gapKeywords === [] ? '(none yet)' : implode("\n", array_map(
             static fn ($k) => '- '.$k, $gapKeywords
@@ -439,17 +442,17 @@ class ContentTopicPlanner
         $countryCode = strtolower(trim((string) ($plan->country ?: 'global')));
         $market = $countryCode === '' || $countryCode === 'global'
             ? null
-            : (\App\Support\KeywordFinderLocations::COUNTRIES[$countryCode] ?? null);
+            : (KeywordFinderLocations::COUNTRIES[$countryCode] ?? null);
         $marketBlock = $market === null ? '' : "\nTARGET MARKET: {$market}. Topics, terminology, pricing/regulatory framing, and search intent must fit THIS market — never assume US/UK defaults.\n";
 
         // Type-aware mix + audience (Phase F): the site type's TOFU/MOFU/BOFU
         // ratio steers what KIND of articles get planned. Null type = no
         // block, exact pre-site-type prompt.
         $typeBlock = '';
-        if (\App\Support\ContentSiteTypeProfiles::isValid($plan->site_type)) {
-            $profile = \App\Support\ContentSiteTypeProfiles::profile($plan->site_type);
+        if (ContentSiteTypeProfiles::isValid($plan->site_type)) {
+            $profile = ContentSiteTypeProfiles::profile($plan->site_type);
             $mix = $profile['article_mix'];
-            $typeBlock = "\nSITE TYPE: ".\App\Support\ContentSiteTypeProfiles::label($plan->site_type)
+            $typeBlock = "\nSITE TYPE: ".ContentSiteTypeProfiles::label($plan->site_type)
                 .'. Aim for roughly '.round($mix['tofu'] * 100).'% broad how-to/educational topics, '
                 .round($mix['mofu'] * 100).'% comparison/consideration topics, and '
                 .round($mix['bofu'] * 100).'% decision-stage topics (cost, choosing, buying).';
@@ -519,6 +522,18 @@ class ContentTopicPlanner
      *
      * @return list<Carbon>
      */
+    /**
+     * Public face of scheduleDates() for callers outside the planner (the
+     * Research page's Add-to-calendar) — next free publish day(s), honoring
+     * cadence, publish_days and the one-article-per-day rule.
+     *
+     * @return list<Carbon>
+     */
+    public function nextDates(ContentPlan $plan, int $count): array
+    {
+        return $this->scheduleDates($plan, $count);
+    }
+
     private function scheduleDates(ContentPlan $plan, int $count): array
     {
         $perWeek = max(1, min(7, (int) $plan->articles_per_week));
@@ -541,7 +556,7 @@ class ContentTopicPlanner
         $used = $plan->topics()
             ->whereNotNull('scheduled_for')
             ->pluck('scheduled_for')
-            ->map(fn ($d) => \Illuminate\Support\Carbon::parse($d)->toDateString())
+            ->map(fn ($d) => Carbon::parse($d)->toDateString())
             ->flip()->all();
 
         $dates = [];

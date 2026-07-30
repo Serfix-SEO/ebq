@@ -307,6 +307,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
         // (content.access), OR an existing plan-with-topics so a lapsed user can
         // still publish already-generated articles (handled inside the middleware).
         Route::view('/content', 'content.index')->middleware(['feature:content', 'content.access'])->name('content.index');
+        Route::view('/content/research', 'content.research')->middleware(['feature:content', 'content.access'])->name('content.research');
         Route::view('/content/settings', 'content.settings')->middleware(['feature:content', 'content.access'])->name('content.settings');
         Route::view('/content/integrations', 'content.integrations')->middleware(['feature:content', 'content.access'])->name('content.integrations');
         Route::view('/content/tracker', 'content.tracker')->middleware(['feature:content', 'content.access'])->name('content.tracker');

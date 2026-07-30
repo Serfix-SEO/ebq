@@ -77,6 +77,36 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   this page — regenerate via `MarketingShotsTest` (which now also seeds GD-painted
   demo heroes + dumps `calendar-list.html` and `settings.html`) after visual changes.
 
+- **Research page (2026-07-30)** — `/content/research` (`content.research`, nav item
+  between Calendar and Settings), Livewire `App\Livewire\Content\ContentResearch` +
+  `livewire/content/content-research.blade.php`. The client-facing keyword-ideas
+  feed over **`content_plan_keywords`** (own + gap + chosen): volume, intent chip,
+  a difficulty label calibrated to the site's own authority
+  (`KeywordWinnability::difficultyCeiling(ownDa)` — `difficultyLabel()` and the SQL
+  filter `applyDifficultyFilter()` MUST stay in lockstep), source chips
+  ("Competitor gap" / "You rank for this" / "Your pick"), `New` badge + weekly
+  counter from `created_at`, search/intent/difficulty filters + sort, custom
+  prev/next pager (no Laravel paginator view — bundle risk). Extra sections:
+  **striking distance** (live GSC aggregate, position 6-30, impressions ≥20/90d,
+  fails soft without GSC) and **questions** from the insights digest.
+  **Add to calendar** creates an APPROVED `source='research'` topic on the next
+  free publish day via `ContentTopicPlanner::nextDates()` (public wrapper around
+  scheduleDates), dedupes on target_keyword, refuses when the unpublished pool ≥
+  `monthlyArticlesPerWebsite()`; **Write** additionally runs the writeNow-style
+  entitlement check + dispatches `ProduceContentArticleJob` and redirects to the
+  review page. `'research'` was added to the planner's accepted-source whitelist.
+  First page visit on an unclassified plan dispatches
+  `PrepareContentKeywordInsightsJob` and shows the researching checklist.
+  **Monthly library growth**: `ContentKeywordInsights::ensureMonthlyRefresh()` —
+  for ACTIVE plans classified before the current month, re-runs the (monthly-
+  guarded) ranking harvest and re-dispatches `ClassifyPlanKeywordsJob` (weekly
+  cache guard `content:kw-reclassify:{plan}`); the existing
+  `keywords_classify_cursor` continues the volume band, so each month adds the
+  next band of vetted keywords. Wired into the dispatcher heartbeat
+  (`advanceKeywordResearch()` second pass). Tests:
+  `tests/Feature/Content/ContentResearchTest.php`. ⚠️ new route → `route:cache`
+  on box A or the nav 500s.
+
 - **Settings layout (2026-07-30)** — the post-onboarding `$settingsView` branch is a
   **left-tab layout**: Alpine `x-data="{ tab: 'profile' }"` on the settings root,
   a sticky vertical tab rail on lg+ (horizontal scroll pills on mobile), panels

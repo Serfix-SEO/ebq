@@ -196,6 +196,27 @@ class MarketingShotsTest extends TestCase
         $this->dump('calendar-list', Livewire::test(ContentCalendar::class)->set('view', 'list')->html());
         $this->dump('settings', Livewire::test(ContentCalendar::class, ['mode' => 'settings'])->html());
 
+        // ── Research page: keyword-ideas feed ───────────────────────────────
+        $plan->forceFill(['keywords_classified_at' => now()->subDay()])->save();
+        foreach ([
+            ['coffee subscription gift', 4400, 0.15, 'commercial', 'gap'],
+            ['how to make cold brew at home', 2900, 0.10, 'informational', 'gap'],
+            ['best manual coffee grinder', 1900, 0.45, 'commercial', 'gap'],
+            ['arabica vs robusta', 1600, 0.20, 'informational', 'own'],
+            ['coffee brewing water temperature', 880, 0.08, 'informational', 'gap'],
+            ['espresso tamper size guide', 720, 0.55, 'informational', 'gap'],
+            ['single origin coffee beans uk', 590, 0.75, 'transactional', 'chosen'],
+            ['what is a coffee bloom', 480, 0.05, 'informational', 'gap'],
+        ] as [$kw, $vol, $comp, $intent, $type]) {
+            \App\Models\ContentPlanKeyword::create([
+                'plan_id' => $plan->id, 'keyword' => $kw,
+                'keyword_hash' => \App\Models\KeywordMetric::hashKeyword($kw),
+                'type' => $type, 'country' => 'global', 'search_volume' => $vol,
+                'competition' => $comp, 'search_intent' => $intent,
+            ]);
+        }
+        $this->dump('research', Livewire::test(\App\Livewire\Content\ContentResearch::class)->html());
+
         $component = Livewire::test(ArticleReview::class, ['topicId' => $topic->id]);
         // Audit trail for tuning the demo article — which weighted checks miss.
         $ref = new \ReflectionMethod(ArticleReview::class, 'scoreCurrent');
