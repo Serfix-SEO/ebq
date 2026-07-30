@@ -7,6 +7,7 @@ use App\Livewire\Content\ContentCalendar;
 use App\Livewire\Content\KeywordRankHistory;
 use App\Livewire\Content\KeywordTracker;
 use App\Models\ContentArticle;
+use App\Models\ContentImage;
 use App\Models\ContentIntegration;
 use App\Models\ContentKeywordRankHistory;
 use App\Models\ContentPlan;
@@ -116,11 +117,66 @@ class MarketingShotsTest extends TestCase
             'credentials' => ['site_url' => 'https://northlanecoffee.com', 'user' => 'demo', 'app_password' => 'demo'],
         ]);
 
-        $this->dump('calendar', Livewire::test(ContentCalendar::class)->html());
+        // ── Hero thumbnails for the calendar cards ──────────────────────────
+        // GD-painted abstract art written under storage/app/public so the
+        // dumped HTML resolves real <img> URLs. No client imagery, no API spend.
+        config(['services.content.images_disk' => 'public']);
+        @mkdir(storage_path('app/public/content/demo-shots'), 0755, true);
+        $palette = [
+            [[244, 162, 89], [120, 60, 20]],
+            [[214, 140, 69], [56, 34, 15]],
+            [[236, 179, 101], [153, 88, 42]],
+            [[250, 208, 137], [176, 108, 57]],
+            [[222, 184, 135], [92, 51, 23]],
+            [[240, 154, 55], [66, 32, 7]],
+            [[235, 200, 160], [130, 70, 30]],
+        ];
+        $paintHero = function (int $i) use ($palette): string {
+            $file = "content/demo-shots/hero-{$i}.png";
+            [$a, $b] = $palette[$i % count($palette)];
+            $im = imagecreatetruecolor(640, 360);
+            for ($y = 0; $y < 360; $y++) {
+                $mix = $y / 359;
+                $col = imagecolorallocate(
+                    $im,
+                    (int) ($a[0] + ($b[0] - $a[0]) * $mix),
+                    (int) ($a[1] + ($b[1] - $a[1]) * $mix),
+                    (int) ($a[2] + ($b[2] - $a[2]) * $mix),
+                );
+                imageline($im, 0, $y, 639, $y, $col);
+            }
+            $hl = imagecolorallocatealpha($im, 255, 255, 255, 96);
+            imagefilledellipse($im, 140 + $i * 55, 120 + ($i % 3) * 60, 220, 220, $hl);
+            imagefilledellipse($im, 480 - $i * 30, 260 - ($i % 2) * 80, 150, 150, $hl);
+            imagepng($im, storage_path('app/public/'.$file));
+            imagedestroy($im);
+
+            return $file;
+        };
+        $attachHero = function (ContentArticle $article, int $i, string $alt) use ($paintHero): void {
+            ContentImage::create([
+                'article_id' => $article->id,
+                'role' => ContentImage::ROLE_FEATURED,
+                'status' => ContentImage::STATUS_GENERATED,
+                'disk_path' => $paintHero($i),
+                'alt_text' => $alt,
+                'filename' => "hero-{$i}.png",
+            ]);
+        };
+        // Topics 0-6 get a lightweight current article + hero; topic 2 gets the
+        // full sample article BELOW (storeVersion moves is_current, so its hero
+        // must attach to that later version, not one created here).
+        foreach ([0, 1, 3, 4, 5, 6] as $i) {
+            $article = ContentArticle::storeVersion($topics[$i], [
+                'h1' => $topics[$i]->title, 'html' => '<p>demo</p>',
+                'seo_score' => [94, 88, 91, 96, 86, 90][$i % 6], 'word_count' => 1100 + $i * 180,
+            ]);
+            $attachHero($article, $i, $topics[$i]->title);
+        }
 
         // ── One finished article: preview + SEO score + checks ──────────────
         $topic = $topics[2];
-        ContentArticle::storeVersion($topic, [
+        $sampleArticle = ContentArticle::storeVersion($topic, [
             'h1' => 'The Complete Pour Over Coffee Guide for Home Brewing',
             'meta_title' => 'Pour Over Coffee Guide: Brew Better Cups at Home',
             'meta_description' => 'A practical pour over coffee guide covering grind size, water temperature and brew ratio, with a simple routine for a sweet, balanced cup every morning.',
@@ -133,6 +189,12 @@ class MarketingShotsTest extends TestCase
             'style_issues' => [],
             'generation_meta' => ['provider' => 'demo', 'model' => 'demo'],
         ]);
+        $attachHero($sampleArticle, 2, $topic->title);
+
+        // Calendar shots AFTER every article exists so cards carry their heroes.
+        $this->dump('calendar', Livewire::test(ContentCalendar::class)->html());
+        $this->dump('calendar-list', Livewire::test(ContentCalendar::class)->set('view', 'list')->html());
+
         $component = Livewire::test(ArticleReview::class, ['topicId' => $topic->id]);
         // Audit trail for tuning the demo article — which weighted checks miss.
         $ref = new \ReflectionMethod(ArticleReview::class, 'scoreCurrent');

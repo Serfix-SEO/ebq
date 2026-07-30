@@ -297,6 +297,21 @@
     @include('livewire.content.partials.wizard')
     @else
         {{-- ── Calendar ─────────────────────────────────────────────── --}}
+        @php
+            /* Literal status-chip classes, light AND dark. Never build these by
+               interpolation ("bg-$color-100"): the Tailwind scanner can't see
+               interpolated names, so such classes only survive if some other
+               file happens to use the same literal — and their dark: variants
+               never existed at all (chips rendered light-on-light in dark mode). */
+            $chipClasses = [
+                'slate' => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                'sky' => 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300',
+                'amber' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+                'emerald' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
+                'rose' => 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300',
+                'orange' => 'bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300',
+            ];
+        @endphp
         <x-content.connect-integration />
 
         {{-- Auto-publish off → nudge with a one-click toggle; hides once on. --}}
@@ -374,15 +389,15 @@
         {{-- ── Overview KPIs ────────────────────────────────────────── --}}
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             @foreach ([
-                ['label' => __('Planned'), 'value' => $stats['planned'], 'color' => 'sky', 'icon' => 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5'],
-                ['label' => __('In progress'), 'value' => $stats['in_progress'], 'color' => 'amber', 'icon' => 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'],
-                ['label' => __('Ready for review'), 'value' => $stats['ready'], 'color' => 'emerald', 'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
-                ['label' => __('Published'), 'value' => $stats['published'], 'color' => 'orange', 'icon' => 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5'],
+                ['label' => __('Planned'), 'value' => $stats['planned'], 'chip' => 'bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400', 'icon' => 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5'],
+                ['label' => __('In progress'), 'value' => $stats['in_progress'], 'chip' => 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400', 'icon' => 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'],
+                ['label' => __('Ready for review'), 'value' => $stats['ready'], 'chip' => 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400', 'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                ['label' => __('Published'), 'value' => $stats['published'], 'chip' => 'bg-orange-100 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400', 'icon' => 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5'],
             ] as $kpi)
                 <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($kpi['value']) }}</span>
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-{{ $kpi['color'] }}-100 text-{{ $kpi['color'] }}-600">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl {{ $kpi['chip'] }}">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $kpi['icon'] }}"/></svg>
                         </span>
                     </div>
@@ -398,6 +413,14 @@
         @endif
 
         @if ($view === 'grid')
+            @if ($topics->isEmpty())
+                <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-orange-50 to-slate-100 text-slate-400 dark:from-orange-950/40 dark:to-slate-800 dark:text-slate-500">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z"/></svg>
+                    </span>
+                    <span>{{ __('No articles planned this month yet.') }} {{ __('Use the month arrows to browse your planned articles.') }}</span>
+                </div>
+            @endif
             <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400" style="min-width:56rem">
                     @foreach ([__('Mon'), __('Tue'), __('Wed'), __('Thu'), __('Fri'), __('Sat'), __('Sun')] as $dow)
@@ -418,7 +441,7 @@
                              x-on:dragleave="over = false"
                              x-on:drop="over = false; if (drag.id) { $wire.reschedule(drag.id, '{{ $day->toDateString() }}') }; drag.id = null"
                              :class="over && drag.id ? 'ring-2 ring-inset ring-orange-400' : ''"
-                             class="border-b border-e border-slate-100 p-1.5 align-top transition-colors dark:border-slate-800 {{ $day->format('Y-m') !== $month ? 'bg-slate-50/60 dark:bg-slate-950/40' : '' }}" style="min-height:7.25rem">
+                             class="border-b border-e border-slate-100 p-1.5 align-top transition-colors dark:border-slate-800 {{ $day->format('Y-m') !== $month ? 'bg-slate-50/60 dark:bg-slate-950/40' : '' }}" style="min-height:9.5rem">
                             <div class="mb-1.5 flex justify-end">
                                 @if ($day->isToday())
                                     <span class="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-orange-600 px-1 text-xs font-bold text-white">{{ $day->day }}</span>
@@ -434,22 +457,56 @@
                                     $canWrite = ! $cellInFlight && in_array($topic->status, ['suggested', 'approved', 'failed'], true);
                                     $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true);
                                     $overCap = in_array($topic->id, $overCapIds ?? [], true);
+                                    $hero = \App\Livewire\Content\ContentCalendar::heroImage($topic);
+                                    $cellScore = $topic->currentArticle?->seo_score;
+                                    $cellScoreColor = $cellScore >= 80 ? 'emerald' : ($cellScore >= 60 ? 'amber' : 'rose');
+                                    $cellImages = $topic->currentArticle?->images?->count() ?? 0;
+                                    $cellWords = $topic->currentArticle?->word_count ?? 0;
                                 @endphp
                                 <div wire:key="cell-{{ $topic->id }}" x-data="{ pick: false, newDate: '{{ $topic->scheduled_for?->toDateString() }}' }"
                                      @if($canDrag) draggable="true"
                                         x-on:dragstart="drag.id = '{{ $topic->id }}'; $event.dataTransfer.setData('text/plain', '{{ $topic->id }}'); $event.dataTransfer.effectAllowed = 'move'"
                                         x-on:dragend="drag.id = null" @endif
-                                     class="mb-1 rounded-lg border p-1.5 {{ $overCap ? 'border-error/60 bg-error/5 dark:border-error/50' : ($cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800') }} {{ $canDrag ? 'cursor-grab active:cursor-grabbing' : '' }}">
+                                     class="mb-1.5 overflow-hidden rounded-lg border shadow-sm transition-shadow hover:shadow-md {{ $overCap ? 'border-error/60 bg-error/5 dark:border-error/50' : ($cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800') }} {{ $canDrag ? 'cursor-grab active:cursor-grabbing' : '' }}">
+                                    {{-- Hero image strip (featured first, else newest) — gradient placeholder when none. --}}
+                                    <div class="relative h-14 w-full bg-gradient-to-br from-orange-50 to-slate-100 dark:from-orange-950/40 dark:to-slate-800">
+                                        @if ($hero?->url())
+                                            <img src="{{ $hero->url() }}" alt="{{ $hero->alt_text ?? $topic->title }}"
+                                                 loading="lazy" decoding="async" draggable="false"
+                                                 class="h-14 w-full object-cover" onerror="this.remove()">
+                                        @else
+                                            <span class="absolute inset-0 flex items-center justify-center text-slate-400 opacity-40 dark:text-slate-500">
+                                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z"/></svg>
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="p-1.5">
                                     @if ($topic->currentArticle || $cellInFlight)
                                         <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80">
-                                            <span class="break-words text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
+                                            <span class="break-words text-xs font-semibold text-slate-800 line-clamp-2 dark:text-slate-100">{{ $topic->title }}</span>
                                         </a>
                                     @else
-                                        <span class="break-words text-xs font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</span>
+                                        <span class="break-words text-xs font-semibold text-slate-800 line-clamp-2 dark:text-slate-100">{{ $topic->title }}</span>
+                                    @endif
+                                    @if ($cellScore || $cellImages > 0 || $cellWords > 0)
+                                        <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                                            @if ($cellScore)
+                                                <span class="inline-flex items-center rounded-full px-1.5 py-px font-bold {{ $chipClasses[$cellScoreColor] }}" title="{{ __('SEO score') }}">{{ __('SEO') }} {{ $cellScore }}</span>
+                                            @endif
+                                            @if ($cellWords > 0)
+                                                <span>{{ number_format($cellWords) }} {{ __('words') }}</span>
+                                            @endif
+                                            @if ($cellImages > 0)
+                                                <span class="inline-flex items-center gap-0.5" title="{{ __('Images') }}">
+                                                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z"/></svg>
+                                                    {{ $cellImages }}
+                                                </span>
+                                            @endif
+                                        </div>
                                     @endif
                                     <div class="mt-1 flex items-center justify-between gap-1">
                                         @php $chipColor = $imgPending ? 'amber' : $p['color']; @endphp
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-{{ $chipColor }}-100 px-1.5 py-px text-[10px] font-semibold text-{{ $chipColor }}-700">
+                                        <span class="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-semibold {{ $chipClasses[$chipColor] ?? $chipClasses['slate'] }}">
                                             @if ($cellInFlight)
                                                 <svg class="h-2.5 w-2.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                                             @endif
@@ -493,6 +550,7 @@
                                             {{ __('Publish now') }}
                                         </button>
                                     @endif
+                                    </div>
                                 </div>
                             @endforeach
                         </div>
@@ -503,6 +561,7 @@
             <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="hidden items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 sm:flex dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
                     <span class="w-40 shrink-0">{{ __('Date') }}</span>
+                    <span class="w-20 shrink-0" aria-hidden="true"></span>
                     <span class="min-w-0 flex-1">{{ __('Article') }}</span>
                     <span>{{ __('Status & actions') }}</span>
                 </div>
@@ -513,7 +572,7 @@
                             $imgPending = \App\Livewire\Content\ContentCalendar::imagesPending($topic);
                             $overCap = in_array($topic->id, $overCapIds ?? [], true);
                         @endphp
-                        <div class="flex flex-wrap items-center gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/30 {{ $overCap ? 'bg-error/5' : '' }}">
+                        <div class="flex flex-wrap items-center gap-3 px-4 py-4 transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/30 {{ $overCap ? 'bg-error/5' : '' }}">
                             @php $canMove = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true); @endphp
                             <div class="w-40 shrink-0">
                                 @if ($canMove)
@@ -521,7 +580,7 @@
                                     <div class="flex items-center gap-1" x-data="{ d: '{{ $topic->scheduled_for?->toDateString() }}' }" wire:key="resched-{{ $topic->id }}">
                                         <input type="date" x-model="d" min="{{ now()->toDateString() }}"
                                             title="{{ __('Move to another day or month') }}"
-                                            class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" />
+                                            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" />
                                         <button type="button" x-show="d && d !== '{{ $topic->scheduled_for?->toDateString() }}'"
                                                 x-on:click="$wire.reschedule('{{ $topic->id }}', d)"
                                                 class="inline-flex shrink-0 items-center rounded-lg bg-orange-600 px-2 py-1 text-xs font-bold text-white hover:bg-orange-700">{{ __('Save') }}</button>
@@ -533,10 +592,23 @@
                             @php
                                 $traffic = \App\Livewire\Content\ContentCalendar::fairMonthlyVisits($topic);
                                 $inFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true);
+                                $hero = \App\Livewire\Content\ContentCalendar::heroImage($topic);
                             @endphp
+                            {{-- Hero thumbnail (featured first, else newest) — gradient placeholder when none. --}}
+                            <div class="hidden h-12 w-20 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-orange-50 to-slate-100 sm:block dark:from-orange-950/40 dark:to-slate-800">
+                                @if ($hero?->url())
+                                    <img src="{{ $hero->url() }}" alt="{{ $hero->alt_text ?? $topic->title }}"
+                                         loading="lazy" decoding="async"
+                                         class="h-full w-full object-cover" onerror="this.remove()">
+                                @else
+                                    <span class="flex h-full w-full items-center justify-center text-slate-400 opacity-40 dark:text-slate-500">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z"/></svg>
+                                    </span>
+                                @endif
+                            </div>
                             <div class="min-w-0 flex-1">
-                                <div class="break-words text-sm font-medium text-slate-800 dark:text-slate-100">{{ $topic->title }}</div>
-                                <div class="flex flex-wrap items-center gap-x-2 text-xs text-slate-500 dark:text-slate-400">
+                                <div class="break-words text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $topic->title }}</div>
+                                <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                                     <span>{{ $topic->target_keyword }}@if($topic->keyword_volume) · {{ number_format($topic->keyword_volume) }} {{ __('searches/mo') }}@endif</span>
                                     @if ($traffic)
                                         <span class="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-px font-semibold text-success" title="{{ __('A fair, conservative estimate once this ranks — not a best case.') }}">
@@ -544,10 +616,29 @@
                                             ~{{ number_format($traffic['low']) }}–{{ number_format($traffic['high']) }} {{ __('visits/mo') }}
                                         </span>
                                     @endif
+                                    @if ($topic->currentArticle?->seo_score)
+                                        @php $scoreColor = $topic->currentArticle->seo_score >= 80 ? 'emerald' : ($topic->currentArticle->seo_score >= 60 ? 'amber' : 'rose'); @endphp
+                                        <span class="inline-flex items-center gap-1 rounded-full px-2 py-px font-semibold {{ $chipClasses[$scoreColor] }}" title="{{ __('SEO score') }}">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            {{ __('SEO') }} {{ $topic->currentArticle->seo_score }}
+                                        </span>
+                                    @endif
+                                    @if (($topic->currentArticle->word_count ?? 0) > 0)
+                                        <span>{{ number_format($topic->currentArticle->word_count) }} {{ __('words') }}</span>
+                                    @endif
+                                    @if (($rowImages = $topic->currentArticle?->images?->count() ?? 0) > 0)
+                                        <span class="inline-flex items-center gap-1" title="{{ __('Images') }}">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z"/></svg>
+                                            {{ $rowImages }} {{ __('images') }}
+                                        </span>
+                                    @endif
+                                    @if ($topic->source && ! in_array($topic->source, ['manual', 'llm'], true))
+                                        <span class="rounded-full bg-slate-100 px-2 py-px font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ __('From search demand') }}</span>
+                                    @endif
                                 </div>
                             </div>
                             @php $chipColor = $imgPending ? 'amber' : $p['color']; @endphp
-                            <span class="rounded-full bg-{{ $chipColor }}-100 px-2 py-0.5 text-xs font-semibold text-{{ $chipColor }}-700">{{ $imgPending ? __('Finalizing images…') : $p['label'] }}</span>
+                            <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $chipClasses[$chipColor] ?? $chipClasses['slate'] }}">{{ $imgPending ? __('Finalizing images…') : $p['label'] }}</span>
                             @if ($overCap)
                                 <span class="rounded-full bg-error/10 px-2 py-0.5 text-xs font-bold text-error">{{ __('Over monthly limit') }}</span>
                             @endif
@@ -592,8 +683,14 @@
                             @endif
                         </div>
                     @empty
-                        <div class="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-                            {{ __('No articles planned this month yet.') }}
+                        <div class="flex flex-col items-center gap-3 px-4 py-14 text-center">
+                            <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-50 to-slate-100 text-slate-400 dark:from-orange-950/40 dark:to-slate-800 dark:text-slate-500">
+                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z"/></svg>
+                            </span>
+                            <div>
+                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ __('No articles planned this month yet.') }}</p>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Use the month arrows to browse your planned articles.') }}</p>
+                            </div>
                         </div>
                     @endforelse
                 </div>

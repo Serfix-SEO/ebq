@@ -9,6 +9,7 @@ use App\Jobs\PlanContentTopicsJob;
 use App\Jobs\PrepareContentKeywordInsightsJob;
 use App\Jobs\ProduceContentArticleJob;
 use App\Jobs\PublishContentArticleJob;
+use App\Models\ContentImage;
 use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
@@ -1250,6 +1251,20 @@ class ContentCalendar extends Component
         };
     }
 
+    /**
+     * Hero image for a topic's calendar card: generated, featured first, else
+     * newest. Works over the eager-loaded relation (see render()) so it costs
+     * zero queries per card. Same pick order as ArticleReview's social
+     * fallback. Null when the topic has no displayable image (yet).
+     */
+    public static function heroImage(ContentTopic $topic): ?ContentImage
+    {
+        return $topic->currentArticle?->images
+            ?->sortByDesc('created_at')
+            ->sortBy(fn (ContentImage $i) => $i->role === ContentImage::ROLE_FEATURED ? 0 : 1)
+            ->first();
+    }
+
     // ── Data access ─────────────────────────────────────────────────────
 
     private function website(): ?Website
@@ -1523,7 +1538,15 @@ class ContentCalendar extends Component
         $monthStart = Carbon::createFromFormat('Y-m', $this->month)->startOfMonth();
         $topics = $plan->topics()
             ->whereNotIn('status', [ContentTopic::STATUS_SKIPPED]) // skipped ones aren't planned articles
-            ->with('currentArticle:id,topic_id,seo_score,word_count,version')
+            ->with([
+                'currentArticle:id,topic_id,seo_score,word_count,version',
+                // Hero thumbnails for the calendar cards: generated images only,
+                // slim column set, eager-loaded so the card path never queries
+                // per topic (the page re-renders every 5s while jobs are in flight).
+                'currentArticle.images' => fn ($q) => $q
+                    ->where('status', ContentImage::STATUS_GENERATED)
+                    ->select('id', 'article_id', 'role', 'disk_path', 'alt_text', 'created_at'),
+            ])
             ->whereBetween('scheduled_for', [$monthStart->copy()->startOfWeek(), $monthStart->copy()->endOfMonth()->endOfWeek()])
             ->orderBy('scheduled_for')->orderBy('position')->get();
 

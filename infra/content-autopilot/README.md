@@ -58,6 +58,25 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   `ProduceContentArticleJob`, cleared on every `GenerateContentImagesJob` exit).
   If no plan exists yet, shows a lightweight empty state ("No content plan yet").
 
+- **Card design (redesigned 2026-07-30)** — every grid card and list row carries a
+  **hero thumbnail**: `ContentCalendar::heroImage($topic)` picks generated-only,
+  featured-first-else-newest from the eager-loaded `currentArticle.images`
+  relation (constrained in `render()` — zero per-card queries, safe under the 5s
+  poll; same pick order as ArticleReview's `socialImageFallback`). Imageless
+  topics get an orange→slate gradient placeholder with a photo icon (never Nodus —
+  30 repeats/month is noise). Cards also show an **SEO-score chip** (≥80 emerald /
+  ≥60 amber / else rose), **word count** and **image count** from the eager-loaded
+  article; list rows add a "From search demand" chip when `source` isn't
+  manual/llm. ⚠️ Status-chip + KPI classes are a **literal `$chipClasses` map** at
+  the top of the calendar branch — they were interpolated (`bg-{$color}-100`)
+  before, which the Tailwind scanner can't see and which had NO dark variants
+  (light-on-light chips in dark mode). Never reintroduce interpolated class names
+  there. Thumbnails load the full-size originals (no resize pipeline yet) with
+  `loading="lazy" decoding="async"`; a thumbnail pipeline is a flagged follow-up.
+  The marketing visual `public/images/content/calendar.webp` is a screenshot of
+  this page — regenerate via `MarketingShotsTest` (which now also seeds GD-painted
+  demo heroes + dumps `calendar-list.html`) after visual changes.
+
 - **Scheduling: planner fills one-article-per-day** — `ContentTopicPlanner::scheduleDates()`
   skips any day the plan already has a topic on. The USER may stack a 2nd article
   on a day via the calendar-icon date picker (grid) / date input (list) — manual
