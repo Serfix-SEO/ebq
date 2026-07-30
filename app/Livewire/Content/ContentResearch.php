@@ -183,6 +183,7 @@ class ContentResearch extends Component
             'title' => mb_substr(Str::title($keyword), 0, 300),
             'target_keyword' => $keyword,
             'keyword_volume' => $volume,
+            'secondary_keywords' => $this->relatedKeywords($plan, $keyword),
             'source' => 'research',
             'status' => ContentTopic::STATUS_APPROVED,
             'scheduled_for' => $date,
@@ -193,6 +194,56 @@ class ContentResearch extends Component
         ]));
 
         return $topic;
+    }
+
+    /**
+     * Secondary keywords for a research-added topic, mined from the plan's own
+     * vetted library (same head start the planner's ideation gives its topics,
+     * zero LLM cost): library keywords sharing a meaningful token with the
+     * focus keyword, ranked by token overlap then volume, capped at 8 (the
+     * planner's own cap).
+     *
+     * @return list<string>
+     */
+    private function relatedKeywords(ContentPlan $plan, string $keyword): array
+    {
+        $stop = ['the', 'and', 'for', 'with', 'what', 'how', 'why', 'best', 'top', 'your', 'you'];
+        $tokens = array_values(array_filter(
+            preg_split('/[^\p{L}\p{N}]+/u', $keyword) ?: [],
+            fn ($t) => mb_strlen($t) >= 3 && ! in_array(mb_strtolower($t), $stop, true),
+        ));
+        if ($tokens === []) {
+            return [];
+        }
+
+        $candidates = ContentPlanKeyword::query()
+            ->where('plan_id', $plan->id)
+            ->where('keyword', '!=', $keyword)
+            ->where(function ($q) use ($tokens) {
+                foreach (array_slice($tokens, 0, 4) as $t) {
+                    $q->orWhere('keyword', 'like', '%'.mb_strtolower($t).'%');
+                }
+            })
+            ->orderByDesc('search_volume')
+            ->limit(30)
+            ->pluck('keyword');
+
+        return $candidates
+            ->map(function (string $kw) use ($tokens) {
+                $overlap = 0;
+                foreach ($tokens as $t) {
+                    if (str_contains($kw, mb_strtolower($t))) {
+                        $overlap++;
+                    }
+                }
+
+                return ['kw' => $kw, 'overlap' => $overlap];
+            })
+            ->sortByDesc('overlap')
+            ->take(8)
+            ->pluck('kw')
+            ->values()
+            ->all();
     }
 
     /**

@@ -104,6 +104,26 @@ class ContentResearchTest extends TestCase
         $this->assertSame(1, $plan->topics()->where('target_keyword', 'best coffee grinder')->count());
     }
 
+    public function test_add_to_calendar_enriches_secondary_keywords_from_library(): void
+    {
+        [$user, $website, $plan] = $this->planFixture();
+        $this->keywordRow($plan, 'best coffee grinder');
+        $this->keywordRow($plan, 'manual coffee grinder review', ['search_volume' => 900]);
+        $this->keywordRow($plan, 'coffee grinder burr vs blade', ['search_volume' => 700]);
+        $this->keywordRow($plan, 'unrelated espresso machine', ['search_volume' => 5000]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentResearch::class)->call('addToCalendar', 'best coffee grinder', 1200);
+
+        $topic = $plan->topics()->where('target_keyword', 'best coffee grinder')->first();
+        $secondary = (array) $topic->secondary_keywords;
+        $this->assertContains('manual coffee grinder review', $secondary);
+        $this->assertContains('coffee grinder burr vs blade', $secondary);
+        $this->assertNotContains('best coffee grinder', $secondary);
+        $this->assertLessThanOrEqual(8, count($secondary));
+    }
+
     public function test_planned_keyword_shows_in_calendar_state(): void
     {
         [$user, $website, $plan] = $this->planFixture();
