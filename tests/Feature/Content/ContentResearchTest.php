@@ -265,6 +265,29 @@ class ContentResearchTest extends TestCase
             ->assertDontSee('hard keyword');
     }
 
+    public function test_giant_head_terms_are_never_easy_wins(): void
+    {
+        [$user, $website, $plan] = $this->planFixture();
+        // Ad competition near zero but 550k/mo — the fallback used to call this
+        // an "Easy win"; volume correction must label it hard.
+        $this->keywordRow($plan, 'digital marketing agencies', ['competition' => 0.0, 'search_volume' => 550000]);
+        $this->keywordRow($plan, 'small niche keyword', ['competition' => 0.1, 'search_volume' => 400]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        // Hard filter finds the giant; easy filter finds only the niche one —
+        // filter and label share one rule, so this pins both.
+        Livewire::test(ContentResearch::class)
+            ->set('difficulty', 'hard')
+            ->assertSee('digital marketing agencies')
+            ->assertDontSee('small niche keyword');
+
+        Livewire::test(ContentResearch::class)
+            ->set('difficulty', 'easy')
+            ->assertSee('small niche keyword')
+            ->assertDontSee('digital marketing agencies');
+    }
+
     public function test_no_internal_vendor_names_leak(): void
     {
         [$user, $website, $plan] = $this->planFixture();

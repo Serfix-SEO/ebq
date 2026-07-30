@@ -258,7 +258,7 @@ class ContentResearch extends Component
      * MUST stay in lockstep with feedDifficultyFilter() — the SQL filter and
      * this chip must agree or filtered rows show the "wrong" chip.
      */
-    private function difficultyLabel(?int $kd, ?float $competition, int $ceiling): string
+    private function difficultyLabel(?int $kd, ?float $competition, ?int $volume, int $ceiling): string
     {
         if ($kd !== null) {
             if ($kd <= (int) ($ceiling * 0.6)) {
@@ -267,34 +267,48 @@ class ContentResearch extends Component
 
             return $kd <= $ceiling ? 'moderate' : 'hard';
         }
-        if ($competition === null) {
+        // No real difficulty score → ad-competition tier, corrected by volume.
+        // Ad competition is near zero on giant informational head terms, which
+        // made 550k/mo keywords read "Easy win" — nothing that big is easy.
+        if (($volume ?? 0) >= 100000) {
+            return 'hard';
+        }
+        $base = $competition === null
+            ? 'moderate'
+            : ($competition < 0.34 ? 'easy' : ($competition < 0.67 ? 'moderate' : 'hard'));
+        if (($volume ?? 0) >= 10000 && $base === 'easy') {
             return 'moderate';
         }
-        if ($competition < 0.34) {
-            return 'easy';
-        }
 
-        return $competition < 0.67 ? 'moderate' : 'hard';
+        return $base;
     }
 
-    /** Apply the difficulty filter in SQL, mirroring difficultyLabel(). */
+    /** Apply the difficulty filter in SQL, mirroring difficultyLabel() exactly. */
     private function applyDifficultyFilter($query, string $level, int $ceiling): void
     {
         $easyKd = (int) ($ceiling * 0.6);
         match ($level) {
             'easy' => $query->where(function ($q) use ($easyKd) {
                 $q->where(fn ($w) => $w->whereNotNull('keyword_difficulty')->where('keyword_difficulty', '<=', $easyKd))
-                    ->orWhere(fn ($w) => $w->whereNull('keyword_difficulty')->whereNotNull('competition')->where('competition', '<', 0.34));
+                    ->orWhere(fn ($w) => $w->whereNull('keyword_difficulty')
+                        ->whereNotNull('competition')->where('competition', '<', 0.34)
+                        ->where(fn ($v) => $v->whereNull('search_volume')->orWhere('search_volume', '<', 10000)));
             }),
             'moderate' => $query->where(function ($q) use ($easyKd, $ceiling) {
                 $q->where(fn ($w) => $w->whereNotNull('keyword_difficulty')->where('keyword_difficulty', '>', $easyKd)->where('keyword_difficulty', '<=', $ceiling))
-                    ->orWhere(fn ($w) => $w->whereNull('keyword_difficulty')->where(
-                        fn ($c) => $c->whereNull('competition')->orWhere(fn ($b) => $b->where('competition', '>=', 0.34)->where('competition', '<', 0.67))
-                    ));
+                    ->orWhere(fn ($w) => $w->whereNull('keyword_difficulty')
+                        ->where(fn ($v) => $v->whereNull('search_volume')->orWhere('search_volume', '<', 100000))
+                        ->where(function ($c) {
+                            $c->where(fn ($b) => $b->whereNull('competition'))
+                                ->orWhere(fn ($b) => $b->where('competition', '>=', 0.34)->where('competition', '<', 0.67))
+                                ->orWhere(fn ($b) => $b->where('competition', '<', 0.34)->where('search_volume', '>=', 10000));
+                        }));
             }),
             'hard' => $query->where(function ($q) use ($ceiling) {
                 $q->where(fn ($w) => $w->whereNotNull('keyword_difficulty')->where('keyword_difficulty', '>', $ceiling))
-                    ->orWhere(fn ($w) => $w->whereNull('keyword_difficulty')->where('competition', '>=', 0.67));
+                    ->orWhere(fn ($w) => $w->whereNull('keyword_difficulty')->where(
+                        fn ($c) => $c->where('competition', '>=', 0.67)->orWhere('search_volume', '>=', 100000)
+                    ));
             }),
             default => null,
         };
@@ -385,7 +399,7 @@ class ContentResearch extends Component
         }
         match ($this->sort) {
             'newest' => $feed->orderByDesc('created_at')->orderByDesc('id'),
-            'easiest' => $feed->orderByRaw('CASE WHEN keyword_difficulty IS NULL THEN COALESCE(competition, 0.5) * 100 ELSE keyword_difficulty END ASC')->orderByDesc('search_volume'),
+            'easiest' => $feed->orderByRaw('CASE WHEN keyword_difficulty IS NOT NULL THEN keyword_difficulty WHEN search_volume >= 100000 THEN 90 WHEN search_volume >= 10000 AND COALESCE(competition, 0.5) * 100 < 34 THEN 50 ELSE COALESCE(competition, 0.5) * 100 END ASC')->orderByDesc('search_volume'),
             default => $feed->orderByDesc('search_volume')->orderBy('id'),
         };
 
@@ -400,7 +414,7 @@ class ContentResearch extends Component
                     'volume' => $row->search_volume,
                     'intent' => $row->search_intent,
                     'type' => $row->type,
-                    'difficulty' => $this->difficultyLabel($row->keyword_difficulty, $row->competition, $ceiling),
+                    'difficulty' => $this->difficultyLabel($row->keyword_difficulty, $row->competition, $row->search_volume, $ceiling),
                     'new' => $row->created_at !== null && $row->created_at->gte(now()->subDays(7)),
                     'planned' => isset($plannedSet[mb_strtolower(trim($row->keyword))]),
                 ];

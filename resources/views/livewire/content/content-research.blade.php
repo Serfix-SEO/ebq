@@ -25,21 +25,23 @@
         </div>
     @else
         @php
-            $intentChips = [
-                'informational' => ['label' => __('Informational'), 'cls' => 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'],
-                'commercial' => ['label' => __('Commercial'), 'cls' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'],
-                'transactional' => ['label' => __('Transactional'), 'cls' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'],
-                'navigational' => ['label' => __('Navigational'), 'cls' => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'],
+            /* ONE colored pill per row (difficulty); everything else muted
+               text — pill soup confused clients (owner feedback 2026-07-30). */
+            $intentLabels = [
+                'informational' => __('Informational'),
+                'commercial' => __('Commercial'),
+                'transactional' => __('Transactional'),
+                'navigational' => __('Navigational'),
             ];
             $difficultyChips = [
                 'easy' => ['label' => __('Easy win'), 'cls' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'],
                 'moderate' => ['label' => __('Moderate'), 'cls' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'],
                 'hard' => ['label' => __('Hard'), 'cls' => 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'],
             ];
-            $sourceChips = [
-                'gap' => ['label' => __('Competitor gap'), 'cls' => 'bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300'],
-                'own' => ['label' => __('You rank for this'), 'cls' => 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'],
-                'chosen' => ['label' => __('Your pick'), 'cls' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'],
+            $sourceLabels = [
+                'gap' => __('found on competitors'),
+                'own' => __('you already rank for this'),
+                'chosen' => __('your pick'),
             ];
         @endphp
 
@@ -187,11 +189,14 @@
                                     @if ($row['volume'])
                                         <span class="font-semibold text-slate-600 dark:text-slate-300">~{{ number_format($row['volume']) }}/{{ __('mo') }}</span>
                                     @endif
-                                    @if ($row['intent'] && isset($intentChips[$row['intent']]))
-                                        <span class="rounded-full px-2 py-px font-medium {{ $intentChips[$row['intent']]['cls'] }}">{{ $intentChips[$row['intent']]['label'] }}</span>
-                                    @endif
-                                    @if (isset($sourceChips[$row['type']]))
-                                        <span class="rounded-full px-2 py-px font-medium {{ $sourceChips[$row['type']]['cls'] }}">{{ $sourceChips[$row['type']]['label'] }}</span>
+                                    @php
+                                        $meta = array_filter([
+                                            $row['intent'] ? ($intentLabels[$row['intent']] ?? null) : null,
+                                            $sourceLabels[$row['type']] ?? null,
+                                        ]);
+                                    @endphp
+                                    @if ($meta !== [])
+                                        <span>{{ implode(' · ', $meta) }}</span>
                                     @endif
                                 </div>
                             </div>
