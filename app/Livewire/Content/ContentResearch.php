@@ -8,9 +8,11 @@ use App\Jobs\ProduceContentArticleJob;
 use App\Models\ContentPlan;
 use App\Models\ContentPlanKeyword;
 use App\Models\ContentTopic;
+use App\Models\ContentTrackedKeyword;
 use App\Models\Website;
 use App\Services\Content\ContentEntitlements;
 use App\Services\Content\ContentKeywordInsights;
+use App\Services\Content\ContentKeywordTracker;
 use App\Services\Content\ContentTopicPlanner;
 use App\Services\Content\KeywordWinnability;
 use App\Support\ContentAutopilotConfig;
@@ -201,6 +203,56 @@ class ContentResearch extends Component
         ]));
 
         return $topic;
+    }
+
+    /**
+     * Add a keyword to the website's Keyword Tracker (live SERP checks + the
+     * rank-history chart) — the "full ranking" behind a You-rank claim.
+     */
+    public function trackKeyword(string $keyword): void
+    {
+        $website = $this->website();
+        $keyword = mb_strtolower(trim($keyword));
+        if ($website === null || $keyword === '') {
+            return;
+        }
+        $result = app(ContentKeywordTracker::class)->track(
+            $website, [$keyword], user: Auth::user(), primaryKeyword: $keyword,
+        );
+        if ($result['capped'] && $result['added'] === 0) {
+            session()->flash('content-error', __('Your Tracker is full — remove a keyword there to add more.'));
+
+            return;
+        }
+        session()->flash('content-status', __('Now tracking ":keyword" — live rankings appear in your Tracker.', ['keyword' => $keyword]));
+    }
+
+    /**
+     * Verified 90-day average Google positions for the given keywords, from the
+     * site's own Search Console data. Only keywords present here may carry a
+     * "You rank" claim — everything else is just "matches your site".
+     *
+     * @param  list<string>  $keywords
+     * @return array<string, int> keyword => rounded avg position
+     */
+    private function gscPositions(Website $website, array $keywords): array
+    {
+        if ($keywords === [] || ! $website->hasGsc()) {
+            return [];
+        }
+        try {
+            return DB::table('search_console_data')
+                ->where('website_id', $website->id)
+                ->where('date', '>=', now()->subDays(90)->toDateString())
+                ->whereIn('query', $keywords)
+                ->groupBy('query')
+                ->selectRaw('query, AVG(position) as position')
+                ->pluck('position', 'query')
+                ->map(fn ($p) => max(1, (int) round((float) $p)))
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     /**
@@ -407,8 +459,24 @@ class ContentResearch extends Component
         $lastPage = max(1, (int) ceil($filteredTotal / self::PER_PAGE));
         $this->feedPage = min($this->feedPage, $lastPage);
 
-        $rows = $feed->forPage($this->feedPage, self::PER_PAGE)->get()
-            ->map(function (ContentPlanKeyword $row) use ($plannedSet, $ceiling) {
+        $pageRows = $feed->forPage($this->feedPage, self::PER_PAGE)->get();
+
+        // Verified positions (GSC) for this page's "own" keywords — a "You rank"
+        // claim is only ever shown WITH the number behind it. Plus the tracked
+        // state so ranked rows link into the Tracker instead of re-adding.
+        $ownKeywords = $pageRows->where('type', ContentPlanKeyword::TYPE_OWN)
+            ->map(fn ($r) => mb_strtolower(trim($r->keyword)))->values()->all();
+        $positions = $this->gscPositions($website, $ownKeywords);
+        $trackedMap = $pageRows->isEmpty() ? [] : ContentTrackedKeyword::query()
+            ->where('website_id', $website->id)
+            ->whereIn('normalized_keyword', $pageRows->map(fn ($r) => ContentTrackedKeyword::normalize($r->keyword))->all())
+            ->pluck('id', 'normalized_keyword')
+            ->all();
+
+        $rows = $pageRows
+            ->map(function (ContentPlanKeyword $row) use ($plannedSet, $ceiling, $positions, $trackedMap) {
+                $kw = mb_strtolower(trim($row->keyword));
+
                 return [
                     'keyword' => $row->keyword,
                     'volume' => $row->search_volume,
@@ -416,7 +484,9 @@ class ContentResearch extends Component
                     'type' => $row->type,
                     'difficulty' => $this->difficultyLabel($row->keyword_difficulty, $row->competition, $row->search_volume, $ceiling),
                     'new' => $row->created_at !== null && $row->created_at->gte(now()->subDays(7)),
-                    'planned' => isset($plannedSet[mb_strtolower(trim($row->keyword))]),
+                    'planned' => isset($plannedSet[$kw]),
+                    'position' => $positions[$kw] ?? null,
+                    'tracked_id' => $trackedMap[ContentTrackedKeyword::normalize($row->keyword)] ?? null,
                 ];
             })
             ->all();

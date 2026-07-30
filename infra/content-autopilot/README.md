@@ -83,10 +83,19 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   feed over **`content_plan_keywords`** (own + gap + chosen): volume, intent chip,
   a difficulty label calibrated to the site's own authority
   (`KeywordWinnability::difficultyCeiling(ownDa)` — `difficultyLabel()` and the SQL
-  filter `applyDifficultyFilter()` MUST stay in lockstep), source chips
-  ("Competitor gap" / "You rank for this" / "Your pick"), `New` badge + weekly
-  counter from `created_at`, search/intent/difficulty filters + sort, custom
-  prev/next pager (no Laravel paginator view — bundle risk). Extra sections:
+  filter `applyDifficultyFilter()` MUST stay in lockstep; the no-KD fallback is
+  **volume-aware**: ≥100k/mo is always hard, ≥10k can't be easy — ad competition
+  is ~0 on giant head terms and used to produce "Easy win" on 550k/mo keywords),
+  ONE colored pill per row (difficulty) with intent+source as muted text,
+  `New` badge + weekly counter from `created_at`, search/intent/difficulty
+  filters + sort, custom prev/next pager (no Laravel paginator view — bundle
+  risk). **Ranking-claim honesty rule**: `own`-type rows say only "matches your
+  site" — the keyword-server site scan proves topical association, NOT a SERP
+  position (its `domain_keyword_rankings` rows have `rank_absolute = null`). A
+  "You rank #N" label appears ONLY when the keyword is found in the site's own
+  GSC data (`gscPositions()`, 90-day avg, one query per page), always WITH the
+  number, plus a "Track ranking" action into the Keyword Tracker (live SERP
+  checks + history chart; `trackKeyword()` respects the tracker quota). Extra sections:
   **striking distance** (live GSC aggregate, position 6-30, impressions ≥20/90d,
   fails soft without GSC) and **questions** from the insights digest.
   **Add to calendar** creates an APPROVED `source='research'` topic on the next

@@ -4072,5 +4072,12 @@
     "Added to your calendar for :date.": "أُضيفت إلى تقويمك بتاريخ :date.",
     "found on competitors": "موجودة لدى المنافسين",
     "you already rank for this": "أنت تتصدر لها بالفعل",
-    "your pick": "اختيارك"
+    "your pick": "اختيارك",
+    "matches your site": "متوافقة مع موقعك",
+    "You rank #:pos": "أنت في المرتبة #:pos",
+    "Verified from your Google Search Console (90-day average)": "مؤكَّد من Google Search Console الخاص بك (متوسط 90 يوماً)",
+    "Track ranking": "تتبّع الترتيب",
+    "Daily live rank checks + history chart in your Tracker": "فحوصات ترتيب مباشرة يومياً + رسم بياني تاريخي في المتتبع",
+    "Now tracking \":keyword\" — live rankings appear in your Tracker.": "بدأ تتبع \":keyword\" — تظهر الترتيبات المباشرة في المتتبع.",
+    "Your Tracker is full — remove a keyword there to add more.": "المتتبع ممتلئ — احذف كلمة منه لإضافة المزيد."
 }

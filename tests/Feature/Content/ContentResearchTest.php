@@ -7,7 +7,10 @@ use App\Livewire\Content\ContentResearch;
 use App\Models\ContentPlan;
 use App\Models\ContentPlanKeyword;
 use App\Models\ContentTopic;
+use App\Models\ContentTrackedKeyword;
+use App\Models\GoogleAccount;
 use App\Models\KeywordMetric;
+use App\Models\SearchConsoleData;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Llm\LlmClient;
@@ -286,6 +289,43 @@ class ContentResearchTest extends TestCase
             ->set('difficulty', 'easy')
             ->assertSee('small niche keyword')
             ->assertDontSee('digital marketing agencies');
+    }
+
+    public function test_own_keywords_claim_a_rank_only_when_gsc_verifies_it(): void
+    {
+        [$user, $website, $plan] = $this->planFixture();
+        $ga = GoogleAccount::factory()->create(['user_id' => $user->id]);
+        $website->forceFill(['gsc_site_url' => 'https://example.com/', 'gsc_google_account_id' => $ga->id])->save();
+        $this->keywordRow($plan, 'verified keyword', ['type' => ContentPlanKeyword::TYPE_OWN]);
+        $this->keywordRow($plan, 'unverified keyword', ['type' => ContentPlanKeyword::TYPE_OWN, 'search_volume' => 1100]);
+        foreach (range(1, 3) as $d) {
+            SearchConsoleData::create([
+                'website_id' => $website->id,
+                'date' => now()->subDays($d)->toDateString(),
+                'query' => 'verified keyword',
+                'page' => 'https://example.com/page',
+                'clicks' => 5, 'impressions' => 100, 'position' => 12.4, 'ctr' => 0.05,
+            ]);
+        }
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentResearch::class)
+            ->assertSee(__('You rank #:pos', ['pos' => 12]))
+            ->assertSee(__('Track ranking'))
+            ->assertSee(__('matches your site')); // the unverified own row stays neutral
+    }
+
+    public function test_track_ranking_adds_keyword_to_tracker(): void
+    {
+        [$user, $website, $plan] = $this->planFixture();
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentResearch::class)->call('trackKeyword', 'verified keyword');
+
+        $this->assertSame(1, ContentTrackedKeyword::where('website_id', $website->id)
+            ->where('normalized_keyword', 'verified keyword')->count());
     }
 
     public function test_no_internal_vendor_names_leak(): void

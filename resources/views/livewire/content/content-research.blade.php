@@ -38,9 +38,11 @@
                 'moderate' => ['label' => __('Moderate'), 'cls' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'],
                 'hard' => ['label' => __('Hard'), 'cls' => 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'],
             ];
+            /* "own" only says "matches your site" — a ranking CLAIM appears
+               solely when GSC verifies it, and then always WITH the position. */
             $sourceLabels = [
                 'gap' => __('found on competitors'),
-                'own' => __('you already rank for this'),
+                'own' => __('matches your site'),
                 'chosen' => __('your pick'),
             ];
         @endphp
@@ -189,10 +191,16 @@
                                     @if ($row['volume'])
                                         <span class="font-semibold text-slate-600 dark:text-slate-300">~{{ number_format($row['volume']) }}/{{ __('mo') }}</span>
                                     @endif
+                                    @if ($row['position'] !== null)
+                                        <span class="inline-flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-300" title="{{ __('Verified from your Google Search Console (90-day average)') }}">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            {{ __('You rank #:pos', ['pos' => $row['position']]) }}
+                                        </span>
+                                    @endif
                                     @php
                                         $meta = array_filter([
                                             $row['intent'] ? ($intentLabels[$row['intent']] ?? null) : null,
-                                            $sourceLabels[$row['type']] ?? null,
+                                            $row['position'] === null ? ($sourceLabels[$row['type']] ?? null) : null,
                                         ]);
                                     @endphp
                                     @if ($meta !== [])
@@ -201,6 +209,21 @@
                                 </div>
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
+                                @if ($row['position'] !== null)
+                                    @if ($row['tracked_id'])
+                                        <a href="{{ route('content.keyword-history', $row['tracked_id']) }}" wire:navigate
+                                           class="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400">
+                                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.256-1.011M21.75 6.75v5.25M21.75 6.75h-5.25"/></svg>
+                                            {{ __('Tracking') }}
+                                        </a>
+                                    @else
+                                        <button type="button" wire:click="trackKeyword(@js($row['keyword']))" wire:loading.attr="disabled"
+                                            class="inline-flex items-center gap-1 rounded-lg border border-sky-200 px-2.5 py-1.5 text-xs font-bold text-sky-700 hover:border-sky-400 dark:border-sky-900 dark:text-sky-300" title="{{ __('Daily live rank checks + history chart in your Tracker') }}">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.256-1.011M21.75 6.75v5.25M21.75 6.75h-5.25"/></svg>
+                                            {{ __('Track ranking') }}
+                                        </button>
+                                    @endif
+                                @endif
                                 @if ($row['planned'])
                                     <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                                         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
