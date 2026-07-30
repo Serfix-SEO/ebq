@@ -41,6 +41,7 @@ class ContentPlan extends Model
             'images_enabled' => 'boolean',
             'ymyl' => 'boolean',
             'keywords_classified_at' => 'datetime',
+            'keywords_enriched_at' => 'datetime',
             'keywords_classify_cursor' => 'integer',
         ];
     }

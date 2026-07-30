@@ -274,6 +274,10 @@ return [
         // gate (not code presence) decides where the feature is visible.
         // Prod keeps false until the operator approves; staging leaves it on.
         'ui_enabled' => (bool) env('CONTENT_AUTOPILOT_UI', true),
+        // Paid DFS keyword-metric enrichment (difficulty/intent/volume) for
+        // covered plans' libraries. Kill switch on top of the DataForSEO
+        // spend meter — flipping this off stops all enrichment spend.
+        'keyword_enrichment' => (bool) env('CONTENT_KEYWORD_ENRICHMENT', true),
     ],
 
     // Open PageRank (by Keywords Everywhere) — global popularity rank + 0-10

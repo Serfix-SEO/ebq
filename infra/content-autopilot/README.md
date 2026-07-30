@@ -113,6 +113,27 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   review page. `'research'` was added to the planner's accepted-source whitelist.
   First page visit on an unclassified plan dispatches
   `PrepareContentKeywordInsightsJob` and shows the researching checklist.
+  **Paid metric enrichment (2026-07-30)**: `EnrichPlanKeywordMetricsJob` gives a
+  covered plan's whole library real DFS keyword difficulty + search intent +
+  precise Google Ads volume via `DataForSeoBacklinkClient::bulkKeywordMetrics()`
+  (3 flat-fee endpoints × 1,000 keywords/chunk, observed ~$0.26-0.35/chunk; the
+  full 4-client backlog cost ~$0.71 total). Money rails, all in the job:
+  ACTIVE + `billing_covered_at` plans only (lapsed clients cost zero), kill
+  switch `CONTENT_KEYWORD_ENRICHMENT`, `DataForSeoSpendMeter` checked before
+  every chunk with real `tasks[0].cost` recorded, delta-only vs fresh
+  `keyword_metrics` `dfs_labs` rows (30d — shared asset, cross-client dedup),
+  MAX_CHUNKS=8/run. Backfills content_plan_keywords for EVERY plan sharing the
+  keyword (KD/intent fill-if-missing, volume upgraded to precise). Triggers:
+  `ClassifyPlanKeywordsJob` tail (onboarding + monthly growth) and heartbeat
+  `ensureEnrichment()` (monthly guard on new `content_plans.keywords_enriched_at`
+  + 6h dispatch-storm cache). ⚠️ deploy-order lesson: the 14:15 heartbeat fired
+  before the 14:16 migration and the first jobs failed at the stamp AFTER their
+  chunks persisted — no money lost (delta resumed), but migrate BEFORE
+  restarting workers. Some keywords legitimately have no DFS KD — their fresh
+  metric row (null KD) prevents re-buying; the volume-aware fallback labels
+  them. Tests: `ContentKeywordEnrichmentTest` (stub client — the suite can
+  never hit the real API).
+
   **Monthly library growth**: `ContentKeywordInsights::ensureMonthlyRefresh()` —
   for ACTIVE plans classified before the current month, re-runs the (monthly-
   guarded) ranking harvest and re-dispatches `ClassifyPlanKeywordsJob` (weekly

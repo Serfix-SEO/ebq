@@ -181,6 +181,16 @@ class ClassifyPlanKeywordsJob implements ShouldQueue
                 'keywords_classify_cursor' => $minVolume,
             ])->saveQuietly();
         });
+
+        // Fresh library keywords just landed → enrich them with real DFS
+        // difficulty/intent/volume right away (onboarding + monthly growth
+        // both flow through here). The enrich job carries every money rail
+        // (coverage gate, kill switch, spend meter, delta-only), so this
+        // dispatch is safe even for uncovered plans — it just no-ops.
+        if (config('services.content_autopilot.keyword_enrichment', true)
+            && $plan->billing_covered_at !== null) {
+            EnrichPlanKeywordMetricsJob::dispatch($plan->id);
+        }
     }
 
     /**

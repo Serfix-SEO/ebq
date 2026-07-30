@@ -3,6 +3,7 @@
 namespace App\Services\Content;
 
 use App\Jobs\Content\ClassifyPlanKeywordsJob;
+use App\Jobs\Content\EnrichPlanKeywordMetricsJob;
 use App\Jobs\Content\HarvestDomainKeywordsJob;
 use App\Models\ContentPlan;
 use App\Models\ContentPlanKeyword;
@@ -172,6 +173,30 @@ class ContentKeywordInsights
             return;
         }
         ClassifyPlanKeywordsJob::dispatch($plan->id);
+    }
+
+    /**
+     * Paid metric enrichment (DFS difficulty/intent/volume) for a covered
+     * plan's library — monthly-guarded heartbeat backstop; the classify job
+     * also dispatches it directly when fresh keywords land. All the hard money
+     * rails (coverage, kill switch, spend meter, delta-only) live in the job;
+     * this only decides cadence.
+     */
+    public function ensureEnrichment(ContentPlan $plan): void
+    {
+        if ($plan->status !== ContentPlan::STATUS_ACTIVE
+            || $plan->billing_covered_at === null
+            || ! config('services.content_autopilot.keyword_enrichment', true)) {
+            return;
+        }
+        if ($plan->keywords_enriched_at !== null
+            && $plan->keywords_enriched_at->format('Y-m') === now()->format('Y-m')) {
+            return; // monthly guard
+        }
+        if (! Cache::add('content:kw-enrich:'.$plan->id, 1, now()->addHours(6))) {
+            return; // dispatch-storm guard while the queued job works
+        }
+        EnrichPlanKeywordMetricsJob::dispatch($plan->id);
     }
 
     /**

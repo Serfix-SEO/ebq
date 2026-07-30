@@ -345,6 +345,97 @@ class DataForSeoBacklinkClient
      * @param  array{language_name?:string, location_code?:int}  $opts
      * @return list<array{keyword:string, search_volume:?int, cpc:?float, competition:?float, keyword_difficulty:?int, search_intent:?string}>
      */
+    /**
+     * Bulk metric enrichment for up to 1,000 keywords in exactly THREE flat-fee
+     * requests, however many keywords are passed (each endpoint charges per
+     * request, not per keyword — the cheap path for whole-library enrichment,
+     * unlike keywordOverview which is capped at 50):
+     *   1. Labs bulk_keyword_difficulty → keyword_difficulty (0-100)
+     *   2. Labs search_intent           → main intent label
+     *   3. Google Ads search_volume     → precise volume + cpc + competition
+     *
+     * Returns rows shaped exactly like keywordOverview(). Missing per-endpoint
+     * data leaves that field null — callers must treat every field as optional.
+     *
+     * @param  list<string>  $keywords
+     * @return list<array{keyword:string, search_volume:?int, cpc:?float, competition:?float, keyword_difficulty:?int, search_intent:?string}>
+     */
+    public function bulkKeywordMetrics(array $keywords, array $opts = []): array
+    {
+        $clean = [];
+        foreach ($keywords as $kw) {
+            $kw = mb_strtolower(trim((string) $kw));
+            if ($kw !== '' && mb_strlen($kw) <= 80) {
+                $clean[$kw] = true;
+            }
+        }
+        $clean = array_slice(array_keys($clean), 0, 1000);
+        if ($clean === []) {
+            return [];
+        }
+
+        $location = (int) ($opts['location_code'] ?? 2840);
+        $language = (string) ($opts['language_name'] ?? 'English');
+        $num = static fn ($v) => is_numeric($v) ? $v : null;
+        $rows = [];
+        $row = function (string $kw) use (&$rows): array|false {
+            $kw = mb_strtolower(trim($kw));
+            if ($kw === '') {
+                return false;
+            }
+            if (! isset($rows[$kw])) {
+                $rows[$kw] = ['keyword' => $kw, 'search_volume' => null, 'cpc' => null,
+                    'competition' => null, 'keyword_difficulty' => null, 'search_intent' => null];
+            }
+
+            return $rows[$kw];
+        };
+
+        $kd = $this->firstResult('/dataforseo_labs/google/bulk_keyword_difficulty/live', [
+            'keywords' => $clean, 'location_code' => $location, 'language_name' => $language,
+        ]);
+        foreach ((array) ($kd['items'] ?? []) as $it) {
+            if (is_array($it) && ($r = $row((string) ($it['keyword'] ?? ''))) !== false
+                && ($v = $num($it['keyword_difficulty'] ?? null)) !== null) {
+                $rows[$r['keyword']]['keyword_difficulty'] = (int) $v;
+            }
+        }
+
+        $intent = $this->firstResult('/dataforseo_labs/google/search_intent/live', [
+            'keywords' => $clean, 'language_name' => $language,
+        ]);
+        foreach ((array) ($intent['items'] ?? []) as $it) {
+            if (is_array($it) && ($r = $row((string) ($it['keyword'] ?? ''))) !== false
+                && ($label = data_get($it, 'keyword_intent.label')) !== null && $label !== '') {
+                $rows[$r['keyword']]['search_intent'] = (string) $label;
+            }
+        }
+
+        $volumes = $this->resultList('/keywords_data/google_ads/search_volume/live', [
+            'keywords' => $clean, 'location_code' => $location, 'language_name' => $language,
+        ]);
+        foreach ($volumes as $it) {
+            if (! is_array($it) || ($r = $row((string) ($it['keyword'] ?? ''))) === false) {
+                continue;
+            }
+            $kw = $r['keyword'];
+            if (($v = $num($it['search_volume'] ?? null)) !== null) {
+                $rows[$kw]['search_volume'] = (int) $v;
+            }
+            if (($v = $num($it['cpc'] ?? null)) !== null) {
+                $rows[$kw]['cpc'] = (float) $v;
+            }
+            if (($v = $num($it['competition_index'] ?? null)) !== null) {
+                $rows[$kw]['competition'] = round(((float) $v) / 100, 4);
+            }
+        }
+
+        // Only keywords the caller asked about (Google Ads may normalize forms).
+        $asked = array_flip($clean);
+
+        return array_values(array_filter($rows, fn ($r) => isset($asked[$r['keyword']])));
+    }
+
     public function keywordOverview(array $keywords, array $opts = []): array
     {
         $clean = [];
@@ -488,7 +579,7 @@ class DataForSeoBacklinkClient
      * already harvested (dupe-free incremental accumulation — the gap harvest).
      *
      * @param  array{limit?:int, volume_cursor?:?int, language_name?:string, location_code?:int}  $opts
-     * @return list<array<string, mixed>>  normalized rows
+     * @return list<array<string, mixed>> normalized rows
      */
     public function rankedKeywords(string $domain, array $opts = []): array
     {
@@ -584,6 +675,22 @@ class DataForSeoBacklinkClient
     }
 
     /**
+     * POST a single-task live request and return `tasks[0].result` as a flat
+     * list — the shape the keywords_data endpoints use (each result entry IS
+     * an item; there is no `items` wrapper like the Labs endpoints have).
+     *
+     * @param  array<string, mixed>  $task
+     * @return list<array<string, mixed>>
+     */
+    private function resultList(string $path, array $task): array
+    {
+        $task['__want_result_list'] = true;
+        $list = $this->firstResult($path, $task);
+
+        return is_array($list) ? array_values(array_filter($list, 'is_array')) : [];
+    }
+
+    /**
      * POST a single-task live request and return `tasks[0].result[0]`.
      *
      * @param  array<string, mixed>  $task
@@ -591,6 +698,8 @@ class DataForSeoBacklinkClient
      */
     private function firstResult(string $path, array $task): ?array
     {
+        $wantList = (bool) ($task['__want_result_list'] ?? false);
+        unset($task['__want_result_list']);
         $auth = $this->authHeader();
         if ($auth === null) {
             Log::warning('DataForSeoBacklinkClient: missing credentials');
@@ -652,6 +761,11 @@ class DataForSeoBacklinkClient
                 return null;
             }
 
+            if ($wantList) {
+                $list = $taskResult['result'] ?? null;
+
+                return is_array($list) ? $list : null;
+            }
             $result = $taskResult['result'][0] ?? null;
 
             return is_array($result) ? $result : null;

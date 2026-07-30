@@ -116,6 +116,7 @@ class ContentAutopilotDispatcher extends Command
             ->each(function (ContentPlan $plan) use ($insights): void {
                 try {
                     $insights->ensureMonthlyRefresh($plan);
+                    $insights->ensureEnrichment($plan);
                 } catch (\Throwable $e) {
                     Log::warning('content_autopilot.kw_refresh_error', [
                         'plan_id' => $plan->id, 'error' => mb_substr($e->getMessage(), 0, 200),
