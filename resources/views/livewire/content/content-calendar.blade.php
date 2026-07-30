@@ -58,11 +58,9 @@
              x-show — all panels stay in the DOM so wire:model bindings and
              validation work regardless of the visible tab) ════════════ --}}
         <div class="mx-auto w-full max-w-5xl" x-data="{ tab: 'profile' }">
-            <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-                <div class="min-w-0">
-                    <h2 class="text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Content settings') }}</h2>
-                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('How your articles are researched, written and published.') }}</p>
-                </div>
+            {{-- No heading here: the page view (content/settings.blade.php) already
+                 renders the "Content Settings" h1 + subtitle. --}}
+            <div class="mb-5 flex justify-end">
                 <a href="{{ route('content.index') }}" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
                     {{ __('View calendar') }}

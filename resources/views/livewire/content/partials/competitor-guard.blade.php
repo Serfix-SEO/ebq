@@ -41,7 +41,10 @@
             {{ __('Checking which of your competitors could pull readers away…') }}
         </div>
     @else
-        @if ($guard['autoEnabled'])
+        {{-- Only when we actually blocked something: with an empty list the
+             sentence read "0 of your competitors sell what you sell", and the
+             "No blocked brands yet" line below already covers that case. --}}
+        @if ($guard['autoEnabled'] && $guard['terms'] !== [])
             <div class="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 dark:border-orange-900 dark:bg-orange-950">
                 <p class="text-xs font-bold text-orange-800 dark:text-orange-200">
                     {{ trans_choice('We turned this on for you: :n of your competitors sells what you sell.|We turned this on for you: :n of your competitors sell what you sell.', count($guard['terms']), ['n' => count($guard['terms'])]) }}
