@@ -57,7 +57,10 @@
         {{-- ══ Post-onboarding SETTINGS: left tab nav (Alpine `tab`, panels
              x-show — all panels stay in the DOM so wire:model bindings and
              validation work regardless of the visible tab) ════════════ --}}
-        <div class="mx-auto w-full max-w-5xl" x-data="{ tab: 'profile' }">
+        {{-- Full page width, NOT mx-auto/max-w-*: the route view's "Content
+             Settings" h1 spans the page, so a centered narrower column left the
+             tabs visibly inset from the heading. --}}
+        <div class="w-full" x-data="{ tab: 'profile' }">
             {{-- No heading here: the page view (content/settings.blade.php) already
                  renders the "Content Settings" h1 + subtitle. --}}
             <div class="mb-5 flex justify-end">
