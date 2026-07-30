@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Content;
 
+use App\Jobs\Content\RefineTopicSecondaryKeywordsJob;
 use App\Jobs\PrepareContentKeywordInsightsJob;
 use App\Jobs\ProduceContentArticleJob;
 use App\Models\ContentPlan;
@@ -118,7 +119,13 @@ class ContentResearch extends Component
      */
     public function addToCalendar(string $keyword, ?int $volume = null): void
     {
-        $this->createTopicFor($keyword, $volume);
+        $topic = $this->createTopicFor($keyword, $volume);
+        if ($topic !== null) {
+            // Async AI polish of the instant token-overlap secondaries — fails
+            // open, never blocks the click. Skipped on the Write path (the
+            // producer claims the topic immediately and does its own research).
+            RefineTopicSecondaryKeywordsJob::dispatch($topic->id);
+        }
     }
 
     /** Add to the calendar AND start writing immediately (entitlement-gated). */

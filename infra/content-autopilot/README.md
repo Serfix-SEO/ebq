@@ -95,7 +95,11 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   `monthlyArticlesPerWebsite()`, and fills `secondary_keywords` from the plan's
   own library (`relatedKeywords()`: token-overlap match against the focus
   keyword, ranked overlap-then-volume, cap 8 — the head start planner-ideated
-  topics get, no LLM); **Write** additionally runs the writeNow-style
+  topics get, no LLM), then `RefineTopicSecondaryKeywordsJob` asynchronously
+  re-picks them with a flash LLM call (choose-from-library-only so every
+  secondary stays vetted + carries volume; fails open to the token pick;
+  guarded update only while the topic is still APPROVED — never rewrites one
+  the producer claimed; skipped on the Write path); **Write** additionally runs the writeNow-style
   entitlement check + dispatches `ProduceContentArticleJob` and redirects to the
   review page. `'research'` was added to the planner's accepted-source whitelist.
   First page visit on an unclassified plan dispatches

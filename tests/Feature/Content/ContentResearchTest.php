@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Content;
 
+use App\Jobs\Content\RefineTopicSecondaryKeywordsJob;
 use App\Livewire\Content\ContentResearch;
 use App\Models\ContentPlan;
 use App\Models\ContentPlanKeyword;
@@ -9,6 +10,7 @@ use App\Models\ContentTopic;
 use App\Models\KeywordMetric;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Llm\LlmClient;
 use App\Support\ContentAutopilotConfig;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -122,6 +124,82 @@ class ContentResearchTest extends TestCase
         $this->assertContains('coffee grinder burr vs blade', $secondary);
         $this->assertNotContains('best coffee grinder', $secondary);
         $this->assertLessThanOrEqual(8, count($secondary));
+    }
+
+    public function test_refine_job_replaces_secondaries_with_llm_pick_from_library_only(): void
+    {
+        [$user, $website, $plan] = $this->planFixture();
+        $this->keywordRow($plan, 'burr mill comparison', ['search_volume' => 800]);
+        $this->keywordRow($plan, 'coffee grinding basics', ['search_volume' => 600]);
+        $topic = ContentTopic::factory()->create([
+            'plan_id' => $plan->id,
+            'website_id' => $website->id,
+            'target_keyword' => 'best coffee grinder',
+            'status' => ContentTopic::STATUS_APPROVED,
+            'secondary_keywords' => ['seed pick'],
+            'source' => 'research',
+        ]);
+
+        // LLM returns one library keyword + one hallucinated keyword — only the
+        // library one may survive.
+        $this->app->instance(LlmClient::class, $this->fakeLlm([
+            'keywords' => ['burr mill comparison', 'invented keyword not in library'],
+        ]));
+
+        (new RefineTopicSecondaryKeywordsJob($topic->id))->handle();
+
+        $this->assertSame(['burr mill comparison'], (array) $topic->fresh()->secondary_keywords);
+    }
+
+    public function test_refine_job_never_touches_a_topic_that_started_writing(): void
+    {
+        [$user, $website, $plan] = $this->planFixture();
+        $this->keywordRow($plan, 'burr mill comparison');
+        $topic = ContentTopic::factory()->create([
+            'plan_id' => $plan->id,
+            'website_id' => $website->id,
+            'target_keyword' => 'best coffee grinder',
+            'status' => ContentTopic::STATUS_WRITING,
+            'secondary_keywords' => ['seed pick'],
+        ]);
+
+        $this->app->instance(LlmClient::class, $this->fakeLlm([
+            'keywords' => ['burr mill comparison'],
+        ]));
+
+        (new RefineTopicSecondaryKeywordsJob($topic->id))->handle();
+
+        $this->assertSame(['seed pick'], (array) $topic->fresh()->secondary_keywords);
+    }
+
+    private function fakeLlm(?array $verdict): LlmClient
+    {
+        return new class($verdict) implements LlmClient
+        {
+            public function __construct(private readonly ?array $verdict) {}
+
+            public function isAvailable(): bool
+            {
+                return $this->verdict !== null;
+            }
+
+            public function complete(array $messages, array $options = []): array
+            {
+                return ['ok' => true, 'content' => '', 'model' => 'fake',
+                    'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0]];
+            }
+
+            public function completeJson(array $messages, array $options = []): ?array
+            {
+                return $this->verdict;
+            }
+
+            public function completeWithTools(array $messages, array $tools, callable $dispatcher, array $options = []): array
+            {
+                return ['ok' => true, 'decoded' => null, 'content' => '', 'model' => 'fake',
+                    'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0], 'tool_calls' => []];
+            }
+        };
     }
 
     public function test_planned_keyword_shows_in_calendar_state(): void
