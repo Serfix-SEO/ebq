@@ -54,15 +54,50 @@
             </a>
         </div>
     @elseif ($settingsView)
-        {{-- ══ Post-onboarding SETTINGS layout (no stepper) ════════════ --}}
-        <div class="mx-auto w-full max-w-4xl space-y-5">
-            <div class="flex justify-end">
+        {{-- ══ Post-onboarding SETTINGS: left tab nav (Alpine `tab`, panels
+             x-show — all panels stay in the DOM so wire:model bindings and
+             validation work regardless of the visible tab) ════════════ --}}
+        <div class="mx-auto w-full max-w-5xl" x-data="{ tab: 'profile' }">
+            <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <h2 class="text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Content settings') }}</h2>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('How your articles are researched, written and published.') }}</p>
+                </div>
                 <a href="{{ route('content.index') }}" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
                     {{ __('View calendar') }}
                 </a>
             </div>
 
+            <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+                {{-- Tab nav: horizontal scroll pills on mobile, sticky left rail on lg+. --}}
+                @php
+                    $settingsTabs = [
+                        'profile' => ['label' => __('Business profile'), 'icon' => 'M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0'],
+                        'offerings' => ['label' => __('Offerings'), 'icon' => 'M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3zM6 6h.008v.008H6V6z'],
+                        'structure' => ['label' => __('Article structure'), 'icon' => 'M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zM3.75 12h.007v.008H3.75V12zm0 5.25h.007v.008H3.75v-.008z'],
+                        'images' => ['label' => __('Images'), 'icon' => 'M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z'],
+                        'publishing' => ['label' => __('Publishing'), 'icon' => 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5'],
+                        'protection' => ['label' => __('Brand protection'), 'icon' => 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z'],
+                    ];
+                @endphp
+                <nav class="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm lg:sticky lg:top-24 lg:w-56 lg:shrink-0 lg:flex-col lg:p-2 dark:border-slate-800 dark:bg-slate-900" role="tablist">
+                    @foreach ($settingsTabs as $tabKey => $tabDef)
+                        <button type="button" role="tab" x-on:click="tab = '{{ $tabKey }}'"
+                            :class="tab === '{{ $tabKey }}' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'"
+                            :aria-selected="tab === '{{ $tabKey }}' ? 'true' : 'false'"
+                            class="flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-sm font-semibold transition lg:w-full">
+                            <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $tabDef['icon'] }}"/></svg>
+                            <span class="min-w-0 truncate">{{ $tabDef['label'] }}</span>
+                            @if ($tabKey === 'profile' && $errors->any())
+                                <span class="ms-auto h-1.5 w-1.5 shrink-0 rounded-full bg-error" title="{{ __('Needs attention') }}"></span>
+                            @endif
+                        </button>
+                    @endforeach
+                </nav>
+
+                <div class="min-w-0 flex-1 space-y-5">
+            <div x-show="tab === 'profile'">
             {{-- Business profile --}}
             <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Business profile') }}</h2>
@@ -92,10 +127,15 @@
                 </div>
             </div>
 
+            </div>
+
             {{-- Competitor mention protection --}}
-            @include('livewire.content.partials.competitor-guard', ['guard' => $guard ?? null])
+            <div x-show="tab === 'protection'" x-cloak>
+                @include('livewire.content.partials.competitor-guard', ['guard' => $guard ?? null])
+            </div>
 
             {{-- Offerings --}}
+            <div x-show="tab === 'offerings'" x-cloak>
             <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('What you sell') }}</h2>
                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Guides article topics toward what you actually offer.') }}</p>
@@ -141,7 +181,10 @@
                 </div>
             </div>
 
+            </div>
+
             {{-- Article structure --}}
+            <div x-show="tab === 'structure'" x-cloak>
             <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('What goes into every article') }}</h2>
                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Turn these sections on or off. Applies to future articles.') }}</p>
@@ -170,7 +213,10 @@
                 </div>
             </div>
 
+            </div>
+
             {{-- Images --}}
+            <div x-show="tab === 'images'" x-cloak>
             <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-4">
                     <div class="min-w-0">
@@ -201,7 +247,10 @@
                 @endif
             </div>
 
+            </div>
+
             {{-- Publishing cadence --}}
+            <div x-show="tab === 'publishing'" x-cloak>
             <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Publishing') }}</h2>
                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('How often we publish and how long each article runs.') }}</p>
@@ -286,10 +335,14 @@
                 </div>
             </div>
 
+            </div>
+
             <div class="flex justify-end">
                 <button type="button" wire:click="saveSettings" class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
                     {{ __('Save settings') }}
                 </button>
+            </div>
+                </div>
             </div>
         </div>
 

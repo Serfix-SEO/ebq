@@ -75,7 +75,18 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   `loading="lazy" decoding="async"`; a thumbnail pipeline is a flagged follow-up.
   The marketing visual `public/images/content/calendar.webp` is a screenshot of
   this page — regenerate via `MarketingShotsTest` (which now also seeds GD-painted
-  demo heroes + dumps `calendar-list.html`) after visual changes.
+  demo heroes + dumps `calendar-list.html` and `settings.html`) after visual changes.
+
+- **Settings layout (2026-07-30)** — the post-onboarding `$settingsView` branch is a
+  **left-tab layout**: Alpine `x-data="{ tab: 'profile' }"` on the settings root,
+  a sticky vertical tab rail on lg+ (horizontal scroll pills on mobile), panels
+  toggled with `x-show` + `x-cloak`. All six panels (profile / offerings /
+  structure / images / publishing / brand-protection) stay in the DOM, so every
+  `wire:model` binding and `saveSettings()` validation works regardless of the
+  visible tab; the single Save button below the panels saves everything at once.
+  The Business profile tab shows a red dot when `$errors->any()` (the only
+  validated field lives there). Card markup inside each panel is unchanged from
+  the pre-tab layout.
 
 - **Scheduling: planner fills one-article-per-day** — `ContentTopicPlanner::scheduleDates()`
   skips any day the plan already has a topic on. The USER may stack a 2nd article

@@ -4031,5 +4031,9 @@
     "Add a website to get started with Content Autopilot.": "أضف موقعاً للبدء مع Content Autopilot.",
     "{1}You have 1 free website slot ready — add a website to use it.|[2,*]You have :count free website slots ready — add a website to use them.": "{1}لديك مساحة موقع مجانية جاهزة — أضف موقعاً لاستخدامها.|[2,*]لديك :count مساحات مواقع مجانية جاهزة — أضف موقعاً لاستخدامها.",
     "From search demand": "من طلب البحث الفعلي",
-    "Use the month arrows to browse your planned articles.": "استخدم أسهم الأشهر لتصفح مقالاتك المخطط لها."
+    "Use the month arrows to browse your planned articles.": "استخدم أسهم الأشهر لتصفح مقالاتك المخطط لها.",
+    "Content settings": "إعدادات المحتوى",
+    "How your articles are researched, written and published.": "كيف تتم دراسة مقالاتك وكتابتها ونشرها.",
+    "Article structure": "هيكل المقال",
+    "Brand protection": "حماية العلامة التجارية"
 }

@@ -194,6 +194,7 @@ class MarketingShotsTest extends TestCase
         // Calendar shots AFTER every article exists so cards carry their heroes.
         $this->dump('calendar', Livewire::test(ContentCalendar::class)->html());
         $this->dump('calendar-list', Livewire::test(ContentCalendar::class)->set('view', 'list')->html());
+        $this->dump('settings', Livewire::test(ContentCalendar::class, ['mode' => 'settings'])->html());
 
         $component = Livewire::test(ArticleReview::class, ['topicId' => $topic->id]);
         // Audit trail for tuning the demo article — which weighted checks miss.
