@@ -1602,7 +1602,11 @@ class ContentCalendar extends Component
                 continue;
             }
             $rank++;
-            if ($rank >= $cap) { // the cap-th (your last) and anything beyond
+            // STRICTLY beyond the cap. This used to be >=, which painted the
+            // cap-th article red and raised the "won't be generated" banner for
+            // a client whose month landed exactly on their allowance — the one
+            // article that IS covered (2026-07-30).
+            if ($rank > $cap) {
                 $overCapIds[] = $t->id;
             }
         }

@@ -47,4 +47,48 @@ class ContentCalendarViewTest extends TestCase
         Livewire::test(ContentCalendar::class, ['mode' => 'calendar'])
             ->assertOk();
     }
+
+    /**
+     * The monthly cap marks articles the plan will NOT generate. A month that
+     * lands exactly on the allowance is fully covered, so nothing is flagged —
+     * the ranking used >= and painted the last covered article red with a
+     * "won't be generated" banner (2026-07-30).
+     */
+    public function test_a_month_exactly_on_the_article_cap_is_not_flagged_as_over_limit(): void
+    {
+        $cap = \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'status' => ContentPlan::STATUS_ACTIVE,
+        ]);
+        // Hours, not days: a 30-day month would push the (cap+1)-th topic into
+        // NEXT month, where the ranking correctly ignores it.
+        for ($i = 0; $i < $cap; $i++) {
+            ContentTopic::factory()->create([
+                'plan_id' => $plan->id,
+                'website_id' => $website->id,
+                'status' => ContentTopic::STATUS_APPROVED,
+                'scheduled_for' => now()->startOfMonth()->addHours($i),
+            ]);
+        }
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'calendar'])
+            ->assertOk()
+            ->assertViewHas('overCapIds', []);
+
+        // One more, and only that one is flagged.
+        $extra = ContentTopic::factory()->create([
+            'plan_id' => $plan->id,
+            'website_id' => $website->id,
+            'status' => ContentTopic::STATUS_APPROVED,
+            'scheduled_for' => now()->startOfMonth()->addHours($cap),
+        ]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'calendar'])
+            ->assertOk()
+            ->assertViewHas('overCapIds', [$extra->id]);
+    }
 }

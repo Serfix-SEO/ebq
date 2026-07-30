@@ -292,13 +292,13 @@
                     <p class="mt-3 text-base text-slate-600">{{ __('Topics come from searches your audience already makes and gaps your competitors are winning — not from a generic list. Every card shows where it is in the pipeline, and you can reorder, skip or write one on demand.') }}</p>
                 </div>
                 <img src="{{ asset('images/content/calendar.webp') }}" alt="{{ __('Content calendar showing a month of planned and published articles') }}"
-                     width="1200" height="960" loading="lazy" class="w-full rounded-2xl border border-slate-200 shadow-xl">
+                     width="1500" height="1120" loading="lazy" class="w-full rounded-2xl border border-slate-200 shadow-xl">
             </div>
 
             {{-- 2. Article + score --}}
             <div class="mt-16 grid items-center gap-8 lg:grid-cols-2">
                 <img src="{{ asset('images/content/article-score.webp') }}" alt="{{ __('Article draft with its on-page SEO score and checks') }}"
-                     width="1200" height="866" loading="lazy" class="w-full rounded-2xl border border-slate-200 shadow-xl lg:order-2">
+                     width="1320" height="1000" loading="lazy" class="w-full rounded-2xl border border-slate-200 shadow-xl lg:order-2">
                 <div class="lg:order-1">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-600">{{ __('The article') }}</p>
                     <h3 class="mt-3 text-2xl font-bold tracking-tight text-slate-900">{{ __('Scored against 30+ checks, and revised until it passes') }}</h3>
@@ -314,13 +314,13 @@
                     <p class="mt-3 text-base text-slate-600">{{ __('Its keywords are added to the tracker the moment it goes live, with live Google positions alongside Search Console clicks, impressions and average position. No spreadsheet, no manual setup.') }}</p>
                 </div>
                 <img src="{{ asset('images/content/tracker.webp') }}" alt="{{ __('Keyword tracker showing positions, clicks and impressions per keyword') }}"
-                     width="1200" height="489" loading="lazy" class="w-full rounded-2xl border border-slate-200 shadow-xl">
+                     width="1320" height="680" loading="lazy" class="w-full rounded-2xl border border-slate-200 shadow-xl">
             </div>
 
             {{-- 4. Rank history --}}
             <div class="mt-16 grid items-center gap-8 lg:grid-cols-2">
                 <img src="{{ asset('images/content/rank-chart.webp') }}" alt="{{ __('Chart of a keyword climbing from position 47 to position 4') }}"
-                     width="1200" height="384" loading="lazy" class="w-full rounded-2xl border border-slate-200 shadow-xl lg:order-2">
+                     width="1320" height="820" loading="lazy" class="w-full rounded-2xl border border-slate-200 shadow-xl lg:order-2">
                 <div class="lg:order-1">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-600">{{ __('The proof') }}</p>
                     <h3 class="mt-3 text-2xl font-bold tracking-tight text-slate-900">{{ __('Watch each keyword climb, week by week') }}</h3>

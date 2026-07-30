@@ -1730,3 +1730,76 @@ nothing was dirty and no UPDATE ran: the demotion landed, the promotion did not,
 ended with ZERO current versions — publish failed with "No current article version to publish",
 the article could not be opened, and no publish CTA rendered. Regression tests for this must
 pass the UNREFRESHED handle; a `->fresh()` model hides the bug entirely.
+
+---
+
+## Public landing page + marketing visuals (2026-07-30)
+
+`/content-autopilot` (`resources/views/content-landing.blade.php`, routed by
+`Route::view` at `routes/web.php:69`) was rebuilt from a short feature list into
+a full sales page. Section order follows the buyer's questions:
+
+hero (real calendar screen + domain capture) → **See it in action** (external
+Supademo walkthrough embed) → the quality objection ("does it read like AI?") →
+what it costs everywhere else → what you get → SEO-platform cross-sell →
+pricing incl. the **extra-website table** → why consistency matters → FAQ
+(+ `FAQPage` schema) → three real posts from our own blog → CTA.
+
+Rules the page must keep (pinned by `tests/Feature/ContentLandingPageTest.php`
+and `tests/Feature/PricingPagesTest.php`):
+
+- **Every price and limit reads `ContentAutopilotConfig`.** The yearly-saving
+  badge and the 3-website worked example are *derived*, so an admin price change
+  moves the whole page. Nothing is typed into the Blade.
+- **No supplier names.** The Supademo snippet's legacy `webkitallowfullscreen` /
+  `mozallowfullscreen` attributes are deliberately deleted — `moz` trips the
+  supplier-name guard, and both attributes are obsolete anyway.
+- **Statistics are attributed** (HubSpot blogging benchmark, Gartner 2024). Never
+  invent a percentage on a page that sells something.
+- The blog strip is wrapped in `rescue(...)`: the articles table ships with the
+  delivery package, and its absence must not 500 the landing page.
+
+### Regenerating the product visuals
+
+`public/images/content/{calendar,article-score,tracker,rank-chart}.webp` are
+**real product UI**, not mockups. `tests/Feature/Content/MarketingShotsTest.php`
+renders the actual Livewire components against a throwaway sqlite database and
+dumps each one's HTML; a headless Chrome turns the HTML into the image:
+
+```bash
+MARKETING_SHOTS=/tmp/shots php artisan test tests/Feature/Content/MarketingShotsTest.php
+# wrap each fragment in a page that links the built CSS, then:
+google-chrome --headless --disable-gpu --no-sandbox --hide-scrollbars \
+  --virtual-time-budget=14000 --window-size=1500,2100 \
+  --screenshot=calendar.png "file:///tmp/shots/wrap-calendar.html"
+```
+
+The fixture is skipped unless `MARKETING_SHOTS` is set. Things learned making it
+look like a real account rather than a demo (2026-07-30):
+
+- **Hero thumbnails must be photographs.** They come from
+  `tests/fixtures/marketing/heroes/hero-*.webp` — our OWN article images,
+  produced by this pipeline for the Serfix blog. GD-painted gradients read as
+  placeholders. Three of them have their article's title rendered inside the
+  image, so the demo topic titles are matched to them.
+- **Fill every date, weekends included.** A five-a-week grid leaves Saturday and
+  Sunday empty, which reads as a broken schedule.
+- **Use a 30-day month.** `Carbon::setTestNow()` is walked back to the nearest
+  30-day month and frozen mid-month: 30 days = 30 articles = exactly the plan
+  allowance (no over-quota banner), and a mid-month "today" yields a believable
+  mix of published / in review / planned instead of an all-green archive.
+- **Connect Google in the fixture** (`gsc_site_url` + `ga_property_id` + a
+  `GoogleAccount`), or the tracker and article screens render their "Connect
+  Search Console" prompts and the shot looks half-configured.
+- Statuses are derived from each card's date, so the grid stays believable
+  whenever it is regenerated.
+
+### Off-by-one in the monthly-cap marker (fixed 2026-07-30)
+
+`ContentCalendar::capAndTrialBindings()` ranked topics and flagged
+`$rank >= $cap`, so a client whose month landed exactly on the allowance saw
+their **last covered** article painted red with "Over monthly limit" and the
+"won't be generated until next month" banner. Now `$rank > $cap` — strictly
+beyond. Regression: `ContentCalendarViewTest::test_a_month_exactly_on_the_article_cap_is_not_flagged_as_over_limit`
+(it schedules by HOURS, not days, so a 30-day month doesn't push the (cap+1)-th
+topic into next month where the ranking correctly ignores it).

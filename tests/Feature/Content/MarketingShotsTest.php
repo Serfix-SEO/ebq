@@ -19,6 +19,7 @@ use App\Models\Website;
 use App\Services\Content\ContentEntitlements;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -64,132 +65,188 @@ class MarketingShotsTest extends TestCase
 
     public function test_render_the_marketing_shots(): void
     {
+        // Freeze "today" mid-month so the calendar always shows a believable
+        // mix — shipped articles behind us, review and scheduled ahead. Run on
+        // the 30th it would otherwise render 21 published and nothing planned.
+        //
+        // A 30-DAY month specifically: the shot fills every date, and the plan
+        // allows 30 articles a month, so a 31-day month trips the over-quota
+        // banner and paints two cards red.
+        $month = now()->startOfMonth();
+        while ($month->daysInMonth !== 30) {
+            $month = $month->subMonthNoOverflow();
+        }
+        Carbon::setTestNow($month->copy()->addDays(13)->setTime(9, 40));
+
         $user = User::factory()->create([
-            'name' => 'Sam Rivera', 'email' => 'sam@northlanecoffee.com',
+            'name' => 'Sam Rivera', 'email' => 'sam@brightpathdigital.com',
             'content_comp_sites' => 5, // a covered account, so the quota meter reads normally
         ]);
-        $website = Website::factory()->for($user)->create(['domain' => 'northlanecoffee.com']);
+        $website = Website::factory()->for($user)->create(['domain' => 'brightpathdigital.com']);
         $plan = ContentPlan::factory()->create([
             'website_id' => $website->id,
             'status' => ContentPlan::STATUS_ACTIVE,
             'auto_publish' => true,
-            'articles_per_week' => 3,
-            'article_length' => 800,
-            'business_description' => 'Northlane Coffee roasts single-origin beans and ships fresh subscriptions across the UK.',
-            'offerings' => ['sell' => ['Single-origin subscriptions', 'Espresso blends', 'Brewing equipment'], 'dont_sell' => []],
+            'articles_per_week' => 7,
+            'article_length' => 1400,
+            'business_description' => 'Brightpath Digital is a small SEO agency that runs audits, technical fixes and reporting for service businesses.',
+            'offerings' => ['sell' => ['SEO audits', 'Technical SEO retainers', 'Monthly reporting'], 'dont_sell' => []],
         ]);
         app(ContentEntitlements::class)->coverWebsite($website);
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
+        // Google connected. Without this the tracker and article screens render
+        // their "Connect Search Console / Analytics" prompts, which read as a
+        // half-configured account on a marketing page. The demo brand is a
+        // fully set-up customer, so the shots show the working state.
+        $google = \App\Models\GoogleAccount::factory()->create(['user_id' => $user->id]);
+        $website->forceFill([
+            'gsc_site_url' => 'https://brightpathdigital.com/',
+            'gsc_google_account_id' => $google->id,
+            'ga_property_id' => '000000000',
+            'ga_google_account_id' => $google->id,
+        ])->save();
+
         // ── A calendar month that looks like a real editorial plan ──────────
-        $day = fn (int $d) => now()->startOfMonth()->addDays($d - 1);
+        // One article on EVERY day of the month, weekends included: a sparse
+        // grid made the screenshot look like an empty trial account, and gaps
+        // on Saturday and Sunday looked like a broken schedule (2026-07-30
+        // feedback, twice). Titles are
+        // matched to the hero photograph each card carries — three of the
+        // photos have their own article's title rendered inside the image — so
+        // the grid reads as one coherent plan rather than stock art.
+        $days = [];
+        for ($d = now()->startOfMonth(); $d->month === now()->month; $d = $d->copy()->addDay()) {
+            $days[] = $d->copy();
+        }
+        // title, keyword, hero index (null = no article yet), monthly volume
         $titles = [
-            ['Single Origin vs Blend: Which Coffee Should You Buy?', 'single origin vs blend', 'published', 3],
-            ['How to Store Coffee Beans So They Stay Fresh for Weeks', 'how to store coffee beans', 'published', 6],
-            ['The Complete Pour Over Coffee Guide for Home Brewing', 'pour over coffee guide', 'published', 9],
-            ['Light vs Dark Roast: A Practical Comparison', 'light vs dark roast', 'published', 13],
-            ['Best Grind Size for Every Brewing Method', 'best grind size for coffee', 'published', 16],
-            ['Why Fresh Roast Dates Matter More Than Origin', 'coffee roast date', 'ready', 20],
-            ['Espresso at Home: Equipment That Is Actually Worth It', 'home espresso equipment', 'scheduled', 23],
-            ['Cold Brew vs Iced Coffee: What Is the Difference?', 'cold brew vs iced coffee', 'approved', 25],
-            ['A Beginner Guide to Coffee Tasting Notes', 'coffee tasting notes', 'approved', 27],
-            ['How Altitude Changes the Flavour of Your Coffee', 'coffee altitude flavour', 'suggested', 30],
+            ['How to Do an SEO Audit: A Step-by-Step Guide for Beginners', 'how to do an seo audit', 0, 5400],
+            ['Technical SEO Checklist: 15 Steps to Fix Crawling and Indexing Issues', 'technical seo checklist', 3, 3600],
+            ['How to Use Google Search Console for SEO: A Beginner\'s Guide', 'how to use google search console', 6, 8100],
+            ['Core Web Vitals: What They Are and How to Fix Them', 'core web vitals', 1, 12100],
+            ['How Search Engines Crawl and Index Your Site', 'how search engines crawl', 4, 1600],
+            ['How to Fix Duplicate Content Issues on Your Website', 'fix duplicate content', 5, 2900],
+            ['Search Console Performance Reports, Explained', 'search console performance report', 7, 1300],
+            ['How to Report SEO Results to Your Clients', 'seo client reporting', 2, 880],
+            ['How to Verify a New Site in Search Console', 'verify site search console', 8, 720],
+            ['XML Sitemaps: What to Include and What to Leave Out', 'xml sitemap best practices', 1, 2400],
+            ['Robots.txt Explained, With Examples That Actually Work', 'robots txt examples', 5, 1900],
+            ['Canonical Tags: When to Use Them and When Not To', 'canonical tags', 4, 1500],
+            ['How to Find and Fix Broken Links at Scale', 'fix broken links', 7, 1100],
+            ['Page Speed for Non-Developers: What to Ask Your Team For', 'improve page speed', 2, 3300],
+            ['Internal Linking: The Cheapest Ranking Win You Are Ignoring', 'internal linking strategy', 8, 2700],
+            ['How to Write Title Tags That Earn the Click', 'how to write title tags', 6, 4100],
+            ['Meta Descriptions: Do They Still Matter in 2026?', 'meta descriptions seo', 3, 1800],
+            ['Schema Markup for Small Sites, Without a Developer', 'schema markup guide', 0, 2200],
+            ['Local SEO Checklist for Multi-Location Businesses', 'local seo checklist', 5, 3900],
+            ['How to Audit a Site Migration Before It Goes Live', 'site migration seo', 1, 990],
+            ['Keyword Research for Service Businesses', 'keyword research services', 7, 4800],
+            ['How Often Should You Run an SEO Audit?', 'how often seo audit', null, 590],
+            ['Index Coverage Errors, One by One', 'index coverage errors', 4, 1400],
+            ['Redirects Without Regret: 301s, 302s and Chains', 'seo redirects guide', 3, 1700],
+            ['How to Track Rankings Without Fooling Yourself', 'how to track rankings', 7, 1250],
+            ['Content Refreshes: Which Old Posts to Update First', 'content refresh seo', 2, 2050],
+            ['Search Intent, Explained With Real SERPs', 'search intent seo', 6, 3100],
+            ['How to Set Up Google Analytics for a Content Site', 'google analytics setup', 8, 2600],
+            ['Structured Data Errors and How to Read Them', 'structured data errors', 0, 860],
+            ['Mobile-First Indexing: What It Changes for You', 'mobile first indexing', 5, 1450],
+            ['How to Brief a Writer So the Draft Comes Back Right', 'seo content brief', 1, 940],
         ];
         $topics = [];
-        foreach ($titles as $i => [$title, $kw, $status, $offset]) {
+        foreach ($titles as $i => [$title, $kw, $hero, $volume]) {
+            $date = $days[$i] ?? null;
+            if ($date === null) {
+                break;      // a short month simply carries fewer topics
+            }
+            // Status follows the DATE, so the grid stays believable whenever it
+            // is regenerated: everything behind us shipped, the next few are in
+            // review, the tail is still being planned.
+            $daysOut = now()->startOfDay()->diffInDays($date->copy()->startOfDay(), false);
+            $status = match (true) {
+                $daysOut < 0 => 'published',
+                $daysOut <= 1 => 'ready',
+                $daysOut <= 4 => 'scheduled',
+                $hero === null => 'suggested',
+                default => 'approved',
+            };
             $topics[] = ContentTopic::factory()->create([
                 'plan_id' => $plan->id,
                 'website_id' => $website->id,
                 'title' => $title,
                 'target_keyword' => $kw,
                 'status' => $status,
-                'scheduled_for' => $day($offset),
-                'keyword_volume' => [2400, 1300, 5400, 880, 1900, 720, 3600, 4400, 590, 320][$i] ?? 500,
-                'published_at' => $status === 'published' ? $day($offset) : null,
-                'source' => $i < 7 ? 'gsc_gap' : 'llm',
-                'secondary_keywords' => ['grind size', 'water temperature', 'brew ratio'],
+                'scheduled_for' => $date,
+                'keyword_volume' => $volume,
+                'published_at' => $status === 'published' ? $date : null,
+                'source' => $i % 3 === 2 ? 'llm' : 'gsc_gap',
+                'secondary_keywords' => ['crawl errors', 'index coverage', 'page speed'],
             ]);
         }
         ContentIntegration::create([
             'website_id' => $website->id,
             'platform' => 'wordpress',
             'status' => ContentIntegration::STATUS_CONNECTED,
-            'credentials' => ['site_url' => 'https://northlanecoffee.com', 'user' => 'demo', 'app_password' => 'demo'],
+            'credentials' => ['site_url' => 'https://brightpathdigital.com', 'user' => 'demo', 'app_password' => 'demo'],
         ]);
 
         // ── Hero thumbnails for the calendar cards ──────────────────────────
-        // GD-painted abstract art written under storage/app/public so the
-        // dumped HTML resolves real <img> URLs. No client imagery, no API spend.
+        // Real photographs, checked in under tests/fixtures/marketing/heroes —
+        // they are OUR OWN article images, produced by this very pipeline for
+        // the Serfix blog, so the screenshot shows what the product actually
+        // makes. (They replaced GD-painted gradients on 2026-07-30: the
+        // gradients made the calendar look like a placeholder.) They are copied
+        // onto the public disk so the dumped HTML resolves real <img> URLs. No
+        // client imagery, no image-API spend.
         config(['services.content.images_disk' => 'public']);
         @mkdir(storage_path('app/public/content/demo-shots'), 0755, true);
-        $palette = [
-            [[244, 162, 89], [120, 60, 20]],
-            [[214, 140, 69], [56, 34, 15]],
-            [[236, 179, 101], [153, 88, 42]],
-            [[250, 208, 137], [176, 108, 57]],
-            [[222, 184, 135], [92, 51, 23]],
-            [[240, 154, 55], [66, 32, 7]],
-            [[235, 200, 160], [130, 70, 30]],
-        ];
-        $paintHero = function (int $i) use ($palette): string {
-            $file = "content/demo-shots/hero-{$i}.png";
-            [$a, $b] = $palette[$i % count($palette)];
-            $im = imagecreatetruecolor(640, 360);
-            for ($y = 0; $y < 360; $y++) {
-                $mix = $y / 359;
-                $col = imagecolorallocate(
-                    $im,
-                    (int) ($a[0] + ($b[0] - $a[0]) * $mix),
-                    (int) ($a[1] + ($b[1] - $a[1]) * $mix),
-                    (int) ($a[2] + ($b[2] - $a[2]) * $mix),
-                );
-                imageline($im, 0, $y, 639, $y, $col);
-            }
-            $hl = imagecolorallocatealpha($im, 255, 255, 255, 96);
-            imagefilledellipse($im, 140 + $i * 55, 120 + ($i % 3) * 60, 220, 220, $hl);
-            imagefilledellipse($im, 480 - $i * 30, 260 - ($i % 2) * 80, 150, 150, $hl);
-            imagepng($im, storage_path('app/public/'.$file));
-            imagedestroy($im);
+        $placeHero = function (int $i): string {
+            $file = "content/demo-shots/hero-{$i}.webp";
+            copy(base_path("tests/fixtures/marketing/heroes/hero-{$i}.webp"), storage_path('app/public/'.$file));
 
             return $file;
         };
-        $attachHero = function (ContentArticle $article, int $i, string $alt) use ($paintHero): void {
+        $attachHero = function (ContentArticle $article, int $i, string $alt) use ($placeHero): void {
             ContentImage::create([
                 'article_id' => $article->id,
                 'role' => ContentImage::ROLE_FEATURED,
                 'status' => ContentImage::STATUS_GENERATED,
-                'disk_path' => $paintHero($i),
+                'disk_path' => $placeHero($i),
                 'alt_text' => $alt,
-                'filename' => "hero-{$i}.png",
+                'filename' => "hero-{$i}.webp",
             ]);
         };
-        // Topics 0-6 get a lightweight current article + hero; topic 2 gets the
-        // full sample article BELOW (storeVersion moves is_current, so its hero
-        // must attach to that later version, not one created here).
-        foreach ([0, 1, 3, 4, 5, 6] as $i) {
+        // Every topic that has a hero gets a lightweight current article; the
+        // one without is still just a suggestion. Topic 0 gets the full sample
+        // article BELOW (storeVersion moves is_current, so its hero must attach
+        // to that later version, not one created here).
+        foreach ($titles as $i => [, , $hero]) {
+            if ($hero === null || $i === 0 || ! isset($topics[$i])) {
+                continue;
+            }
             $article = ContentArticle::storeVersion($topics[$i], [
                 'h1' => $topics[$i]->title, 'html' => '<p>demo</p>',
-                'seo_score' => [94, 88, 91, 96, 86, 90][$i % 6], 'word_count' => 1100 + $i * 180,
+                'seo_score' => [94, 88, 91, 96, 86, 90, 93, 89, 92][$i % 9], 'word_count' => 1180 + (($i * 137) % 900),
             ]);
-            $attachHero($article, $i, $topics[$i]->title);
+            $attachHero($article, $hero, $topics[$i]->title);
         }
 
         // ── One finished article: preview + SEO score + checks ──────────────
-        $topic = $topics[2];
+        $topic = $topics[0];
         $sampleArticle = ContentArticle::storeVersion($topic, [
-            'h1' => 'The Complete Pour Over Coffee Guide for Home Brewing',
-            'meta_title' => 'Pour Over Coffee Guide: Brew Better Cups at Home',
-            'meta_description' => 'A practical pour over coffee guide covering grind size, water temperature and brew ratio, with a simple routine for a sweet, balanced cup every morning.',
-            'slug' => 'pour-over-coffee-guide',
-            'focus_keyword' => 'pour over coffee guide',
-            'seo_score' => 92,
-            'word_count' => 2140,
+            'h1' => 'How to Do an SEO Audit: A Step-by-Step Guide for Beginners',
+            'meta_title' => 'How to Do an SEO Audit: A Step-by-Step Guide',
+            'meta_description' => 'A practical SEO audit walkthrough: what to check for crawling, indexing, on-page and speed problems, in what order, and how to turn findings into fixes.',
+            'slug' => 'how-to-do-an-seo-audit',
+            'focus_keyword' => 'seo audit',
+            'seo_score' => 100,
+            'word_count' => 984,
             'html' => $this->sampleArticleHtml(),
             'seo_issues' => [],
             'style_issues' => [],
             'generation_meta' => ['provider' => 'demo', 'model' => 'demo'],
         ]);
-        $attachHero($sampleArticle, 2, $topic->title);
+        $attachHero($sampleArticle, 0, $topic->title);
 
         // Calendar shots AFTER every article exists so cards carry their heroes.
         $this->dump('calendar', Livewire::test(ContentCalendar::class)->html());
@@ -199,14 +256,14 @@ class MarketingShotsTest extends TestCase
         // ── Research page: keyword-ideas feed ───────────────────────────────
         $plan->forceFill(['keywords_classified_at' => now()->subDay()])->save();
         foreach ([
-            ['coffee subscription gift', 4400, 0.15, 'commercial', 'gap'],
-            ['how to make cold brew at home', 2900, 0.10, 'informational', 'gap'],
-            ['best manual coffee grinder', 1900, 0.45, 'commercial', 'gap'],
-            ['arabica vs robusta', 1600, 0.20, 'informational', 'own'],
-            ['coffee brewing water temperature', 880, 0.08, 'informational', 'gap'],
-            ['espresso tamper size guide', 720, 0.55, 'informational', 'gap'],
-            ['single origin coffee beans uk', 590, 0.75, 'transactional', 'chosen'],
-            ['what is a coffee bloom', 480, 0.05, 'informational', 'gap'],
+            ['seo audit checklist', 4400, 0.15, 'informational', 'gap'],
+            ['how to fix crawl errors', 2900, 0.10, 'informational', 'gap'],
+            ['best seo reporting tools', 1900, 0.45, 'commercial', 'gap'],
+            ['what is core web vitals', 1600, 0.20, 'informational', 'own'],
+            ['google search console tutorial', 880, 0.08, 'informational', 'gap'],
+            ['xml sitemap best practices', 720, 0.55, 'informational', 'gap'],
+            ['seo agency for small business', 590, 0.75, 'transactional', 'chosen'],
+            ['what is an index coverage report', 480, 0.05, 'informational', 'gap'],
         ] as [$kw, $vol, $comp, $intent, $type]) {
             \App\Models\ContentPlanKeyword::create([
                 'plan_id' => $plan->id, 'keyword' => $kw,
@@ -231,17 +288,17 @@ class MarketingShotsTest extends TestCase
         // ── Tracker + one keyword's rank history ───────────────────────────
         $tracked = [];
         foreach ([
-            ['pour over coffee guide', true, 4],
-            ['best grind size for coffee', false, 7],
-            ['how to store coffee beans', false, 11],
-            ['single origin vs blend', false, 3],
+            ['how to do an seo audit', true, 4],
+            ['seo audit checklist', false, 7],
+            ['technical seo checklist', false, 11],
+            ['how to use google search console', false, 3],
         ] as [$kw, $primary, $pos]) {
             $tracked[] = ContentTrackedKeyword::create([
                 'website_id' => $website->id,
                 'topic_id' => $topic->id,
                 'keyword' => $kw,
                 'normalized_keyword' => ContentTrackedKeyword::normalize($kw),
-                'page_url' => 'https://northlanecoffee.com/blog/pour-over-coffee-guide',
+                'page_url' => 'https://brightpathdigital.com/blog/how-to-do-an-seo-audit',
                 'is_primary' => $primary,
                 'source' => ContentTrackedKeyword::SOURCE_AUTO,
                 'serp_position' => $pos,
@@ -256,7 +313,7 @@ class MarketingShotsTest extends TestCase
                     'website_id' => $website->id,
                     'date' => now()->subDays($d)->toDateString(),
                     'query' => $row->normalized_keyword,
-                    'page' => 'https://northlanecoffee.com/blog/pour-over-coffee-guide',
+                    'page' => 'https://brightpathdigital.com/blog/how-to-do-an-seo-audit',
                     'clicks' => max(0, (int) round($impr * 0.09)),
                     'impressions' => $impr,
                     'position' => round(([6.2, 9.4, 13.1, 4.8][$i] ?? 8) + $d / 12, 1),
@@ -276,7 +333,7 @@ class MarketingShotsTest extends TestCase
                 'normalized_keyword' => $tracked[0]->normalized_keyword,
                 'checked_on' => now()->subDays((count($climb) - $i) * 7)->toDateString(),
                 'position' => $pos,
-                'url' => 'https://northlanecoffee.com/blog/pour-over-coffee-guide',
+                'url' => 'https://brightpathdigital.com/blog/how-to-do-an-seo-audit',
                 'source' => ContentKeywordRankHistory::SOURCE_SERP,
             ]);
         }
@@ -284,34 +341,38 @@ class MarketingShotsTest extends TestCase
 
         $this->assertTrue(true, 'fixtures written to '.$this->out);
     }
-
     private function sampleArticleHtml(): string
     {
         return <<<'HTML'
-<p>This pour over coffee guide covers the three things that decide whether your cup tastes sweet or sour: grind size, water temperature and brew ratio. Get those right and a thirty-dollar dripper will out-brew most café machines.</p>
-<div class="key-takeaways"><h2>Key takeaways</h2><ul><li>Start at a 1:16 brew ratio, or 60g of coffee per litre of water.</li><li>Use a medium-fine grind size, roughly the texture of table salt.</li><li>Keep water temperature between 92&deg;C and 96&deg;C.</li><li>Aim for a total brew time of three to four minutes.</li></ul></div>
-<h2>What this pour over coffee guide covers</h2>
-<p>Weigh the coffee before you adjust anything else. A 1:16 brew ratio is what most roasters design their profiles around, and it is forgiving enough that a mistake elsewhere shows up clearly instead of hiding behind an odd strength. Twenty grams of coffee to 320g of water makes a generous single mug.</p>
-<p>Once the ratio is fixed, every other change you make has exactly one variable behind it. That is the point of following a pour over coffee guide in order: if you adjust three things at once and the cup improves, you have learned nothing you can repeat tomorrow.</p>
-<h2>Grind size does most of the work</h2>
-<p>Grind size controls how fast water moves through the bed, and therefore how much of the coffee actually dissolves. Too coarse and the water rushes past, pulling out the bright acids but leaving the sugars behind, which is the thin, sour cup. Too fine and the water stalls, dragging out the dry, bitter compounds that come last.</p>
-<p>Table salt is the reference most people find useful for a cone dripper. If your brew finishes well under three minutes, go a step finer. If it drags past four and a half, go coarser. Adjust in small steps and taste between each one. The difference between a good cup and a great one is usually two clicks on a burr grinder.</p>
-<h2>Water temperature and why the bloom matters</h2>
-<p>Water temperature between 92&deg;C and 96&deg;C keeps extraction in the sweet range. Off the boil for thirty seconds is close enough without a thermometer. Cooler water under-extracts and tastes flat, while water at a rolling boil scalds the grounds and adds a papery harshness that no ratio will rescue.</p>
-<p>Before the main pour, wet the grounds with roughly twice their weight in water and wait thirty seconds. Fresh coffee releases carbon dioxide, and that gas physically pushes water away from the grounds. The bloom lets it escape so the rest of the pour meets coffee instead of bubbles, which is why the same beans taste better a week after roasting than on day one. The <a href="https://sca.coffee/" rel="nofollow">Specialty Coffee Association</a> publishes brewing standards that land in the same range.</p>
-<h2>Pouring technique, simplified</h2>
-<p>After the bloom, pour in slow concentric circles, keeping the water level roughly halfway up the cone. Avoid pouring directly onto the filter wall: water that runs down the paper bypasses the coffee entirely and dilutes the cup. Two or three steady pours are easier to repeat than one continuous stream.</p>
-<p>A flat, even bed at the end of the brew means the water moved through uniformly. Deep craters, or a bed climbing one wall, tell you the pour was uneven long before the taste does.</p>
-<h2>Troubleshooting your cup</h2>
-<p>Sour, thin, finishes fast: grind finer or raise the water temperature slightly. Bitter, dry, finishes slowly: grind coarser and check that you are not over-agitating the bed. Muddled and flat with no clear flavour: your beans are probably past their best, so check the roast date rather than blaming the technique.</p>
-<p>Keep a short log for a week covering brew ratio, grind setting, water temperature, total time and one line on how it tasted. Five entries in, the pattern is usually obvious, and you will have a recipe you can hit every morning without thinking about it.</p>
-<h2>Frequently asked questions about this pour over coffee guide</h2>
-<h3>Does the filter brand matter?</h3>
-<p>Less than rinsing it. A pre-rinse removes the papery taste and preheats the brewer, which affects the cup far more than which box the filters came from.</p>
-<h3>Do I need a gooseneck kettle?</h3>
-<p>It helps, because it makes the pour rate repeatable, but grind size and brew ratio will change your coffee far more than the kettle spout does. Fix those first.</p>
-<h3>How fresh should the beans be?</h3>
-<p>Best between five days and four weeks off roast. Before that the bloom is violent and the flavours are still tight. Well after it, the aromatics have faded and no adjustment brings them back.</p>
+<p>An SEO audit is a structured look at everything standing between your pages and the people searching for them. Work through it in order, starting with crawling, then indexing, then on-page, then speed, and each answer narrows the next question instead of leaving you with a pile of unrelated warnings.</p>
+<div class="key-takeaways"><h2>Key takeaways</h2><ul><li>Start every SEO audit with crawling and indexing: a page Google can't reach can't rank.</li><li>Check one representative page per template rather than every URL on the site.</li><li>Fix crawl errors and duplicate titles before you touch keyword placement.</li><li>Re-run the audit quarterly, and after any redesign or migration.</li></ul></div>
+<h2>What an SEO audit actually covers</h2>
+<p>Most checklists are a flat list of two hundred items, which is why most audits stall. Group the work into four questions instead. Can search engines reach the page, are they allowed to keep it, does the page answer the query, and does it load fast enough to be worth showing. Everything worth checking sits under one of those four.</p>
+<p>Order matters more than coverage. Rewriting a title tag on a page that's blocked in robots.txt changes nothing, so the crawling layer comes first and the polish comes last. That ordering is the difference between an audit that produces fixes and one that produces a spreadsheet nobody opens twice.</p>
+<h2>Step one: crawling</h2>
+<p>Start with the robots.txt file and the XML sitemap, because between them they decide what a crawler even attempts. A disallow rule left over from a staging site is the single most common reason a section vanishes from search, and it costs nothing to rule out in the first minute of an SEO audit.</p>
+<p>Then crawl the site yourself and look at the response codes. A handful of 404s from old campaigns is normal. The crawl errors worth acting on are the patterns: long redirect chains, soft 404s returning 200, and internal links still pointing at http when the site is https. Each one wastes crawl budget and muddies the signals you're trying to send.</p>
+<p>Fix the template, not the row. One bad partial in a theme usually explains hundreds of broken links, and correcting it there clears the whole list at once. If you fix URLs individually you'll be back next quarter with the same report.</p>
+<h2>Step two: indexing</h2>
+<p>Reaching a page and keeping it are different things. The index coverage report tells you which pages Google chose to store and which it discarded, and the reasons it gives, like "Discovered, currently not indexed" or "Duplicate without user-selected canonical", are diagnostic rather than decorative. <a href="https://developers.google.com/search/docs" rel="nofollow">Google Search Central</a> documents what each state means.</p>
+<p>Two patterns account for most exclusions. The first is duplication: filtered, paginated or session URLs producing near-identical pages, none of which is clearly canonical. The second is thinness: tag archives and location pages that carry a heading and little else. Canonicalise the first group, then consolidate or expand the second.</p>
+<h2>Step three: on-page</h2>
+<p>Only now does the writing come into it. Take one page per template, so a service page, a blog post and a category, and check the obvious things. One H1 that matches what the page is for, a title tag that would earn the click, a meta description that isn't truncated, and headings that describe sections rather than decorate them.</p>
+<p>Look for pages competing with each other. Two articles targeting the same query split their own links and impressions, and the one Google picks is rarely the one you'd have chosen. Merging them into a single stronger page is usually the highest-value fix an SEO audit produces, and it's invisible to any tool that only checks pages in isolation.</p>
+<p>While you're there, check that each page links out to the others it should. Internal links are the cheapest ranking signal you control, and most sites leave their best pages three clicks deep with nothing pointing at them.</p>
+<h2>Step four: page speed and stability</h2>
+<p>Core Web Vitals measure how the page feels while it loads: how long the main content takes to appear, whether the layout jumps as it does, and how quickly it responds to a tap. Field data beats lab data here, because it reflects the devices and connections your visitors actually have rather than a fast machine on a fast line.</p>
+<p>The usual page speed culprits are unsized images, render-blocking scripts, and fonts that arrive late and reflow the text. None of them need a rebuild. Set explicit width and height on images, defer whatever isn't needed for the first screen, and the numbers usually move without anyone touching the design.</p>
+<h2>Turning findings into fixes</h2>
+<p>An audit that ends in a document hasn't finished. Sort every finding by how many pages it affects and how hard it is to change, then take the top of that list to whoever owns the code. Blocked pages and broken canonicals are one-line changes with site-wide effects, so they go first. Rewriting individual meta descriptions can wait.</p>
+<p>Record the date, the issues found, and the pages affected. The next SEO audit is far quicker when you can see what was already fixed, what came back, and which templates keep producing the same problem month after month.</p>
+<h2>Frequently asked questions about running an SEO audit</h2>
+<h3>How long does an SEO audit take?</h3>
+<p>A focused pass on a small site takes a few hours. Large sites with many templates take longer, but the extra time goes into sampling more templates, not into checking more URLs.</p>
+<h3>How often should I run one?</h3>
+<p>Quarterly is enough for most sites, plus an extra pass straight after a redesign, a platform change or a domain migration. Those are the moments when crawling and indexing problems get introduced.</p>
+<h3>Do I need paid tools to do this?</h3>
+<p>No. Search Console covers indexing and performance, and a crawler covers response codes and duplication. Paid tools mostly save time and add competitive context rather than revealing anything the free ones hide.</p>
 HTML;
     }
 }
