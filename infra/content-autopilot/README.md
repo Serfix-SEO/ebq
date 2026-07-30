@@ -144,6 +144,35 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   `tests/Feature/Content/ContentResearchTest.php`. ⚠️ new route → `route:cache`
   on box A or the nav 500s.
 
+- **Social auto-share (2026-07-30)** — published articles' links auto-post to the
+  website's connected **Facebook Page** and/or **X** account. Connect once on
+  /content/integrations (`SocialShareSettings` card, hidden until the provider's
+  OAuth app creds exist in `services.facebook` / `services.x`; admin must create
+  the FB business app — pages_show_list/pages_manage_posts/pages_read_engagement,
+  App Review for non-tester clients — and the X OAuth2 PKCE app — tweet.read/
+  tweet.write/users.read/offline.access; NOTE X free tier has low app-wide post
+  caps). OAuth: `SocialShareOAuthController` (`social.facebook.*` / `social.x.*`
+  routes in the authed throttle:oauth group — **route:cache on deploy**); FB
+  exchanges a long-lived token, lists Pages (1 → auto-connect, many → session
+  page picker on the card), stores the never-expiring PAGE token; X stores
+  access+refresh (rotated at post time by `SocialPoster::freshXToken`).
+  Storage: `content_social_accounts` (encrypted credentials bag, plaintext
+  `display_name` for listings, share_enabled toggle, unique website+provider).
+  Posting: `ShareArticleToSocialJob` dispatched from PublishContentArticleJob's
+  confirmed block (best-effort, async). Guards: `CONTENT_SOCIAL_SHARING` kill
+  switch → once-per-topic `meta.social_shared_at` (stamped only when ≥1 network
+  posted) → **live-link pre-flight GET — a dead or missing URL is NEVER
+  shared** → per-account isolation (revoked token → account status=error +
+  last_error → "Needs reconnect" on the card; the other network still posts).
+  Composer: FB = h1 + meta_description w/ link param (OG card from the
+  article's own og tags); X = h1 + URL ≤275 chars (t.co counts 23).
+  **Real-URL contract hardening**: `WebhookDriver::publish()` now falls back to
+  `article.canonical_url` when the receiver omits `{"url": ...}` (never guesses
+  base+slug); the integrations UI copy says the url response field powers
+  live-link/indexing/tracking/auto-share. WordPress always returns the true
+  permalink. Tests: `ContentSocialShareTest` (Http::fake — suite never touches
+  real social APIs) + canonical-fallback case in ContentWebhookSecurityTest.
+
 - **Settings layout (2026-07-30)** — the post-onboarding `$settingsView` branch is a
   **left-tab layout**: Alpine `x-data="{ tab: 'profile' }"` on the settings root,
   a sticky vertical tab rail on lg+ (horizontal scroll pills on mobile), panels

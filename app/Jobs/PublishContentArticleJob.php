@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Content\ShareArticleToSocialJob;
 use App\Mail\ContentArticlePublishedMail;
 use App\Models\ContentIntegration;
 use App\Models\ContentPublication;
@@ -177,6 +178,7 @@ class PublishContentArticleJob implements ShouldQueue
             $this->submitToGoogleIndex($topic, $article, $liveUrl);
             $this->addToKeywordTracker($topic, $liveUrl);
             $this->notifyPublished($topic, $article, $liveUrl, $integrations);
+            $this->shareToSocial($topic, $liveUrl);
 
             return;
         }
@@ -197,6 +199,26 @@ class PublishContentArticleJob implements ShouldQueue
         ContentTopic::query()->whereKey($this->topicId)
             ->whereIn('status', [ContentTopic::STATUS_PUBLISHING, ContentTopic::STATUS_SCHEDULED])
             ->first()?->fail('Publishing error: '.$e->getMessage());
+    }
+
+    /**
+     * Queue the social auto-share (Facebook/X) for the freshly published
+     * article. Best-effort and asynchronous — social APIs are slow/flaky and
+     * must never delay or fail the publish. The job itself re-checks every
+     * guard (kill switch, once-per-topic stamp, live-link pre-flight).
+     */
+    private function shareToSocial(ContentTopic $topic, ?string $liveUrl): void
+    {
+        try {
+            if ($liveUrl === null || $liveUrl === '') {
+                return; // no real URL, nothing to share — never guess one
+            }
+            ShareArticleToSocialJob::dispatch($topic->id, $liveUrl);
+        } catch (\Throwable $e) {
+            Log::warning('content_autopilot.social_share_dispatch_error', [
+                'topic_id' => $topic->id, 'error' => mb_substr($e->getMessage(), 0, 300),
+            ]);
+        }
     }
 
     /**

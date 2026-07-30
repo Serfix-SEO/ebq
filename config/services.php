@@ -278,6 +278,32 @@ return [
         // covered plans' libraries. Kill switch on top of the DataForSEO
         // spend meter — flipping this off stops all enrichment spend.
         'keyword_enrichment' => (bool) env('CONTENT_KEYWORD_ENRICHMENT', true),
+        // Auto-share published article links to connected Facebook/X accounts.
+        // Kill switch only — each provider also needs its own OAuth app
+        // credentials below before its connect button appears at all.
+        'social_sharing' => (bool) env('CONTENT_SOCIAL_SHARING', true),
+    ],
+
+    // Facebook (Meta) OAuth app for Content Autopilot social auto-share.
+    // Register at developers.facebook.com → business app → Facebook Login.
+    // Scopes: pages_show_list, pages_manage_posts, pages_read_engagement.
+    // App admins/testers can connect before App Review; arbitrary clients
+    // need the app reviewed. Unset client_id = feature hidden in the UI.
+    'facebook' => [
+        'client_id' => env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+        'redirect' => env('FACEBOOK_REDIRECT_URI', 'https://serfix.io/auth/facebook/callback'),
+        'graph_version' => env('FACEBOOK_GRAPH_VERSION', 'v21.0'),
+    ],
+
+    // X (Twitter) OAuth 2.0 app (PKCE) for social auto-share. Register at
+    // developer.x.com. Scopes: tweet.read tweet.write users.read offline.access.
+    // NOTE: the free API tier has low app-wide monthly post caps — revisit the
+    // tier as client count grows. Unset client_id = feature hidden in the UI.
+    'x' => [
+        'client_id' => env('X_CLIENT_ID'),
+        'client_secret' => env('X_CLIENT_SECRET'),
+        'redirect' => env('X_REDIRECT_URI', 'https://serfix.io/auth/x/callback'),
     ],
 
     // Open PageRank (by Keywords Everywhere) — global popularity rank + 0-10

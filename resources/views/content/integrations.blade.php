@@ -24,5 +24,7 @@
         </div>
 
         <livewire:content.publishing-settings />
+
+        <livewire:content.social-share-settings />
     </div>
 </x-layouts.app>

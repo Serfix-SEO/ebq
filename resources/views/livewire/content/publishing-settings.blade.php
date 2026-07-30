@@ -211,7 +211,7 @@ CONTENT_AI_ROUTE_PREFIX=blog</pre>
                                 </p>
                             </div>
                         @else
-                            <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ __("We'll POST each article as JSON to your endpoint, signed with your secret (X-Serfix-Signature, HMAC-SHA256). Reply 2xx to accept; optionally return {\"url\": \"...\"} so we can link the live page.") }}</p>
+                            <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ __("We'll POST each article as JSON to your endpoint, signed with your secret (X-Serfix-Signature, HMAC-SHA256). Reply 2xx to accept, and return {\"url\": \"...\"} with the article's public address — it powers the live-page link, Google indexing, rank tracking and social auto-share.") }}</p>
                         @endif
                         <div class="mt-3 grid gap-3 sm:grid-cols-2">
                             <div>

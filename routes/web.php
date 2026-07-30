@@ -1,34 +1,64 @@
 <?php
 
+use App\Http\Controllers\Admin\ActivityController as AdminActivityController;
+use App\Http\Controllers\Admin\ArtisanCommandsController as AdminArtisanCommandsController;
+use App\Http\Controllers\Admin\BacklinkExplorerController;
+use App\Http\Controllers\Admin\BillingController as AdminBillingController;
+use App\Http\Controllers\Admin\BugReportController;
+use App\Http\Controllers\Admin\ClientController as AdminClientController;
+use App\Http\Controllers\Admin\ClientImpersonationController;
+use App\Http\Controllers\Admin\ContentFeedbackController;
+use App\Http\Controllers\Admin\CrawlerController;
+use App\Http\Controllers\Admin\DbFleetController;
+use App\Http\Controllers\Admin\DomainMetricsController;
+use App\Http\Controllers\Admin\FleetController;
+use App\Http\Controllers\Admin\FleetTestController;
+use App\Http\Controllers\Admin\KeywordApiServerController as AdminKeywordApiServerController;
+use App\Http\Controllers\Admin\LeadController;
+use App\Http\Controllers\Admin\LinkGraphController;
+use App\Http\Controllers\Admin\MarketingController as AdminMarketingController;
+use App\Http\Controllers\Admin\OpsController;
+use App\Http\Controllers\Admin\PlanController as AdminPlanController;
+use App\Http\Controllers\Admin\PlatformSettingsController as AdminPlatformSettingsController;
+use App\Http\Controllers\Admin\PluginAdoptionController as AdminPluginAdoptionController;
+use App\Http\Controllers\Admin\PluginReleaseController as AdminPluginReleaseController;
+use App\Http\Controllers\Admin\SiteExplorerUsageController as AdminSiteExplorerUsageController;
+use App\Http\Controllers\Admin\UsageController as AdminUsageController;
+use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureController;
+use App\Http\Controllers\AiStudioController;
+use App\Http\Controllers\AiStudioWriterController;
+use App\Http\Controllers\Api\V1\PricingController;
+use App\Http\Controllers\BacklinksController;
+use App\Http\Controllers\BillingController;
+use App\Http\Controllers\ClientReportExportController;
+use App\Http\Controllers\CompetitorsController;
+use App\Http\Controllers\Content\PublicOnboardingStartController;
+use App\Http\Controllers\ContentBillingController;
+use App\Http\Controllers\GoogleCapController;
 use App\Http\Controllers\GoogleOAuthController;
 use App\Http\Controllers\GuestAuditController;
+use App\Http\Controllers\GuestKeywordVolumeController;
 use App\Http\Controllers\GuestPageSpeedController;
 use App\Http\Controllers\GuestRankCheckController;
-use App\Http\Controllers\GuestKeywordVolumeController;
-use App\Http\Controllers\GoogleCapController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MicrosoftOAuthController;
 use App\Http\Controllers\PageAuditController;
 use App\Http\Controllers\PublicReportController;
-use App\Http\Controllers\ClientReportExportController;
+use App\Http\Controllers\ReportDisavowController;
+use App\Http\Controllers\ReportShareController;
+use App\Http\Controllers\ReportViewController;
 use App\Http\Controllers\SiteAuditExportController;
-use App\Http\Controllers\Admin\ActivityController as AdminActivityController;
-use App\Http\Controllers\Admin\ClientController as AdminClientController;
-use App\Http\Controllers\Admin\ClientImpersonationController;
-use App\Http\Controllers\Admin\PluginAdoptionController as AdminPluginAdoptionController;
-use App\Http\Controllers\Admin\PluginReleaseController as AdminPluginReleaseController;
-use App\Http\Controllers\Admin\UsageController as AdminUsageController;
-use App\Http\Controllers\Admin\SiteExplorerUsageController as AdminSiteExplorerUsageController;
-use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureController;
-use App\Http\Controllers\Admin\BillingController as AdminBillingController;
-use App\Http\Controllers\Admin\PlanController as AdminPlanController;
-use App\Http\Controllers\Admin\ArtisanCommandsController as AdminArtisanCommandsController;
-use App\Http\Controllers\Admin\PlatformSettingsController as AdminPlatformSettingsController;
-use App\Http\Controllers\Admin\KeywordApiServerController as AdminKeywordApiServerController;
-use App\Http\Controllers\Admin\MarketingController as AdminMarketingController;
+use App\Http\Controllers\SocialShareOAuthController;
+use App\Http\Controllers\StripeWebhookController;
+use App\Http\Controllers\ToolPreviewController;
+use App\Http\Controllers\Webhooks\KeywordFinderWebhookController;
+use App\Http\Controllers\WebsiteAnalyzeController;
+use App\Http\Controllers\WebsiteOverviewController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressEmbedController;
 use App\Http\Controllers\WordPressPluginDownloadController;
 use App\Http\Controllers\WordPressPluginVersionController;
+use App\Livewire\Content\PublicOnboarding;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'landing')->name('landing');
@@ -43,9 +73,9 @@ Route::view('/content-autopilot', 'content-landing')->name('content.landing');
 Route::view('/content-autopilot/pricing', 'content-pricing')->name('content.pricing');
 // Landing form posts here: verify + create the provisional site, then hand off
 // to the wizard (Business step). Keeps the domain question on the landing only.
-Route::post('/content-autopilot/start', \App\Http\Controllers\Content\PublicOnboardingStartController::class)
+Route::post('/content-autopilot/start', PublicOnboardingStartController::class)
     ->name('content.onboarding.begin');
-Route::get('/content-autopilot/start', \App\Livewire\Content\PublicOnboarding::class)
+Route::get('/content-autopilot/start', PublicOnboarding::class)
     ->name('content.onboarding');
 // "Continue with Google" from the onboarding account step (reuses the whitelisted
 // SSO callback via a session intent flag).
@@ -58,7 +88,7 @@ Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
 Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');
 Route::view('/guide', 'guide')->name('guide');
 
-Route::get('/locale/{locale}', [\App\Http\Controllers\LocaleController::class, 'set'])->name('locale.set');
+Route::get('/locale/{locale}', [LocaleController::class, 'set'])->name('locale.set');
 
 // Public, no-auth shared backlink report. High-entropy token → cached snapshot.
 // Bad/revoked/expired tokens 404 (never 403). Throttled against enumeration.
@@ -69,27 +99,27 @@ Route::get('/r/{token}', [PublicReportController::class, 'show'])
 // Homepage "Analyze website" funnel. Anonymous submit calls NO backlink API —
 // it validates the URL (throttle + SSRF + reCAPTCHA) and returns require:signup.
 // Only a signed-in submit generates the report. See WebsiteAnalyzeController.
-Route::post('/analyze', [\App\Http\Controllers\WebsiteAnalyzeController::class, 'store'])->name('analyze.store');
+Route::post('/analyze', [WebsiteAnalyzeController::class, 'store'])->name('analyze.store');
 
 // Report view. Guests see a blurred MOCK teaser + signup modal (no API call);
 // authed (NOT verified-gated) users see the real report — first value lands
 // right after signup, before email verification.
-Route::get('/report/status', [\App\Http\Controllers\ReportViewController::class, 'status'])
+Route::get('/report/status', [ReportViewController::class, 'status'])
     ->middleware(['auth', 'throttle:60,1'])
     ->name('report.status');
-Route::get('/report/disavow', \App\Http\Controllers\ReportDisavowController::class)
+Route::get('/report/disavow', ReportDisavowController::class)
     ->middleware(['auth', 'throttle:20,1'])
     ->name('report.disavow');
-Route::get('/report/anchor-links', [\App\Http\Controllers\ReportViewController::class, 'anchorLinks'])
+Route::get('/report/anchor-links', [ReportViewController::class, 'anchorLinks'])
     ->middleware(['auth', 'throttle:10,1'])
     ->name('report.anchor-links');
-Route::get('/report/view', [\App\Http\Controllers\ReportViewController::class, 'show'])
+Route::get('/report/view', [ReportViewController::class, 'show'])
     ->middleware('throttle:60,1')
     ->name('report.view');
 
 // Blurred teaser preview for the public tools (anonymous): renders the tool's
 // real result view with sample data behind a signup/login modal. No API.
-Route::get('/tools/preview/{tool}', [\App\Http\Controllers\ToolPreviewController::class, 'show'])
+Route::get('/tools/preview/{tool}', [ToolPreviewController::class, 'show'])
     ->middleware('throttle:60,1')
     ->name('tool.preview');
 
@@ -137,19 +167,19 @@ Route::get('/wordpress/plugin/version', WordPressPluginVersionController::class)
 // Public pricing API — anonymous, drives the WordPress plugin's setup
 // wizard pricing step + any external integration that needs the plan
 // list. No identifier captured (matches /wordpress/plugin/version).
-Route::get('/api/v1/plans', [\App\Http\Controllers\Api\V1\PricingController::class, 'public'])
+Route::get('/api/v1/plans', [PricingController::class, 'public'])
     ->name('api.v1.plans');
 
 // Stripe webhook — extends Cashier's controller. CSRF-exempted in
 // bootstrap/app.php. Stripe signs the request body; the controller
 // verifies via STRIPE_WEBHOOK_SECRET so no extra auth needed.
-Route::post('/stripe/webhook', [\App\Http\Controllers\StripeWebhookController::class, 'handleWebhook'])
+Route::post('/stripe/webhook', [StripeWebhookController::class, 'handleWebhook'])
     ->name('cashier.webhook');
 
 // Self-hosted keyword API result callback. Server-to-server; CSRF-exempted in
 // bootstrap/app.php. The body is HMAC-signed with the originating server's
 // webhook_secret — the controller verifies it.
-Route::post('/webhooks/keyword-finder', \App\Http\Controllers\Webhooks\KeywordFinderWebhookController::class)
+Route::post('/webhooks/keyword-finder', KeywordFinderWebhookController::class)
     ->name('webhooks.keyword-finder');
 
 // Billing — Stripe Checkout + Customer Portal redirects. Auth required
@@ -159,45 +189,45 @@ Route::post('/webhooks/keyword-finder', \App\Http\Controllers\Webhooks\KeywordFi
 Route::middleware(['web', 'auth'])->group(function (): void {
     // Subscription management page — current plan, plan grid, cancel,
     // resume, recent invoices. Lives at /billing under sidebar nav.
-    Route::get('/billing', [\App\Http\Controllers\BillingController::class, 'show'])
+    Route::get('/billing', [BillingController::class, 'show'])
         ->name('billing.show');
-    Route::post('/billing/swap', [\App\Http\Controllers\BillingController::class, 'swap'])
+    Route::post('/billing/swap', [BillingController::class, 'swap'])
         ->name('billing.swap');
-    Route::post('/billing/cancel', [\App\Http\Controllers\BillingController::class, 'cancelSubscription'])
+    Route::post('/billing/cancel', [BillingController::class, 'cancelSubscription'])
         ->name('billing.cancel-subscription');
-    Route::post('/billing/resume', [\App\Http\Controllers\BillingController::class, 'resume'])
+    Route::post('/billing/resume', [BillingController::class, 'resume'])
         ->name('billing.resume');
 
     // Stripe Hosted Checkout flow — first-time purchase or post-cancel
     // re-subscribe. swap() is preferred for active subscribers.
-    Route::get('/billing/checkout', [\App\Http\Controllers\BillingController::class, 'checkout'])
+    Route::get('/billing/checkout', [BillingController::class, 'checkout'])
         ->name('billing.checkout');
-    Route::get('/billing/success', [\App\Http\Controllers\BillingController::class, 'success'])
+    Route::get('/billing/success', [BillingController::class, 'success'])
         ->name('billing.success');
     // Renamed from `billing.cancel` to free that name for the
     // subscription-cancel POST above. This handles "user backed out
     // of Stripe Checkout" only, not in-app cancellation.
-    Route::get('/billing/cancel-checkout', [\App\Http\Controllers\BillingController::class, 'cancel'])
+    Route::get('/billing/cancel-checkout', [BillingController::class, 'cancel'])
         ->name('billing.cancel-checkout');
-    Route::get('/billing/portal', [\App\Http\Controllers\BillingController::class, 'portal'])
+    Route::get('/billing/portal', [BillingController::class, 'portal'])
         ->name('billing.portal');
 
     // Content Autopilot product — its own Stripe named subscription (`content`)
     // + per-website addon. Separate controller so the dashboard `default` flow
     // (checkout guard, swap, plan-slug sync) is never touched.
-    Route::get('/content/billing/checkout', [\App\Http\Controllers\ContentBillingController::class, 'checkout'])
+    Route::get('/content/billing/checkout', [ContentBillingController::class, 'checkout'])
         ->name('content.billing.checkout');
-    Route::get('/content/billing/success', [\App\Http\Controllers\ContentBillingController::class, 'success'])
+    Route::get('/content/billing/success', [ContentBillingController::class, 'success'])
         ->name('content.billing.success');
-    Route::get('/content/billing/cancel-checkout', [\App\Http\Controllers\ContentBillingController::class, 'cancelCheckout'])
+    Route::get('/content/billing/cancel-checkout', [ContentBillingController::class, 'cancelCheckout'])
         ->name('content.billing.cancel-checkout');
-    Route::post('/content/billing/add-website', [\App\Http\Controllers\ContentBillingController::class, 'addWebsite'])
+    Route::post('/content/billing/add-website', [ContentBillingController::class, 'addWebsite'])
         ->name('content.billing.add-website');
-    Route::post('/content/billing/remove-website', [\App\Http\Controllers\ContentBillingController::class, 'removeWebsite'])
+    Route::post('/content/billing/remove-website', [ContentBillingController::class, 'removeWebsite'])
         ->name('content.billing.remove-website');
-    Route::post('/content/billing/cancel', [\App\Http\Controllers\ContentBillingController::class, 'cancel'])
+    Route::post('/content/billing/cancel', [ContentBillingController::class, 'cancel'])
         ->name('content.billing.cancel');
-    Route::post('/content/billing/resume', [\App\Http\Controllers\ContentBillingController::class, 'resume'])
+    Route::post('/content/billing/resume', [ContentBillingController::class, 'resume'])
         ->name('content.billing.resume');
 });
 
@@ -221,13 +251,13 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     // Post-signup landing hub — website-scoped Site Explorer report + a top
     // tab bar (Site Explorer / Site Health / Traffic / GSC), each tab showing
     // a real processing/needs-action/ready pill. See WebsiteOverviewController.
-    Route::get('/overview', [\App\Http\Controllers\WebsiteOverviewController::class, 'show'])->name('website-overview');
+    Route::get('/overview', [WebsiteOverviewController::class, 'show'])->name('website-overview');
     Route::view('/site-explorer', 'site-explorer')->name('site-explorer');
     // Backlink slice of the Site Explorer snapshot for the current website,
     // rendered in dashboard style (Pulse group nav item).
-    Route::get('/backlinks', [\App\Http\Controllers\BacklinksController::class, 'show'])->name('backlinks.index');
+    Route::get('/backlinks', [BacklinksController::class, 'show'])->name('backlinks.index');
     // Organic-competitor slice of the same snapshot (Pulse group nav item).
-    Route::get('/competitors', [\App\Http\Controllers\CompetitorsController::class, 'show'])->name('competitors.index');
+    Route::get('/competitors', [CompetitorsController::class, 'show'])->name('competitors.index');
     // Priority Action Queue drill-down: one filterable + paginated page per issue
     // group (crawl_* findings and the GSC/keyword action types).
     Route::get('/issues/{key}', fn (string $key) => view('issues.show', ['key' => $key]))
@@ -278,10 +308,10 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::get('/report/download', [ClientReportExportController::class, 'download'])
         ->middleware('throttle:10,1')
         ->name('report.download');
-    Route::post('/report/share', [\App\Http\Controllers\ReportShareController::class, 'store'])
+    Route::post('/report/share', [ReportShareController::class, 'store'])
         ->middleware('throttle:20,1')
         ->name('report.share');
-    Route::delete('/report/share', [\App\Http\Controllers\ReportShareController::class, 'destroy'])
+    Route::delete('/report/share', [ReportShareController::class, 'destroy'])
         ->name('report.share.revoke');
     Route::get('/page-audits/{pageAuditReport}', [PageAuditController::class, 'show'])
         ->middleware('feature:audits')
@@ -325,16 +355,16 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     // Route names stay registered even when disabled so firstAccessibleRoute()
     // redirects never hit an unknown route — the middleware just 404s the hit.
     Route::middleware(['feature.enabled:ai_studio', 'feature:ai_studio'])->group(function (): void {
-        Route::get('/ai-studio', [\App\Http\Controllers\AiStudioController::class, 'index'])
+        Route::get('/ai-studio', [AiStudioController::class, 'index'])
             ->name('ai-studio.index');
-        Route::post('/ai-studio/tools/{toolId}/run', [\App\Http\Controllers\AiStudioController::class, 'run'])
+        Route::post('/ai-studio/tools/{toolId}/run', [AiStudioController::class, 'run'])
             ->where('toolId', '[a-z0-9\-]+')
             ->middleware('throttle:30,1')
             ->name('ai-studio.run');
-        Route::put('/ai-studio/brand-voice', [\App\Http\Controllers\AiStudioController::class, 'brandVoiceUpdate'])
+        Route::put('/ai-studio/brand-voice', [AiStudioController::class, 'brandVoiceUpdate'])
             ->middleware('throttle:10,1')
             ->name('ai-studio.brand-voice.update');
-        Route::delete('/ai-studio/brand-voice', [\App\Http\Controllers\AiStudioController::class, 'brandVoiceDestroy'])
+        Route::delete('/ai-studio/brand-voice', [AiStudioController::class, 'brandVoiceDestroy'])
             ->name('ai-studio.brand-voice.destroy');
 
         // Blog Post Wizard — the dashboard re-implementation of the WP
@@ -342,39 +372,39 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
         // links here instead of running the generic tool form. All state
         // mutations delegate to WriterProjectService via
         // AiStudioWriterController (session-resolved website).
-        Route::get('/ai-studio/blog-post-wizard', [\App\Http\Controllers\AiStudioWriterController::class, 'page'])
+        Route::get('/ai-studio/blog-post-wizard', [AiStudioWriterController::class, 'page'])
             ->name('ai-studio.wizard');
 
         Route::prefix('ai-studio/writer-projects')->name('ai-studio.writer-projects.')->group(function (): void {
-            Route::get('/', [\App\Http\Controllers\AiStudioWriterController::class, 'index'])->name('index');
-            Route::post('/', [\App\Http\Controllers\AiStudioWriterController::class, 'store'])->name('store');
-            Route::get('/{externalId}', [\App\Http\Controllers\AiStudioWriterController::class, 'show'])
+            Route::get('/', [AiStudioWriterController::class, 'index'])->name('index');
+            Route::post('/', [AiStudioWriterController::class, 'store'])->name('store');
+            Route::get('/{externalId}', [AiStudioWriterController::class, 'show'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('show');
-            Route::patch('/{externalId}', [\App\Http\Controllers\AiStudioWriterController::class, 'update'])
+            Route::patch('/{externalId}', [AiStudioWriterController::class, 'update'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('update');
-            Route::delete('/{externalId}', [\App\Http\Controllers\AiStudioWriterController::class, 'destroy'])
+            Route::delete('/{externalId}', [AiStudioWriterController::class, 'destroy'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('destroy');
-            Route::post('/{externalId}/brief', [\App\Http\Controllers\AiStudioWriterController::class, 'generateBrief'])
+            Route::post('/{externalId}/brief', [AiStudioWriterController::class, 'generateBrief'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('brief');
-            Route::post('/{externalId}/brief/chat', [\App\Http\Controllers\AiStudioWriterController::class, 'briefChat'])
+            Route::post('/{externalId}/brief/chat', [AiStudioWriterController::class, 'briefChat'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('brief.chat');
-            Route::post('/{externalId}/images/search', [\App\Http\Controllers\AiStudioWriterController::class, 'searchImages'])
+            Route::post('/{externalId}/images/search', [AiStudioWriterController::class, 'searchImages'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('images.search');
-            Route::post('/{externalId}/strategy', [\App\Http\Controllers\AiStudioWriterController::class, 'strategy'])
+            Route::post('/{externalId}/strategy', [AiStudioWriterController::class, 'strategy'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('strategy');
-            Route::post('/{externalId}/generate', [\App\Http\Controllers\AiStudioWriterController::class, 'generate'])
+            Route::post('/{externalId}/generate', [AiStudioWriterController::class, 'generate'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('generate');
-            Route::get('/{externalId}/generate-status', [\App\Http\Controllers\AiStudioWriterController::class, 'generateStatus'])
+            Route::get('/{externalId}/generate-status', [AiStudioWriterController::class, 'generateStatus'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('generate.status');
-            Route::get('/{externalId}/credits', [\App\Http\Controllers\AiStudioWriterController::class, 'credits'])
+            Route::get('/{externalId}/credits', [AiStudioWriterController::class, 'credits'])
                 ->where('externalId', '[A-Za-z0-9\-]+')->name('credits');
         });
 
-        Route::get('/ai-studio/ai-writer-prompts', [\App\Http\Controllers\AiStudioWriterController::class, 'promptsIndex'])
+        Route::get('/ai-studio/ai-writer-prompts', [AiStudioWriterController::class, 'promptsIndex'])
             ->name('ai-studio.prompts.index');
-        Route::post('/ai-studio/ai-writer-prompts', [\App\Http\Controllers\AiStudioWriterController::class, 'promptsStore'])
+        Route::post('/ai-studio/ai-writer-prompts', [AiStudioWriterController::class, 'promptsStore'])
             ->middleware('throttle:20,1')->name('ai-studio.prompts.store');
-        Route::delete('/ai-studio/ai-writer-prompts/{externalId}', [\App\Http\Controllers\AiStudioWriterController::class, 'promptsDestroy'])
+        Route::delete('/ai-studio/ai-writer-prompts/{externalId}', [AiStudioWriterController::class, 'promptsDestroy'])
             ->where('externalId', '[A-Za-z0-9\-]+')->name('ai-studio.prompts.destroy');
     });
 });
@@ -389,6 +419,11 @@ Route::middleware(['auth', 'verified', 'throttle:oauth'])->group(function () {
     // Microsoft / Outlook OAuth — powers the "send report from Outlook" mail transport.
     Route::get('/auth/microsoft/redirect', [MicrosoftOAuthController::class, 'redirect'])->name('microsoft.redirect');
     Route::get('/auth/microsoft/callback', [MicrosoftOAuthController::class, 'callback'])->name('microsoft.callback');
+    // Facebook / X OAuth — Content Autopilot social auto-share connections.
+    Route::get('/auth/facebook/redirect', [SocialShareOAuthController::class, 'facebookRedirect'])->name('social.facebook.redirect');
+    Route::get('/auth/facebook/callback', [SocialShareOAuthController::class, 'facebookCallback'])->name('social.facebook.callback');
+    Route::get('/auth/x/redirect', [SocialShareOAuthController::class, 'xRedirect'])->name('social.x.redirect');
+    Route::get('/auth/x/callback', [SocialShareOAuthController::class, 'xCallback'])->name('social.x.callback');
 });
 
 // Google Cross-Account Protection (RISC/CAP) receiver endpoint.
@@ -410,61 +445,61 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/activities', [AdminActivityController::class, 'index'])->name('activities.index');
 
-    Route::get('/crawler', [\App\Http\Controllers\Admin\CrawlerController::class, 'index'])->name('crawler.index');
+    Route::get('/crawler', [CrawlerController::class, 'index'])->name('crawler.index');
 
     // Backlink Explorer — search stored backlinks (crawler + persisted
     // DataForSEO) from the link graph; zero new provider calls.
-    Route::get('/backlink-explorer', [\App\Http\Controllers\Admin\BacklinkExplorerController::class, 'index'])->name('backlink-explorer.index');
-    Route::get('/backlink-explorer/export', [\App\Http\Controllers\Admin\BacklinkExplorerController::class, 'export'])->name('backlink-explorer.export');
+    Route::get('/backlink-explorer', [BacklinkExplorerController::class, 'index'])->name('backlink-explorer.index');
+    Route::get('/backlink-explorer/export', [BacklinkExplorerController::class, 'export'])->name('backlink-explorer.export');
 
     // Domain intelligence — browse/search/drill the domain_metrics asset.
-    Route::get('/domain-metrics', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'index'])->name('domain-metrics.index');
-    Route::get('/domain-metrics/{domainMetric}', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'show'])->name('domain-metrics.show');
-    Route::post('/domain-metrics/{domainMetric}/reclassify', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'reclassify'])->name('domain-metrics.reclassify');
-    Route::post('/domain-metrics/{domainMetric}/refresh', [\App\Http\Controllers\Admin\DomainMetricsController::class, 'refresh'])->name('domain-metrics.refresh');
+    Route::get('/domain-metrics', [DomainMetricsController::class, 'index'])->name('domain-metrics.index');
+    Route::get('/domain-metrics/{domainMetric}', [DomainMetricsController::class, 'show'])->name('domain-metrics.show');
+    Route::post('/domain-metrics/{domainMetric}/reclassify', [DomainMetricsController::class, 'reclassify'])->name('domain-metrics.reclassify');
+    Route::post('/domain-metrics/{domainMetric}/refresh', [DomainMetricsController::class, 'refresh'])->name('domain-metrics.refresh');
 
     // Link-graph engine dashboard (Tier-1.5 crawler + discovery analytics).
-    Route::get('/link-graph', [\App\Http\Controllers\Admin\LinkGraphController::class, 'index'])->name('link-graph.index');
-    Route::post('/link-graph/toggle', [\App\Http\Controllers\Admin\LinkGraphController::class, 'toggle'])->name('link-graph.toggle');
-    Route::post('/link-graph/reseed', [\App\Http\Controllers\Admin\LinkGraphController::class, 'reseed'])->name('link-graph.reseed');
+    Route::get('/link-graph', [LinkGraphController::class, 'index'])->name('link-graph.index');
+    Route::post('/link-graph/toggle', [LinkGraphController::class, 'toggle'])->name('link-graph.toggle');
+    Route::post('/link-graph/reseed', [LinkGraphController::class, 'reseed'])->name('link-graph.reseed');
 
     // Ops dashboard: failed jobs + never-crawled stuck sites + queue depths.
     // Companion to the ebq:failed-jobs-alert mailed digest (2026-07-06 incident).
-    Route::get('/ops', [\App\Http\Controllers\Admin\OpsController::class, 'index'])->name('ops.index');
-    Route::get('/content-feedback', [\App\Http\Controllers\Admin\ContentFeedbackController::class, 'index'])->name('content-feedback.index');
-    Route::post('/ops/retry', [\App\Http\Controllers\Admin\OpsController::class, 'retry'])->name('ops.retry');
-    Route::post('/ops/forget', [\App\Http\Controllers\Admin\OpsController::class, 'forget'])->name('ops.forget');
-    Route::post('/ops/crawl/{crawlSite}', [\App\Http\Controllers\Admin\OpsController::class, 'startCrawl'])->name('ops.start-crawl');
+    Route::get('/ops', [OpsController::class, 'index'])->name('ops.index');
+    Route::get('/content-feedback', [ContentFeedbackController::class, 'index'])->name('content-feedback.index');
+    Route::post('/ops/retry', [OpsController::class, 'retry'])->name('ops.retry');
+    Route::post('/ops/forget', [OpsController::class, 'forget'])->name('ops.forget');
+    Route::post('/ops/crawl/{crawlSite}', [OpsController::class, 'startCrawl'])->name('ops.start-crawl');
 
-    Route::get('/fleet', [\App\Http\Controllers\Admin\FleetController::class, 'index'])->name('fleet.index');
-    Route::post('/fleet/settings', [\App\Http\Controllers\Admin\FleetController::class, 'settings'])->name('fleet.settings');
-    Route::post('/fleet/provision', [\App\Http\Controllers\Admin\FleetController::class, 'provision'])->name('fleet.provision');
-    Route::post('/fleet/reconcile', [\App\Http\Controllers\Admin\FleetController::class, 'reconcile'])->name('fleet.reconcile');
-    Route::post('/fleet/{node}/drain', [\App\Http\Controllers\Admin\FleetController::class, 'drain'])->name('fleet.drain');
-    Route::post('/fleet/{node}/destroy', [\App\Http\Controllers\Admin\FleetController::class, 'destroy'])->name('fleet.destroy');
+    Route::get('/fleet', [FleetController::class, 'index'])->name('fleet.index');
+    Route::post('/fleet/settings', [FleetController::class, 'settings'])->name('fleet.settings');
+    Route::post('/fleet/provision', [FleetController::class, 'provision'])->name('fleet.provision');
+    Route::post('/fleet/reconcile', [FleetController::class, 'reconcile'])->name('fleet.reconcile');
+    Route::post('/fleet/{node}/drain', [FleetController::class, 'drain'])->name('fleet.drain');
+    Route::post('/fleet/{node}/destroy', [FleetController::class, 'destroy'])->name('fleet.destroy');
 
     // Fleet UI E2E test report (screenshot slideshow from the latest Dusk run)
-    Route::get('/fleet-test', [\App\Http\Controllers\Admin\FleetTestController::class, 'index'])->name('fleet-test');
+    Route::get('/fleet-test', [FleetTestController::class, 'index'])->name('fleet-test');
 
     // Database-shard node fleet (App\Http\Controllers\Admin\DbFleetController)
-    Route::get('/db-fleet', [\App\Http\Controllers\Admin\DbFleetController::class, 'index'])->name('db-fleet.index');
-    Route::post('/db-fleet/settings', [\App\Http\Controllers\Admin\DbFleetController::class, 'settings'])->name('db-fleet.settings');
-    Route::post('/db-fleet/register-primary', [\App\Http\Controllers\Admin\DbFleetController::class, 'registerPrimary'])->name('db-fleet.register-primary');
-    Route::post('/db-fleet/provision', [\App\Http\Controllers\Admin\DbFleetController::class, 'provision'])->name('db-fleet.provision');
-    Route::post('/db-fleet/move', [\App\Http\Controllers\Admin\DbFleetController::class, 'move'])->name('db-fleet.move');
-    Route::post('/db-fleet/{node}/bootstrap', [\App\Http\Controllers\Admin\DbFleetController::class, 'bootstrap'])->name('db-fleet.bootstrap');
-    Route::post('/db-fleet/{node}/migrate', [\App\Http\Controllers\Admin\DbFleetController::class, 'migrate'])->name('db-fleet.migrate');
-    Route::post('/db-fleet/{node}/drain', [\App\Http\Controllers\Admin\DbFleetController::class, 'drain'])->name('db-fleet.drain');
-    Route::post('/db-fleet/{node}/destroy', [\App\Http\Controllers\Admin\DbFleetController::class, 'destroy'])->name('db-fleet.destroy');
+    Route::get('/db-fleet', [DbFleetController::class, 'index'])->name('db-fleet.index');
+    Route::post('/db-fleet/settings', [DbFleetController::class, 'settings'])->name('db-fleet.settings');
+    Route::post('/db-fleet/register-primary', [DbFleetController::class, 'registerPrimary'])->name('db-fleet.register-primary');
+    Route::post('/db-fleet/provision', [DbFleetController::class, 'provision'])->name('db-fleet.provision');
+    Route::post('/db-fleet/move', [DbFleetController::class, 'move'])->name('db-fleet.move');
+    Route::post('/db-fleet/{node}/bootstrap', [DbFleetController::class, 'bootstrap'])->name('db-fleet.bootstrap');
+    Route::post('/db-fleet/{node}/migrate', [DbFleetController::class, 'migrate'])->name('db-fleet.migrate');
+    Route::post('/db-fleet/{node}/drain', [DbFleetController::class, 'drain'])->name('db-fleet.drain');
+    Route::post('/db-fleet/{node}/destroy', [DbFleetController::class, 'destroy'])->name('db-fleet.destroy');
 
     Route::get('/marketing', [AdminMarketingController::class, 'index'])->name('marketing.index');
     Route::get('/marketing/sends', [AdminMarketingController::class, 'sends'])->name('marketing.sends');
     Route::post('/marketing/{website}/send', [AdminMarketingController::class, 'send'])->name('marketing.send');
 
-    Route::get('/leads', [\App\Http\Controllers\Admin\LeadController::class, 'index'])->name('leads.index');
-    Route::get('/bug-reports', [\App\Http\Controllers\Admin\BugReportController::class, 'index'])->name('bug-reports.index');
-    Route::get('/bug-reports/{bugReport}/screenshot', [\App\Http\Controllers\Admin\BugReportController::class, 'screenshot'])->name('bug-reports.screenshot');
-    Route::post('/bug-reports/{bugReport}/resolve', [\App\Http\Controllers\Admin\BugReportController::class, 'resolve'])->name('bug-reports.resolve');
+    Route::get('/leads', [LeadController::class, 'index'])->name('leads.index');
+    Route::get('/bug-reports', [BugReportController::class, 'index'])->name('bug-reports.index');
+    Route::get('/bug-reports/{bugReport}/screenshot', [BugReportController::class, 'screenshot'])->name('bug-reports.screenshot');
+    Route::post('/bug-reports/{bugReport}/resolve', [BugReportController::class, 'resolve'])->name('bug-reports.resolve');
     Route::get('/usage', [AdminUsageController::class, 'index'])->name('usage.index');
     Route::get('/site-explorer-usage', [AdminSiteExplorerUsageController::class, 'index'])->name('site-explorer-usage.index');
     Route::post('/site-explorer-usage/clear-cache', [AdminSiteExplorerUsageController::class, 'clearCache'])->name('site-explorer-usage.clear-cache');

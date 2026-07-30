@@ -96,7 +96,15 @@ class WebhookDriver implements PublishDriver
             return $result;
         }
 
+        // The receiver's {"url": ...} is the REAL public URL — required for
+        // auto-share, Google indexing and rank tracking. When a hand-rolled
+        // endpoint answers a bare 200, fall back to the article's own
+        // canonical_url (client-authored, also real). NEVER guess base+slug:
+        // a wrong link would be shared publicly and submitted to Google.
         $returnedUrl = (string) ($result->response['url'] ?? '');
+        if ($returnedUrl === '') {
+            $returnedUrl = trim((string) ($article->canonical_url ?? ''));
+        }
 
         return PublishResult::success(
             // Receivers without ids: reuse the slug so retries route via update().

@@ -3,13 +3,17 @@
 namespace Tests\Feature\Content;
 
 use App\Livewire\Content\PublishingSettings;
+use App\Models\ContentArticle;
 use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
+use App\Models\ContentTopic;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\Publishing\WebhookDriver;
+use App\Support\Audit\SafeHttpGuard;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -120,6 +124,48 @@ class ContentWebhookSecurityTest extends TestCase
 
         $this->assertFalse($result->ok);
         $this->assertStringContainsString('https://', (string) $result->error);
+    }
+
+    /**
+     * The real public URL contract: when the receiver answers a bare 200
+     * without {"url": ...}, the driver falls back to the article's own
+     * canonical_url — and NEVER invents a base+slug guess.
+     */
+    public function test_publish_falls_back_to_canonical_url_when_receiver_returns_none(): void
+    {
+        [, $website] = $this->contentUser();
+        $plan = ContentPlan::where('website_id', $website->id)->first();
+        $topic = ContentTopic::factory()->create([
+            'plan_id' => $plan->id, 'website_id' => $website->id,
+        ]);
+        $article = ContentArticle::storeVersion($topic, [
+            'h1' => 'T', 'html' => '<p>x</p>', 'slug' => 'my-post',
+            'canonical_url' => 'https://client.test/blog/my-post',
+        ]);
+        $integration = ContentIntegration::create([
+            'website_id' => $website->id,
+            'platform' => ContentIntegration::PLATFORM_WEBHOOK,
+            'credentials' => ['endpoint_url' => 'https://client.test/hook', 'secret' => str_repeat('a', 48)],
+            'status' => ContentIntegration::STATUS_CONNECTED,
+        ]);
+
+        // SafeHttpGuard does live DNS resolution; the fake hostname must not
+        // depend on the internet. HTTP itself is faked below.
+        $this->app->bind(SafeHttpGuard::class, fn () => new class extends SafeHttpGuard
+        {
+            public function check(string $url): array
+            {
+                return ['ok' => true];
+            }
+        });
+        Http::fake([
+            'client.test/hook' => Http::response(['ok' => true], 200), // no url in body
+        ]);
+
+        $result = app(WebhookDriver::class)->publish($article, $integration);
+
+        $this->assertTrue($result->ok);
+        $this->assertSame('https://client.test/blog/my-post', $result->externalUrl);
     }
 
     /** Credentials must never be readable in the database. */
