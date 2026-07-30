@@ -92,7 +92,10 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   **Add to calendar** creates an APPROVED `source='research'` topic on the next
   free publish day via `ContentTopicPlanner::nextDates()` (public wrapper around
   scheduleDates), dedupes on target_keyword, refuses when the unpublished pool ≥
-  `monthlyArticlesPerWebsite()`; **Write** additionally runs the writeNow-style
+  `monthlyArticlesPerWebsite()`, and fills `secondary_keywords` from the plan's
+  own library (`relatedKeywords()`: token-overlap match against the focus
+  keyword, ranked overlap-then-volume, cap 8 — the head start planner-ideated
+  topics get, no LLM); **Write** additionally runs the writeNow-style
   entitlement check + dispatches `ProduceContentArticleJob` and redirects to the
   review page. `'research'` was added to the planner's accepted-source whitelist.
   First page visit on an unclassified plan dispatches
