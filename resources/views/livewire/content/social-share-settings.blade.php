@@ -1,5 +1,5 @@
 <div>
-@if ($hasWebsite && $sharingEnabled && ($facebookConfigured || $xConfigured))
+@if ($hasWebsite && $sharingEnabled && ($facebookConfigured || $xConfigured || $pinterestConfigured))
     {{-- No `mt-6` and no card header any more: since 2026-07-31 this is the
          whole /content/social page, which supplies its own h1. Repeating the
          title inside the card read as a duplicated heading. --}}
@@ -33,10 +33,26 @@
             </div>
         @endif
 
+        {{-- Pinterest board picker (account has several boards) --}}
+        @if (! empty($pendingBoards))
+            <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/40">
+                <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Which Pinterest board should we pin to?') }}</p>
+                <div class="mt-2.5 flex flex-wrap gap-2">
+                    @foreach ($pendingBoards as $board)
+                        <button type="button" wire:click="choosePinterestBoard(@js((string) $board['id']))" wire:key="ptb-{{ $board['id'] }}"
+                            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-rose-400 hover:text-rose-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                            {{ $board['name'] }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         <div class="space-y-3">
             @foreach ([
                 ['provider' => 'facebook', 'label' => __('Facebook Page'), 'configured' => $facebookConfigured, 'route' => 'social.facebook.redirect', 'hint' => __('Posts go to your business Page.')],
                 ['provider' => 'x', 'label' => 'X', 'configured' => $xConfigured, 'route' => 'social.x.redirect', 'hint' => __('Posts go to your X profile.')],
+                ['provider' => 'pinterest', 'label' => 'Pinterest', 'configured' => $pinterestConfigured, 'route' => 'social.pinterest.redirect', 'hint' => __('Pins the article image to a board you choose. Needs a business account.')],
             ] as $p)
                 @continue(! $p['configured'])
                 @php $account = $accounts[$p['provider']] ?? null; @endphp

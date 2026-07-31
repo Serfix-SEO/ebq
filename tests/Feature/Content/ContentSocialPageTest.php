@@ -86,6 +86,9 @@ class ContentSocialPageTest extends TestCase
         config(['services.x.client_id' => null, 'services.facebook.client_id' => 'fb-app']);
         $this->assertTrue(SocialPoster::anyProviderConfigured(), 'either provider counts');
 
+        config(['services.facebook.client_id' => null, 'services.pinterest.client_id' => 'pin-app']);
+        $this->assertTrue(SocialPoster::anyProviderConfigured(), 'Pinterest alone counts too');
+
         config(['services.content_autopilot.social_sharing' => false]);
         $this->assertFalse(SocialPoster::anyProviderConfigured(), 'the kill switch wins');
     }
@@ -101,6 +104,60 @@ class ContentSocialPageTest extends TestCase
             $layout,
             'the Auto-share nav item must sit behind anyProviderConfigured()',
         );
+    }
+
+    /**
+     * Pinterest's OAuth is hand-rolled (no Socialite driver), so the CSRF state
+     * check is ours to get right: a callback whose state does not match the one
+     * we issued must never mint a connection.
+     */
+    public function test_a_pinterest_callback_with_a_forged_state_is_rejected(): void
+    {
+        config(['services.pinterest.client_id' => 'pin-app', 'services.pinterest.client_secret' => 'pin-secret']);
+        [$user, $website] = $this->contentUser();
+        $this->actingAs($user)->withSession([
+            'current_website_id' => $website->id,
+            'content_social.website_id' => $website->id,
+            'content_social.pinterest_state' => 'the-real-state',
+        ]);
+        \Illuminate\Support\Facades\Http::fake();   // any call here would be a bug
+
+        $this->get(route('social.pinterest.callback', ['code' => 'abc', 'state' => 'forged']))
+            ->assertRedirect(route('content.social'));
+
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+        $this->assertSame(0, \App\Models\ContentSocialAccount::query()->count());
+    }
+
+    /** One board → connect it straight away, no picker. */
+    public function test_a_pinterest_callback_with_one_board_connects_it(): void
+    {
+        config(['services.pinterest.client_id' => 'pin-app', 'services.pinterest.client_secret' => 'pin-secret']);
+        [$user, $website] = $this->contentUser();
+        $this->actingAs($user)->withSession([
+            'current_website_id' => $website->id,
+            'content_social.website_id' => $website->id,
+            'content_social.pinterest_state' => 'st-1',
+        ]);
+        \Illuminate\Support\Facades\Http::fake([
+            'api.pinterest.com/v5/oauth/token' => \Illuminate\Support\Facades\Http::response([
+                'access_token' => 'at', 'refresh_token' => 'rt', 'expires_in' => 2592000,
+            ], 200),
+            'api.pinterest.com/v5/user_account' => \Illuminate\Support\Facades\Http::response(['username' => 'clientco'], 200),
+            'api.pinterest.com/v5/boards*' => \Illuminate\Support\Facades\Http::response([
+                'items' => [['id' => 'b-9', 'name' => 'Recipes']],
+            ], 200),
+        ]);
+
+        $this->get(route('social.pinterest.callback', ['code' => 'abc', 'state' => 'st-1']))
+            ->assertRedirect(route('content.social'));
+
+        $account = \App\Models\ContentSocialAccount::query()
+            ->where('provider', \App\Models\ContentSocialAccount::PROVIDER_PINTEREST)
+            ->firstOrFail();
+        $this->assertSame('Recipes', $account->display_name);
+        $this->assertSame('b-9', (string) $account->credentials['board_id']);
+        $this->assertSame('at', (string) $account->credentials['access_token']);
     }
 
     /** Reached directly with nothing configured, the page explains itself. */

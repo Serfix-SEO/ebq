@@ -11,8 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * A connected social account for auto-sharing published articles, one row per
  * website+provider. `credentials` is an ENCRYPTED array cast — tokens never
  * touch the DB in plaintext:
- *   facebook → {page_id, page_token, page_name}   (page tokens don't expire)
- *   x        → {access_token, refresh_token, expires_at, username}
+ *   facebook  → {page_id, page_token, page_name}  (page tokens don't expire)
+ *   x         → {access_token, refresh_token, expires_at, username}
+ *   pinterest → {access_token, refresh_token, expires_at, username,
+ *                board_id, board_name}  (a Pin always belongs to a board)
  *
  * `display_name` duplicates the non-secret label (page name / @handle) so
  * listings never need to decrypt credentials.
@@ -24,6 +26,8 @@ class ContentSocialAccount extends Model
     public const PROVIDER_FACEBOOK = 'facebook';
 
     public const PROVIDER_X = 'x';
+
+    public const PROVIDER_PINTEREST = 'pinterest';
 
     public const STATUS_CONNECTED = 'connected';
 
@@ -50,6 +54,7 @@ class ContentSocialAccount extends Model
         return match ($this->provider) {
             self::PROVIDER_FACEBOOK => 'Facebook',
             self::PROVIDER_X => 'X',
+            self::PROVIDER_PINTEREST => 'Pinterest',
             default => ucfirst((string) $this->provider),
         };
     }

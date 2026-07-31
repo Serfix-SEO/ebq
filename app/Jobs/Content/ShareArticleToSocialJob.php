@@ -2,6 +2,8 @@
 
 namespace App\Jobs\Content;
 
+use App\Models\ContentArticle;
+use App\Models\ContentImage;
 use App\Models\ContentSocialAccount;
 use App\Models\ContentTopic;
 use App\Services\Content\Social\SocialPoster;
@@ -13,11 +15,14 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Best-effort auto-share of a freshly published article's REAL public URL to
- * the website's connected social accounts (Facebook Page / X).
+ * the website's connected social accounts (Facebook Page / X / Pinterest).
  *
  * Guards, in order: kill switch → topic PUBLISHED → once-per-topic
  * `meta.social_shared_at` stamp → live-link pre-flight (a dead or missing URL
  * is NEVER shared) → per-account post with independent failure isolation.
+ * Pinterest additionally needs an IMAGE — a link-only pin does not exist — so
+ * the article's featured image is resolved and verified fetchable first; when
+ * there isn't one, Pinterest is skipped and the other networks still post.
  * Account failures land on the account row (status/last_error) so the
  * Integrations card shows a reconnect prompt; nothing here ever affects the
  * publish itself.
@@ -81,6 +86,11 @@ class ShareArticleToSocialJob implements ShouldQueue
             return;
         }
 
+        // Resolved once, and only when a network actually needs it.
+        $imageUrl = $accounts->contains('provider', ContentSocialAccount::PROVIDER_PINTEREST)
+            ? $this->pinnableImageUrl($article)
+            : null;
+
         $results = [];
         foreach ($accounts as $account) {
             $text = SocialPoster::compose(
@@ -89,7 +99,7 @@ class ShareArticleToSocialJob implements ShouldQueue
                 (string) ($article->meta_description ?? ''),
                 $this->liveUrl,
             );
-            $result = $poster->post($account, $text, $this->liveUrl);
+            $result = $poster->post($account, $text, $this->liveUrl, $imageUrl);
             $results[$account->provider] = $result['status'];
 
             if ($result['ok']) {
@@ -104,6 +114,9 @@ class ShareArticleToSocialJob implements ShouldQueue
                     'last_error' => mb_substr($result['message'], 0, 500),
                 ])->save();
             } else {
+                // 'error' and 'skipped' both just annotate the row: a skip means
+                // the connection is fine and this article simply had nothing to
+                // pin, so the account must NOT go red for it.
                 $account->forceFill(['last_error' => mb_substr($result['message'], 0, 500)])->save();
             }
             Log::info('content_social.share', [
@@ -117,6 +130,48 @@ class ShareArticleToSocialJob implements ShouldQueue
             $meta['social_shared_at'] = now()->toIso8601String();
             $meta['social_share_results'] = $results;
             $topic->forceFill(['meta' => $meta])->saveQuietly();
+        }
+    }
+
+    /**
+     * The article's own featured image, verified to be a real image a third
+     * party can fetch. Pinterest downloads this URL itself, so an unreachable
+     * or non-image URL means a failed pin — better to skip than to post one.
+     */
+    private function pinnableImageUrl(ContentArticle $article): ?string
+    {
+        $candidates = array_filter([
+            trim((string) ($article->og_image ?? '')),
+            $article->images()
+                ->where('role', ContentImage::ROLE_FEATURED)
+                ->where('status', ContentImage::STATUS_GENERATED)
+                ->latest()
+                ->first()?->url(),
+        ]);
+
+        foreach ($candidates as $url) {
+            if (! filter_var($url, FILTER_VALIDATE_URL) || ! str_starts_with($url, 'https://')) {
+                continue;   // Pinterest fetches it publicly; http/relative is no use
+            }
+            if ($this->isFetchableImage($url)) {
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
+    private function isFetchableImage(string $url): bool
+    {
+        try {
+            $response = Http::timeout(15)->connectTimeout(8)
+                ->withHeaders(['User-Agent' => 'SerfixBot/1.0 (+https://serfix.io)'])
+                ->head($url);
+
+            return $response->status() < 400
+                && str_starts_with(mb_strtolower((string) $response->header('Content-Type')), 'image/');
+        } catch (\Throwable) {
+            return false;
         }
     }
 

@@ -11,8 +11,8 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * "Auto-share" card on the Content Integrations page: connect a Facebook Page
- * and/or X account once — every published article's link is then posted
+ * "Auto-share" card on /content/social: connect a Facebook Page, an X account
+ * and/or a Pinterest board once — every published article's link is then posted
  * automatically. Providers whose OAuth app isn't configured are hidden
  * entirely (prod-safe before the apps exist). Client copy never mentions
  * tokens, tiers or API internals.
@@ -63,6 +63,24 @@ class SocialShareSettings extends Component
         }
     }
 
+    /** Finish the Pinterest connect when the account has several boards. */
+    public function choosePinterestBoard(string $boardId): void
+    {
+        $website = $this->website();
+        $boards = (array) session('content_social.pinterest_boards', []);
+        if ($website === null || $website->id !== (string) session('content_social.pinterest_website_id')) {
+            return;
+        }
+        foreach ($boards as $board) {
+            if ((string) ($board['id'] ?? '') === $boardId) {
+                SocialShareOAuthController::storePinterestBoard($website, $board);
+                session()->flash('social-status', __('Pinterest board ":name" connected.', ['name' => $board['name']]));
+
+                return;
+            }
+        }
+    }
+
     public function toggleShare(string $accountId): void
     {
         $account = $this->accountOrFail($accountId);
@@ -101,14 +119,20 @@ class SocialShareSettings extends Component
         if ($website !== null && (string) session('content_social.fb_website_id') === $website->id) {
             $pendingPages = (array) session('content_social.fb_pages', []);
         }
+        $pendingBoards = [];
+        if ($website !== null && (string) session('content_social.pinterest_website_id') === $website->id) {
+            $pendingBoards = (array) session('content_social.pinterest_boards', []);
+        }
 
         return view('livewire.content.social-share-settings', [
             'hasWebsite' => $website !== null,
             'sharingEnabled' => (bool) config('services.content_autopilot.social_sharing', true),
             'facebookConfigured' => SocialPoster::facebookConfigured(),
             'xConfigured' => SocialPoster::xConfigured(),
+            'pinterestConfigured' => SocialPoster::pinterestConfigured(),
             'accounts' => $accounts,
             'pendingPages' => $pendingPages,
+            'pendingBoards' => $pendingBoards,
         ]);
     }
 }

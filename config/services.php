@@ -306,6 +306,26 @@ return [
         'redirect' => env('X_REDIRECT_URI', 'https://serfix.io/auth/x/callback'),
     ],
 
+    // Pinterest OAuth 2.0 (API v5) for social auto-share. Register a business
+    // app at developers.pinterest.com. Scopes: boards:read, pins:write,
+    // user_accounts:read. Two things differ from the other networks:
+    //   1. A Pin ALWAYS needs an image — link-only pins do not exist — so the
+    //      share job resolves the article's featured image and skips Pinterest
+    //      when there isn't a fetchable one.
+    //   2. A Pin always belongs to a BOARD, so the connect flow ends in a
+    //      board picker (like Facebook's Page picker).
+    // The client must have a Pinterest BUSINESS account; personal accounts
+    // cannot be connected. Write scopes need standard-access app review —
+    // until it is granted the app only works against your own account.
+    // Unset client_id = feature hidden in the UI.
+    'pinterest' => [
+        'client_id' => env('PINTEREST_CLIENT_ID'),
+        'client_secret' => env('PINTEREST_CLIENT_SECRET'),
+        'redirect' => env('PINTEREST_REDIRECT_URI', 'https://serfix.io/auth/pinterest/callback'),
+        // Sandbox has its own host + its own credentials; leave unset for live.
+        'base_url' => env('PINTEREST_BASE_URL', 'https://api.pinterest.com/v5'),
+    ],
+
     // Open PageRank (by Keywords Everywhere) — global popularity rank + 0-10
     // score + monthly history per domain. Bulk endpoint accepts up to 100
     // domains/call; free tier 30k domains/mo. Used for the report's Popularity

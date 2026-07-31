@@ -425,6 +425,8 @@ Route::middleware(['auth', 'verified', 'throttle:oauth'])->group(function () {
     Route::get('/auth/facebook/callback', [SocialShareOAuthController::class, 'facebookCallback'])->name('social.facebook.callback');
     Route::get('/auth/x/redirect', [SocialShareOAuthController::class, 'xRedirect'])->name('social.x.redirect');
     Route::get('/auth/x/callback', [SocialShareOAuthController::class, 'xCallback'])->name('social.x.callback');
+    Route::get('/auth/pinterest/redirect', [SocialShareOAuthController::class, 'pinterestRedirect'])->name('social.pinterest.redirect');
+    Route::get('/auth/pinterest/callback', [SocialShareOAuthController::class, 'pinterestCallback'])->name('social.pinterest.callback');
 });
 
 // Google Cross-Account Protection (RISC/CAP) receiver endpoint.

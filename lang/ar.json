@@ -4235,5 +4235,11 @@
     ":n articles per month": ":n مقالًا شهريًا",
     ":n more articles per month, per site": ":n مقالًا إضافيًا شهريًا لكل موقع",
     "Connect your accounts once. When an article goes live, we post its link for you.": "اربط حساباتك مرة واحدة. وعندما يُنشر أي مقال، ننشر رابطه نيابةً عنك.",
-    "Automatic sharing of your published articles isn't available on your account yet. Your articles keep publishing as normal.": "المشاركة التلقائية لمقالاتك المنشورة غير متاحة على حسابك بعد. وتستمر مقالاتك في النشر كالمعتاد."
+    "Automatic sharing of your published articles isn't available on your account yet. Your articles keep publishing as normal.": "المشاركة التلقائية لمقالاتك المنشورة غير متاحة على حسابك بعد. وتستمر مقالاتك في النشر كالمعتاد.",
+    "Pins the article image to a board you choose. Needs a business account.": "يثبّت صورة المقال على لوحة تختارها. يتطلب حساب أعمال.",
+    "Which Pinterest board should we pin to?": "على أي لوحة في Pinterest نثبّت المقالات؟",
+    "Pinterest board \":name\" connected.": "تم ربط لوحة Pinterest \":name\".",
+    "Choose which Pinterest board to pin to.": "اختر لوحة Pinterest التي سنثبّت عليها.",
+    "Pinterest connection failed — please try again.": "فشل الاتصال بـ Pinterest — يرجى المحاولة مرة أخرى.",
+    "No Pinterest board found on that account. Pins are saved to a board — create one on Pinterest first.": "لم يتم العثور على أي لوحة في هذا الحساب. تُحفظ التثبيتات داخل لوحة — أنشئ واحدة على Pinterest أولًا."
 }

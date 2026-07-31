@@ -145,7 +145,8 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   on box A or the nav 500s.
 
 - **Social auto-share (2026-07-30)** — published articles' links auto-post to the
-  website's connected **Facebook Page** and/or **X** account. Connect once on
+  website's connected **Facebook Page**, **X** account and/or **Pinterest
+  board**. Connect once on
   **/content/social** — its own nav entry under Content since 2026-07-31; it
   shipped as the last card on /content/integrations, but that page answers
   "where do articles publish to", so "what happens once they're live" sat below
@@ -185,6 +186,31 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   soon" (client-facing copy rule — never expose "unconfigured"). The card's own
   header was dropped when it moved: the page supplies the h1, and keeping both
   read as a duplicated heading.
+
+  **Pinterest (2026-07-31)** differs from the other two in ways that shaped the
+  code, not just the config:
+  - **A Pin is an image with a link attached.** Link-only pins do not exist, so
+    `ShareArticleToSocialJob::pinnableImageUrl()` resolves the article's
+    `og_image` then its featured `ContentImage`, requires **https**, and HEADs
+    it to confirm `status < 400` and an `image/*` content type — Pinterest
+    fetches that URL itself, so an unreachable one is a failed pin. No image →
+    status `skipped`, which annotates `last_error` but leaves the account
+    CONNECTED (nothing is broken; this article just had nothing to pin) and
+    never blocks the other networks. Verified 2026-07-31 that
+    `ContentImage::url()` on the content_s3 disk IS publicly fetchable
+    (206 + `image/png`).
+  - **Every Pin belongs to a board**, so the connect flow ends in a board picker
+    like Facebook's Page picker. The freshly minted token is parked in the
+    session (`content_social.pinterest_*`) until the client chooses.
+  - **No Socialite driver** — the OAuth2 code flow is hand-rolled, which means
+    the CSRF `state` is ours: generated at redirect, `hash_equals`-checked at
+    callback (regression-tested; a forged state must send zero HTTP calls).
+  - Pinterest does **not** rotate refresh tokens (X does), so `freshPinterestToken`
+    keeps the stored one when the refresh response omits a new one. Access
+    tokens ~30 days.
+  - Client-side prerequisites: a **business** account (personal cannot connect)
+    and **standard-access app review** for `pins:write` before non-tester
+    clients can authorize.
 
 - **Settings layout (2026-07-30)** — the post-onboarding `$settingsView` branch is a
   **left-tab layout**: Alpine `x-data="{ tab: 'profile' }"` on the settings root,
