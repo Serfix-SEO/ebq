@@ -23,8 +23,10 @@
             </div>
         </div>
 
+        {{-- Auto-share used to sit here. It moved to its own page under Content
+             (route content.social) on 2026-07-31: this page is about where
+             articles PUBLISH to, and burying "what happens once they're live"
+             under the WordPress/webhook setup meant nobody found it. --}}
         <livewire:content.publishing-settings />
-
-        <livewire:content.social-share-settings />
     </div>
 </x-layouts.app>

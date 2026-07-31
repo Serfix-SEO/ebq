@@ -1,6 +1,9 @@
 <div>
 @if ($hasWebsite && $sharingEnabled && ($facebookConfigured || $xConfigured))
-    <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+    {{-- No `mt-6` and no card header any more: since 2026-07-31 this is the
+         whole /content/social page, which supplies its own h1. Repeating the
+         title inside the card read as a duplicated heading. --}}
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         {{-- Flash --}}
         @if (session('social-status'))
             <div class="mb-4 flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">
@@ -14,16 +17,6 @@
                 {{ session('social-error') }}
             </div>
         @endif
-
-        <div class="flex items-center gap-2.5">
-            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z"/></svg>
-            </span>
-            <div class="min-w-0">
-                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Auto-share') }}</h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('When an article goes live, we automatically post its link to your connected accounts.') }}</p>
-            </div>
-        </div>
 
         {{-- Facebook page picker (account manages several Pages) --}}
         @if (! empty($pendingPages))
@@ -40,7 +33,7 @@
             </div>
         @endif
 
-        <div class="mt-4 space-y-3">
+        <div class="space-y-3">
             @foreach ([
                 ['provider' => 'facebook', 'label' => __('Facebook Page'), 'configured' => $facebookConfigured, 'route' => 'social.facebook.redirect', 'hint' => __('Posts go to your business Page.')],
                 ['provider' => 'x', 'label' => 'X', 'configured' => $xConfigured, 'route' => 'social.x.redirect', 'hint' => __('Posts go to your X profile.')],

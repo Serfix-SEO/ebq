@@ -29,6 +29,18 @@ class SocialPoster
     }
 
     /**
+     * Is auto-share offerable at all? One answer for the nav item and the page
+     * itself, so a client can never click through to a screen with nothing on
+     * it: the feature needs the kill switch on AND at least one provider's
+     * OAuth app configured.
+     */
+    public static function anyProviderConfigured(): bool
+    {
+        return (bool) config('services.content_autopilot.social_sharing', true)
+            && (self::facebookConfigured() || self::xConfigured());
+    }
+
+    /**
      * Compose the post text for a network. Facebook gets title + summary (the
      * link is a separate param and renders as an OG card). X gets title + URL,
      * truncated so the total stays ≤ 275 (t.co wraps any URL to 23 chars).

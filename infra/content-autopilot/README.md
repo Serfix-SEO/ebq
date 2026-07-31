@@ -146,7 +146,11 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
 
 - **Social auto-share (2026-07-30)** — published articles' links auto-post to the
   website's connected **Facebook Page** and/or **X** account. Connect once on
-  /content/integrations (`SocialShareSettings` card, hidden until the provider's
+  **/content/social** — its own nav entry under Content since 2026-07-31; it
+  shipped as the last card on /content/integrations, but that page answers
+  "where do articles publish to", so "what happens once they're live" sat below
+  the WordPress/webhook setup and went unfound (`SocialShareSettings` card,
+  hidden until the provider's
   OAuth app creds exist in `services.facebook` / `services.x`; admin must create
   the FB business app — pages_show_list/pages_manage_posts/pages_read_engagement,
   App Review for non-tester clients — and the X OAuth2 PKCE app — tweet.read/
@@ -171,7 +175,16 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   base+slug); the integrations UI copy says the url response field powers
   live-link/indexing/tracking/auto-share. WordPress always returns the true
   permalink. Tests: `ContentSocialShareTest` (Http::fake — suite never touches
-  real social APIs) + canonical-fallback case in ContentWebhookSecurityTest.
+  real social APIs) + canonical-fallback case in ContentWebhookSecurityTest
+  + `ContentSocialPageTest` (the page, the removal from Integrations, the gate).
+
+  **One gate for the nav and the page**: `SocialPoster::anyProviderConfigured()`
+  = kill switch ON && (facebook || x configured). The sidebar item and
+  /content/social both call it, so the menu can never link to an empty screen;
+  reached directly with nothing configured the page shows a neutral "Coming
+  soon" (client-facing copy rule — never expose "unconfigured"). The card's own
+  header was dropped when it moved: the page supplies the h1, and keeping both
+  read as a duplicated heading.
 
 - **Settings layout (2026-07-30)** — the post-onboarding `$settingsView` branch is a
   **left-tab layout**: Alpine `x-data="{ tab: 'profile' }"` on the settings root,
