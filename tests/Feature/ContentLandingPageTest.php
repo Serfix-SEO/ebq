@@ -76,6 +76,29 @@ class ContentLandingPageTest extends TestCase
         $response->assertSee('Each additional website');
     }
 
+    /**
+     * The extra-sites block used to be a single table with a min-width inside
+     * an overflow-x-auto wrapper, so on a phone it scrolled sideways and the
+     * PRICE column — the whole point of the block — was off-screen. It renders
+     * as stacked cards below `sm` now.
+     */
+    public function test_the_extra_site_prices_do_not_sit_behind_a_sideways_scroll_on_mobile(): void
+    {
+        $html = $this->get(route('content.landing'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('min-w-[34rem]', $html, 'no forced-width table on the landing page');
+        $this->assertStringContainsString('sm:hidden', $html, 'the phone (stacked-card) variant must render');
+
+        // Both variants read the same row data, so the price appears twice —
+        // once in the cards, once in the table.
+        $monthly = ContentAutopilotConfig::displayPrice('addon_monthly');
+        $this->assertGreaterThanOrEqual(
+            2,
+            substr_count($html, '$'.$monthly.'</span>'),
+            'each extra-site price must be present in both the card and the table variant',
+        );
+    }
+
     /** The yearly saving is derived from the two prices, never written down. */
     public function test_the_yearly_saving_badge_is_derived_from_the_prices(): void
     {

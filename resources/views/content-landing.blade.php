@@ -456,8 +456,69 @@
                 <h3 class="text-center text-lg font-extrabold tracking-tight text-slate-900">{{ __('Running more than one website?') }}</h3>
                 <p class="mx-auto mt-2 max-w-xl text-center text-sm text-slate-600">{{ __('Your plan covers one website. Add as many more as you like — each one gets its own research, calendar, articles and tracker.') }}</p>
 
-                <div class="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
-                    <table class="w-full min-w-[34rem] border-collapse text-start text-sm">
+                {{-- One source for the numbers, rendered two ways: stacked cards
+                     on a phone, the table from `sm` up. The table used to carry a
+                     min-width and scroll sideways on mobile, which hid the price
+                     column — the one thing this block exists to show. --}}
+                @php
+                    $siteRows = [
+                        [
+                            'label' => __('First website'),
+                            'included' => true,
+                            'articles' => number_format($articles),
+                            'note' => __(':n articles per month', ['n' => number_format($articles)]),
+                            'annual' => '$'.$annual,
+                            'monthly' => '$'.$monthly,
+                            'highlight' => false,
+                        ],
+                        [
+                            'label' => __('Each additional website'),
+                            'included' => false,
+                            'articles' => __('+:n each', ['n' => number_format($articles)]),
+                            'note' => __(':n more articles per month, per site', ['n' => number_format($articles)]),
+                            'annual' => '$'.$addonA,
+                            'monthly' => '$'.$addonM,
+                            'highlight' => false,
+                        ],
+                        [
+                            'label' => __('Example: 3 websites'),
+                            'included' => false,
+                            'articles' => number_format($articles * 3),
+                            'note' => __(':n articles per month', ['n' => number_format($articles * 3)]),
+                            'annual' => '$'.$threeSitesAnnual,
+                            'monthly' => '$'.$threeSitesMonthly,
+                            'highlight' => true,
+                        ],
+                    ];
+                @endphp
+
+                {{-- Phone: one card per row, nothing clipped --}}
+                <div class="mt-6 space-y-3 sm:hidden">
+                    @foreach ($siteRows as $row)
+                        <div @class([
+                            'rounded-2xl border border-slate-200 p-4',
+                            'bg-white' => ! $row['highlight'],
+                            'bg-slate-50' => $row['highlight'],
+                        ])>
+                            <div class="flex items-baseline justify-between gap-3">
+                                <p class="text-sm font-semibold text-slate-900">
+                                    {{ $row['label'] }}
+                                    @if ($row['included'])
+                                        <span class="ms-1.5 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-orange-700">{{ __('Included') }}</span>
+                                    @endif
+                                </p>
+                                <p class="whitespace-nowrap text-base font-bold text-slate-900">
+                                    <span x-show="billing === 'annual'">{{ $row['annual'] }}</span><span x-show="billing === 'monthly'" x-cloak>{{ $row['monthly'] }}</span><span class="text-xs font-medium text-slate-500">/{{ __('mo') }}</span>
+                                </p>
+                            </div>
+                            <p class="mt-1 text-xs text-slate-500">{{ $row['note'] }}</p>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Tablet and up: the table --}}
+                <div class="mt-6 hidden overflow-hidden rounded-2xl border border-slate-200 sm:block">
+                    <table class="w-full border-collapse text-start text-sm">
                         <thead>
                             <tr class="bg-slate-50 text-slate-500">
                                 <th scope="col" class="px-5 py-3 text-start text-xs font-bold uppercase tracking-wider">{{ __('Websites') }}</th>
@@ -466,27 +527,20 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200 bg-white">
-                            <tr>
-                                <th scope="row" class="px-5 py-4 text-start font-semibold text-slate-900">{{ __('First website') }}<span class="ms-2 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-orange-700">{{ __('Included') }}</span></th>
-                                <td class="px-5 py-4 text-slate-600">{{ number_format($articles) }}</td>
-                                <td class="px-5 py-4 text-end font-bold text-slate-900">
-                                    <span x-show="billing === 'annual'">${{ $annual }}</span><span x-show="billing === 'monthly'" x-cloak>${{ $monthly }}</span><span class="font-medium text-slate-500">/{{ __('mo') }}</span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th scope="row" class="px-5 py-4 text-start font-semibold text-slate-900">{{ __('Each additional website') }}</th>
-                                <td class="px-5 py-4 text-slate-600">{{ __('+:n each', ['n' => number_format($articles)]) }}</td>
-                                <td class="px-5 py-4 text-end font-bold text-slate-900">
-                                    <span x-show="billing === 'annual'">${{ $addonA }}</span><span x-show="billing === 'monthly'" x-cloak>${{ $addonM }}</span><span class="font-medium text-slate-500">/{{ __('mo') }}</span>
-                                </td>
-                            </tr>
-                            <tr class="bg-slate-50/70">
-                                <th scope="row" class="px-5 py-4 text-start font-semibold text-slate-900">{{ __('Example: 3 websites') }}</th>
-                                <td class="px-5 py-4 text-slate-600">{{ number_format($articles * 3) }}</td>
-                                <td class="px-5 py-4 text-end font-bold text-slate-900">
-                                    <span x-show="billing === 'annual'">${{ $threeSitesAnnual }}</span><span x-show="billing === 'monthly'" x-cloak>${{ $threeSitesMonthly }}</span><span class="font-medium text-slate-500">/{{ __('mo') }}</span>
-                                </td>
-                            </tr>
+                            @foreach ($siteRows as $row)
+                                <tr @class(['bg-slate-50/70' => $row['highlight']])>
+                                    <th scope="row" class="px-5 py-4 text-start font-semibold text-slate-900">
+                                        {{ $row['label'] }}
+                                        @if ($row['included'])
+                                            <span class="ms-2 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-orange-700">{{ __('Included') }}</span>
+                                        @endif
+                                    </th>
+                                    <td class="px-5 py-4 text-slate-600">{{ $row['articles'] }}</td>
+                                    <td class="px-5 py-4 text-end font-bold text-slate-900">
+                                        <span x-show="billing === 'annual'">{{ $row['annual'] }}</span><span x-show="billing === 'monthly'" x-cloak>{{ $row['monthly'] }}</span><span class="font-medium text-slate-500">/{{ __('mo') }}</span>
+                                    </td>
+                                </tr>
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
