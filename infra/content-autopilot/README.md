@@ -1803,3 +1803,25 @@ their **last covered** article painted red with "Over monthly limit" and the
 beyond. Regression: `ContentCalendarViewTest::test_a_month_exactly_on_the_article_cap_is_not_flagged_as_over_limit`
 (it schedules by HOURS, not days, so a 30-day month doesn't push the (cap+1)-th
 topic into next month where the ranking correctly ignores it).
+
+### The review page polls, so its editable state can go stale (2026-07-30)
+
+`ArticleReview` hydrates `bodyHtml` / the meta fields / `liveScore` in `mount()`,
+but the page carries `wire:poll.3s` for the whole build (through revisions AND
+the image pass, which stores a *further* version after the article is already
+readable). A poll re-renders without re-running `mount()`, so everything stored
+after the page opened was invisible to the component.
+
+Visible symptom: open a freshly written article straight from the progress
+modal, click Edit, and the SEO score jumps — the non-edit ring had fallen back
+to the stored generation-time score (`liveScore > 0 ? liveScore : seo_score`,
+above) while the edit ring scored the *stale* body. Refreshing first made them
+agree. The silent half was worse: `saveEdits()` writes `$bodyHtml` back as a new
+version, so editing from that state could overwrite the finished article with
+the draft — or the empty string — the page had loaded with.
+
+`syncIfArticleChanged()` re-hydrates when `currentArticle->id` no longer matches
+the `hydratedArticleId` the state came from. It runs at the top of `render()`
+and at the top of `startEditing()` (before `editing` flips, since the guard
+deliberately refuses to touch state mid-edit — an in-progress edit must never be
+clobbered). Tests: `tests/Feature/Content/ArticleReviewStalenessTest.php`.

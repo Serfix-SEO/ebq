@@ -112,6 +112,13 @@ class ArticleReview extends Component
 
     public int $liveScore = 0;
 
+    /**
+     * Which article version the editable state above was hydrated from, so a
+     * poll can notice the pipeline moved on underneath us. See
+     * syncIfArticleChanged().
+     */
+    public string $hydratedArticleId = '';
+
     /** Cached once per request-cycle: site_urls/existing_titles are DB reads. */
     protected ?array $scorerContext = null;
 
@@ -272,11 +279,46 @@ class ArticleReview extends Component
         $this->editTwitterDescription = (string) ($article?->twitter_description ?? '');
         $this->editTwitterImage = (string) ($article?->twitter_image ?? '');
         $this->editTwitterCard = (string) ($article?->twitter_card ?: 'summary_large_image');
+        $this->hydratedArticleId = (string) ($article?->id ?? '');
         $this->refreshChecks();
+    }
+
+    /**
+     * Re-hydrate when the pipeline stored a newer version underneath us.
+     *
+     * The page polls every 3s while an article is being built, and a poll
+     * re-renders WITHOUT re-running mount(). So the moment the writer finishes
+     * — or the image pass, which stores a FURTHER version after the article is
+     * already readable — the component is still holding the body and live
+     * score it hydrated when the page first opened: an earlier draft, or, if
+     * the page was opened before any draft existed, nothing at all.
+     *
+     * Symptom (prod 2026-07-30): open a freshly written article straight from
+     * the progress modal, click Edit, and the SEO score jumps, because the
+     * non-edit ring had fallen back to the stored score while the edit ring
+     * scored the stale body. Refreshing first made both agree. The worse half
+     * was silent: Save writes `$bodyHtml` back as a new version, so editing
+     * from that state could have overwritten the finished article with the
+     * draft (or the empty string) the page loaded with.
+     *
+     * Never fires mid-edit — an in-progress edit must not be clobbered.
+     */
+    private function syncIfArticleChanged(?ContentTopic $topic): void
+    {
+        if ($this->editing) {
+            return;
+        }
+        $currentId = (string) ($topic?->currentArticle?->id ?? '');
+        if ($currentId !== '' && $currentId !== $this->hydratedArticleId) {
+            $this->hydrateFromArticle();
+        }
     }
 
     public function startEditing(): void
     {
+        // Before the flag flips: syncIfArticleChanged() deliberately refuses to
+        // touch state while editing, and this is the last moment it can.
+        $this->syncIfArticleChanged($this->topic());
         $this->editing = true;
         $this->refreshChecks();
     }
@@ -908,6 +950,9 @@ class ArticleReview extends Component
     public function render()
     {
         $topic = $this->topic();
+        // Poll requests re-render without re-running mount(), so pick up a
+        // version the pipeline stored since the page opened.
+        $this->syncIfArticleChanged($topic);
         $article = $topic?->currentArticle;
 
         // Keep the live progress overlay (with the draft blurred behind it) for
