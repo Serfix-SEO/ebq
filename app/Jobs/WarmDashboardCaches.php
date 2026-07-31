@@ -76,6 +76,16 @@ class WarmDashboardCaches implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        // These are the heaviest aggregates in the app (the country group-by
+        // alone scans a 1.4M-row GSC table), and the worker container's PHP
+        // default is 128M. Blowing that is a FATAL, not an exception: the
+        // per-card try/catch below never sees it, the worker process dies
+        // mid-job, and the retry dies the same way — so the whole warm is lost
+        // and the digest reports MaxAttemptsExceeded with no cause attached
+        // (prod 2026-07-30 + 07-31, largest GSC account). Same ceiling the
+        // sync that feeds this data already sets (SyncSearchConsoleData:73).
+        ini_set('memory_limit', '1024M');
+
         app(ShardContext::class)->forWebsite($this->websiteId);
         $website = Website::find($this->websiteId);
         if (! $website || $website->isFrozen()) {
@@ -84,11 +94,21 @@ class WarmDashboardCaches implements ShouldBeUnique, ShouldQueue
         $owner = $website->owner;
 
         // Each warm is independent — one card's failure must not cold the rest.
+        // Peak memory is measured per card and reported when a single one gets
+        // near the ceiling: an OOM here is a fatal that leaves no stack trace
+        // worth reading (`#0 {main}`), so without this the next incident again
+        // can't say WHICH card was the expensive one.
         $warm = function (string $label, callable $fn): void {
+            memory_reset_peak_usage();
             try {
                 $fn();
             } catch (\Throwable $e) {
                 Log::warning("WarmDashboardCaches: {$label} failed for {$this->websiteId}: {$e->getMessage()}");
+            }
+            gc_collect_cycles();
+            $peakMb = (int) round(memory_get_peak_usage(true) / 1048576);
+            if ($peakMb >= 512) {
+                Log::warning("WarmDashboardCaches: {$label} peaked at {$peakMb}MB for {$this->websiteId}.");
             }
         };
 

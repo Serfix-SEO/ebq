@@ -93,6 +93,17 @@ Two version-integer classes underpin all caching (full detail in [insights.md](.
   each 7-day window the sync upserts bumps the version, so a mid-sync warm is minutes
   of heavy aggregates that get orphaned immediately (observed: 3 warms stacked during
   one large-account sync). Only the end-of-sync warm sticks.
+
+  **Memory ceiling (2026-07-31):** the job `ini_set('memory_limit', '1024M')` before it
+  starts. The worker container's PHP default is **128M**, and the largest GSC account
+  (~1.4M rows; 120k+ rows in a single 7-day window) blew straight through it. That is a
+  FATAL, not an exception, so the per-card `try/catch` never saw it: the worker process
+  died mid-job, the retry died the same way, and the ops digest reported only
+  `MaxAttemptsExceeded` — the actual cause (`Allowed memory size of 134217728 bytes
+  exhausted`, `#0 {main}`, no useful frames) sat in the worker log an hour earlier. The
+  site's dashboard then stayed cold until the next sync. The per-card wrapper now also
+  resets and reads the peak per card and logs any card that peaks ≥512MB, so the next
+  incident names the expensive one instead of leaving a traceless fatal.
 - **`RankCache::version($websiteId)`** (`app/Services/RankCache.php`) — same integer mechanic,
   but tracks rank-tracker freshness only. **Flushed by**: `TrackKeywordRankJob` on each
   successful rank check. Mixed into `PluginHqController::overview`'s cache key (that payload

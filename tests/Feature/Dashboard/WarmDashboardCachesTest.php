@@ -107,4 +107,26 @@ class WarmDashboardCachesTest extends TestCase
         $version = ReportCache::version($frozen->id);
         $this->assertNull(Cache::get("country_filter:{$frozen->id}:v{$version}"), 'frozen site must not be warmed');
     }
+
+    /**
+     * These are the heaviest aggregates in the app and the worker container's
+     * PHP default is 128M. Blowing it is a FATAL: the per-card try/catch never
+     * sees it, the worker dies mid-job, and the retry dies the same way — the
+     * digest just reports MaxAttemptsExceeded with no cause (prod 2026-07-30 +
+     * 07-31 on the largest GSC account, two OOMs then a permanent failure).
+     */
+    public function test_the_job_raises_the_memory_ceiling_before_running_the_aggregates(): void
+    {
+        $original = ini_get('memory_limit');
+        ini_set('memory_limit', '128M');
+
+        $owner = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'ceiling.com']);
+
+        Bus::dispatchSync(new WarmDashboardCaches((string) $website->id));
+
+        $this->assertSame('1024M', ini_get('memory_limit'), 'the warm must lift the 128M container default');
+
+        ini_set('memory_limit', $original === false ? '-1' : $original);
+    }
 }
