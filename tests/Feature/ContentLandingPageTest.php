@@ -36,12 +36,23 @@ class ContentLandingPageTest extends TestCase
         }
     }
 
-    /** "See it in action" is an interactive walkthrough, not a screenshot. */
-    public function test_the_interactive_product_tour_is_embedded(): void
+    /**
+     * "See it in action" is an interactive walkthrough, not a screenshot — and
+     * a desktop-only one: at its fixed 2.16 ratio a phone gets a ~240px pane of
+     * someone else's UI that can't be clicked through. Hiding the container
+     * also means mobile never requests the third-party embed at all (verified
+     * in a real browser: 0 requests at 390px, 116 at 1440px).
+     */
+    public function test_the_interactive_product_tour_is_embedded_on_desktop_only(): void
     {
         $html = $this->get(route('content.landing'))->assertOk()->getContent();
 
         $this->assertStringContainsString('app.supademo.com/embed/', $html);
+        $this->assertMatchesRegularExpression(
+            '/<section id="demo" class="hidden[^"]*\blg:block\b/',
+            $html,
+            'the product tour section must be hidden below the lg breakpoint',
+        );
         // The vendor snippet's legacy fullscreen attributes are deliberately
         // dropped: `mozallowfullscreen` contains a supplier name that
         // PricingPagesTest forbids on public pages.

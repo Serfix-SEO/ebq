@@ -180,7 +180,12 @@
     </section>
 
     {{-- ── See it in action (interactive product tour) ────────── --}}
-    <section id="demo" class="scroll-mt-20 border-b border-slate-200 bg-slate-50">
+    {{-- Desktop only. The walkthrough is a fixed 2.16 aspect ratio, so on a
+         phone it collapses to a ~240px-tall pane of someone else's UI that
+         cannot be clicked through usefully — worse than not offering it. The
+         iframe is inside the hidden container, so mobile never pays to load
+         the third-party embed either. --}}
+    <section id="demo" class="hidden scroll-mt-20 border-b border-slate-200 bg-slate-50 lg:block">
         <div class="mx-auto max-w-5xl px-6 py-16 lg:px-8 lg:py-20">
             <div class="text-center">
                 <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">{{ __('Product tour') }}</p>
