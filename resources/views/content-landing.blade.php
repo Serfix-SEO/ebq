@@ -188,14 +188,26 @@
                 <p class="mx-auto mt-3 max-w-xl text-base text-slate-600">{{ __('Click through the real setup, from your domain to a planned month of articles. No signup, no sales call.') }}</p>
             </div>
 
-            {{-- Interactive walkthrough (external embed). Sized by aspect ratio so
-                 it never letterboxes, and capped to the viewport on short screens. --}}
-            <div style="position: relative; box-sizing: content-box; max-height: 80vh; max-height: 80svh; width: 100%; aspect-ratio: 2.16; padding: 40px 0 40px 0;">
+            {{-- Interactive walkthrough (external embed), framed like every other
+                 product visual on this page: rounded, bordered, lifted.
+
+                 The vendor snippet arrived with `padding: 40px 0` baked into the
+                 wrapper, which pushed the embed 40px out of the page's spacing
+                 scale at BOTH ends — 120px before the next section against 80px
+                 everywhere else. The gap is a normal top margin now, and the
+                 bottom is left to the section's own padding.
+
+                 Corners are clipped on the WRAPPER (overflow-hidden), not the
+                 iframe: an iframe's own border-radius does not clip what the
+                 embedded document paints. Aspect ratio and the viewport cap stay
+                 inline — they are the embed's sizing contract, not styling. --}}
+            <div class="relative mt-12 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                 style="max-height: 80vh; max-height: 80svh; aspect-ratio: 2.16;">
                 {{-- The vendor's snippet also carries the legacy webkit/moz fullscreen
                      attributes; both are obsolete (every current browser honours plain
                      `allowfullscreen`), and the `moz` one trips the supplier-name guard
                      in PricingPagesTest. Dropped deliberately — do not paste them back. --}}
-                <iframe src="https://app.supademo.com/embed/cms6473jf32eyqmqqm19mxp9j?embed_v=2&utm_source=embed" loading="lazy" title="{{ __('Set up your content platform on Serfix') }}" allow="clipboard-write" frameborder="0" allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+                <iframe src="https://app.supademo.com/embed/cms6473jf32eyqmqqm19mxp9j?embed_v=2&utm_source=embed" loading="lazy" title="{{ __('Set up your content platform on Serfix') }}" allow="clipboard-write" frameborder="0" allowfullscreen class="absolute inset-0 h-full w-full rounded-2xl"></iframe>
             </div>
         </div>
     </section>
@@ -588,7 +600,7 @@
                 <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">{{ __('FAQ') }}</p>
                 <h2 class="mt-3 text-balance text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">{{ __('Frequently asked questions') }}</h2>
             </div>
-            <div class="mt-10 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+            <div class="mt-12 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
                 @foreach ($faqs as $faq)
                     <details class="group p-6 [&_summary::-webkit-details-marker]:hidden">
                         <summary class="flex cursor-pointer items-center justify-between gap-3 text-[15px] font-semibold text-slate-900">
@@ -619,7 +631,7 @@
                     </a>
                 </div>
 
-                <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($latestPosts as $post)
                         <a href="{{ $post->url() }}" class="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-600/5">
                             @if ($image = $post->featuredImage())
