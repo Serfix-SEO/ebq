@@ -125,16 +125,18 @@ class ContentLandingPageTest extends TestCase
         $html = $response->getContent();
 
         // The per-day comparison, not the misleading raw totals.
-        $response->assertSee('Per day, before and after');
+        $response->assertSee('What that adds up to, per day');
         foreach (['18', '118', '1.9', '5.4', '14.7', '10.8'] as $figure) {
             $this->assertStringContainsString($figure, $html, "per-day figure {$figure} must be shown");
         }
 
-        // The metric that fell, and its explanation.
-        $response->assertSee('Click-through rate');
-        $response->assertSee('10.4%');
-        $response->assertSee('4.6%');
-        $this->assertStringContainsString('points lower', $html, 'the CTR decline must stay on the page');
+        // The metric that fell keeps its own explained panel — shown, framed,
+        // never deleted. It reads as expected arithmetic rather than a miss,
+        // because clicks per day rose at the same time.
+        $this->assertStringContainsString('10.4%', $html, 'the CTR before figure must stay on the page');
+        $this->assertStringContainsString('4.6%', $html, 'the CTR after figure must stay on the page');
+        $this->assertStringContainsString('One number went down', $html, 'the decline must be surfaced, not buried');
+        $this->assertStringContainsString('More people are clicking, not fewer', $html);
 
         // Anonymous: never the client's name or domain.
         foreach (['daomarketing', 'daomarketing.com'] as $identifier) {
@@ -155,9 +157,9 @@ class ContentLandingPageTest extends TestCase
             $this->assertStringContainsString("cases/{$shot}.webp", $html);
         }
 
-        // The two source-window panels are desktop-only: on a phone the chart
-        // already says it, and they render as unreadable strips.
-        $this->assertMatchesRegularExpression('/hidden gap-6 lg:grid\b/', $html);
+        // The before/after pair sits side by side from md and stacks below it,
+        // so a phone reads them in sequence rather than as two shrunken strips.
+        $this->assertMatchesRegularExpression('/grid gap-6 md:grid-cols-2/', $html);
     }
 
     /** The yearly saving is derived from the two prices, never written down. */

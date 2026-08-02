@@ -4274,5 +4274,17 @@
     "Their content calendar: empty until the 22nd, then a published article every day from the 23rd, each showing its SEO score, word count and images.": "تقويم المحتوى الخاص بهم: فارغ حتى الثاني والعشرين، ثم مقال منشور كل يوم اعتبارًا من الثالث والعشرين، مع درجة السيو وعدد الكلمات والصور لكل مقال.",
     "Their real calendar: nothing until the 22nd, then an article a day.": "تقويمهم الحقيقي: لا شيء حتى الثاني والعشرين، ثم مقال كل يوم.",
     "One website, one week. That is early movement rather than a settled result, and we are not claiming these articles were the only thing that changed on the site. Yours will behave differently.": "موقع واحد وأسبوع واحد. هذه حركة مبكرة وليست نتيجة مستقرة، ولا نزعم أن هذه المقالات كانت التغيير الوحيد على الموقع. وسيختلف أداء موقعك.",
-    "An illustration generated for a published article": "صورة مولّدة لمقال منشور"
+    "An illustration generated for a published article": "صورة مولّدة لمقال منشور",
+    "A Dubai brand-strategy consultancy put their blog on Content AI Autopilot. The first article went live on :date — here is their Search Console before and after, measured per day, because the two windows are not the same length.": "شركة استشارات علامات تجارية في دبي شغّلت مدونتها على Content AI Autopilot. نُشر أول مقال في :date — وهذه بيانات Search Console لديهم قبل وبعد، محسوبة يوميًا لأن الفترتين غير متساويتين في الطول.",
+    "28 days · publishing starts 24 July": "28 يومًا · النشر يبدأ في 24 يوليو",
+    "The flat stretch on the left is the three weeks before. The climb starts the day the articles did.": "الجزء المستوي على اليسار هو الأسابيع الثلاثة السابقة. والصعود يبدأ في اليوم نفسه الذي بدأت فيه المقالات.",
+    "What that adds up to, per day": "ما يعنيه ذلك يوميًا",
+    "How often the site appeared in Google.": "كم مرة ظهر الموقع في جوجل.",
+    "How many people actually came through.": "كم شخصًا وصل فعلًا إلى الموقع.",
+    "Where the site ranks on average. Lower is better.": "متوسط ترتيب الموقع. والأقل أفضل.",
+    "One number went down — here is why that is a good sign": "مؤشر واحد انخفض — وإليك لماذا يُعدّ ذلك مؤشرًا جيدًا",
+    "Expected": "متوقع",
+    "Click-through rate went from 10.4% to 4.6%. That is a share, not a count: the site is now shown for far more searches, so the average share that clicks is smaller — while the actual clicks per day went UP 2.9×. More people are clicking, not fewer. A rising CTR on flat impressions would have meant the opposite: no new reach at all.": "انخفض معدل النقر إلى الظهور من 10.4% إلى 4.6%. وهذه نسبة وليست عددًا: صار الموقع يظهر في عدد أكبر بكثير من عمليات البحث، فقلّت النسبة الوسطية التي تنقر — بينما ارتفع عدد النقرات اليومية الفعلي 2.9×. عدد من ينقر ازداد ولم ينقص. أما ارتفاع المعدل مع ثبات مرات الظهور فكان سيعني العكس: لا وصول جديد إطلاقًا.",
+    "4 – 24 July": "4 – 24 يوليو",
+    "24 – 30 July": "24 – 30 يوليو"
 }
