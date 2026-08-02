@@ -1864,3 +1864,37 @@ the `hydratedArticleId` the state came from. It runs at the top of `render()`
 and at the top of `startEditing()` (before `editing` flips, since the guard
 deliberately refuses to touch state mid-edit — an in-progress edit must never be
 clobbered). Tests: `tests/Feature/Content/ArticleReviewStalenessTest.php`.
+
+### Landing-page case study (2026-07-31)
+
+`/content-autopilot` carries an **anonymised** case study — the page's only first-party evidence.
+Source client: **daomarketing.com** (a Dubai brand-strategy consultancy), live 23 July 2026.
+Screenshots live in `public/cases/*.webp`; they were checked before committing and carry no
+property selector, URL bar or site name. The calendar shot's article titles reveal the niche,
+not the company.
+
+⚠️ **The figures are typed literals from the Search Console UI. NEVER derive them from our own
+`search_console_data` table.** Query-level sampling makes our stored totals materially lower —
+for the same before-window Google's UI reports 383 impressions where our table holds 323. A
+DB-driven number would visibly contradict the screenshot printed beside it, which is also why
+the visual is a before/after comparison and not a daily time series.
+
+Presentation rules, each of them load-bearing and pinned by
+`ContentLandingPageTest::test_the_case_study_reports_per_day_rates_and_keeps_the_decline`:
+
+- **Per-day rates are the headline.** The windows are unequal (21 days before, 7 after), so raw
+  totals mislead: clicks read as flat (40 → 38) when the daily rate nearly tripled. Totals appear
+  only as a small audit-trail line.
+- **The CTR decline stays on the page** (10.4% → 4.6%) with its explanation — reach grew ~6.5×
+  while clicks grew ~2.9×. The test exists mainly to stop a later edit quietly deleting the one
+  inconvenient number.
+- Each metric's bar is scaled to its OWN max; the four units are not comparable to one another.
+  Direction is carried by colour plus an explicit "lower is better" note on position — a bar is
+  never silently inverted.
+- Only the bar geometry is SVG; labels and numbers stay real HTML so they remain translatable and
+  legible at 390px. `overflow-visible` on the bar is load-bearing (round caps are clipped without it).
+- The two source-window panels are `hidden lg:grid`: on a phone the chart already says it and two
+  near-identical Search Console panels are noise.
+
+Seven days is a short window — revisit and update the figures rather than leaving first-week
+numbers on the page indefinitely.

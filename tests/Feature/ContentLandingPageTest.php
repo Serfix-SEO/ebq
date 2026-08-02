@@ -110,6 +110,56 @@ class ContentLandingPageTest extends TestCase
         );
     }
 
+    /**
+     * The case study is the page's only first-party evidence, so its integrity
+     * matters more than its presence:
+     *  - per-day rates, because the source windows are unequal (21 days vs 7)
+     *    and the raw totals make clicks look flat when the daily rate tripled;
+     *  - the CTR DECLINE stays on the page — this test exists mainly to stop a
+     *    future edit quietly deleting the one number that went down;
+     *  - the client is anonymous.
+     */
+    public function test_the_case_study_reports_per_day_rates_and_keeps_the_decline(): void
+    {
+        $response = $this->get(route('content.landing'))->assertOk();
+        $html = $response->getContent();
+
+        // The per-day comparison, not the misleading raw totals.
+        $response->assertSee('Per day, before and after');
+        foreach (['18', '118', '1.9', '5.4', '14.7', '10.8'] as $figure) {
+            $this->assertStringContainsString($figure, $html, "per-day figure {$figure} must be shown");
+        }
+
+        // The metric that fell, and its explanation.
+        $response->assertSee('Click-through rate');
+        $response->assertSee('10.4%');
+        $response->assertSee('4.6%');
+        $this->assertStringContainsString('points lower', $html, 'the CTR decline must stay on the page');
+
+        // Anonymous: never the client's name or domain.
+        foreach (['daomarketing', 'daomarketing.com'] as $identifier) {
+            $this->assertStringNotContainsStringIgnoringCase($identifier, $html);
+        }
+
+        // And the honesty caveat about the sample size.
+        $this->assertStringContainsString('One website, one week', $html);
+    }
+
+    /** The screenshots are the receipt — a missing file must not break the page. */
+    public function test_the_case_study_screenshots_exist_and_are_wired_up(): void
+    {
+        $html = $this->get(route('content.landing'))->assertOk()->getContent();
+
+        foreach (['gsc-28-days', 'gsc-before', 'gsc-after', 'calendar-run'] as $shot) {
+            $this->assertFileExists(public_path("cases/{$shot}.webp"));
+            $this->assertStringContainsString("cases/{$shot}.webp", $html);
+        }
+
+        // The two source-window panels are desktop-only: on a phone the chart
+        // already says it, and they render as unreadable strips.
+        $this->assertMatchesRegularExpression('/hidden gap-6 lg:grid\b/', $html);
+    }
+
     /** The yearly saving is derived from the two prices, never written down. */
     public function test_the_yearly_saving_badge_is_derived_from_the_prices(): void
     {
