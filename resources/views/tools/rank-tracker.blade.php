@@ -19,9 +19,9 @@
     </x-slot:schema>
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
-    <section class="relative">
+    <section class="relative overflow-hidden">
         <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[26rem] bg-[radial-gradient(ellipse_at_top,rgba(242,100,25,0.08),transparent_60%)]"></div>
-        <div class="mx-auto max-w-3xl px-6 pb-16 pt-16 text-center lg:px-8 lg:pb-24 lg:pt-24">
+        <div class="mx-auto max-w-5xl px-6 pb-16 pt-16 text-center lg:px-8 lg:pb-24 lg:pt-24">
             <h1 class="mx-auto max-w-2xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
                 {{ __('Free Google rank checker') }}
             </h1>
@@ -37,12 +37,12 @@
             </div>
 
             {{-- Search bar --}}
-            <div class="relative mx-auto mt-8 max-w-2xl">
+            <div class="relative mx-auto mt-8 max-w-4xl">
                 <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -inset-y-10 sm:-inset-x-8 -z-10 bg-[radial-gradient(55%_60%_at_50%_0%,rgba(242,100,25,0.20),transparent_70%)] blur-2xl"></div>
 
                 <form id="rk-form" data-tool-gate-form class="text-start" data-action="{{ route('guest-rank.store') }}" novalidate>
-                    <div class="flex flex-col rounded-[20px] bg-white p-2 shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)] ring-1 ring-slate-200/80 transition focus-within:ring-2 focus-within:ring-orange-500/70 sm:flex-row sm:items-center sm:divide-x sm:divide-slate-200/70 divide-y divide-slate-100 sm:divide-y-0">
-                        <div class="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5">
+                    <div class="flex flex-col rounded-[20px] bg-white p-2 shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)] ring-1 ring-slate-200/80 transition focus-within:ring-2 focus-within:ring-orange-500/70 lg:flex-row lg:items-center lg:divide-x lg:divide-slate-200/70 divide-y divide-slate-100 lg:divide-y-0">
+                        <div class="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 lg:min-w-[15rem]">
                             <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-100">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582" /></svg>
                             </span>
@@ -52,7 +52,7 @@
                                     class="w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0">
                             </div>
                         </div>
-                        <div class="flex items-center gap-3 px-3 py-2.5 sm:w-52">
+                        <div class="flex items-center gap-3 px-3 py-2.5 lg:w-48">
                             <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
                             </span>
@@ -62,7 +62,7 @@
                                     class="w-full border-0 bg-transparent p-0 text-[15px] font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0">
                             </div>
                         </div>
-                        <div class="flex items-center gap-3 px-3 py-2.5 sm:w-44">
+                        <div class="flex items-center gap-3 px-3 py-2.5 lg:w-48">
                             <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
                             </span>
@@ -76,9 +76,9 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="pt-2 sm:ps-2 sm:pt-0">
+                        <div class="pt-2 lg:ps-2 lg:pt-0">
                             <button type="submit" id="rk-submit"
-                                class="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-orange-600 px-6 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
+                                class="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-orange-600 px-6 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60 lg:w-auto">
                                 <svg id="rk-spinner" class="hidden h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                 <span id="rk-label">{{ __('Check rank') }}</span>
                                 <svg id="rk-arrow" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5l7.5 7.5-7.5 7.5M21 12H3" /></svg>
