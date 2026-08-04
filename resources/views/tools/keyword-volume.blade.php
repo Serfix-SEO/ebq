@@ -22,11 +22,11 @@
     <section class="relative">
         <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[26rem] bg-[radial-gradient(ellipse_at_top,rgba(242,100,25,0.08),transparent_60%)]"></div>
         <div class="mx-auto max-w-3xl px-6 pb-16 pt-16 text-center lg:px-8 lg:pb-24 lg:pt-24">
-            <a href="{{ route('tools.rank-tracker') }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900">
-                <span class="h-1.5 w-1.5 rounded-full bg-orange-500"></span>
-                {{ __('Also free: Google rank checker') }}
-                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
-            </a>
+            {{-- Every free tool, not just one. A visitor who landed here
+                 from search previously saw a single "Also free" pill and had
+                 no way to discover the rest. Shared partial, so the set stays
+                 identical to the home page's. --}}
+            @include('partials.free-tools-row', ['except' => 'tools.keyword-volume'])
 
             <h1 class="mx-auto mt-6 max-w-2xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
                 {{ __('Free keyword volume checker') }}
@@ -111,6 +111,18 @@
                         <p class="mt-2 text-sm leading-6 text-slate-600">{{ $f[1] }}</p>
                     </div>
                 @endforeach
+            </div>
+        </div>
+    </section>
+
+    {{-- Cross-sell the rest of the free tools once the visitor has their
+         result — the point at which they are most likely to try another. --}}
+    <section class="border-t border-slate-200 bg-white">
+        <div class="mx-auto max-w-5xl px-6 py-14 text-center lg:px-8">
+            <h2 class="text-xl font-semibold tracking-tight text-slate-900">{{ __('More free tools') }}</h2>
+            <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-600">{{ __('No signup for the first run, no card, no limits worth worrying about.') }}</p>
+            <div class="mt-6">
+                @include('partials.free-tools-row', ['except' => 'tools.keyword-volume'])
             </div>
         </div>
     </section>

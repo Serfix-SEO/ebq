@@ -128,3 +128,21 @@ the lead is marked converted on capture. `Lead::markConvertedFor($user)` fires f
   `app/Support/Audit/SerpGlCatalog.php`, `app/Support/KeywordsEverywhereCountries.php`, `app/Support/Queues.php`
 - Routes — `routes/web.php:44-76`
 - Migrations — `database/migrations/2026_06_0{6,8,9}_*guest_*`
+
+## Cross-linking between the tools (2026-08-02)
+
+All four tool chips live in **one partial**, `resources/views/partials/free-tools-row.blade.php`,
+included by the home page (`landing.blade.php`, with `['label' => true]` for the "Free tools:"
+prefix) and by every tool page twice — once under the hero, once as a "More free tools" block
+after the results. Each include passes `['except' => '<its own route name>']` so a tool never
+links to itself.
+
+Why it exists: most visitors reach a tool straight from search, not via the home page. Before
+this, the home page listed all four while a tool page carried a single hardcoded "Also free: …"
+pill pointing at one sibling — so someone landing on the rank checker had no route to the other
+three. Adding a tool now means adding one array entry in the partial, and it appears on all five
+pages at once.
+
+Pinned by `tests/Feature/FreeToolsCrossLinkTest.php`: every tool links to every other tool, the
+chip count per page is exactly `(tools - 1) × 2` (which is also the self-exclusion check, since a
+self-link would make it four per row), and the home page still lists the full set.
