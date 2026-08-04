@@ -21,20 +21,21 @@
     <section class="relative">
         <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[26rem] bg-[radial-gradient(ellipse_at_top,rgba(242,100,25,0.08),transparent_60%)]"></div>
         <div class="mx-auto max-w-4xl px-6 pb-16 pt-16 text-center lg:px-8 lg:pb-24 lg:pt-24">
-            {{-- Every free tool, not just one. A visitor who landed here
-                 from search previously saw a single "Also free" pill and had
-                 no way to discover the rest. Shared partial, so the set stays
-                 identical to the home page's. --}}
-            @include('partials.free-tools-row', ['except' => 'tools.audit'])
-
-            <h1 class="mx-auto mt-6 max-w-2xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+            <h1 class="mx-auto max-w-2xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
                 {{ __('Free SEO audit for any page') }}
             </h1>
             <p class="mx-auto mt-5 max-w-xl text-balance text-[17px] leading-8 text-slate-600">
                 {{ __('On-page fixes, keyword targeting, Core Web Vitals and a top-ranking competitor benchmark — in about a minute.') }}
             </p>
 
-            <div class="relative mx-auto mt-10 max-w-3xl">
+            {{-- Same position as the home page: under the promise,
+                 above the search bar. Shared partial, so the set can
+                 never drift between here and there. --}}
+            <div class="mt-6">
+                @include('partials.free-tools-row', ['except' => 'tools.audit'])
+            </div>
+
+            <div class="relative mx-auto mt-8 max-w-3xl">
                 <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -inset-y-10 sm:-inset-x-8 -z-10 bg-[radial-gradient(55%_60%_at_50%_0%,rgba(242,100,25,0.20),transparent_70%)] blur-2xl"></div>
 
                 <form id="ga-form" data-tool-gate-form class="text-start" data-action="{{ route('guest-audit.store') }}" novalidate>
@@ -123,17 +124,6 @@
         </div>
     </section>
 
-    {{-- Cross-sell the rest of the free tools once the visitor has their
-         result — the point at which they are most likely to try another. --}}
-    <section class="border-t border-slate-200 bg-white">
-        <div class="mx-auto max-w-5xl px-6 py-14 text-center lg:px-8">
-            <h2 class="text-xl font-semibold tracking-tight text-slate-900">{{ __('More free tools') }}</h2>
-            <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-600">{{ __('No signup for the first run, no card, no limits worth worrying about.') }}</p>
-            <div class="mt-6">
-                @include('partials.free-tools-row', ['except' => 'tools.audit'])
-            </div>
-        </div>
-    </section>
 
     @if (\App\Support\Recaptcha::isEnabled())
         <script src="https://www.google.com/recaptcha/api.js" async defer></script>

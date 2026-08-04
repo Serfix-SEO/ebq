@@ -13,8 +13,9 @@ use Tests\TestCase;
  * single "Also free: …" pill, so someone who landed on the rank checker had no
  * way to discover the other three.
  *
- * Every page now renders the same partial (`partials/free-tools-row`), which is
- * what makes this testable as one rule instead of four.
+ * Every page now renders the same partial (`partials/free-tools-row`), in the
+ * same place the home page puts it — under the promise, above the search bar —
+ * which is what makes this testable as one rule instead of four.
  */
 class FreeToolsCrossLinkTest extends TestCase
 {
@@ -61,12 +62,13 @@ class FreeToolsCrossLinkTest extends TestCase
             // The chip markup is unique to the row, so counting it isolates the
             // row from the page's canonical/schema self-references.
             $chips = substr_count($html, 'rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5');
-            // Exactly three chips per row × two rows. A self-link would make it
-            // four per row, so the count is the self-exclusion check.
+            // Exactly three chips: the other tools, never this one. A
+            // self-link would make it four, so the count IS the self-exclusion
+            // check.
             $this->assertSame(
-                (count(self::TOOLS) - 1) * 2,
+                count(self::TOOLS) - 1,
                 $chips,
-                route($current).' should render the other three tools twice (header + footer), and never itself',
+                route($current).' should render the other three tools once, and never itself',
             );
         }
     }
