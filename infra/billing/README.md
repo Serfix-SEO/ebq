@@ -186,7 +186,7 @@ Conversion label `AW-18374890122/YhmCCK3Vm90cEIql6rlE`, value = **the real subsc
 amount in the currency Stripe charges** ($39/month or $348/year today).
 
 - `resources/views/partials/google-analytics.blade.php` loads gtag.js once and configures
-  **both** `G-FPEHXNCFT5` (GA4) and `AW-18374890122` (Ads). ⚠️ Without that second `config`
+  **both** `G-PS1SPVQXZR` (GA4) and `AW-18374890122` (Ads). ⚠️ Without that second `config`
   line a `send_to: 'AW-…'` event is accepted by the page and **silently dropped** by Google.
   It also carries Google's own `gtag_report_conversion(url)` helper verbatim, for click-based
   conversions on marketing pages (`onclick="return gtag_report_conversion(url)"`).
