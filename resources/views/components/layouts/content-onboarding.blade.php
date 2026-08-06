@@ -37,5 +37,7 @@
     <footer class="mx-auto max-w-6xl px-4 pb-10 pt-4 text-center text-xs text-slate-400">
         &copy; {{ date('Y') }} Serfix. {{ __('All rights reserved.') }}
     </footer>
+    {{-- Consent Mode v2 banner (drives the gtag consent state). --}}
+    @include('partials.consent-banner')
 </body>
 </html>

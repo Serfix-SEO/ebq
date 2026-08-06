@@ -243,5 +243,7 @@
             </div>
         </div>
     </footer>
+    {{-- Consent Mode v2 banner (drives the gtag consent state). --}}
+    @include('partials.consent-banner')
 </body>
 </html>

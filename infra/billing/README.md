@@ -180,6 +180,33 @@ next request. The `/billing` page hides the plan grid + danger zone and shows an
 - `database/seeders/PlanSeeder.php`, `database/migrations/2026_0*_*plans*`, `*client_activities*`
 - Routes: `routes/web.php` (`/billing/*`, `cashier.webhook`, `/admin/{plans,billing,usage,website-features}`)
 
+## Consent Mode v2 + our own banner (2026-08-04)
+
+`partials/google-analytics.blade.php` sets the consent state, and
+`partials/consent-banner.blade.php` collects the answer. In Google Ads/GA4, this site is
+declared as **"I use a custom consent banner"**.
+
+⚠️ **Order is load-bearing.** The `gtag('consent','default', …)` calls must be queued on
+dataLayer BEFORE `gtag.js` is fetched. Put the loader first and the tag fires once with storage
+allowed — the exact failure the banner exists to prevent, and invisible in the rendered page
+unless you check the order. Pinned by `ConsentModeTest::test_consent_defaults_are_queued_before_the_tag_loads`.
+
+- Defaults are **region-scoped**: denied across the EEA + `GB` + `CH`, granted elsewhere. All
+  four v2 signals are set (`ad_storage`, `ad_user_data`, `ad_personalization`, `analytics_storage`)
+  — setting only `ad_storage` is a silent v1 implementation.
+- `ads_data_redaction` + `url_passthrough` are on, so click ids still attribute while denied.
+- The choice lives in `localStorage.serfix_consent` (`granted`/`denied`). The analytics partial
+  re-applies it on the next load *before* the first hit, so the banner never asks twice.
+- The banner is plain JS, not Alpine: the layouts that include it don't all load Alpine, and a
+  consent prompt must not wait on a bundle. It renders `hidden` and is revealed by script, so a
+  visitor without JS never gets an undismissable overlay.
+- Included by the four layouts that load the tag (marketing page, guest, onboarding,
+  content-onboarding). Adding a fifth public layout means adding the include there too —
+  `ConsentModeTest` checks the public routes, not every layout.
+
+Consent Mode still sends cookieless pings while denied, which is what feeds Google's conversion
+modelling — denying by default costs far less measurement than it appears to.
+
 ## Google Ads conversion — Content Autopilot subscription (2026-08-04)
 
 Conversion label `AW-18374890122/YhmCCK3Vm90cEIql6rlE`, value = **the real subscription
