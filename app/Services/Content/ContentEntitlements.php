@@ -6,6 +6,7 @@ use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\User;
 use App\Models\Website;
+use App\Support\AdsConversion;
 use App\Support\ContentAutopilotConfig;
 use App\Support\TrialStatus;
 use Illuminate\Support\Carbon;
@@ -204,6 +205,18 @@ class ContentEntitlements
                 'content_trial_started_at' => now(),
                 'content_trial_ends_at' => now()->addDays(ContentAutopilotConfig::trialDays()),
             ])->save();
+
+            // Report the trial to Google Ads from HERE, inside the guard: this
+            // is the single moment a trial comes into existence, and the guard
+            // is what makes it once-per-user forever. Both entry points (the
+            // in-app Get started and the public onboarding converter) get it
+            // without either having to remember.
+            AdsConversion::queue(
+                AdsConversion::TRIAL,
+                AdsConversion::trialValueUsd(),
+                'USD',
+                'trial-'.$user->id,
+            );
         }
         $this->coverWebsite($website);
     }

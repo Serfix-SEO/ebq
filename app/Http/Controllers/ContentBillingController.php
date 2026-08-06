@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\ContentEntitlements;
+use App\Support\AdsConversion;
 use App\Support\ContentAutopilotConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -257,12 +258,12 @@ class ContentBillingController extends Controller
         $sub = $user->subscription(self::SUB);
         [$value, $currency] = $this->subscriptionValue($user, $sub);
 
-        $request->session()->flash('ads_conversion', [
-            'send_to' => 'AW-18374890122/U8gBCNCfkt0cEIql6rlE',
-            'value' => $value,
-            'currency' => $currency,
-            'transaction_id' => (string) ($sub?->stripe_id ?? ''),
-        ]);
+        AdsConversion::queue(
+            AdsConversion::SUBSCRIPTION,
+            $value,
+            $currency,
+            (string) ($sub?->stripe_id ?? ''),
+        );
     }
 
     /**

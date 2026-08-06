@@ -2,8 +2,12 @@
 
 namespace Tests\Feature\Content;
 
+use App\Models\Setting;
 use App\Models\User;
+use App\Models\Website;
 use App\Services\Content\ContentEntitlements;
+use App\Support\AdsConversion;
+use App\Support\ContentAutopilotConfig;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -71,7 +75,7 @@ class ContentAdsConversionTest extends TestCase
         // exercises the config fallback: the monthly plan's list price.
         $this->assertSame('USD', $conv['currency']);
         $this->assertSame(
-            (float) \App\Support\ContentAutopilotConfig::displayPrice('monthly'),
+            (float) ContentAutopilotConfig::displayPrice('monthly'),
             $conv['value'],
         );
         // Google Ads de-duplicates on this, so it must carry the real id.
@@ -86,8 +90,8 @@ class ContentAdsConversionTest extends TestCase
     public function test_the_annual_plan_reports_the_yearly_charge_not_the_monthly_display_price(): void
     {
         // Price ids live in Settings, which the test database starts empty.
-        \App\Models\Setting::set('content.pricing.annual_price_id', 'price_annual_test');
-        $annualPriceId = \App\Support\ContentAutopilotConfig::priceId('annual');
+        Setting::set('content.pricing.annual_price_id', 'price_annual_test');
+        $annualPriceId = ContentAutopilotConfig::priceId('annual');
         $this->assertSame('price_annual_test', $annualPriceId);
 
         $user = User::factory()->create();
@@ -103,7 +107,7 @@ class ContentAdsConversionTest extends TestCase
 
         $conv = session('ads_conversion');
         $this->assertSame(
-            (float) \App\Support\ContentAutopilotConfig::displayPrice('annual') * 12,
+            (float) ContentAutopilotConfig::displayPrice('annual') * 12,
             $conv['value'],
         );
         $this->assertSame('USD', $conv['currency']);
@@ -138,6 +142,77 @@ class ContentAdsConversionTest extends TestCase
             ->get($landing->headers->get('Location'))
             ->assertOk()
             ->assertDontSee(self::SEND_TO, false);
+    }
+
+    // ── Trial ───────────────────────────────────────────────────────────
+
+    /**
+     * A trial is a separate conversion action from a purchase, so it must reach
+     * its own label. Sending a trial to the subscription label would inflate
+     * paid signups with people who have not paid anything.
+     */
+    public function test_starting_a_trial_queues_the_trial_conversion(): void
+    {
+        $this->startSession();
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+
+        app(ContentEntitlements::class)->startTrial($user, $website);
+
+        $conv = session('ads_conversion');
+        $this->assertIsArray($conv, 'a started trial must be reported');
+        $this->assertSame(AdsConversion::TRIAL, $conv['send_to']);
+        $this->assertNotSame(AdsConversion::SUBSCRIPTION, $conv['send_to']);
+        // $1 — the first month a monthly signup actually pays, and the value
+        // set on the trial action in Google Ads.
+        $this->assertSame(1.0, $conv['value']);
+        $this->assertSame('USD', $conv['currency']);
+        $this->assertSame('trial-'.$user->id, $conv['transaction_id']);
+    }
+
+    /**
+     * startTrial() is called on every pass through Get started, not only the
+     * first — the write is guarded by content_trial_started_at. The conversion
+     * has to sit behind that same guard, or one user revisiting the page
+     * reports a new trial every time.
+     */
+    public function test_a_second_call_reports_nothing(): void
+    {
+        $this->startSession();
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+        $entitlements = app(ContentEntitlements::class);
+
+        $entitlements->startTrial($user, $website);
+        session()->forget('ads_conversion');
+
+        $entitlements->startTrial($user->fresh(), $website);
+
+        $this->assertNull(session('ads_conversion'), 'only a real trial start counts');
+    }
+
+    /** The trial value is a guess; it has to be correctable without a deploy. */
+    public function test_the_trial_value_is_settings_driven(): void
+    {
+        Setting::set('content.ads.trial_value_usd', '12.50');
+
+        $this->assertSame(12.50, AdsConversion::trialValueUsd());
+    }
+
+    /**
+     * startTrial() is reachable from console and queue contexts (backfills,
+     * admin grants) where there is no session. Reporting nothing is fine there;
+     * throwing in the middle of granting someone their trial is not.
+     */
+    public function test_a_trial_started_without_a_session_does_not_blow_up(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+
+        AdsConversion::queue(AdsConversion::TRIAL, 1.0, 'USD', 'trial-'.$user->id);
+        app(ContentEntitlements::class)->startTrial($user, $website);
+
+        $this->assertNotNull($user->fresh()->content_trial_ends_at, 'the trial itself must still start');
     }
 
     /** The Ads tag has to be configured, or the event is silently dropped. */

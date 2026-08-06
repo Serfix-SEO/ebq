@@ -1,11 +1,20 @@
 {{--
-    Google Ads conversion for a confirmed Content Autopilot subscription.
+    Google Ads conversions for Content Autopilot: a confirmed subscription
+    (ContentBillingController::success) or a started trial
+    (ContentEntitlements::startTrial). Both arrive the same way — see
+    App\Support\AdsConversion — so this partial only renders what it is handed
+    and never decides which conversion happened.
 
-    Renders NOTHING unless ContentBillingController::success() flashed
-    `ads_conversion` — flash data survives exactly one request, so the tag fires
-    once, on the page the customer lands on after checkout, and never again on a
-    refresh or a later visit. A purchase is confirmed server-side, so this is
-    deliberately not wired to gtag_report_conversion()'s click handler.
+    Renders NOTHING unless `ads_conversion` was flashed. Flash data survives
+    exactly one request, so the tag fires once, on the page the customer lands
+    on afterwards, and never again on a refresh or a later visit. Both events
+    are confirmed server-side, so neither is wired to
+    gtag_report_conversion()'s click handler.
+
+    Included at the END OF THE BODY, not in the head: Livewire's wire:navigate
+    swaps the body and re-runs its scripts but merges the head without
+    re-executing inline scripts there, so a head-only tag would silently miss
+    any conversion that lands via a navigate redirect.
 
     The app layout does not load gtag.js (we don't run analytics across the
     signed-in app), so the tag is loaded here just-in-time for the event. The

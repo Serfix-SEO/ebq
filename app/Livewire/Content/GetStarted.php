@@ -64,7 +64,10 @@ class GetStarted extends Component
             return;
         }
         $this->entitlements()->startTrial($user, $website);
-        $this->redirectRoute('content.settings', navigate: true);
+        // Full load, not a navigate: the trial conversion tag has to execute on
+        // the page we land on, and this happens once per user ever — the SPA
+        // transition is not worth the risk of losing the conversion.
+        $this->redirectRoute('content.settings', navigate: false);
     }
 
     public function activate(): void

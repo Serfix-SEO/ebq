@@ -207,7 +207,42 @@ unless you check the order. Pinned by `ConsentModeTest::test_consent_defaults_ar
 Consent Mode still sends cookieless pings while denied, which is what feeds Google's conversion
 modelling — denying by default costs far less measurement than it appears to.
 
-## Google Ads conversion — Content Autopilot subscription (2026-08-04)
+## Google Ads conversions — Content Autopilot (2026-08-04, trial added 2026-08-06)
+
+Two conversion actions, both routed through `app/Support/AdsConversion.php`, which owns the
+labels and the queue-for-the-next-page mechanism. Callers say *what happened*; the partial only
+renders what it is handed.
+
+| Action | Label | Fired by | Value |
+|---|---|---|---|
+| Sign-up (subscription) | `AW-18374890122/U8gBCNCfkt0cEIql6rlE` | `ContentBillingController::success()` | real Stripe amount ($39/mo, $348/yr) |
+| Trial | `AW-18374890122/n_X8CJ2elN0cEIql6rlE` | `ContentEntitlements::startTrial()` | `$1` (setting `content.ads.trial_value_usd`) |
+
+⚠️ **The values set on the actions in Google Ads (2026-08-06: $39 payment, $1 trial) only give
+way to what we send if each action is set to "Use different values for each conversion".** Left on
+"same value", the Ads-side number wins and the real amount we send is discarded — which silently
+flattens a $348 annual sale to $39.
+
+### Trial
+
+`startTrial()` reports from **inside** the `content_trial_started_at === null` guard. That guard
+is what makes it once-per-user-forever, and it is the single moment a trial comes into existence,
+so both entry points — `App\Livewire\Content\GetStarted` and `ContentOnboardingConverter` — are
+covered without either having to remember. `startTrial()` is also reachable from console/queue
+contexts, so `AdsConversion::queue()` no-ops without a started session: an untracked trial beats a
+500 in the middle of granting one.
+
+`$1` matches the first month a monthly signup actually pays and the Ads-side default. The honest
+value is the subscription price × the share of trials that convert, which is unknown until there
+is history — hence the `content.ads.trial_value_usd` setting: correct it (and the Ads default)
+once the real rate is known, no deploy needed.
+
+⚠️ `GetStarted::startTrial()` redirects with `navigate: **false**`, and the partial is included at
+the **end of the body**, not the head. Livewire's `wire:navigate` swaps the body and re-runs its
+scripts but merges the head *without* re-executing inline scripts there — a head-only tag would
+silently miss every conversion that arrives via a navigate redirect.
+
+### Subscription
 
 Conversion label `AW-18374890122/U8gBCNCfkt0cEIql6rlE` (the **Sign-up** action — it replaced
 the Purchase action on 2026-08-06, which was retired in Google Ads), value = **the real subscription
@@ -220,8 +255,9 @@ amount in the currency Stripe charges** ($39/month or $348/year today).
   conversions on marketing pages (`onclick="return gtag_report_conversion(url)"`).
 - The subscription conversion does **not** use that helper — a purchase is confirmed
   server-side, not by a click. `ContentBillingController::flashAdsConversion()` puts the payload
-  in **one-request flash data** and `resources/views/partials/ads-conversion.blade.php`
-  (included in the app layout head) renders the tag only when that flash exists.
+  in **one-request flash data** (via `AdsConversion::queue()`) and
+  `resources/views/partials/ads-conversion.blade.php` renders the tag only when that flash
+  exists.
 
 Two properties, both invisible when broken and both regression-tested in
 `tests/Feature/Content/ContentAdsConversionTest.php`:

@@ -3,8 +3,6 @@
 <head>
     <meta charset="utf-8">
     @include('partials.clarity')
-    {{-- Renders only on the request that follows a confirmed subscription. --}}
-    @include('partials.ads-conversion')
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Serfix</title>
@@ -574,5 +572,10 @@
     });
     </script>
     @endauth
+    {{-- Google Ads conversion. In the BODY, not the head: wire:navigate
+         re-executes body scripts but does not re-run head ones, and one of the
+         trial paths lands here via a navigate redirect. Renders only on the
+         request that follows a real trial start or subscription. --}}
+    @include('partials.ads-conversion')
 </body>
 </html>
