@@ -179,3 +179,30 @@ next request. The `/billing` page hides the plan grid + danger zone and shows an
 - `app/Exceptions/QuotaExceededException.php`, `app/Http/Middleware/InjectFeatureFlags.php`
 - `database/seeders/PlanSeeder.php`, `database/migrations/2026_0*_*plans*`, `*client_activities*`
 - Routes: `routes/web.php` (`/billing/*`, `cashier.webhook`, `/admin/{plans,billing,usage,website-features}`)
+
+## Google Ads conversion — Content Autopilot subscription (2026-08-04)
+
+Conversion label `AW-18374890122/YhmCCK3Vm90cEIql6rlE`, value 1.0 AED.
+
+- `resources/views/partials/google-analytics.blade.php` loads gtag.js once and configures
+  **both** `G-FPEHXNCFT5` (GA4) and `AW-18374890122` (Ads). ⚠️ Without that second `config`
+  line a `send_to: 'AW-…'` event is accepted by the page and **silently dropped** by Google.
+  It also carries Google's own `gtag_report_conversion(url)` helper verbatim, for click-based
+  conversions on marketing pages (`onclick="return gtag_report_conversion(url)"`).
+- The subscription conversion does **not** use that helper — a purchase is confirmed
+  server-side, not by a click. `ContentBillingController::flashAdsConversion()` puts the payload
+  in **one-request flash data** and `resources/views/partials/ads-conversion.blade.php`
+  (included in the app layout head) renders the tag only when that flash exists.
+
+Two properties, both invisible when broken and both regression-tested in
+`tests/Feature/Content/ContentAdsConversionTest.php`:
+
+1. **Fires once.** Stripe's success URL is a plain GET that a customer can refresh or bookmark.
+   Flash data is consumed by the request that renders it, so a reload reports nothing.
+2. **Only for a live subscription.** Stripe redirects on its own schedule; an abandoned or
+   still-processing checkout must never be reported as a sale. Comped access is not a purchase
+   and does not fire either.
+
+`transaction_id` carries the Stripe subscription id so Google Ads can de-duplicate. The app
+layout deliberately does **not** include the GA4 partial — we don't run pageview analytics across
+the signed-in app — so `ads-conversion.blade.php` loads gtag.js just-in-time for the event.

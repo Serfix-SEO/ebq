@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\ContentEntitlements;
 use App\Support\ContentAutopilotConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Checkout;
 use Laravel\Cashier\Exceptions\IncompletePayment;
 use Laravel\Cashier\Subscription;
+use Stripe\Exception\InvalidRequestException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -24,9 +27,7 @@ class ContentBillingController extends Controller
 {
     private const SUB = ContentEntitlements::SUBSCRIPTION;
 
-    public function __construct(private readonly ContentEntitlements $entitlements)
-    {
-    }
+    public function __construct(private readonly ContentEntitlements $entitlements) {}
 
     // ── Base subscription checkout ──────────────────────────────────────
 
@@ -67,7 +68,7 @@ class ContentBillingController extends Controller
             }
             try {
                 return $builder->checkout(['success_url' => $successUrl, 'cancel_url' => $cancelUrl]);
-            } catch (\Stripe\Exception\InvalidRequestException $e) {
+            } catch (InvalidRequestException $e) {
                 // A dead coupon must never block the sale — retry at full price.
                 if ($coupon === null || ! str_contains(strtolower($e->getMessage()), 'coupon')) {
                     throw $e;
@@ -86,6 +87,7 @@ class ContentBillingController extends Controller
     {
         $user = $request->user();
         $this->syncContentSubscription($user);
+        $this->flashAdsConversion($request, $user);
 
         // Cover the initiating website (base slot) once the sub is live.
         $websiteId = (string) $request->query('website', '');
@@ -189,12 +191,12 @@ class ContentBillingController extends Controller
 
     // ── internals ───────────────────────────────────────────────────────
 
-    private function healStaleCustomer(\App\Models\User $user): void
+    private function healStaleCustomer(User $user): void
     {
         if ($user->hasStripeId() && ! $user->subscribed(self::SUB)) {
             try {
                 $user->asStripeCustomer();
-            } catch (\Stripe\Exception\InvalidRequestException $e) {
+            } catch (InvalidRequestException $e) {
                 if (str_contains($e->getMessage(), 'No such customer')) {
                     $user->forceFill(['stripe_id' => null, 'pm_type' => null, 'pm_last_four' => null])->save();
                 } else {
@@ -217,14 +219,14 @@ class ContentBillingController extends Controller
         return $sub->items->contains('stripe_price', $addonId);
     }
 
-    private function currentWebsite(Request $request, \App\Models\User $user): ?Website
+    private function currentWebsite(Request $request, User $user): ?Website
     {
         $id = (string) ($request->input('website') ?: $request->session()->get('current_website_id', ''));
 
         return $id !== '' ? $user->websites()->whereKey($id)->first() : null;
     }
 
-    private function resolveWebsiteId(\App\Models\User $user, ?string $requested): ?string
+    private function resolveWebsiteId(User $user, ?string $requested): ?string
     {
         if ($requested && $user->websites()->whereKey($requested)->exists()) {
             return $requested;
@@ -234,7 +236,33 @@ class ContentBillingController extends Controller
     }
 
     /** Optimistic pull of the content subscription from Stripe on the success hop. */
-    private function syncContentSubscription(\App\Models\User $user): void
+    /**
+     * Queue the Google Ads conversion for the page the customer is about to
+     * land on. Flash data lives for exactly one request, so the tag fires once
+     * — never again on a refresh, a bookmark, or a later visit to the same
+     * screen. Rendered by partials/ads-conversion.blade.php.
+     *
+     * Only a LIVE subscription counts: Stripe redirects here on its own
+     * schedule, and an abandoned or still-processing checkout must not be
+     * reported as a sale. The Stripe subscription id rides along as
+     * transaction_id so Google Ads can de-duplicate if this is ever reached
+     * twice.
+     */
+    private function flashAdsConversion(Request $request, User $user): void
+    {
+        if (! $this->entitlements->hasContentSubscription($user)) {
+            return;
+        }
+
+        $request->session()->flash('ads_conversion', [
+            'send_to' => 'AW-18374890122/YhmCCK3Vm90cEIql6rlE',
+            'value' => 1.0,
+            'currency' => 'AED',
+            'transaction_id' => (string) ($user->subscription(self::SUB)?->stripe_id ?? ''),
+        ]);
+    }
+
+    private function syncContentSubscription(User $user): void
     {
         if (! $user->hasStripeId() || $user->subscribed(self::SUB)) {
             return;
@@ -257,7 +285,7 @@ class ContentBillingController extends Controller
                 'stripe_status' => $s->status,
                 'stripe_price' => $price?->price?->id,
                 'quantity' => $price?->quantity,
-                'ends_at' => $s->cancel_at ? \Illuminate\Support\Carbon::createFromTimestamp((int) $s->cancel_at) : null,
+                'ends_at' => $s->cancel_at ? Carbon::createFromTimestamp((int) $s->cancel_at) : null,
             ]);
             // Mirror the subscription items so addonQuantity() reads correctly.
             foreach ($s->items->data as $item) {
