@@ -62,11 +62,13 @@
     gtag('config', 'G-PS1SPVQXZR');
     gtag('config', 'AW-18374890122');
 
-    {{-- Google's own snippet, kept verbatim so it can be pasted onto a link or
-         button as `onclick="return gtag_report_conversion(url)"`. The Content
-         Autopilot subscription conversion does NOT use it — a purchase is
-         confirmed server-side, not by a click, so it fires from
-         partials/ads-conversion.blade.php instead. --}}
+    {{-- Google's own snippet for the Sign-up conversion, kept verbatim so it
+         can be pasted onto a link or button as
+         `onclick="return gtag_report_conversion(url)"`. Currently unused: the
+         subscription conversion fires from partials/ads-conversion.blade.php on
+         the post-payment page, because payment is confirmed server-side and a
+         click happens BEFORE it — click-firing would count every abandoned
+         checkout as a sale. --}}
     function gtag_report_conversion(url) {
         var callback = function () {
             if (typeof(url) != 'undefined') {
@@ -74,10 +76,9 @@
             }
         };
         gtag('event', 'conversion', {
-            'send_to': 'AW-18374890122/YhmCCK3Vm90cEIql6rlE',
+            'send_to': 'AW-18374890122/U8gBCNCfkt0cEIql6rlE',
             'value': 1.0,
             'currency': 'AED',
-            'transaction_id': '',
             'event_callback': callback
         });
         return false;

@@ -209,7 +209,8 @@ modelling — denying by default costs far less measurement than it appears to.
 
 ## Google Ads conversion — Content Autopilot subscription (2026-08-04)
 
-Conversion label `AW-18374890122/YhmCCK3Vm90cEIql6rlE`, value = **the real subscription
+Conversion label `AW-18374890122/U8gBCNCfkt0cEIql6rlE` (the **Sign-up** action — it replaced
+the Purchase action on 2026-08-06, which was retired in Google Ads), value = **the real subscription
 amount in the currency Stripe charges** ($39/month or $348/year today).
 
 - `resources/views/partials/google-analytics.blade.php` loads gtag.js once and configures

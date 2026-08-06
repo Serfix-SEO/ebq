@@ -24,7 +24,10 @@ class ContentAdsConversionTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const SEND_TO = 'AW-18374890122/YhmCCK3Vm90cEIql6rlE';
+    // The Sign-up conversion action. It replaced the Purchase one on
+    // 2026-08-06; that action was retired in Google Ads, and sending to a
+    // deleted action records nothing at all.
+    private const SEND_TO = 'AW-18374890122/U8gBCNCfkt0cEIql6rlE';
 
     protected function setUp(): void
     {

@@ -24,7 +24,7 @@
         gtag('js', new Date());
         gtag('config', 'AW-18374890122');
         gtag('event', 'conversion', {
-            'send_to': @json($conv['send_to'] ?? 'AW-18374890122/YhmCCK3Vm90cEIql6rlE', JSON_UNESCAPED_SLASHES),
+            'send_to': @json($conv['send_to'] ?? 'AW-18374890122/U8gBCNCfkt0cEIql6rlE', JSON_UNESCAPED_SLASHES),
             'value': {{ (float) ($conv['value'] ?? 1.0) }},
             'currency': @json($conv['currency'] ?? 'AED', JSON_UNESCAPED_SLASHES),
             'transaction_id': @json((string) ($conv['transaction_id'] ?? ''), JSON_UNESCAPED_SLASHES)

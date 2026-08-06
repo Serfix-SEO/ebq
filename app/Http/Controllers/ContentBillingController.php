@@ -258,7 +258,7 @@ class ContentBillingController extends Controller
         [$value, $currency] = $this->subscriptionValue($user, $sub);
 
         $request->session()->flash('ads_conversion', [
-            'send_to' => 'AW-18374890122/YhmCCK3Vm90cEIql6rlE',
+            'send_to' => 'AW-18374890122/U8gBCNCfkt0cEIql6rlE',
             'value' => $value,
             'currency' => $currency,
             'transaction_id' => (string) ($sub?->stripe_id ?? ''),
