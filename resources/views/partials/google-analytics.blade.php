@@ -1,4 +1,4 @@
-{{-- Google tag (gtag.js) — GA4 property G-FPEHXNCFT5 + Google Ads AW-18374890122.
+{{-- Google tag (gtag.js) — GA4 property G-PS1SPVQXZR + Google Ads AW-18374890122.
 
      One gtag.js load serves both: the GA4 config reports pageviews, the Ads
      config is what makes `send_to: 'AW-18374890122/…'` conversions resolve.
@@ -10,12 +10,12 @@
      The Content Autopilot subscription conversion does NOT go through it — a
      purchase is confirmed server-side, not by a click, so it fires from
      partials/ads-conversion.blade.php instead. --}}
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-FPEHXNCFT5"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-PS1SPVQXZR"></script>
 <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'G-FPEHXNCFT5');
+    gtag('config', 'G-PS1SPVQXZR');
     gtag('config', 'AW-18374890122');
 
     function gtag_report_conversion(url) {

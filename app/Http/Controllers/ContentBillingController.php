@@ -254,12 +254,53 @@ class ContentBillingController extends Controller
             return;
         }
 
+        $sub = $user->subscription(self::SUB);
+        [$value, $currency] = $this->subscriptionValue($user, $sub);
+
         $request->session()->flash('ads_conversion', [
             'send_to' => 'AW-18374890122/YhmCCK3Vm90cEIql6rlE',
-            'value' => 1.0,
-            'currency' => 'AED',
-            'transaction_id' => (string) ($user->subscription(self::SUB)?->stripe_id ?? ''),
+            'value' => $value,
+            'currency' => $currency,
+            'transaction_id' => (string) ($sub?->stripe_id ?? ''),
         ]);
+    }
+
+    /**
+     * What the customer actually subscribed for, for conversion value.
+     *
+     * Read from Stripe so a price change flows through without a code edit:
+     * whatever the subscription's price says is what gets reported ($39/month
+     * or $348/year today). Falls back to the configured display prices if the
+     * call fails — reporting a slightly stale number beats reporting none, and
+     * a missing value makes the conversion useless for bidding.
+     *
+     * NOTE: this is the RECURRING price, not the first invoice. Monthly signups
+     * take a $1 first month from the promo coupon; reporting that $1 would tell
+     * Smart Bidding a monthly customer is worth almost nothing.
+     *
+     * @return array{0: float, 1: string}
+     */
+    private function subscriptionValue(User $user, ?Subscription $sub): array
+    {
+        $priceId = (string) ($sub?->stripe_price ?? '');
+
+        if ($priceId !== '') {
+            try {
+                $price = $user->stripe()->prices->retrieve($priceId);
+                if (($price->unit_amount ?? null) !== null) {
+                    return [round($price->unit_amount / 100, 2), strtoupper((string) $price->currency)];
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Content ads conversion: could not read price '.$priceId.': '.$e->getMessage());
+            }
+        }
+
+        // Fallback: the annual plan is displayed per month, so ×12 is the charge.
+        $annual = $priceId !== '' && $priceId === ContentAutopilotConfig::priceId('annual');
+
+        return $annual
+            ? [(float) ContentAutopilotConfig::displayPrice('annual') * 12, 'USD']
+            : [(float) ContentAutopilotConfig::displayPrice('monthly'), 'USD'];
     }
 
     private function syncContentSubscription(User $user): void

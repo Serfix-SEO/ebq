@@ -63,10 +63,47 @@ class ContentAdsConversionTest extends TestCase
         $conv = session('ads_conversion');
         $this->assertIsArray($conv, 'a paid subscription must queue the conversion');
         $this->assertSame(self::SEND_TO, $conv['send_to']);
-        $this->assertSame('AED', $conv['currency']);
-        $this->assertSame(1.0, $conv['value']);
+        // The real subscription amount, in the currency Stripe charges in —
+        // not a flat placeholder. Stripe is unreachable in tests, so this
+        // exercises the config fallback: the monthly plan's list price.
+        $this->assertSame('USD', $conv['currency']);
+        $this->assertSame(
+            (float) \App\Support\ContentAutopilotConfig::displayPrice('monthly'),
+            $conv['value'],
+        );
         // Google Ads de-duplicates on this, so it must carry the real id.
         $this->assertSame('sub_test_123', $conv['transaction_id']);
+    }
+
+    /**
+     * The yearly plan is DISPLAYED per month ($29) but CHARGED once a year, so
+     * the fallback has to multiply. Reporting 29 for a $348 sale would tell
+     * Smart Bidding an annual customer is worth less than a monthly one.
+     */
+    public function test_the_annual_plan_reports_the_yearly_charge_not_the_monthly_display_price(): void
+    {
+        // Price ids live in Settings, which the test database starts empty.
+        \App\Models\Setting::set('content.pricing.annual_price_id', 'price_annual_test');
+        $annualPriceId = \App\Support\ContentAutopilotConfig::priceId('annual');
+        $this->assertSame('price_annual_test', $annualPriceId);
+
+        $user = User::factory()->create();
+        $user->subscriptions()->create([
+            'type' => ContentEntitlements::SUBSCRIPTION,
+            'stripe_id' => 'sub_test_year',
+            'stripe_status' => 'active',
+            'stripe_price' => $annualPriceId,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user)->get(route('content.billing.success'))->assertRedirect();
+
+        $conv = session('ads_conversion');
+        $this->assertSame(
+            (float) \App\Support\ContentAutopilotConfig::displayPrice('annual') * 12,
+            $conv['value'],
+        );
+        $this->assertSame('USD', $conv['currency']);
     }
 
     /**
@@ -106,7 +143,7 @@ class ContentAdsConversionTest extends TestCase
         $html = $this->get(route('content.landing'))->assertOk()->getContent();
 
         $this->assertStringContainsString("gtag('config', 'AW-18374890122')", $html);
-        $this->assertStringContainsString("gtag('config', 'G-FPEHXNCFT5')", $html);
+        $this->assertStringContainsString("gtag('config', 'G-PS1SPVQXZR')", $html);
         $this->assertStringContainsString('function gtag_report_conversion(url)', $html);
     }
 }

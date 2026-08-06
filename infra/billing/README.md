@@ -182,7 +182,8 @@ next request. The `/billing` page hides the plan grid + danger zone and shows an
 
 ## Google Ads conversion — Content Autopilot subscription (2026-08-04)
 
-Conversion label `AW-18374890122/YhmCCK3Vm90cEIql6rlE`, value 1.0 AED.
+Conversion label `AW-18374890122/YhmCCK3Vm90cEIql6rlE`, value = **the real subscription
+amount in the currency Stripe charges** ($39/month or $348/year today).
 
 - `resources/views/partials/google-analytics.blade.php` loads gtag.js once and configures
   **both** `G-FPEHXNCFT5` (GA4) and `AW-18374890122` (Ads). ⚠️ Without that second `config`
@@ -202,6 +203,13 @@ Two properties, both invisible when broken and both regression-tested in
 2. **Only for a live subscription.** Stripe redirects on its own schedule; an abandoned or
    still-processing checkout must never be reported as a sale. Comped access is not a purchase
    and does not fire either.
+
+**Value** is read from the subscription's own Stripe price (`subscriptionValue()`), so a price
+change flows through without a code edit; it falls back to the configured display prices —
+annual ×12, since that plan is displayed per month and charged per year — if the API call fails.
+It is the RECURRING price, deliberately **not** the first invoice: monthly signups pay $1 for the
+first month under the promo coupon, and reporting $1 would tell Smart Bidding a monthly customer
+is worth almost nothing.
 
 `transaction_id` carries the Stripe subscription id so Google Ads can de-duplicate. The app
 layout deliberately does **not** include the GA4 partial — we don't run pageview analytics across
