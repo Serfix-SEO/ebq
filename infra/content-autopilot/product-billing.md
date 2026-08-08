@@ -69,6 +69,27 @@ syncSubscriptionsFromStripe` to resolve the sub type from Stripe metadata
   middleware teasers dashboard report/crawl routes (`dashboard/content-only-teaser`);
   `Website::crawlPageCap` clamps to `content_only_crawl_pages` (default 200) so the
   pipeline still gets site profile / internal links / keyword seeds.
+## Where the customer sees their content billing (2026-08-08)
+
+`/billing` renders TWO panels. `Billing\SubscriptionPanel` reads the `default`
+subscription (SEO platform); `Billing\ContentSubscriptionPanel` reads `content`. The second
+one exists because the first structurally cannot show this product: a paying content customer
+saw no plan, no amount, no renewal date and no cancel button, and a content-only client got a
+page announcing their trial had expired while being charged monthly (daomarketing.com). The
+`content.billing.cancel` / `.resume` endpoints had shipped at launch with **no UI anywhere**.
+
+- Renders nothing unless the user has a content subscription, trial, comp grant, or a
+  `content` subscription row — an SEO-only billing page is byte-identical to before.
+- Amount comes from the subscribed Stripe price, falling back to the configured display price
+  (annual ×12). Renewal date is only on the Stripe object, same as the dashboard panel;
+  an unreachable API renders "—" rather than failing the page.
+- Invoices are **filtered to the content price ids**. One Stripe customer carries both
+  subscriptions, so an unfiltered list would show SEO charges under a content heading.
+- Order: content-first for `isContentOnly()` users (otherwise their paid product sits below
+  four SEO upgrade cards), SEO-first for everyone else. Pinned by `ContentBillingPanelTest`.
+- Covered-site list comes from `ContentEntitlements::coveredWebsites()`, which shares its
+  query with `sitesCovered()` so the count and the list cannot disagree.
+
 - `EnsureTrialNotExpired` allowlist adds `content.` so lapsed dashboard users can buy — and
   Livewire actions fired from those pages are judged by their origin page, or the allowlist
   only covers reading them (see `infra/billing/plans-and-gating.md`).

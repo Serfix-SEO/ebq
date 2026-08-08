@@ -10,6 +10,7 @@ use App\Support\AdsConversion;
 use App\Support\ContentAutopilotConfig;
 use App\Support\TrialStatus;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -132,6 +133,25 @@ class ContentEntitlements
             ->whereIn('website_id', $user->websites()->select('id'))
             ->whereNotNull('billing_covered_at')
             ->count();
+    }
+
+    /**
+     * The websites those covered slots are actually spent on — same rule as
+     * sitesCovered(), so a billing screen can never show a count and a list
+     * that disagree.
+     *
+     * @return Collection<int, Website>
+     */
+    public function coveredWebsites(User $user): Collection
+    {
+        $ids = ContentPlan::query()
+            ->whereIn('website_id', $user->websites()->select('id'))
+            ->whereNotNull('billing_covered_at')
+            ->pluck('website_id');
+
+        return $ids->isEmpty()
+            ? collect()
+            : $user->websites()->whereIn('id', $ids)->orderBy('domain')->get();
     }
 
     /**
