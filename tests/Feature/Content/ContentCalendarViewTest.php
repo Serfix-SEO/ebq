@@ -7,6 +7,7 @@ use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\User;
 use App\Models\Website;
+use App\Support\ContentAutopilotConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -49,6 +50,44 @@ class ContentCalendarViewTest extends TestCase
     }
 
     /**
+     * "Write now" without content access sends the user to the CONTENT plans,
+     * not the SEO ones. The two products are bought separately, so an upsell
+     * that lands on the dashboard billing page asks for money that would not
+     * unlock the button they just pressed (reported 2026-08-06).
+     */
+    public function test_write_now_without_content_access_offers_the_content_plans(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create([
+            'normalized_domain' => 'example.com', 'domain' => 'example.com',
+        ]);
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'status' => ContentPlan::STATUS_ACTIVE,
+        ]);
+        $topic = ContentTopic::factory()->create([
+            'plan_id' => $plan->id,
+            'status' => ContentTopic::STATUS_SUGGESTED,
+            'scheduled_for' => now(),
+        ]);
+
+        // No subscription, no trial, no comp: blockReason() -> 'no_access'.
+        $this->assertFalse($user->hasContentAccess());
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'calendar'])
+            ->call('writeNow', $topic->id)
+            ->assertRedirect(route('content.get-started'));
+
+        $this->assertNotSame(
+            ContentTopic::STATUS_APPROVED,
+            $topic->fresh()->status,
+            'a blocked topic must not be queued for generation',
+        );
+    }
+
+    /**
      * The monthly cap marks articles the plan will NOT generate. A month that
      * lands exactly on the allowance is fully covered, so nothing is flagged —
      * the ranking used >= and painted the last covered article red with a
@@ -56,7 +95,7 @@ class ContentCalendarViewTest extends TestCase
      */
     public function test_a_month_exactly_on_the_article_cap_is_not_flagged_as_over_limit(): void
     {
-        $cap = \App\Support\ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $cap = ContentAutopilotConfig::monthlyArticlesPerWebsite();
         $user = User::factory()->create();
         $website = Website::factory()->for($user)->create();
         $plan = ContentPlan::factory()->create([

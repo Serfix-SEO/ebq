@@ -69,7 +69,9 @@ syncSubscriptionsFromStripe` to resolve the sub type from Stripe metadata
   middleware teasers dashboard report/crawl routes (`dashboard/content-only-teaser`);
   `Website::crawlPageCap` clamps to `content_only_crawl_pages` (default 200) so the
   pipeline still gets site profile / internal links / keyword seeds.
-- `EnsureTrialNotExpired` allowlist adds `content.` so lapsed dashboard users can buy.
+- `EnsureTrialNotExpired` allowlist adds `content.` so lapsed dashboard users can buy — and
+  Livewire actions fired from those pages are judged by their origin page, or the allowlist
+  only covers reading them (see `infra/billing/plans-and-gating.md`).
 
 ## In-app Get started — `app/Livewire/Content/GetStarted.php`
 

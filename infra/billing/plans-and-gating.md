@@ -108,8 +108,20 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
 - **`EnsureTrialNotExpired`** (web middleware): lockout uses `TrialStatus::isLockedOut()` =
   expired **AND not a team member anywhere** — a user managing other owners' websites keeps
   full app access (works under those owners' plans) while their own sites still expire.
-  Locked users are confined to `billing.*`/`cashier.*`/logout/impersonation-stop; everything
-  else redirects to /billing with an explanatory flash. Impersonating admins pass through.
+  Locked users are confined to `billing.*`/`cashier.*`/`content.*`/logout/impersonation-stop;
+  everything else redirects to /billing with an explanatory flash. Impersonating admins pass
+  through.
+  - ⚠️ **Livewire actions are judged by their ORIGIN page, not by the route they POST to.**
+    Every Livewire action hits one shared update route (named `default.livewire.update` here,
+    *not* `livewire.update` — match with `str_contains`, not a prefix), so judging that name
+    contradicts the allowlist: a locked user could open `/content` but every button on it
+    bounced to the SEO billing page — "Write now" on the content calendar offered dashboard
+    plans that would not unlock it (prod 2026-08-06, daomarketing.com). `originRouteName()`
+    resolves the same-host Referer back to a route name. Not a security boundary (the client
+    controls its Referer) and it does not need to be — every route downstream still enforces
+    `feature:`, `content.access` and `ContentEntitlements::blockReason()`. An unresolvable or
+    offsite Referer falls back to the update route, i.e. stays locked. Pinned by
+    `ContentCrossProductTest`.
 - **Onboarding trial-expired panel (2026-07-10)**: `/onboarding`
   (`resources/views/onboarding/index.blade.php`) renders a "Your free trial has ended" card
   with a billing CTA — never the connect-Google/add-site wizard — for any
