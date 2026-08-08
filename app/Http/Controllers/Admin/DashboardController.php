@@ -153,6 +153,100 @@ class DashboardController extends Controller
     }
 
     /**
+     * Drill-down: the RECORDS behind a dashboard tile. Every metric resolves
+     * to the same row shape so one table view serves them all, and each query
+     * mirrors the tile's counting rules exactly — a drill that disagrees with
+     * its tile is worse than no drill.
+     */
+    public function drill(string $metric): View
+    {
+        $now = Carbon::now();
+        $today = $now->copy()->startOfDay();
+        $customers = fn () => User::query()->where('is_system', false)->where('is_admin', false);
+        $activeSub = function ($q): void {
+            $q->selectRaw(1)->from('subscriptions')
+                ->whereColumn('subscriptions.user_id', 'users.id')
+                ->whereIn('stripe_status', ['active', 'trialing', 'past_due']);
+        };
+
+        $userRows = fn ($query) => $query->latest()->limit(200)->get()
+            ->map(fn (User $u) => [
+                'title' => $u->name ?: $u->email,
+                'subtitle' => $u->email,
+                'badge' => $u->is_disabled ? 'disabled' : null,
+                'at' => $u->created_at,
+                'href' => route('admin.clients.index', ['q' => $u->email]),
+            ]);
+
+        [$label, $rows] = match ($metric) {
+            'signups-today' => ['Signups today', $userRows($customers()->where('created_at', '>=', $today))],
+            'trials-today' => ['Trials started today', $userRows($customers()->where('content_trial_started_at', '>=', $today))],
+            'customers' => ['All customers', $userRows($customers())],
+            'paid' => ['Paid customers', $userRows($customers()->whereExists($activeSub))],
+            'on-trial' => ['Customers on trial', $userRows($customers()->whereNotExists($activeSub)->where('content_trial_ends_at', '>', $now))],
+            'free' => ['Free customers', $userRows($customers()->whereNotExists($activeSub)->where(fn ($q) => $q->whereNull('content_trial_ends_at')->orWhere('content_trial_ends_at', '<=', $now)))],
+            'with-card' => ['Card added, not paid', $userRows($customers()->whereNotNull('pm_type')->whereNotExists($activeSub))],
+            'disabled' => ['Disabled customers', $userRows($customers()->where('is_disabled', true))],
+            'internal' => ['Internal accounts', $userRows(User::query()->where(fn ($q) => $q->where('is_system', true)->orWhere('is_admin', true)))],
+            'articles-today', 'articles-all' => [
+                $metric === 'articles-today' ? 'Articles published today' : 'Published articles (all time)',
+                ContentTopic::query()->with('website')
+                    ->where('status', ContentTopic::STATUS_PUBLISHED)
+                    ->when($metric === 'articles-today', fn ($q) => $q->where('published_at', '>=', $today))
+                    ->orderByDesc('published_at')->limit(200)->get()
+                    ->map(fn (ContentTopic $t) => [
+                        'title' => $t->title ?: $t->target_keyword,
+                        'subtitle' => $t->website?->domain ?? '—',
+                        'badge' => null,
+                        'at' => $t->published_at,
+                        'href' => null,
+                    ]),
+            ],
+            'leads-today' => [
+                'Leads today',
+                Lead::query()->where('created_at', '>=', $today)->latest()->limit(200)->get()
+                    ->map(fn (Lead $l) => [
+                        'title' => $l->name ?: $l->email,
+                        'subtitle' => $l->email.($l->source ? ' · '.$l->source : ''),
+                        'badge' => $l->converted_at ? 'converted' : null,
+                        'at' => $l->created_at,
+                        'href' => route('admin.leads.index'),
+                    ]),
+            ],
+            'websites' => [
+                'Websites',
+                Website::query()->with('user')->latest()->limit(200)->get()
+                    ->map(fn (Website $w) => [
+                        'title' => $w->domain ?: '(no domain)',
+                        'subtitle' => $w->user?->email ?? '—',
+                        'badge' => null,
+                        'at' => $w->created_at,
+                        'href' => $w->user ? route('admin.clients.index', ['q' => $w->user->email]) : null,
+                    ]),
+            ],
+            'payments-today', 'payments-month' => [
+                $metric === 'payments-today' ? 'Payments today' : 'Payments this month',
+                collect($this->stripeSnapshot($today)['recent'])
+                    ->when($metric === 'payments-today', fn ($c) => $c->filter(fn ($p) => $p['at'] !== null && $p['at']->gte($today)))
+                    ->map(fn (array $p) => [
+                        'title' => $p['email'] ?? 'unknown',
+                        'subtitle' => number_format($p['amount'], 2).' '.$p['currency'],
+                        'badge' => null,
+                        'at' => $p['at'],
+                        'href' => $p['url'],
+                    ])->values(),
+            ],
+            default => abort(404),
+        };
+
+        return view('admin.dashboard-drill', [
+            'metric' => $metric,
+            'label' => $label,
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
      * Payments straight from Stripe, cached 10 minutes.
      *
      * @return array{available: bool, today_count: int, today_amount: float,

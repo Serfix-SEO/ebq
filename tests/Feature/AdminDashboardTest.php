@@ -85,6 +85,40 @@ class AdminDashboardTest extends TestCase
         $this->assertStringContainsString('internal', $html);
     }
 
+    /** Every tile links to a drill-down listing the records behind its number. */
+    public function test_tiles_link_to_drill_downs_and_drills_list_the_records(): void
+    {
+        $paid = User::factory()->create(['name' => 'Paid Customer']);
+        $paid->subscriptions()->create([
+            'type' => ContentEntitlements::SUBSCRIPTION, 'stripe_id' => 'sub_d',
+            'stripe_status' => 'active', 'stripe_price' => 'price_x', 'quantity' => 1,
+        ]);
+        $free = User::factory()->create(['name' => 'Free Customer']);
+
+        $admin = $this->admin();
+        $html = $this->actingAs($admin)->get(route('admin.dashboard'))->assertOk()->getContent();
+        foreach (['customers', 'paid', 'on-trial', 'free', 'with-card', 'disabled',
+            'signups-today', 'trials-today', 'articles-today', 'leads-today',
+            'payments-today', 'payments-month', 'websites', 'articles-all', 'internal'] as $metric) {
+            $this->assertStringContainsString(route('admin.dashboard.drill', $metric), $html, "tile links to {$metric}");
+        }
+
+        // The drill shows the records the tile counted — and only those.
+        $this->actingAs($admin)->get(route('admin.dashboard.drill', 'paid'))
+            ->assertOk()
+            ->assertSee('Paid Customer')
+            ->assertDontSee('Free Customer');
+        $this->actingAs($admin)->get(route('admin.dashboard.drill', 'free'))
+            ->assertOk()
+            ->assertSee('Free Customer')
+            ->assertDontSee('Paid Customer');
+
+        // Unknown metric is a 404, not a 500.
+        $this->actingAs($admin)->get(route('admin.dashboard.drill', 'nonsense'))->assertNotFound();
+        // And the drill is admin-only like the dashboard.
+        $this->actingAs($free)->get(route('admin.dashboard.drill', 'paid'))->assertForbidden();
+    }
+
     public function test_stripe_being_unreachable_degrades_not_breaks(): void
     {
         $html = $this->actingAs($this->admin())->get(route('admin.dashboard'))->assertOk()->getContent();

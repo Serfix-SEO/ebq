@@ -57,19 +57,21 @@
         {{-- ── Today ─────────────────────────────────────────────── --}}
         <div class="grid grid-cols-2 gap-2 lg:grid-cols-5">
             @foreach ([
-                ['label' => 'Signups today', 'data' => $daily['signups']],
-                ['label' => 'Trials started today', 'data' => $daily['trials']],
-                ['label' => 'Articles published today', 'data' => $daily['articles']],
-                ['label' => 'Leads today', 'data' => $daily['leads']],
+                ['label' => 'Signups today', 'data' => $daily['signups'], 'metric' => 'signups-today'],
+                ['label' => 'Trials started today', 'data' => $daily['trials'], 'metric' => 'trials-today'],
+                ['label' => 'Articles published today', 'data' => $daily['articles'], 'metric' => 'articles-today'],
+                ['label' => 'Leads today', 'data' => $daily['leads'], 'metric' => 'leads-today'],
             ] as $card)
                 @php $d = $delta($card['data']['today'], $card['data']['yesterday']); @endphp
-                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <a href="{{ route('admin.dashboard.drill', $card['metric']) }}"
+                   class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/40">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ $card['label'] }}</p>
                     <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{{ $fmtN($card['data']['today']) }}</p>
                     <p class="mt-0.5 text-[11px] font-medium {{ $d['class'] }}">{{ $d['text'] }}</p>
-                </div>
+                </a>
             @endforeach
-            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <a href="{{ route('admin.dashboard.drill', 'payments-today') }}"
+               class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/40">
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Payments today</p>
                 @if ($stripe['available'])
                     <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{{ $money($stripe['today_amount'], $stripe['currency']) }}</p>
@@ -78,23 +80,24 @@
                     <p class="mt-1 text-2xl font-bold text-slate-400">&mdash;</p>
                     <p class="mt-0.5 text-[11px] font-medium text-slate-400">Stripe unavailable</p>
                 @endif
-            </div>
+            </a>
         </div>
 
         {{-- ── Customer segments + revenue ───────────────────────── --}}
         <div class="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
             @foreach ([
-                ['label' => 'Total customers', 'value' => $segments['total'], 'tone' => 'text-slate-900 dark:text-white'],
-                ['label' => 'Paid', 'value' => $segments['paid'], 'tone' => 'text-emerald-600 dark:text-emerald-400'],
-                ['label' => 'On trial', 'value' => $segments['on_trial'], 'tone' => 'text-orange-600 dark:text-orange-400'],
-                ['label' => 'Free', 'value' => $segments['free'], 'tone' => 'text-slate-900 dark:text-white'],
-                ['label' => 'Card added, not paid', 'value' => $segments['with_card'], 'tone' => 'text-amber-600 dark:text-amber-400'],
-                ['label' => 'Disabled', 'value' => $segments['disabled'], 'tone' => 'text-rose-600 dark:text-rose-400'],
+                ['label' => 'Total customers', 'value' => $segments['total'], 'tone' => 'text-slate-900 dark:text-white', 'metric' => 'customers'],
+                ['label' => 'Paid', 'value' => $segments['paid'], 'tone' => 'text-emerald-600 dark:text-emerald-400', 'metric' => 'paid'],
+                ['label' => 'On trial', 'value' => $segments['on_trial'], 'tone' => 'text-orange-600 dark:text-orange-400', 'metric' => 'on-trial'],
+                ['label' => 'Free', 'value' => $segments['free'], 'tone' => 'text-slate-900 dark:text-white', 'metric' => 'free'],
+                ['label' => 'Card added, not paid', 'value' => $segments['with_card'], 'tone' => 'text-amber-600 dark:text-amber-400', 'metric' => 'with-card'],
+                ['label' => 'Disabled', 'value' => $segments['disabled'], 'tone' => 'text-rose-600 dark:text-rose-400', 'metric' => 'disabled'],
             ] as $tile)
-                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <a href="{{ route('admin.dashboard.drill', $tile['metric']) }}"
+                   class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/40">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ $tile['label'] }}</p>
                     <p class="mt-1 text-2xl font-bold tabular-nums {{ $tile['tone'] }}">{{ $fmtN($tile['value']) }}</p>
-                </div>
+                </a>
             @endforeach
         </div>
 
@@ -105,21 +108,23 @@
                     {{ $stripe['available'] && $stripe['mrr'] !== null ? $money($stripe['mrr'], $stripe['currency']) : '—' }}
                 </p>
             </div>
-            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <a href="{{ route('admin.dashboard.drill', 'payments-month') }}"
+               class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/40">
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Collected this month</p>
                 <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
                     {{ $stripe['available'] ? $money($stripe['month_amount'], $stripe['currency']) : '—' }}
                 </p>
-            </div>
+            </a>
             @foreach ([
-                ['label' => 'Websites', 'value' => $segments['websites']],
-                ['label' => 'Articles published (all time)', 'value' => $segments['articles_total']],
-                ['label' => 'Internal accounts', 'value' => $segments['internal']],
+                ['label' => 'Websites', 'value' => $segments['websites'], 'metric' => 'websites'],
+                ['label' => 'Articles published (all time)', 'value' => $segments['articles_total'], 'metric' => 'articles-all'],
+                ['label' => 'Internal accounts', 'value' => $segments['internal'], 'metric' => 'internal'],
             ] as $tile)
-                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <a href="{{ route('admin.dashboard.drill', $tile['metric']) }}"
+                   class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500/40">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ $tile['label'] }}</p>
                     <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{{ $fmtN($tile['value']) }}</p>
-                </div>
+                </a>
             @endforeach
         </div>
 

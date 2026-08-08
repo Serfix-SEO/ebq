@@ -361,4 +361,7 @@ subscriptions, recent payments).
   API calls and "tested" the unreachable fallback against a reachable Stripe. Never remove.
 - Charts use `fill-orange-500`/`fill-slate-200` SVG classes — part of the compiled Tailwind
   bundle since this change; `npm run build` required if new fill-* classes are added.
+- **Drill-downs**: every tile links to `admin.dashboard.drill/{metric}` — one generic method +
+  one table view for all 15 metrics, each drill query mirroring its tile's counting rules
+  exactly (a drill that disagrees with its tile is worse than no drill). Unknown metric 404s.
 - Pinned by `tests/Feature/AdminDashboardTest.php`.
