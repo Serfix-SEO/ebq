@@ -100,6 +100,31 @@ class SeoPlatformUiToggleTest extends TestCase
         }
     }
 
+    /**
+     * A user with NO websites must land somewhere TERMINAL. content.index
+     * bounces them through EnsureFeatureAccess → websites.index →
+     * EnsureOnboarded → /onboarding → back into the kill-switch: too many
+     * redirects (prod 2026-08-08, a website-less lead under impersonation).
+     * The whole loop, hop by hop, until a page actually renders.
+     */
+    public function test_a_user_with_no_websites_reaches_a_terminal_page_not_a_redirect_loop(): void
+    {
+        $this->off();
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('onboarding'));
+        $seen = [];
+        $hops = 0;
+        while ($response->isRedirect()) {
+            $target = $response->headers->get('Location');
+            $this->assertNotContains($target, $seen, 'redirect loop: '.implode(' -> ', array_merge($seen, [$target])));
+            $this->assertLessThan(6, ++$hops, 'redirect chain too long');
+            $seen[] = $target;
+            $response = $this->actingAs($user)->get($target);
+        }
+        $response->assertOk();
+    }
+
     /** Admins debug client data — they keep the SEO surfaces. */
     public function test_admins_keep_seo_access_when_off(): void
     {

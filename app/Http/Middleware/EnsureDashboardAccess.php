@@ -69,8 +69,15 @@ class EnsureDashboardAccess
             && ! $user->is_admin
             && ($this->matches($route, self::TEASER_PREFIXES) || $this->matches($route, self::SEO_ONLY_PREFIXES))) {
             // EnsureContentAccess cascades non-entitled users on to
-            // content.get-started, so this single target fits everyone.
-            return redirect()->route('content.index');
+            // content.get-started — but a user with NO websites must go there
+            // DIRECTLY. content.index bounces them through EnsureFeatureAccess
+            // → websites.index → EnsureOnboarded → /onboarding → back here: a
+            // redirect loop (prod 2026-08-08, a website-less lead). The SEO
+            // onboarding wizard used to be their terminal state; get-started
+            // is the content product's, and it renders fine with no website.
+            return $user->hasAccessibleWebsites()
+                ? redirect()->route('content.index')
+                : redirect()->route('content.get-started');
         }
 
         // 2. Content-only teaser.
