@@ -128,6 +128,12 @@ class SeoPlatformUiToggleTest extends TestCase
         $this->assertStringNotContainsString(route('rank-tracking.index'), $html, 'no Ranking link');
         $this->assertStringContainsString(route('billing.show'), $html, 'Billing stays');
         $this->assertStringContainsString(route('websites.index'), $html, 'Websites stays');
+        // Content is THE product now — its items sit flat at the top level,
+        // not collapsed behind a "Content" flyout group. The flyout JSON map is
+        // empty when no labeled groups remain (the toggle-selector string
+        // itself always appears in the click-outside handler, so assert the
+        // data, not the markup).
+        $this->assertStringContainsString('groups: []', $html, 'no collapsed groups remain');
     }
 
     public function test_billing_is_single_product_when_off(): void

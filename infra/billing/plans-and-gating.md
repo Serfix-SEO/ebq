@@ -334,7 +334,9 @@ hides the entire SEO product and makes the app Content-AI-focused. UI-only — e
   registration default → `content.get-started`; trial lockout redirect → `content.get-started`;
   `TrialExpiryMail` copy goes product-neutral.
 - Sidebar: Pulse + Orbit groups and Sitemaps/Reports emptied (existing empty-group filter drops
-  the headers). Billing page: content-only summary + plans, no tabs.
+  the headers), and the Content group loses its label — its items render FLAT at the top of the
+  sidebar instead of collapsed behind a flyout (content IS the product; the content settings item
+  is relabelled "Content Settings" to disambiguate from account Settings). Billing page: content-only summary + plans, no tabs.
 - ⚠️ The flag must be set in **both** boxes' `.env` — box B renders queued mail (TrialExpiryMail
   branches on it). Rollback = `SEO_PLATFORM_UI=true` + FPM restart (box A) / container restart (box B).
 - Pinned by `tests/Feature/SeoPlatformUiToggleTest.php` — covers both states, canonical dedup,
