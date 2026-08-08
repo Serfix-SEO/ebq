@@ -141,6 +141,10 @@
 
                     @if ($isWordPress)
                         <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ __('In WordPress go to Users → Profile → Application Passwords, create one named "Serfix", and paste it here. The account needs to be an Author or above.') }}</p>
+                        {{-- The one-line instruction above assumes the reader already
+                             knows what an application password is; this is the
+                             illustrated walkthrough for everyone else. --}}
+                        @include('partials.wp-connect-guide')
                         <div class="mt-3 grid gap-3 sm:grid-cols-3">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Site URL') }}</label>
