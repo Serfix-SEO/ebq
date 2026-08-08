@@ -144,7 +144,7 @@
                         {{-- The one-line instruction above assumes the reader already
                              knows what an application password is; this is the
                              illustrated walkthrough for everyone else. --}}
-                        @include('partials.wp-connect-guide')
+                        @include('partials.wp-connect-guide', ['guideForceOpen' => $errors->has('connect')])
                         <div class="mt-3 grid gap-3 sm:grid-cols-3">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('Site URL') }}</label>

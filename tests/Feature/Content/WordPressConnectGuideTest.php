@@ -45,10 +45,16 @@ class WordPressConnectGuideTest extends TestCase
         // illustrations alone would not survive a different WP version.
         $this->assertStringContainsString('Users', $html);
         $this->assertStringContainsString('Application Passwords', $html);
-        $this->assertStringContainsString('Add New Application Password', $html);
+        // The real WordPress button reads "Add Application Password".
+        $this->assertStringContainsString('Add Application Password', $html);
+        // The username trips people up: it is often an email, never the display name.
+        $this->assertStringContainsString('Find your WordPress username', $html);
         // Shown once: the single most common way this goes wrong.
-        $this->assertStringContainsString('WordPress shows it ONCE', $html);
-        $this->assertStringContainsString('Use your login username', $html);
+        $this->assertStringContainsString('It appears once', $html);
+        // The wrong button one section up resets their real login password.
+        $this->assertStringContainsString('Do NOT use “Set New Password”', $html);
+        // The username is often an email and is never the display name.
+        $this->assertStringContainsString('it is NOT the same as your display name', $html);
     }
 
     /**
@@ -60,7 +66,7 @@ class WordPressConnectGuideTest extends TestCase
     {
         $html = $this->connectPanel()->html();
 
-        $this->assertStringContainsString('Don’t see “Application Passwords”?', $html);
+        $this->assertStringContainsString('Don’t see “Application Passwords”, or it won’t connect?', $html);
         $this->assertStringContainsString('HTTPS', $html);
         $this->assertStringContainsString('5.6', $html);
         $this->assertStringContainsString('Wordfence', $html);
@@ -75,15 +81,46 @@ class WordPressConnectGuideTest extends TestCase
         );
     }
 
-    /** The illustrations are inline SVG — no external asset can 404 here. */
-    public function test_the_screens_are_illustrated_inline(): void
+    /**
+     * A failed connection must not collapse the instructions — the steps are
+     * the answer to nearly every cause, so the guide reopens with a lead-in
+     * instead of leaving the raw API error as the last word.
+     */
+    public function test_a_failed_connection_reopens_the_guide(): void
+    {
+        $panel = $this->connectPanel()
+            ->set('wpSiteUrl', 'https://not-a-real-wordpress-site.invalid')
+            ->set('wpUsername', 'someone')
+            ->set('wpAppPassword', 'abcd EFGH 1234 wxyz')
+            ->call('connect');
+
+        $panel->assertHasErrors('connect');
+        $html = $panel->html();
+
+        $this->assertStringContainsString('The connection didn’t go through', $html);
+        // Keyed on the error state so Livewire replaces the node and the
+        // `open` attribute applies again even if the user had collapsed it.
+        $this->assertStringContainsString('wire:key="wp-guide-error"', $html);
+    }
+
+    /**
+     * Screenshots are optional: a missing file falls back to a drawn SVG of
+     * the same screen, so a lost asset never leaves a step unillustrated.
+     */
+    public function test_every_screen_is_illustrated_with_a_screenshot_or_a_fallback(): void
     {
         $html = $this->connectPanel()->html();
 
-        $this->assertStringContainsString('<svg viewBox="0 0 420 190"', $html, 'the profile screen');
-        $this->assertStringContainsString('<svg viewBox="0 0 420 96"', $html, 'the password reveal');
-        $this->assertStringContainsString('role="img"', $html, 'illustrations are announced to screen readers');
-        $this->assertStringNotContainsString('<img', $html, 'no external screenshot to break');
+        foreach ([
+            '01-application-passwords.png' => '<svg viewBox="0 0 420 190"',
+            '02-password-revealed.png' => '<svg viewBox="0 0 420 96"',
+        ] as $file => $fallback) {
+            if (is_file(public_path('guide/wordpress/'.$file))) {
+                $this->assertStringContainsString($file, $html, "the {$file} screenshot renders");
+            } else {
+                $this->assertStringContainsString($fallback, $html, "the drawn fallback for {$file} renders");
+            }
+        }
     }
 
     /** The guide belongs to the WordPress tab, not the webhook/Laravel ones. */
