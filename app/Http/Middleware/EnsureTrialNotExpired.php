@@ -83,6 +83,14 @@ class EnsureTrialNotExpired
             }
         }
 
+        // SEO UI off: /billing sells Content Autopilot only, and the product
+        // this user's lockout is about is hidden — send them to the content
+        // Get started page instead (`content.` is allowlisted above, no loop).
+        if (! config('features.seo_platform_ui')) {
+            return redirect()->route('content.get-started')
+                ->with('error', __('Your free trial has ended. Choose a plan to keep using Serfix — your data is held for 3 days after expiry.'));
+        }
+
         return redirect()->route('billing.show')
             ->with('error', 'Your free trial has ended. Choose a plan to keep using Serfix — your data is held for 3 days after expiry.');
     }

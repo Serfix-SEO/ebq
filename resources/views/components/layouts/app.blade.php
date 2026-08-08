@@ -57,8 +57,11 @@
                 // only, feature-gating/active-state logic is untouched.
                 $navGroups = [
                     [
+                        // Pulse is all SEO surfaces — the whole group goes with
+                        // the SEO-platform kill-switch (empty groups are dropped
+                        // by the filter below).
                         'label' => 'Pulse',
-                        'items' => [
+                        'items' => ! config('features.seo_platform_ui') ? [] : [
                             ['route' => 'dashboard', 'feature' => 'dashboard', 'label' => __('Site Health'), 'icon' => 'M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'],
                             ['route' => 'statistics', 'feature' => 'dashboard', 'label' => __('Statistics'), 'icon' => 'M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6zM13.5 3v7.5H21A7.5 7.5 0 0013.5 3z'],
                             ['route' => 'site-explorer', 'feature' => null, 'label' => __('Explorer'), 'icon' => 'M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z'],
@@ -94,8 +97,9 @@
                         ]),
                     ],
                     [
+                        // Orbit (keyword tools) is all SEO too — same switch.
                         'label' => 'Orbit',
-                        'items' => [
+                        'items' => ! config('features.seo_platform_ui') ? [] : [
                             ['route' => 'keywords.index', 'feature' => 'keywords', 'label' => __('Keywords'), 'icon' => 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z'],
                             ['route' => 'keyword-research.index', 'feature' => 'keywords', 'label' => __('Keyword Research'), 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z'],
                             ['route' => 'keyword-gap.index', 'feature' => 'keywords', 'label' => __('Competitor Gap'), 'icon' => 'M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5'],
@@ -106,8 +110,13 @@
                     [
                         'label' => null,
                         'items' => [
+                            // Sitemaps + Reports are SEO surfaces; the rest of
+                            // this group (websites/team/settings/billing)
+                            // survives the SEO-platform kill-switch.
+                            ...(config('features.seo_platform_ui') ? [
                             ['route' => 'sitemaps.index', 'feature' => 'sitemaps', 'label' => __('Sitemaps'), 'icon' => 'M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z'],
                             ['route' => 'reports.index', 'feature' => 'reports', 'label' => __('Reports'), 'icon' => 'M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5'],
+                            ] : []),
                             // AI Studio (beta) — shown only when the global kill-switch
                             // config('features.ai_studio') is on. Off in prod during beta.
                             ...(config('features.ai_studio') ? [

@@ -193,8 +193,12 @@
                 {{ __('One price. Articles researched, written, published and tracked.') }}
             </h1>
             <p class="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
-                {{ __('This is our content product, priced on its own page because it is a separate product from the Serfix SEO platform.') }}
-                <a href="{{ route('pricing') }}" class="font-semibold text-orange-600 underline underline-offset-4 hover:text-orange-700">{{ __('Looking for SEO platform pricing?') }}</a>
+                @if (config('features.seo_platform_ui'))
+                    {{ __('This is our content product, priced on its own page because it is a separate product from the Serfix SEO platform.') }}
+                    <a href="{{ route('pricing') }}" class="font-semibold text-orange-600 underline underline-offset-4 hover:text-orange-700">{{ __('Looking for SEO platform pricing?') }}</a>
+                @else
+                    {{ __('Simple, transparent pricing. Start free, cancel any time.') }}
+                @endif
             </p>
             <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <a href="{{ $startUrl }}" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700">
@@ -386,6 +390,7 @@
                     <p class="mt-3 text-sm text-slate-600">{{ __('Plans, writes, optimises and publishes articles for you, then tracks how they rank.') }}</p>
                     <p class="mt-4 text-sm font-semibold text-slate-900">{{ __('Choose this if you need content produced.') }}</p>
                 </div>
+                @if (config('features.seo_platform_ui'))
                 <div class="rounded-2xl border border-slate-200 bg-white p-7">
                     <h3 class="text-lg font-bold text-slate-900">{{ __('SEO Platform') }}</h3>
                     <p class="mt-1 text-sm font-semibold text-slate-500">{{ __('From $19/mo') }}</p>
@@ -396,6 +401,7 @@
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
                     </a>
                 </div>
+                @endif
             </div>
         </div>
     </section>

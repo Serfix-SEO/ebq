@@ -79,6 +79,7 @@
     title="Content AI Autopilot — SEO Articles Written & Published For You"
     description="Serfix researches your niche, writes genuinely useful SEO articles, illustrates them, and publishes to your site on schedule — then tracks how they rank. Free trial, no card."
     active="content"
+    :canonical="config('features.seo_platform_ui') ? null : url('/')"
 >
     <x-slot:schema>
         <script type="application/ld+json">{!! json_encode($faqSchema, $jsonFlags) !!}</script>
@@ -602,7 +603,8 @@
         </div>
     </section>
 
-    {{-- ── Cross-sell: the SEO platform ──────────────────────── --}}
+    {{-- ── Cross-sell: the SEO platform (hidden with the product) ── --}}
+    @if (config('features.seo_platform_ui'))
     <section class="border-b border-slate-200 bg-orange-50/50">
         <div class="mx-auto max-w-6xl px-6 py-16 lg:px-8 lg:py-20">
             <div class="grid items-center gap-10 rounded-3xl border border-orange-200 bg-white p-8 shadow-sm lg:grid-cols-2 lg:p-10">
@@ -627,6 +629,7 @@
             </div>
         </div>
     </section>
+    @endif
 
     {{-- ── Pricing ───────────────────────────────────────────── --}}
     <section id="pricing" class="scroll-mt-20 border-b border-slate-200 bg-white">

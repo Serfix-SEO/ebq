@@ -95,6 +95,7 @@
     @include('partials.locale-picker')
     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">{{ __('Skip to content') }}</a>
 
+    @php $seoUi = (bool) config('features.seo_platform_ui'); @endphp
     <header x-data="{ mobileOpen: false }" @keydown.escape.window="mobileOpen = false" class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
             <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="Serfix home">
@@ -102,9 +103,17 @@
             </a>
 
             <nav aria-label="Primary" class="hidden items-center gap-7 text-sm text-slate-600 md:flex">
-                <a href="{{ route('features') }}" class="transition hover:text-slate-900 {{ $active === 'features' ? 'text-slate-900' : '' }}">{{ __('Features') }}</a>
-                <a href="{{ route('content.landing') }}" class="inline-flex items-center transition hover:text-slate-900 {{ $active === 'content' ? 'text-slate-900' : '' }}">{{ __('Content AI') }}<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('New') }}</span></a>
-                <a href="{{ route('guide') }}" class="transition hover:text-slate-900 {{ $active === 'guide' ? 'text-slate-900' : '' }}">{{ __('Guide') }}</a>
+                @if ($seoUi)
+                    <a href="{{ route('features') }}" class="transition hover:text-slate-900 {{ $active === 'features' ? 'text-slate-900' : '' }}">{{ __('Features') }}</a>
+                    <a href="{{ route('content.landing') }}" class="inline-flex items-center transition hover:text-slate-900 {{ $active === 'content' ? 'text-slate-900' : '' }}">{{ __('Content AI') }}<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('New') }}</span></a>
+                    <a href="{{ route('guide') }}" class="transition hover:text-slate-900 {{ $active === 'guide' ? 'text-slate-900' : '' }}">{{ __('Guide') }}</a>
+                @else
+                    {{-- SEO UI off: one product, so the nav names its parts, not
+                         two catalogues. Home is the content landing. --}}
+                    <a href="{{ route('landing') }}" class="transition hover:text-slate-900 {{ in_array($active, ['content', 'home'], true) ? 'text-slate-900' : '' }}">{{ __('How it works') }}</a>
+                    <a href="{{ route('content.pricing') }}" class="transition hover:text-slate-900 {{ $active === 'pricing' ? 'text-slate-900' : '' }}">{{ __('Pricing') }}</a>
+                @endif
+                @if ($seoUi)
                 {{-- Two products, two pricing pages: a bare "Pricing" link hid the
                      content catalogue entirely, so name both destinations. --}}
                 <div class="relative" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false">
@@ -127,9 +136,12 @@
                         </div>
                     </div>
                 </div>
+                @endif
                 <a href="{{ route('contact') }}" class="transition hover:text-slate-900 {{ $active === 'contact' ? 'text-slate-900' : '' }}">{{ __('Contact') }}</a>
-                <a href="{{ route('wordpress-plugin') }}" class="inline-flex items-center transition hover:text-slate-900 {{ $active === 'wordpress' ? 'text-slate-900' : '' }}">{{ __('WordPress') }}@if (config('services.wordpress_plugin.coming_soon'))<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('Soon') }}</span>@endif</a>
-                <a href="{{ route('pricing') }}#faq" class="transition hover:text-slate-900">{{ __('FAQ') }}</a>
+                @if ($seoUi)
+                    <a href="{{ route('wordpress-plugin') }}" class="inline-flex items-center transition hover:text-slate-900 {{ $active === 'wordpress' ? 'text-slate-900' : '' }}">{{ __('WordPress') }}@if (config('services.wordpress_plugin.coming_soon'))<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('Soon') }}</span>@endif</a>
+                    <a href="{{ route('pricing') }}#faq" class="transition hover:text-slate-900">{{ __('FAQ') }}</a>
+                @endif
             </nav>
 
             <div class="flex items-center gap-2">
@@ -168,14 +180,21 @@
             x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
             class="border-t border-slate-200/80 bg-white md:hidden">
             <nav aria-label="Primary mobile" @click="mobileOpen = false" class="mx-auto flex max-w-6xl flex-col gap-1 px-6 py-4 text-sm text-slate-600">
-                <a href="{{ route('features') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'features' ? 'font-semibold text-slate-900' : '' }}">{{ __('Features') }}</a>
-                <a href="{{ route('content.landing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'content' ? 'font-semibold text-slate-900' : '' }}">{{ __('Content AI') }}<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('New') }}</span></a>
-                <a href="{{ route('guide') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'guide' ? 'font-semibold text-slate-900' : '' }}">{{ __('Guide') }}</a>
-                <a href="{{ route('pricing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'pricing' ? 'font-semibold text-slate-900' : '' }}">{{ __('SEO Platform pricing') }}</a>
-                <a href="{{ route('content.pricing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900">{{ __('Content AI pricing') }}</a>
+                @if ($seoUi)
+                    <a href="{{ route('features') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'features' ? 'font-semibold text-slate-900' : '' }}">{{ __('Features') }}</a>
+                    <a href="{{ route('content.landing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'content' ? 'font-semibold text-slate-900' : '' }}">{{ __('Content AI') }}<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('New') }}</span></a>
+                    <a href="{{ route('guide') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'guide' ? 'font-semibold text-slate-900' : '' }}">{{ __('Guide') }}</a>
+                    <a href="{{ route('pricing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'pricing' ? 'font-semibold text-slate-900' : '' }}">{{ __('SEO Platform pricing') }}</a>
+                    <a href="{{ route('content.pricing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900">{{ __('Content AI pricing') }}</a>
+                @else
+                    <a href="{{ route('landing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ in_array($active, ['content', 'home'], true) ? 'font-semibold text-slate-900' : '' }}">{{ __('How it works') }}</a>
+                    <a href="{{ route('content.pricing') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'pricing' ? 'font-semibold text-slate-900' : '' }}">{{ __('Pricing') }}</a>
+                @endif
                 <a href="{{ route('contact') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'contact' ? 'font-semibold text-slate-900' : '' }}">{{ __('Contact') }}</a>
-                <a href="{{ route('wordpress-plugin') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'wordpress' ? 'font-semibold text-slate-900' : '' }}">{{ __('WordPress') }}@if (config('services.wordpress_plugin.coming_soon'))<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('Soon') }}</span>@endif</a>
-                <a href="{{ route('pricing') }}#faq" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900">{{ __('FAQ') }}</a>
+                @if ($seoUi)
+                    <a href="{{ route('wordpress-plugin') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900 {{ $active === 'wordpress' ? 'font-semibold text-slate-900' : '' }}">{{ __('WordPress') }}@if (config('services.wordpress_plugin.coming_soon'))<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('Soon') }}</span>@endif</a>
+                    <a href="{{ route('pricing') }}#faq" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900">{{ __('FAQ') }}</a>
+                @endif
 
                 <div class="my-2 border-t border-slate-200"></div>
 
@@ -208,22 +227,34 @@
                 <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="Serfix home">
                     <img src="{{ asset('serfix-logo.png') }}" alt="Serfix" width="101" height="36" class="h-9 w-auto object-contain">
                 </a>
-                <p class="mt-4 max-w-xs text-slate-500">{{ __('The SEO command center for teams that ship every week. Discover, prioritize, execute, measure.') }}</p>
+                @php $seoUiFooter = (bool) config('features.seo_platform_ui'); @endphp
+                @if ($seoUiFooter)
+                    <p class="mt-4 max-w-xs text-slate-500">{{ __('The SEO command center for teams that ship every week. Discover, prioritize, execute, measure.') }}</p>
+                @else
+                    <p class="mt-4 max-w-xs text-slate-500">{{ __('A content marketing team on autopilot: researched, written, optimised and published for you, every day.') }}</p>
+                @endif
             </div>
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Product') }}</p>
                 <ul class="mt-3 space-y-2.5">
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('features') }}">{{ __('Features') }}</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('guide') }}">{{ __('Guide') }}</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}">{{ __('SEO Platform pricing') }}</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('content.pricing') }}">{{ __('Content AI pricing') }}</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('wordpress-plugin') }}">{{ __('WordPress plugin') }}@if (config('services.wordpress_plugin.coming_soon'))<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('Soon') }}</span>@endif</a></li>
+                    @if ($seoUiFooter)
+                        <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('features') }}">{{ __('Features') }}</a></li>
+                        <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('guide') }}">{{ __('Guide') }}</a></li>
+                        <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}">{{ __('SEO Platform pricing') }}</a></li>
+                        <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('content.pricing') }}">{{ __('Content AI pricing') }}</a></li>
+                        <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('wordpress-plugin') }}">{{ __('WordPress plugin') }}@if (config('services.wordpress_plugin.coming_soon'))<span class="ms-1 rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-orange-700">{{ __('Soon') }}</span>@endif</a></li>
+                    @else
+                        <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('landing') }}">{{ __('How it works') }}</a></li>
+                        <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('content.pricing') }}">{{ __('Pricing') }}</a></li>
+                    @endif
                 </ul>
             </div>
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ __('Company') }}</p>
                 <ul class="mt-3 space-y-2.5">
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}#faq">{{ __('FAQ') }}</a></li>
+                    @if ($seoUiFooter)
+                        <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}#faq">{{ __('FAQ') }}</a></li>
+                    @endif
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('contact') }}">{{ __('Contact') }}</a></li>
                 </ul>
             </div>

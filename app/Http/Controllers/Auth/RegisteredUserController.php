@@ -7,12 +7,15 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Models\WebsiteInvitation;
 use App\Rules\ValidRecaptcha;
+use App\Services\WebsiteAttachService;
+use App\Support\DialCodes;
 use App\Support\Recaptcha;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
@@ -47,7 +50,7 @@ class RegisteredUserController extends Controller
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'dial_code' => ['nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\DialCodes::validCodes())],
+            'dial_code' => ['nullable', 'string', Rule::in(DialCodes::validCodes())],
             'phone' => ['nullable', 'string', 'min:5', 'max:20', 'regex:/^[0-9()\-.\s]+$/'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'invite' => ['nullable', 'string', 'max:128'],
@@ -92,7 +95,7 @@ class RegisteredUserController extends Controller
         // stays linked to the same row. Email verification still happens
         // later via the standard verified-route middleware; we don't gate
         // checkout on it (Stripe collects a verified email of its own).
-        $pendingPlan     = (string) $request->session()->pull('pending_plan', '');
+        $pendingPlan = (string) $request->session()->pull('pending_plan', '');
         $pendingInterval = (string) $request->session()->pull('pending_plan_interval', 'annual');
         if ($pendingPlan !== '' && $this->isCheckoutablePlan($pendingPlan, $pendingInterval)) {
             // Don't create a Website here — the placeholder flow owns that.
@@ -103,7 +106,7 @@ class RegisteredUserController extends Controller
             }
 
             return redirect()->route('billing.checkout', array_filter([
-                'plan'     => $pendingPlan,
+                'plan' => $pendingPlan,
                 'interval' => $pendingInterval !== 'annual' ? $pendingInterval : null,
             ]));
         }
@@ -122,7 +125,7 @@ class RegisteredUserController extends Controller
         // view is auth-gated but NOT verified-gated, so first value lands
         // before email verification).
         if ($analyzeDomain !== '') {
-            app(\App\Services\WebsiteAttachService::class)->attach($user, $analyzeDomain);
+            app(WebsiteAttachService::class)->attach($user, $analyzeDomain);
 
             return redirect()->route('report.view', ['url' => $analyzeDomain]);
         }
@@ -131,6 +134,16 @@ class RegisteredUserController extends Controller
         // user straight into onboarding to add their first website. They keep
         // full access until the grace window elapses, then EnsureEmailVerified-
         // AfterGrace forces the verify-email screen.
+        //
+        // SEO UI off: the GSC/GA wizard is an SEO surface, so a fresh signup
+        // goes to the content Get started page instead — it is built for the
+        // no-website state (see EnsureFeatureAccess). The other `onboarding`
+        // redirect targets (Google SSO paths) are left alone: visiting the
+        // route while the switch is off gets re-routed by EnsureDashboardAccess.
+        if (! config('features.seo_platform_ui')) {
+            return redirect()->route('content.get-started');
+        }
+
         return redirect()->route('onboarding');
     }
 
@@ -142,7 +155,7 @@ class RegisteredUserController extends Controller
      */
     private function capturePendingPlan(Request $request): string
     {
-        $slug     = trim((string) $request->query('plan', ''));
+        $slug = trim((string) $request->query('plan', ''));
         $interval = in_array($request->query('interval'), ['monthly', 'annual'], true)
             ? $request->query('interval')
             : 'annual';

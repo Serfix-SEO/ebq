@@ -310,3 +310,32 @@ The plugin's per-site feature map is composed **highest-priority "off" wins**:
 - **Freeze is plan-derived, computed live** — there's no `frozen` column. A plan change
   freezes/unfreezes on the next read with no migration; great for correctness, but means
   every consumer that cares must call through the model methods, not read a column.
+
+
+## SEO-platform UI kill-switch (2026-08-08)
+
+`config('features.seo_platform_ui')` (`SEO_PLATFORM_UI` env, default true, **prod = false**)
+hides the entire SEO product and makes the app Content-AI-focused. UI-only — every backend
+(crawls, queues, APIs, WP plugin, admin) keeps running.
+
+- **Runtime check, never boot-time**: routes stay registered in both states because `landing`,
+  `pricing` etc. are referenced by NAME across dozens of blades and in
+  `EnsureTrialNotExpired::ALLOWED_ROUTES`. All visibility checks use `config(...)`, never
+  `Route::has(...)`. This is also what lets one test file flip the flag per-test.
+- Public: `/` serves the content landing (both `/` and `/content-autopilot` canonicalize to the
+  root); `pricing`→content pricing 302; features/guide/wordpress-plugin/trust-score/
+  website-revamp + the 4 free-tool entry pages 302 → `/`. Tool POST/status/show sub-routes stay
+  live (emailed permalinks). `/report/*` + `/r/{token}` untouched — client deliverables.
+- Authed: `EnsureDashboardAccess` gained a second job — flag off → every SEO-prefixed route
+  redirects non-admins (and non-impersonating sessions) to `content.index`; admins keep full SEO
+  access. Livewire needs no Referer machinery here: the shared update route never matches an SEO
+  prefix, so component actions pass through.
+- Landing/redirect defaults: `User::firstAccessibleRoute()` skips non-content features when off;
+  registration default → `content.get-started`; trial lockout redirect → `content.get-started`;
+  `TrialExpiryMail` copy goes product-neutral.
+- Sidebar: Pulse + Orbit groups and Sitemaps/Reports emptied (existing empty-group filter drops
+  the headers). Billing page: content-only summary + plans, no tabs.
+- ⚠️ The flag must be set in **both** boxes' `.env` — box B renders queued mail (TrialExpiryMail
+  branches on it). Rollback = `SEO_PLATFORM_UI=true` + FPM restart (box A) / container restart (box B).
+- Pinned by `tests/Feature/SeoPlatformUiToggleTest.php` — covers both states, canonical dedup,
+  admin exemption, report-deliverable passthrough.

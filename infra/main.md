@@ -281,6 +281,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-08 — SEO-platform UI kill-switch** (`SEO_PLATFORM_UI` env, `config('features.seo_platform_ui')`,
+  default true; **prod runs false**): the app is Content-AI-focused. `/` serves the content landing
+  (canonical → root on both URLs), SEO marketing + free-tool pages 302 away, authed SEO surfaces
+  redirect non-admins to /content (`EnsureDashboardAccess`, which now has two jobs), sidebar drops
+  Pulse/Orbit/Sitemaps/Reports, /billing is single-product, registration lands on content
+  Get started, trial lockout targets content Get started, trial-expiry mail copy goes
+  product-neutral. RUNTIME config check — every route name stays registered in both states
+  (blades + middleware allowlists reference them by name). Backend fully live: crawls, jobs,
+  APIs, WP plugin, admin, /report/* and /r/{token} deliverables. Reversible: set true + FPM
+  restart on both boxes. Pinned by `tests/Feature/SeoPlatformUiToggleTest.php` (both states).
+
 - **2026-07-23 (Nodus mascot site-wide)** — The Content-Autopilot mascot `<x-nodus>`
   now fronts loading/empty/error/success states across the whole app (was only in the
   content wizard). Added composed wrappers `<x-nodus.state>` / `<x-nodus.inline>`;

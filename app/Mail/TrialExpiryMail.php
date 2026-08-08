@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\User;
+use App\Support\LocaleConfig;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -23,7 +24,7 @@ class TrialExpiryMail extends Mailable
         public string $stage,          // expired | h48 | h24 | h12
         public Carbon $deletionAt,
     ) {
-        $this->locale(\App\Support\LocaleConfig::resolve($user->locale));
+        $this->locale(LocaleConfig::resolve($user->locale));
     }
 
     public function envelope(): Envelope
@@ -72,11 +73,19 @@ class TrialExpiryMail extends Mailable
 HTML;
         }
 
+        // With the SEO UI off, the product being sold is Content Autopilot, so
+        // "SEO data (rankings, audits, Search Console history)" would describe
+        // features the recipient cannot see. The deletion warning itself stays
+        // true in both states — ebq:trial-cleanup deletes regardless.
+        $dataPhrase = config('features.seo_platform_ui')
+            ? 'SEO data (rankings, audits, Search Console history)'
+            : 'data (articles, keywords, performance history)';
+
         $lead = match ($this->stage) {
-            'expired' => 'Your free trial has ended. Your websites and all collected SEO data (rankings, audits, Search Console history) will be permanently deleted on '.$when.'.',
-            'h48' => 'Two days left: your websites and all collected SEO data will be permanently deleted on '.$when.'.',
-            'h24' => 'Tomorrow is the last day: your websites and all collected SEO data will be permanently deleted on '.$when.'.',
-            default => 'This is the final notice — in about 12 hours ('.$when.') your websites and all collected SEO data will be permanently deleted.',
+            'expired' => 'Your free trial has ended. Your websites and all collected '.$dataPhrase.' will be permanently deleted on '.$when.'.',
+            'h48' => 'Two days left: your websites and all collected '.$dataPhrase.' will be permanently deleted on '.$when.'.',
+            'h24' => 'Tomorrow is the last day: your websites and all collected '.$dataPhrase.' will be permanently deleted on '.$when.'.',
+            default => 'This is the final notice — in about 12 hours ('.$when.') your websites and all collected '.$dataPhrase.' will be permanently deleted.',
         };
 
         $html = <<<HTML

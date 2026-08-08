@@ -61,11 +61,28 @@ use App\Http\Controllers\WordPressPluginVersionController;
 use App\Livewire\Content\PublicOnboarding;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'landing')->name('landing');
-Route::view('/features', 'features')->name('features');
-Route::view('/wordpress-plugin', 'wordpress-plugin')->name('wordpress-plugin');
-Route::view('/pricing', 'pricing')->name('pricing');
-Route::view('/trust-score', 'trust-score')->name('trust-score');
+// SEO-platform marketing pages, behind the runtime kill-switch
+// (config/features.php `seo_platform_ui`). Names STAY REGISTERED in both
+// states — they are referenced across dozens of blades and in middleware
+// allowlists, and firstAccessibleRoute() must never resolve an unknown name.
+// When the switch is off, `/` serves the Content Autopilot landing (the root
+// URL carries the product page) and the SEO pages 302 home — 302, not 301,
+// because the switch is reversible and a cached 301 would outlive it.
+Route::get('/', fn () => config('features.seo_platform_ui')
+    ? view('landing')
+    : view('content-landing'))->name('landing');
+Route::get('/features', fn () => config('features.seo_platform_ui')
+    ? view('features')
+    : redirect()->route('landing'))->name('features');
+Route::get('/wordpress-plugin', fn () => config('features.seo_platform_ui')
+    ? view('wordpress-plugin')
+    : redirect()->route('landing'))->name('wordpress-plugin');
+Route::get('/pricing', fn () => config('features.seo_platform_ui')
+    ? view('pricing')
+    : redirect()->route('content.pricing'))->name('pricing');
+Route::get('/trust-score', fn () => config('features.seo_platform_ui')
+    ? view('trust-score')
+    : redirect()->route('landing'))->name('trust-score');
 Route::view('/content-autopilot', 'content-landing')->name('content.landing');
 // Content AI Autopilot is a separately-billed product, so it gets its own
 // pricing page — /pricing prices the SEO platform only (they used to share
@@ -81,12 +98,16 @@ Route::get('/content-autopilot/start', PublicOnboarding::class)
 // SSO callback via a session intent flag).
 Route::get('/content-autopilot/auth/google', [GoogleOAuthController::class, 'contentOnboardingRedirect'])
     ->name('content.onboarding.google');
-Route::view('/website-revamp', 'website-revamp')->name('website-revamp');
+Route::get('/website-revamp', fn () => config('features.seo_platform_ui')
+    ? view('website-revamp')
+    : redirect()->route('landing'))->name('website-revamp');
 Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
 Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
 Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');
-Route::view('/guide', 'guide')->name('guide');
+Route::get('/guide', fn () => config('features.seo_platform_ui')
+    ? view('guide')
+    : redirect()->route('landing'))->name('guide');
 
 Route::get('/locale/{locale}', [LocaleController::class, 'set'])->name('locale.set');
 
@@ -131,12 +152,16 @@ Route::get('/audit/{guestPageAudit}/status', [GuestAuditController::class, 'stat
 Route::get('/audit/{guestPageAudit}', [GuestAuditController::class, 'show'])->name('guest-audit.show');
 
 // Dedicated public SEO-audit tool page (same flow as the landing hero).
-Route::view('/free-audit', 'tools.audit')->name('tools.audit');
+Route::get('/free-audit', fn () => config('features.seo_platform_ui')
+    ? view('tools.audit')
+    : redirect()->route('landing'))->name('tools.audit');
 
 // Public, no-signup PageSpeed test tool — same progressive friction as the
 // guest audit (1st free on-screen, 2nd by email, 3rd → signup). Runs the
 // self-hosted Lighthouse; rate-limited + reCAPTCHA-gated in the controller.
-Route::view('/pagespeed-test', 'tools.page-speed')->name('tools.pagespeed');
+Route::get('/pagespeed-test', fn () => config('features.seo_platform_ui')
+    ? view('tools.page-speed')
+    : redirect()->route('landing'))->name('tools.pagespeed');
 Route::post('/pagespeed-test', [GuestPageSpeedController::class, 'store'])->name('guest-pagespeed.store');
 Route::get('/pagespeed-test/{guestPageSpeed}/status', [GuestPageSpeedController::class, 'status'])->name('guest-pagespeed.status');
 Route::get('/pagespeed-test/{guestPageSpeed}', [GuestPageSpeedController::class, 'show'])->name('guest-pagespeed.show');
@@ -144,7 +169,9 @@ Route::get('/pagespeed-test/{guestPageSpeed}', [GuestPageSpeedController::class,
 // Public, no-signup keyword rank tracker — same progressive friction as the
 // guest audit / PageSpeed test (1st free on-screen, 2nd by email, 3rd → signup).
 // Runs a single Serper organic lookup; rate-limited + reCAPTCHA-gated in the controller.
-Route::view('/rank-tracker', 'tools.rank-tracker')->name('tools.rank-tracker');
+Route::get('/rank-tracker', fn () => config('features.seo_platform_ui')
+    ? view('tools.rank-tracker')
+    : redirect()->route('landing'))->name('tools.rank-tracker');
 Route::post('/rank-tracker', [GuestRankCheckController::class, 'store'])->name('guest-rank.store');
 Route::get('/rank-tracker/{guestRankCheck}/status', [GuestRankCheckController::class, 'status'])->name('guest-rank.status');
 Route::get('/rank-tracker/{guestRankCheck}', [GuestRankCheckController::class, 'show'])->name('guest-rank.show');
@@ -155,7 +182,9 @@ Route::get('/rank-tracker/{guestRankCheck}', [GuestRankCheckController::class, '
 // Everywhere on a cache miss. Rate-limited + reCAPTCHA-gated in the controller.
 // Distinct public path so it doesn't collide with the authenticated portal
 // finder at /keyword-volume (mirrors /pagespeed vs /pagespeed-test).
-Route::view('/keyword-volume-checker', 'tools.keyword-volume')->name('tools.keyword-volume');
+Route::get('/keyword-volume-checker', fn () => config('features.seo_platform_ui')
+    ? view('tools.keyword-volume')
+    : redirect()->route('landing'))->name('tools.keyword-volume');
 Route::post('/keyword-volume-checker', [GuestKeywordVolumeController::class, 'store'])->name('guest-volume.store');
 Route::get('/keyword-volume-checker/{guestKeywordVolume}/status', [GuestKeywordVolumeController::class, 'status'])->name('guest-volume.status');
 Route::get('/keyword-volume-checker/{guestKeywordVolume}', [GuestKeywordVolumeController::class, 'show'])->name('guest-volume.show');

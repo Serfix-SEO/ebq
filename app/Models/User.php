@@ -285,6 +285,13 @@ class User extends Authenticatable implements MustVerifyEmail
                 if ($key === 'ai_studio' && ! config('features.ai_studio')) {
                     continue;
                 }
+                // SEO UI off: every SEO surface redirects to content (see
+                // EnsureDashboardAccess), so landing there would bounce.
+                // content/settings/team are the only feature routes that
+                // survive the switch.
+                if (! config('features.seo_platform_ui') && ! in_array($key, ['content', 'settings', 'team'], true)) {
+                    continue;
+                }
                 if ($this->hasFeatureAccess($key, $websiteId)) {
                     return $meta['route'];
                 }

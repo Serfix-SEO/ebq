@@ -10,13 +10,20 @@
             || $user->subscription(\App\Services\Content\ContentEntitlements::SUBSCRIPTION) !== null
         );
         $contentUi = \Illuminate\Support\Facades\Route::has('content.get-started');
+        // SEO UI kill-switch: the whole SEO half of this page (summary panel,
+        // plans tab) disappears and the page becomes single-product.
+        $seoUi = (bool) config('features.seo_platform_ui');
         $contentFirst = (bool) $user?->isContentOnly();
     @endphp
 
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-slate-900 dark:text-white">{{ __('Billing') }}</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {{ __('Your subscriptions, usage and invoices. The SEO platform and Content AI are billed separately.') }}
+            @if ($seoUi)
+                {{ __('Your subscriptions, usage and invoices. The SEO platform and Content AI are billed separately.') }}
+            @else
+                {{ __('Your subscription, invoices and plan.') }}
+            @endif
         </p>
     </div>
 
@@ -24,7 +31,10 @@
          tables used to sit between the two summaries, so a subscriber had to
          scroll past a wall of plan cards to find their own subscription — and
          a content customer found theirs dead last (reported 2026-08-08). --}}
-    @if ($contentFirst && $contentUi)
+    @if (! $seoUi)
+        {{-- Single product: content summary only. --}}
+        <livewire:billing.content-subscription-panel section="summary" :first="true" />
+    @elseif ($contentFirst && $contentUi)
         <livewire:billing.content-subscription-panel section="summary" :first="true" />
         <livewire:billing.subscription-panel section="summary" />
     @else
@@ -37,7 +47,13 @@
     {{-- WHAT YOU COULD BUY, one product at a time. Two full pricing tables
          stacked on one page is the mess; a tab shows one and keeps the other
          a click away. Plain Alpine, no server round-trip to switch. --}}
-    @if ($contentUi)
+    @if (! $seoUi && $contentUi)
+        {{-- Single product: content plans, no tabs. --}}
+        <div class="mt-10">
+            <h2 class="mb-4 text-lg font-bold text-slate-900 dark:text-white">{{ __('Plans') }}</h2>
+            <livewire:billing.content-subscription-panel section="plans" />
+        </div>
+    @elseif ($contentUi)
         @php $defaultTab = ($hasContent && ! $user?->subscribed('default')) ? 'content' : 'seo'; @endphp
         <div class="mt-10" x-data="{ tab: @js($defaultTab) }">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">

@@ -26,13 +26,23 @@
 
             <div class="max-w-md">
                 <x-nodus state="idle" :size="72" class="mb-6 text-slate-400 dark:text-slate-500"/>
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('SEO command center') }}</p>
-                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
-                    {{ __('The clearest way to run SEO across every site you own.') }}
-                </h2>
-                <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                    {{ __('Connect Search Console and Analytics. Get prioritized actions, ranking trends, audits, and reporting in one workspace.') }}
-                </p>
+                @if (config('features.seo_platform_ui'))
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('SEO command center') }}</p>
+                    <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
+                        {{ __('The clearest way to run SEO across every site you own.') }}
+                    </h2>
+                    <p class="mt-4 text-[15px] leading-7 text-slate-600">
+                        {{ __('Connect Search Console and Analytics. Get prioritized actions, ranking trends, audits, and reporting in one workspace.') }}
+                    </p>
+                @else
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Content AI Autopilot') }}</p>
+                    <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
+                        {{ __('Your content marketing, on autopilot.') }}
+                    </h2>
+                    <p class="mt-4 text-[15px] leading-7 text-slate-600">
+                        {{ __('Researched, written, optimised, illustrated and published to your site on schedule — then tracked as it climbs the rankings.') }}
+                    </p>
+                @endif
 
                 <dl class="mt-10 grid grid-cols-3 gap-4 text-center">
                     <div class="rounded-xl border border-slate-200 bg-white p-4">

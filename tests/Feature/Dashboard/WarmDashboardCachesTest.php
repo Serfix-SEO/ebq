@@ -118,7 +118,13 @@ class WarmDashboardCachesTest extends TestCase
     public function test_the_job_raises_the_memory_ceiling_before_running_the_aggregates(): void
     {
         $original = ini_get('memory_limit');
-        ini_set('memory_limit', '128M');
+        // PHP refuses to set a limit BELOW current usage, and a long full-suite
+        // run is already past 128M by the time this test executes — which made
+        // this test fail on suite growth, not on any real regression. Any
+        // starting limit under the job's 1024M proves the same thing.
+        $startLimit = max(128, (int) ceil(memory_get_usage(true) / 1048576) + 32);
+        $this->assertLessThan(1024, $startLimit, 'suite uses so much memory the assertion below would be vacuous');
+        ini_set('memory_limit', $startLimit.'M');
 
         $owner = User::factory()->create();
         $website = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'ceiling.com']);
