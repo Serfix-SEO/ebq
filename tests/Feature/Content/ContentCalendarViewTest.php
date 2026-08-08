@@ -88,6 +88,36 @@ class ContentCalendarViewTest extends TestCase
     }
 
     /**
+     * The whole calendar card is clickable, not just the 2-line title —
+     * users rage-clicked the image and card body (2026-08-08). Every card
+     * carries the role=link click handler targeting its topic page, plus the
+     * opening spinner that makes the slow navigation visible.
+     */
+    public function test_calendar_cards_are_fully_clickable_with_opening_feedback(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create([
+            'normalized_domain' => 'example.com', 'domain' => 'example.com',
+        ]);
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id,
+            'status' => ContentPlan::STATUS_ACTIVE,
+        ]);
+        $topic = ContentTopic::factory()->create([
+            'plan_id' => $plan->id,
+            'status' => ContentTopic::STATUS_SUGGESTED,
+            'scheduled_for' => now(),
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+        $html = Livewire::test(ContentCalendar::class, ['mode' => 'calendar'])->html();
+
+        $this->assertStringContainsString('role="link"', $html, 'cards are announced as links');
+        $this->assertStringContainsString(route('content.review', $topic->id), $html, 'card targets the topic page');
+        $this->assertStringContainsString('opening = true', $html, 'click sets the opening spinner');
+    }
+
+    /**
      * The monthly cap marks articles the plan will NOT generate. A month that
      * lands exactly on the allowance is fully covered, so nothing is flagged —
      * the ranking used >= and painted the last covered article red with a

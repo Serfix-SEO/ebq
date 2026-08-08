@@ -372,8 +372,14 @@
 
                 <div class="space-y-2">
                     @if (! $editing)
-                        <button wire:click="startEditing" class="w-full rounded-lg border border-orange-300 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-700 hover:bg-orange-100 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300">
-                            {{ __('Edit article') }}
+                        {{-- startEditing loads the whole editor bundle — without
+                             feedback the click reads as dead (same complaint as
+                             the calendar cards, 2026-08-08). --}}
+                        <button wire:click="startEditing" wire:loading.attr="disabled" wire:target="startEditing"
+                                class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-orange-300 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-70 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300">
+                            <svg wire:loading wire:target="startEditing" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            <span wire:loading.remove wire:target="startEditing">{{ __('Edit article') }}</span>
+                            <span wire:loading wire:target="startEditing">{{ __('Opening editor…') }}</span>
                         </button>
                         @if ($topic->status === \App\Models\ContentTopic::STATUS_READY)
                             <button wire:click="approve" class="w-full rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">

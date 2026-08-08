@@ -517,11 +517,27 @@
                                     $cellImages = $topic->currentArticle?->images?->count() ?? 0;
                                     $cellWords = $topic->currentArticle?->word_count ?? 0;
                                 @endphp
-                                <div wire:key="cell-{{ $topic->id }}" x-data="{ pick: false, newDate: '{{ $topic->scheduled_for?->toDateString() }}' }"
+                                {{-- The WHOLE card opens the topic page — people click the
+                                     image and the card body, not just the 2-line title (rage
+                                     clicks, 2026-08-08). The guard skips the card's own
+                                     controls and text selection; drag is untouched because
+                                     the handler fires on plain clicks only. --}}
+                                <div wire:key="cell-{{ $topic->id }}" x-data="{ pick: false, opening: false, newDate: '{{ $topic->scheduled_for?->toDateString() }}' }"
                                      @if($canDrag) draggable="true"
                                         x-on:dragstart="drag.id = '{{ $topic->id }}'; $event.dataTransfer.setData('text/plain', '{{ $topic->id }}'); $event.dataTransfer.effectAllowed = 'move'"
                                         x-on:dragend="drag.id = null" @endif
-                                     class="mb-1.5 overflow-hidden rounded-lg border shadow-sm transition-shadow hover:shadow-md {{ $overCap ? 'border-error/60 bg-error/5 dark:border-error/50' : ($cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800') }} {{ $canDrag ? 'cursor-grab active:cursor-grabbing' : '' }}">
+                                     x-on:click="if (! $event.target.closest('button, a, input, [role=switch]') && ! window.getSelection()?.toString()) { opening = true; window.location = '{{ route('content.review', $topic->id) }}' }"
+                                     x-on:pageshow.window="opening = false"
+                                     role="link" tabindex="0" aria-label="{{ $topic->title }}"
+                                     x-on:keydown.enter="opening = true; window.location = '{{ route('content.review', $topic->id) }}'"
+                                     class="relative mb-1.5 cursor-pointer overflow-hidden rounded-lg border shadow-sm transition-shadow hover:shadow-md hover:border-orange-300 dark:hover:border-orange-500/50 {{ $overCap ? 'border-error/60 bg-error/5 dark:border-error/50' : ($cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800') }} {{ $canDrag ? 'active:cursor-grabbing' : '' }}">
+                                    {{-- Opening feedback: navigation to the article page is not
+                                         instant, and a silent click reads as broken (the rage-
+                                         click report). pageshow resets it when the page is
+                                         restored from the back/forward cache. --}}
+                                    <div x-show="opening" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/70">
+                                        <svg class="h-5 w-5 animate-spin text-orange-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                    </div>
                                     {{-- Hero image strip (featured first, else newest) — gradient placeholder when none. --}}
                                     <div class="relative h-14 w-full bg-gradient-to-br from-orange-50 to-slate-100 dark:from-orange-950/40 dark:to-slate-800">
                                         @if ($hero?->url())
@@ -536,11 +552,13 @@
                                     </div>
                                     <div class="p-1.5">
                                     @if ($topic->currentArticle || $cellInFlight)
-                                        <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80">
+                                        <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80" x-on:click="opening = true">
                                             <span class="break-words text-xs font-semibold text-slate-800 line-clamp-2 dark:text-slate-100">{{ $topic->title }}</span>
                                         </a>
                                     @else
-                                        <span class="break-words text-xs font-semibold text-slate-800 line-clamp-2 dark:text-slate-100">{{ $topic->title }}</span>
+                                        <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80" x-on:click="opening = true">
+                                            <span class="break-words text-xs font-semibold text-slate-800 line-clamp-2 dark:text-slate-100">{{ $topic->title }}</span>
+                                        </a>
                                     @endif
                                     @if ($cellScore || $cellImages > 0 || $cellWords > 0)
                                         <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400 dark:text-slate-500">
@@ -626,7 +644,17 @@
                             $imgPending = \App\Livewire\Content\ContentCalendar::imagesPending($topic);
                             $overCap = in_array($topic->id, $overCapIds ?? [], true);
                         @endphp
-                        <div class="flex flex-wrap items-center gap-3 px-4 py-4 transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/30 {{ $overCap ? 'bg-error/5' : '' }}">
+                        {{-- Whole row opens the topic page (same rage-click fix as
+                             the grid cards); the guard skips the row's own controls. --}}
+                        <div x-data="{ opening: false }"
+                             x-on:click="if (! $event.target.closest('button, a, input, [role=switch]') && ! window.getSelection()?.toString()) { opening = true; window.location = '{{ route('content.review', $topic->id) }}' }"
+                             x-on:pageshow.window="opening = false"
+                             role="link" tabindex="0" aria-label="{{ $topic->title }}"
+                             x-on:keydown.enter="opening = true; window.location = '{{ route('content.review', $topic->id) }}'"
+                             class="relative flex cursor-pointer flex-wrap items-center gap-3 px-4 py-4 transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/30 {{ $overCap ? 'bg-error/5' : '' }}">
+                            <div x-show="opening" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/70">
+                                <svg class="h-5 w-5 animate-spin text-orange-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            </div>
                             @php $canMove = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true); @endphp
                             <div class="w-40 shrink-0">
                                 @if ($canMove)
