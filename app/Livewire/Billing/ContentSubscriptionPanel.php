@@ -29,6 +29,13 @@ class ContentSubscriptionPanel extends Component
     /** Rendered above the SEO panel (content-only customers) — drops the top gap. */
     public bool $first = false;
 
+    /**
+     * 'summary' (the subscription you hold), 'plans' (what you could buy), or
+     * 'all'. Mirrors SubscriptionPanel::$section so /billing can show both
+     * products' billing above both products' pricing.
+     */
+    public string $section = 'all';
+
     public bool $confirmingCancel = false;
 
     public function openCancelConfirm(): void
@@ -57,10 +64,16 @@ class ContentSubscriptionPanel extends Component
         $onTrial = $ent->onContentTrial($user);
         $comped = $ent->compSites($user);
 
-        // No relationship with the product — render nothing rather than turning
-        // the billing page into an ad.
-        if (! $hasSub && ! $onTrial && $comped === 0 && $sub === null) {
-            return view('livewire.billing.content-subscription-panel', ['show' => false]);
+        // The summary half is about a subscription you hold: with no content
+        // relationship at all there is nothing to summarise, and the billing
+        // page should not become an ad. The plans half always renders — that
+        // IS the ad, and it lives behind the product tab where it belongs.
+        $hasRelationship = $hasSub || $onTrial || $comped > 0 || $sub !== null;
+        if ($this->section !== 'plans' && ! $hasRelationship) {
+            return view('livewire.billing.content-subscription-panel', [
+                'show' => false,
+                'showPlans' => false,
+            ]);
         }
 
         $interval = $this->interval($sub?->stripe_price);
@@ -71,7 +84,7 @@ class ContentSubscriptionPanel extends Component
         $isCancelled = $sub !== null && $sub->canceled() && $sub->onGracePeriod();
         $nextChargeAt = null;
         try {
-            if ($sub !== null && $sub->valid() && ! $isCancelled) {
+            if ($this->section !== 'plans' && $sub !== null && $sub->valid() && ! $isCancelled) {
                 $stripeSub = $sub->asStripeSubscription();
                 if (isset($stripeSub->current_period_end)) {
                     $nextChargeAt = Carbon::createFromTimestamp((int) $stripeSub->current_period_end);
@@ -82,7 +95,22 @@ class ContentSubscriptionPanel extends Component
         }
 
         return view('livewire.billing.content-subscription-panel', [
-            'show' => true,
+            'show' => $this->section !== 'plans',
+            'showPlans' => $this->section !== 'summary',
+            'prices' => [
+                'monthly' => ContentAutopilotConfig::displayPrice('monthly'),
+                'annual' => ContentAutopilotConfig::displayPrice('annual'),
+                'first_month' => ContentAutopilotConfig::displayPrice('first_month'),
+                'addon_monthly' => ContentAutopilotConfig::displayPrice('addon_monthly'),
+                'addon_annual' => ContentAutopilotConfig::displayPrice('addon_annual'),
+            ],
+            'checkoutReady' => [
+                'monthly' => ContentAutopilotConfig::checkoutReady('monthly'),
+                'annual' => ContentAutopilotConfig::checkoutReady('annual'),
+            ],
+            'trialDays' => ContentAutopilotConfig::trialDays(),
+            'monthlyArticles' => ContentAutopilotConfig::monthlyArticlesPerWebsite(),
+            'checkoutWebsiteId' => $user->websites()->value('id'),
             'user' => $user,
             'subscription' => $sub,
             'hasSub' => $hasSub,
@@ -155,7 +183,7 @@ class ContentSubscriptionPanel extends Component
             ContentAutopilotConfig::addonPriceId('monthly'),
             ContentAutopilotConfig::addonPriceId('annual'),
         ]);
-        if ($contentPrices === [] || ! $user->hasStripeId()) {
+        if ($this->section === 'plans' || $contentPrices === [] || ! $user->hasStripeId()) {
             return [];
         }
 

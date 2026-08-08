@@ -1,7 +1,20 @@
 <div class="space-y-5">
-    {{-- Header + status pill --}}
-    <div class="flex items-center justify-between gap-3">
-        <h1 class="text-2xl font-bold text-slate-900 dark:text-white">{{ __('Billing') }}</h1>
+    {{-- The panel renders in two halves so /billing can show what you are
+         paying for ABOVE what you could buy. `section` is set by the page:
+         'summary' = status + usage + invoices + cancel, 'plans' = the plan
+         grid and its swap modal, 'all' = everything (the default). --}}
+    @if ($section !== 'plans')
+    {{-- Section header + status pill. This is the SEO product's header, not
+         the page's — /billing owns the h1, because the page now carries two
+         products and a single "Billing / Free" heading described only one of
+         them (a content customer paying monthly saw "Free"). --}}
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">{{ __('SEO platform') }}</h2>
+            <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                {{ __('Crawling, audits, rank tracking and reports.') }}
+            </p>
+        </div>
         @php
             $statusLabel = __('Free');
             $statusTone = 'slate';
@@ -222,6 +235,9 @@
         </div>
     @endif
 
+    @endif {{-- /section: summary --}}
+
+    @if ($section !== 'summary')
     {{-- Plan grid — hidden during the free-promo window since there
          is nothing to switch to or buy. --}}
     @if (! $isFreePromo)
@@ -403,6 +419,9 @@
     </div>
     @endif
 
+    @endif {{-- /section: plans --}}
+
+    @if ($section !== 'plans')
     {{-- Recent invoices --}}
     @if ($invoices && count($invoices) > 0)
         <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -471,6 +490,9 @@
         </div>
     @endif
 
+    @endif {{-- /section: summary --}}
+
+    @if ($section !== 'summary')
     {{-- Swap confirmation modal --}}
     @if ($confirmingSwap)
         @php
@@ -516,4 +538,5 @@
             </div>
         @endif
     @endif
+    @endif {{-- /section: plans --}}
 </div>

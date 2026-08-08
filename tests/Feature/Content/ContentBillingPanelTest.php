@@ -73,15 +73,52 @@ class ContentBillingPanelTest extends TestCase
             ->assertSee('Billed separately from your SEO platform plan.');
     }
 
-    /** An SEO-only customer's billing page is untouched. */
-    public function test_a_user_with_no_content_relationship_sees_nothing(): void
+    /**
+     * An SEO-only customer gets no content SUMMARY card — there is no
+     * subscription to summarise — but the content plans stay browsable under
+     * their own tab. Both products are listed; neither is asserted at anyone.
+     */
+    public function test_a_user_with_no_content_subscription_sees_plans_but_no_summary_card(): void
     {
         $user = User::factory()->create();
         Website::factory()->for($user)->create();
 
         $this->actingAs($user)->get(route('billing.show'))
             ->assertOk()
-            ->assertDontSee('Content AI Autopilot');
+            ->assertDontSee('Content AI Autopilot')
+            ->assertSee('Content AI')
+            ->assertSee('$'.ContentAutopilotConfig::displayPrice('monthly'));
+    }
+
+    /**
+     * The page is BILLING first, pricing second. Both pricing tables used to
+     * sit between the two summaries, so a paying customer scrolled past a wall
+     * of plan cards to find what they were actually paying for.
+     */
+    public function test_subscriptions_come_before_the_pricing_tables(): void
+    {
+        $html = $this->actingAs($this->subscriber())->get(route('billing.show'))
+            ->assertOk()->getContent();
+
+        $plansHeading = strpos($html, '>'.__('Plans').'<');
+        $this->assertNotFalse($plansHeading);
+        $this->assertLessThan($plansHeading, strpos($html, 'Content AI Autopilot'), 'content billing above the plans');
+        $this->assertLessThan($plansHeading, strpos($html, 'This month'), 'SEO billing above the plans');
+    }
+
+    /** Both products' pricing is reachable from the one page. */
+    public function test_both_products_pricing_is_on_the_page_behind_tabs(): void
+    {
+        $user = User::factory()->create();
+        Website::factory()->for($user)->create();
+
+        $html = $this->actingAs($user)->get(route('billing.show'))->assertOk()->getContent();
+
+        // SEO plan grid...
+        $this->assertStringContainsString('Available plans', $html);
+        // ...and the content grid, with its extra-website pricing.
+        $this->assertStringContainsString('Extra websites', $html);
+        $this->assertStringContainsString('$'.ContentAutopilotConfig::displayPrice('addon_monthly'), $html);
     }
 
     /**

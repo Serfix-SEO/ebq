@@ -4,6 +4,9 @@ namespace App\Livewire\Billing;
 
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\Usage\UsageMeter;
+use App\Support\TrialStatus;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -26,6 +29,13 @@ class SubscriptionPanel extends Component
     public bool $confirmingCancel = false;
 
     public ?string $confirmingSwap = null;
+
+    /**
+     * Which half of the panel to render: 'summary' (what you pay for),
+     * 'plans' (what you could buy), or 'all'. /billing sets this so the
+     * customer's own subscription is not buried under two pricing tables.
+     */
+    public string $section = 'all';
 
     public function openCancelConfirm(): void
     {
@@ -71,10 +81,10 @@ class SubscriptionPanel extends Component
         // straight from the Stripe object as a one-off when needed.
         $nextChargeAt = null;
         try {
-            if ($subscription && $subscription->valid() && ! $isCancelled) {
+            if ($this->section !== 'plans' && $subscription && $subscription->valid() && ! $isCancelled) {
                 $stripeSub = $subscription->asStripeSubscription();
                 if (isset($stripeSub->current_period_end)) {
-                    $nextChargeAt = \Illuminate\Support\Carbon::createFromTimestamp((int) $stripeSub->current_period_end);
+                    $nextChargeAt = Carbon::createFromTimestamp((int) $stripeSub->current_period_end);
                 }
             }
         } catch (\Throwable $_) {
@@ -91,7 +101,7 @@ class SubscriptionPanel extends Component
         // the first real-charge invoice appears here.
         $invoices = [];
         try {
-            if ($user->hasStripeId()) {
+            if ($this->section !== 'plans' && $user->hasStripeId()) {
                 $invoices = collect($user->invoices())
                     ->filter(fn ($inv) => (int) ($inv->total ?? 0) > 0)
                     ->take(3);
@@ -105,7 +115,7 @@ class SubscriptionPanel extends Component
         $frozenIds = $user->frozenWebsiteIds();
         $frozenSites = empty($frozenIds)
             ? collect()
-            : $user->websites()->whereIn('id', $frozenIds)->orderBy('created_at')->get(['id','domain']);
+            : $user->websites()->whereIn('id', $frozenIds)->orderBy('created_at')->get(['id', 'domain']);
 
         // Free-for-limited-time promo mode. When APP_FREE=true (mirrors
         // the /pricing marketing page's behaviour), the plan grid +
@@ -120,11 +130,11 @@ class SubscriptionPanel extends Component
         // trial-tier user (active trial too), not only expired ones —
         // same config knobs as the h24 expiry email.
         $winbackCode = (string) config('services.stripe.winback_promo_code');
-        $showWinback = $winbackCode !== '' && \App\Support\TrialStatus::isWinbackEligible($user);
+        $showWinback = $winbackCode !== '' && TrialStatus::isWinbackEligible($user);
 
         // This month's metered usage — used/limit per capped provider, so
         // the billing page shows exactly where the plan's quotas stand.
-        $meter = app(\App\Services\Usage\UsageMeter::class);
+        $meter = app(UsageMeter::class);
         $usage = [];
         foreach ([
             'serp_api' => __('Live ranking checks'),

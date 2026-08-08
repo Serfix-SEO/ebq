@@ -85,6 +85,19 @@ page announcing their trial had expired while being charged monthly (daomarketin
   an unreachable API renders "—" rather than failing the page.
 - Invoices are **filtered to the content price ids**. One Stripe customer carries both
   subscriptions, so an unfiltered list would show SEO charges under a content heading.
+- **Page shape (2026-08-08b): billing above pricing, one pricing table at a time.**
+  `SubscriptionPanel` and `ContentSubscriptionPanel` each render in halves via a `section`
+  prop (`summary` | `plans` | `all`). `billing/subscription.blade.php` renders both summaries
+  first, then a tabbed Plans block (SEO platform / Content AI). Before this, the two pricing
+  tables sat between the summaries and buried what the customer actually pays for.
+  - The default tab is chosen SERVER-side and the other pane carries an inline
+    `display:none`, so a page where Alpine fails to boot still shows the right product
+    instead of a pane `x-show` never reveals.
+  - The `plans` render skips the Stripe invoice + renewal-date calls: the page mounts each
+    component twice and that half shows neither.
+  - The page owns the `<h1>`; each product owns an `<h2>` and its OWN status pill. The single
+    "Billing / Free" heading described only the SEO product — a content customer paying
+    monthly read it as "Free".
 - Order: content-first for `isContentOnly()` users (otherwise their paid product sits below
   four SEO upgrade cards), SEO-first for everyone else. Pinned by `ContentBillingPanelTest`.
 - Covered-site list comes from `ContentEntitlements::coveredWebsites()`, which shares its

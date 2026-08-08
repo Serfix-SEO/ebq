@@ -201,4 +201,113 @@
         @endif
     </section>
 @endif
+
+@if ($showPlans ?? false)
+    @php
+        $annualMonthly = $prices['annual'];
+        $annualTotal = $prices['annual'] * 12;
+        $savePct = $prices['monthly'] > 0
+            ? (int) round(100 * ($prices['monthly'] - $prices['annual']) / $prices['monthly'])
+            : 0;
+        $currentInterval = ($hasSub ?? false) ? $interval : null;
+    @endphp
+
+    <div class="grid gap-3 sm:grid-cols-2">
+        {{-- Monthly --}}
+        <div class="relative flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-baseline justify-between">
+                <h4 class="text-base font-semibold text-slate-900 dark:text-white">{{ __('Monthly') }}</h4>
+                @if ($currentInterval === 'monthly')
+                    <span class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">{{ __('Current') }}</span>
+                @endif
+            </div>
+            <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{{ __('Cancel any time.') }}</p>
+            <div class="mt-3 flex items-baseline gap-1">
+                <span class="text-2xl font-bold text-slate-900 dark:text-white">${{ $prices['monthly'] }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{ __('/mo') }}</span>
+            </div>
+            @if (! ($hasSub ?? false) && $prices['first_month'] > 0 && $prices['first_month'] < $prices['monthly'])
+                <p class="text-[10px] text-slate-400 dark:text-slate-500">
+                    {{ __('$:first for your first month', ['first' => $prices['first_month']]) }}
+                </p>
+            @endif
+            @if ($currentInterval !== 'monthly' && ($checkoutReady['monthly'] ?? false))
+                <a href="{{ route('content.billing.checkout', array_filter(['interval' => 'monthly', 'website' => $checkoutWebsiteId])) }}"
+                   class="mt-4 inline-flex items-center justify-center rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500">
+                    {{ ($hasSub ?? false) ? __('Switch to monthly') : __('Choose monthly') }}
+                </a>
+            @elseif ($currentInterval !== 'monthly')
+                <span class="mt-4 inline-flex items-center justify-center rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                    {{ __('Coming soon') }}
+                </span>
+            @endif
+        </div>
+
+        {{-- Yearly --}}
+        <div class="relative flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm ring-2 ring-orange-500/40 dark:border-slate-800 dark:bg-slate-900">
+            @if ($savePct > 0)
+                <span class="absolute -top-2 end-3 rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    {{ __('Save :percent%', ['percent' => $savePct]) }}
+                </span>
+            @endif
+            <div class="flex items-baseline justify-between">
+                <h4 class="text-base font-semibold text-slate-900 dark:text-white">{{ __('Yearly') }}</h4>
+                @if ($currentInterval === 'annual')
+                    <span class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">{{ __('Current') }}</span>
+                @endif
+            </div>
+            <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{{ __('Best value for an always-on calendar.') }}</p>
+            <div class="mt-3 flex items-baseline gap-1">
+                <span class="text-2xl font-bold text-slate-900 dark:text-white">${{ $annualMonthly }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{ __('/mo') }}</span>
+            </div>
+            <p class="text-[10px] text-slate-400 dark:text-slate-500">{{ __('$:price billed yearly', ['price' => $annualTotal]) }}</p>
+            @if ($currentInterval !== 'annual' && ($checkoutReady['annual'] ?? false))
+                <a href="{{ route('content.billing.checkout', array_filter(['interval' => 'annual', 'website' => $checkoutWebsiteId])) }}"
+                   class="mt-4 inline-flex items-center justify-center rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500">
+                    {{ ($hasSub ?? false) ? __('Switch to yearly') : __('Choose yearly') }}
+                </a>
+            @elseif ($currentInterval !== 'annual')
+                <span class="mt-4 inline-flex items-center justify-center rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                    {{ __('Coming soon') }}
+                </span>
+            @endif
+        </div>
+    </div>
+
+    {{-- What the price buys, and what an extra website costs. Both plans
+         include the same thing — the only variable is how many websites. --}}
+    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 text-[12px] shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <p class="text-xs font-semibold text-slate-900 dark:text-white">{{ __('Every plan includes') }}</p>
+            <ul class="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
+                <li>{{ __('Up to :n articles a month, per website', ['n' => $monthlyArticles]) }}</li>
+                <li>{{ __('Research, writing, SEO scoring and original images') }}</li>
+                <li>{{ __('Auto-publishing to WordPress, plus keyword tracking') }}</li>
+                <li>{{ __('1 website included') }}</li>
+            </ul>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 text-[12px] shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <p class="text-xs font-semibold text-slate-900 dark:text-white">{{ __('Extra websites') }}</p>
+            <p class="mt-2 text-slate-600 dark:text-slate-300">
+                {{ __('Add more sites to the same subscription at any time.') }}
+            </p>
+            <dl class="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
+                <div class="flex items-center justify-between gap-3">
+                    <dt>{{ __('On the monthly plan') }}</dt>
+                    <dd class="font-semibold text-slate-900 dark:text-white">${{ $prices['addon_monthly'] }} {{ __('/mo each') }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                    <dt>{{ __('On the yearly plan') }}</dt>
+                    <dd class="font-semibold text-slate-900 dark:text-white">${{ $prices['addon_annual'] }} {{ __('/mo each') }}</dd>
+                </div>
+            </dl>
+            @if ($hasSub ?? false)
+                <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    {{ __('Add one from Content settings.') }}
+                </p>
+            @endif
+        </div>
+    </div>
+@endif
 </div>
