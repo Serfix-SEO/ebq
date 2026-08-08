@@ -365,3 +365,37 @@ subscriptions, recent payments).
   one table view for all 15 metrics, each drill query mirroring its tile's counting rules
   exactly (a drill that disagrees with its tile is worse than no drill). Unknown metric 404s.
 - Pinned by `tests/Feature/AdminDashboardTest.php`.
+
+
+## Microsoft Clarity segmentation (2026-08-08)
+
+`App\Support\ClarityContext::tags()` → `partials/clarity.blade.php` emits `clarity("set", …)`
+custom tags on every layout. Filter on them in Clarity under **Filters → Custom tags**, and save
+combinations as **Segments** (they apply to Recordings, Heatmaps and the Dashboard).
+
+| Tag | Values |
+|---|---|
+| `staff_session` | `yes` / `no` — **the everyday filter**; `no` = real customers |
+| `session_type` | `guest` / `customer` / `admin` / `impersonating` |
+| `plan` | `paid` / `trial` / `comped` / `free` (same rules the admin dashboard counts by) |
+| `trial_day` | `1`–`5` |
+| `websites`, `articles_published` | bucketed (`0`, `1`, `2-4`, `5+` …) |
+| `publishing` | `connected` / `none` |
+| `locale`, `product_mode`, `email_verified` | — |
+| `onboarding_step`, `onboarding_reached` | `1`–`8` (see below) |
+
+- ⚠️ **Impersonation is why this exists.** While impersonating, the authenticated user IS the
+  client (`is_admin` false), so a naive read tags admin QA as `customer` — the sessions were
+  indistinguishable from the customer behaviour they are meant to diagnose. `sessionType()`
+  checks the session flag FIRST.
+- ⚠️ **The onboarding wizard runs 8 steps behind ONE url** (`/content-autopilot/start`), so
+  page-level data can never show where people drop. `ContentWizard::goToStep()` dispatches a
+  `clarity-step` browser event; the partial's listener sets the tag and fires an
+  `onboarding_step_N` custom event. `onboarding_reached` accumulates (Clarity tags are
+  multi-value per session), giving the furthest-step funnel view.
+- **Performance**: cheap tags read already-loaded user columns; anything needing a COUNT is
+  cached per user for 10 min (`clarity:tags:{id}`). This renders in the `<head>` of every page.
+- **No PII, ever.** Clarity hashes the `identify()` id but NOT tag values — no email, name or
+  domain may appear. Pinned by `ClaritySegmentTest::test_no_identifying_values_are_tagged`.
+- Still open: Clarity is NOT gated on the consent banner (GA/Ads are), and admin URLs carry
+  customer emails in `?q=` — see the session notes; both untouched by this change.

@@ -222,6 +222,13 @@ trait ContentWizard
     {
         $max = $this->draftPlanId !== null ? 8 : 2;
         $this->wizardStep = max(1, min($step, $max));
+
+        // Tell Clarity which step we are on. The whole wizard lives behind ONE
+        // url, so without this every session is just "/content-autopilot/start"
+        // and where people abandon is invisible — the reason the onboarding
+        // funnel looked untracked (2026-08-08). Fire-and-forget browser event;
+        // the layout listener owns the clarity() call.
+        $this->dispatch('clarity-step', step: $this->wizardStep);
     }
 
     /** Step-1 site-type chip click — an explicit human decision. */
