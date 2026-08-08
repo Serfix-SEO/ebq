@@ -4,7 +4,6 @@ namespace App\Livewire\Billing;
 
 use App\Models\Plan;
 use App\Models\User;
-use App\Services\Usage\UsageMeter;
 use App\Support\StripePeriod;
 use App\Support\TrialStatus;
 use Illuminate\Support\Facades\Auth;
@@ -126,30 +125,7 @@ class SubscriptionPanel extends Component
         $winbackCode = (string) config('services.stripe.winback_promo_code');
         $showWinback = $winbackCode !== '' && TrialStatus::isWinbackEligible($user);
 
-        // This month's metered usage — used/limit per capped provider, so
-        // the billing page shows exactly where the plan's quotas stand.
-        $meter = app(UsageMeter::class);
-        $usage = [];
-        foreach ([
-            'serp_api' => __('Live ranking checks'),
-            'keyword_finder' => __('Keyword searches'),
-            'mistral' => __('AI research tokens'),
-        ] as $provider => $label) {
-            $limit = $meter->limit($user, $provider);
-            if ($limit === null) {
-                continue; // unlimited on this plan — nothing to show
-            }
-            $used = $meter->consumedInWindow($user, $provider);
-            $usage[] = [
-                'label' => $label,
-                'used' => $used,
-                'limit' => $limit,
-                'pct' => $limit > 0 ? min(100, (int) round(100 * $used / $limit)) : 100,
-            ];
-        }
-
         return view('livewire.billing.subscription-panel', [
-            'usage' => $usage,
             'user' => $user,
             'subscription' => $subscription,
             'currentPlan' => $currentPlan,

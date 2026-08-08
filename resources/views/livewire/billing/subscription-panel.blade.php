@@ -55,35 +55,11 @@
         </div>
     @endif
 
-    {{-- Trial-expired winback offer: discount is auto-applied at checkout --}}
-    @if ($showWinback)
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 px-5 py-5 text-white shadow-lg sm:px-7">
-            <div class="pointer-events-none absolute -end-8 -top-10 h-40 w-40 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-12 end-24 h-32 w-32 rounded-full bg-white/10"></div>
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-widest text-orange-100">{{ __('Limited-time offer') }}</p>
-                    <p class="mt-1 text-2xl font-extrabold leading-tight sm:text-3xl">
-                        {{ __(':percent% OFF any plan', ['percent' => $winbackPercent]) }}
-                    </p>
-                    <p class="mt-1 max-w-xl text-sm text-orange-50">
-                        @if (\App\Support\TrialStatus::isExpired($user))
-                            {{ __('Your trial has ended — subscribe now and we\'ll take :percent% off your first payment.', ['percent' => $winbackPercent]) }}
-                        @else
-                            {{ __('You\'re on the free trial — subscribe now and we\'ll take :percent% off your first payment.', ['percent' => $winbackPercent]) }}
-                        @endif
-                        {{ __('The discount is') }} <strong>{{ __('applied automatically at checkout') }}</strong>{{ __(', no code needed.') }}
-                    </p>
-                </div>
-                <div class="shrink-0 text-center">
-                    <span class="inline-block rounded-xl border-2 border-dashed border-white/70 bg-white/15 px-5 py-2.5 text-lg font-extrabold tracking-widest">
-                        {{ $winbackCode }}
-                    </span>
-                    <p class="mt-1.5 text-[11px] font-medium text-orange-100">{{ __('auto-applied for you') }}</p>
-                </div>
-            </div>
-        </div>
-    @endif
+    {{-- The full-width winback banner used to live here. Removed 2026-08-08:
+         /billing is where a customer checks what they pay, and a promo shout
+         above their own subscription buried it. The discount still shows on
+         the plan cards, where it is actionable, and $showWinback still drives
+         their strikethrough pricing. --}}
 
     {{-- Frozen-sites banner --}}
     @if ($frozenSites->isNotEmpty())
@@ -144,34 +120,10 @@
         </div>
     @endif
 
-    {{-- This month's usage — used/limit for every capped provider on the plan. --}}
-    @if (! empty($usage ?? []))
-        <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
-                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ __('This month’s usage') }}</h2>
-                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Counters reset monthly. Cached results never count against your limits.') }}</p>
-            </div>
-            <div class="grid gap-4 p-5 sm:grid-cols-3">
-                @foreach ($usage as $u)
-                    @php $full = $u['used'] >= $u['limit']; @endphp
-                    <div>
-                        <div class="flex items-baseline justify-between gap-2">
-                            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ $u['label'] }}</span>
-                            <span class="text-xs tabular-nums {{ $full ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400' }}">
-                                {{ number_format($u['used']) }} / {{ number_format($u['limit']) }}
-                            </span>
-                        </div>
-                        <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                            <div class="h-full rounded-full {{ $full ? 'bg-amber-500' : ($u['pct'] >= 80 ? 'bg-orange-500' : 'bg-emerald-500') }}" style="width: {{ max(2, $u['pct']) }}%"></div>
-                        </div>
-                        @if ($full)
-                            <p class="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">{{ __('Limit reached — upgrade for more.') }}</p>
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    @endif
+    {{-- The monthly usage meters used to live here. Removed 2026-08-08 at the
+         owner's request: they are plan QUOTAS, not billing, and a content-only
+         customer saw "Limit reached — upgrade for more" for SEO counters they
+         do not use. SubscriptionPanel no longer computes them. --}}
 
     {{-- Current plan card --}}
     @if (! $isFreePromo && $currentPlan && $subscription)
@@ -238,6 +190,24 @@
     @endif {{-- /section: summary --}}
 
     @if ($section !== 'summary')
+    {{-- No SEO subscription: say so in one line. With the usage meters gone,
+         a Free/trial account was left with a section header and nothing under
+         it, which reads like something failed to load. --}}
+    @if (! $isFreePromo && ! ($currentPlan && $subscription))
+        <div class="rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <p class="text-slate-700 dark:text-slate-200">
+                @if ($isOnTrial && $trialEndsAt)
+                    {{ __('You\'re on the free trial until :date.', ['date' => $trialEndsAt->toFormattedDateString()]) }}
+                @else
+                    {{ __('You don\'t have an SEO platform subscription.') }}
+                @endif
+            </p>
+            <p class="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                {{ __('Pick a plan under Plans below to add one. Your Content AI subscription is unaffected.') }}
+            </p>
+        </div>
+    @endif
+
     {{-- Plan grid — hidden during the free-promo window since there
          is nothing to switch to or buy. --}}
     @if (! $isFreePromo)

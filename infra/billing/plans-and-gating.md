@@ -122,6 +122,13 @@ Exempt always: admins, active Stripe subscribers, comped (`current_plan_slug` = 
     `feature:`, `content.access` and `ContentEntitlements::blockReason()`. An unresolvable or
     offsite Referer falls back to the update route, i.e. stays locked. Pinned by
     `ContentCrossProductTest`.
+- **Removed from /billing (2026-08-08)**: the full-width winback BANNER and the monthly usage
+  meters, at the owner's request. The winback discount still reaches customers on the plan
+  cards (strikethrough + `first year with :code`) and `TrialStatus::isWinbackEligible()` /
+  the checkout auto-apply are untouched — only the banner markup went. Usage meters were plan
+  QUOTAS rather than billing, and a content-only customer read "Limit reached — upgrade for
+  more" against SEO counters they never use; `SubscriptionPanel` no longer computes them, and
+  they are currently surfaced nowhere client-facing (admin has `/admin/usage`).
 - **Onboarding trial-expired panel (2026-07-10)**: `/onboarding`
   (`resources/views/onboarding/index.blade.php`) renders a "Your free trial has ended" card
   with a billing CTA — never the connect-Google/add-site wizard — for any

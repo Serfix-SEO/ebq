@@ -180,7 +180,13 @@ class TrialCleanupTest extends TestCase
         $this->assertStringNotContainsString('30% off', $h24Off);
     }
 
-    public function test_billing_page_shows_winback_banner_for_trial_tier_users(): void
+    /**
+     * The full-width winback BANNER was removed from /billing on 2026-08-08 —
+     * a promo shout above the customer's own subscription buried what they
+     * came to read. The discount itself must survive on the plan cards, where
+     * it is actionable; losing it there would silently kill the offer.
+     */
+    public function test_billing_page_shows_the_winback_discount_on_the_plan_cards(): void
     {
         config(['services.stripe.winback_promo_code' => 'SAVE30', 'services.stripe.winback_promo_percent' => 30]);
 
@@ -192,9 +198,11 @@ class TrialCleanupTest extends TestCase
         $expired = $this->trialUser(15 * 24);
         $this->actingAs($expired)->get(route('billing.show'))
             ->assertOk()
-            ->assertSee('30% OFF any plan')
+            // No banner on the billing page any more...
+            ->assertDontSee('30% OFF any plan')
+            // ...but the offer still reaches the customer where they act on it:
+            // strikethrough original + discounted first payment on the plan card.
             ->assertSee('SAVE30')
-            // strikethrough original + discounted first payment on the plan card
             ->assertSee('line-through')
             ->assertSee('$310.8')                    // 444 * 0.7 (yearly)
             ->assertSee('first year with SAVE30')
@@ -229,13 +237,13 @@ class TrialCleanupTest extends TestCase
         $this->get(route('landing'))->assertOk()->assertSee('SAVE30')->assertSee('Sign in');
 
         // Since 2026-07-10 ACTIVE trial users get the same straight discount
-        // (isWinbackEligible), with in-trial copy instead of "trial has ended".
+        // (isWinbackEligible). The banner that used to carry the in-trial copy
+        // is gone from /billing; the discounted plan cards are what remains.
         $active = $this->trialUser(5 * 24);
         $this->actingAs($active)->get(route('billing.show'))
             ->assertOk()
-            ->assertSee('30% OFF any plan')
-            ->assertSee("You're on the free trial")
-            ->assertDontSee('Your trial has ended');
+            ->assertDontSee('30% OFF any plan')
+            ->assertSee('first year with SAVE30');
 
         // Subscribers/comped plans never see it.
         $comped = $this->trialUser(5 * 24);
