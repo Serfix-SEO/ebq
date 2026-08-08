@@ -1,0 +1,227 @@
+<x-layouts.app>
+    @php
+        /**
+         * @var array $daily
+         * @var array $segments
+         * @var array $series
+         * @var \Illuminate\Support\Collection $recentSignups
+         * @var \Illuminate\Support\Collection $recentSubscriptions
+         * @var array $stripe
+         */
+        $fmtN = fn ($n) => number_format((int) $n);
+        $money = fn (float $v, string $cur = 'USD') => ($cur === 'USD' ? '$' : $cur.' ').number_format($v, 2);
+        // Yesterday comparison chip: neutral at zero-change, green up, red down.
+        $delta = function (int $today, int $yesterday): array {
+            $diff = $today - $yesterday;
+            return [
+                'text' => ($diff > 0 ? '+' : '').$diff.' vs yesterday',
+                'class' => $diff > 0 ? 'text-emerald-600 dark:text-emerald-400'
+                    : ($diff < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'),
+            ];
+        };
+        // Inline bar chart: pure SVG, one bar per day, scaled to the series max.
+        $bars = function (array $values) {
+            $max = max(1, max($values));
+            $n = count($values);
+            $w = 100 / $n;
+            $svg = '';
+            foreach ($values as $i => $v) {
+                $h = $v > 0 ? max(4, round(92 * $v / $max)) : 2;
+                $x = round($i * $w + $w * 0.15, 2);
+                $svg .= sprintf(
+                    '<rect x="%s%%" y="%s" width="%s%%" height="%s" rx="1.5" class="%s"><title>%s</title></rect>',
+                    $x, 100 - $h, round($w * 0.7, 2), $h,
+                    $v > 0 ? 'fill-orange-500' : 'fill-slate-200 dark:fill-slate-700',
+                    $v,
+                );
+            }
+            return $svg;
+        };
+    @endphp
+
+    <div class="space-y-6">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Dashboard</h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400">
+                    {{ now()->toFormattedDayDateString() }} — signups, trials, publishing and revenue at a glance.
+                    Internal (admin/system) accounts are excluded from customer counts.
+                </p>
+            </div>
+            <a href="{{ route('admin.clients.index') }}"
+               class="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                All clients →
+            </a>
+        </div>
+
+        {{-- ── Today ─────────────────────────────────────────────── --}}
+        <div class="grid grid-cols-2 gap-2 lg:grid-cols-5">
+            @foreach ([
+                ['label' => 'Signups today', 'data' => $daily['signups']],
+                ['label' => 'Trials started today', 'data' => $daily['trials']],
+                ['label' => 'Articles published today', 'data' => $daily['articles']],
+                ['label' => 'Leads today', 'data' => $daily['leads']],
+            ] as $card)
+                @php $d = $delta($card['data']['today'], $card['data']['yesterday']); @endphp
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ $card['label'] }}</p>
+                    <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{{ $fmtN($card['data']['today']) }}</p>
+                    <p class="mt-0.5 text-[11px] font-medium {{ $d['class'] }}">{{ $d['text'] }}</p>
+                </div>
+            @endforeach
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Payments today</p>
+                @if ($stripe['available'])
+                    <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{{ $money($stripe['today_amount'], $stripe['currency']) }}</p>
+                    <p class="mt-0.5 text-[11px] font-medium text-slate-400">{{ $fmtN($stripe['today_count']) }} {{ $stripe['today_count'] === 1 ? 'payment' : 'payments' }}</p>
+                @else
+                    <p class="mt-1 text-2xl font-bold text-slate-400">&mdash;</p>
+                    <p class="mt-0.5 text-[11px] font-medium text-slate-400">Stripe unavailable</p>
+                @endif
+            </div>
+        </div>
+
+        {{-- ── Customer segments + revenue ───────────────────────── --}}
+        <div class="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+            @foreach ([
+                ['label' => 'Total customers', 'value' => $segments['total'], 'tone' => 'text-slate-900 dark:text-white'],
+                ['label' => 'Paid', 'value' => $segments['paid'], 'tone' => 'text-emerald-600 dark:text-emerald-400'],
+                ['label' => 'On trial', 'value' => $segments['on_trial'], 'tone' => 'text-orange-600 dark:text-orange-400'],
+                ['label' => 'Free', 'value' => $segments['free'], 'tone' => 'text-slate-900 dark:text-white'],
+                ['label' => 'Card added, not paid', 'value' => $segments['with_card'], 'tone' => 'text-amber-600 dark:text-amber-400'],
+                ['label' => 'Disabled', 'value' => $segments['disabled'], 'tone' => 'text-rose-600 dark:text-rose-400'],
+            ] as $tile)
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ $tile['label'] }}</p>
+                    <p class="mt-1 text-2xl font-bold tabular-nums {{ $tile['tone'] }}">{{ $fmtN($tile['value']) }}</p>
+                </div>
+            @endforeach
+        </div>
+
+        <div class="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">MRR (Stripe)</p>
+                <p class="mt-1 text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {{ $stripe['available'] && $stripe['mrr'] !== null ? $money($stripe['mrr'], $stripe['currency']) : '—' }}
+                </p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Collected this month</p>
+                <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
+                    {{ $stripe['available'] ? $money($stripe['month_amount'], $stripe['currency']) : '—' }}
+                </p>
+            </div>
+            @foreach ([
+                ['label' => 'Websites', 'value' => $segments['websites']],
+                ['label' => 'Articles published (all time)', 'value' => $segments['articles_total']],
+                ['label' => 'Internal accounts', 'value' => $segments['internal']],
+            ] as $tile)
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ $tile['label'] }}</p>
+                    <p class="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{{ $fmtN($tile['value']) }}</p>
+                </div>
+            @endforeach
+        </div>
+
+        {{-- ── 14-day trends ─────────────────────────────────────── --}}
+        <div class="grid gap-3 lg:grid-cols-3">
+            @foreach ([
+                ['label' => 'Signups', 'values' => $series['signups']],
+                ['label' => 'Content trials started', 'values' => $series['trials']],
+                ['label' => 'Articles published', 'values' => $series['articles']],
+            ] as $chart)
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div class="flex items-baseline justify-between">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $chart['label'] }}</p>
+                        <p class="text-xs tabular-nums text-slate-400">{{ $fmtN(array_sum($chart['values'])) }} / 14 days</p>
+                    </div>
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="mt-3 h-24 w-full" role="img"
+                         aria-label="{{ $chart['label'] }}, last 14 days">
+                        {!! $bars($chart['values']) !!}
+                    </svg>
+                    <div class="mt-1 flex justify-between text-[10px] text-slate-400">
+                        <span>{{ $series['labels'][0] }}</span>
+                        <span>{{ end($series['labels']) }}</span>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+
+        {{-- ── Feeds ─────────────────────────────────────────────── --}}
+        <div class="grid gap-3 lg:grid-cols-3">
+            <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                    <p class="text-sm font-semibold text-slate-900 dark:text-white">Latest signups</p>
+                </div>
+                <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                    @forelse ($recentSignups as $u)
+                        <li class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                            <div class="min-w-0">
+                                <p class="truncate font-medium text-slate-900 dark:text-white">{{ $u->name ?: $u->email }}</p>
+                                <p class="truncate text-xs text-slate-500">{{ $u->email }}</p>
+                            </div>
+                            <div class="shrink-0 text-end">
+                                @php $tone = ['paid' => 'bg-emerald-100 text-emerald-800', 'trial' => 'bg-orange-100 text-orange-800', 'free' => 'bg-slate-100 text-slate-600']; @endphp
+                                <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase {{ $tone[$u->segment_label] }}">{{ $u->segment_label }}</span>
+                                <p class="mt-0.5 text-[11px] text-slate-400">{{ $u->created_at->diffForHumans(short: true) }}</p>
+                            </div>
+                        </li>
+                    @empty
+                        <li class="px-4 py-6 text-center text-sm text-slate-400">No signups yet.</li>
+                    @endforelse
+                </ul>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                    <p class="text-sm font-semibold text-slate-900 dark:text-white">Active subscriptions</p>
+                </div>
+                <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                    @forelse ($recentSubscriptions as $s)
+                        <li class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                            <div class="min-w-0">
+                                <p class="truncate font-medium text-slate-900 dark:text-white">
+                                    {{ $s->name ?: $s->email }}
+                                    @if ($s->is_admin)
+                                        <span class="ms-1 rounded bg-slate-100 px-1 py-px text-[9px] font-bold uppercase text-slate-500 dark:bg-slate-800">internal</span>
+                                    @endif
+                                </p>
+                                <p class="truncate text-xs text-slate-500">{{ $s->sub_type === 'content' ? 'Content Autopilot' : 'SEO platform' }} · {{ $s->sub_status }}</p>
+                            </div>
+                            <p class="shrink-0 text-[11px] text-slate-400">{{ \Illuminate\Support\Carbon::parse($s->subscribed_at)->diffForHumans(short: true) }}</p>
+                        </li>
+                    @empty
+                        <li class="px-4 py-6 text-center text-sm text-slate-400">No active subscriptions.</li>
+                    @endforelse
+                </ul>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                    <p class="text-sm font-semibold text-slate-900 dark:text-white">Recent payments</p>
+                    <span class="text-[10px] text-slate-400">via Stripe, ~10 min delay</span>
+                </div>
+                <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                    @forelse ($stripe['recent'] as $p)
+                        <li class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                            <div class="min-w-0">
+                                <p class="truncate font-medium text-slate-900 dark:text-white">{{ $p['email'] ?? 'unknown' }}</p>
+                                <p class="text-[11px] text-slate-400">{{ $p['at']?->diffForHumans(short: true) ?? '—' }}</p>
+                            </div>
+                            <div class="shrink-0 text-end">
+                                <p class="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{{ $money($p['amount'], $p['currency']) }}</p>
+                                @if ($p['url'])
+                                    <a href="{{ $p['url'] }}" target="_blank" rel="noopener" class="text-[11px] font-semibold text-orange-600 hover:underline">Invoice</a>
+                                @endif
+                            </div>
+                        </li>
+                    @empty
+                        <li class="px-4 py-6 text-center text-sm text-slate-400">
+                            {{ $stripe['available'] ? 'No payments yet this month.' : 'Stripe unavailable.' }}
+                        </li>
+                    @endforelse
+                </ul>
+            </div>
+        </div>
+    </div>
+</x-layouts.app>

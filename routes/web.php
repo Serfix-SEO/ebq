@@ -468,6 +468,8 @@ Route::post('/auth/google/cap/events', GoogleCapController::class)
     ->name('google.cap.events');
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function (): void {
+    // Admin home: today's signups/trials/payments, customer segments, revenue.
+    Route::get('/', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/clients', [AdminClientController::class, 'index'])->name('clients.index');
     Route::post('/clients', [AdminClientController::class, 'store'])->name('clients.store');
     Route::post('/clients/bulk', [AdminClientController::class, 'bulk'])->name('clients.bulk');

@@ -341,3 +341,24 @@ hides the entire SEO product and makes the app Content-AI-focused. UI-only — e
   branches on it). Rollback = `SEO_PLATFORM_UI=true` + FPM restart (box A) / container restart (box B).
 - Pinned by `tests/Feature/SeoPlatformUiToggleTest.php` — covers both states, canonical dedup,
   admin exemption, report-deliverable passthrough.
+
+
+## Admin insights dashboard — /admin (2026-08-08)
+
+`Admin\DashboardController` + `admin/dashboard.blade.php`, first item in the admin nav
+(`admin.dashboard`). Today-vs-yesterday tiles (signups, content trials, published articles,
+leads, payments), customer segments (total/paid/on-trial/free/card-added/disabled), MRR +
+month-collected from Stripe, 14-day inline-SVG bar series, and three feeds (signups, active
+subscriptions, recent payments).
+
+- **Counting rules**: "customers" excludes `is_system` AND `is_admin` (the owner's own test
+  subscription inflated "Trial → paid" on the clients page); paid = active Cashier subscription
+  (comped plans never count); money comes from Stripe paid invoices, never derived locally.
+- **Stripe snapshot** cached 10 min (`admin:dashboard:stripe:v1`), failure-tolerant: outage
+  renders "—", never a broken page. MRR normalises every active subscription item to monthly.
+- ⚠️ `phpunit.xml` now pins `STRIPE_SECRET=""` — the real secret was leaking into tests (the
+  documented phpunit-only-isolates-what-it-overrides class), so Stripe-touching paths made LIVE
+  API calls and "tested" the unreachable fallback against a reachable Stripe. Never remove.
+- Charts use `fill-orange-500`/`fill-slate-200` SVG classes — part of the compiled Tailwind
+  bundle since this change; `npm run build` required if new fill-* classes are added.
+- Pinned by `tests/Feature/AdminDashboardTest.php`.

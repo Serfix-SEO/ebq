@@ -157,6 +157,7 @@
                 // sidebar entry whenever any of the unified routes is the
                 // current page — a single nav item, three landing pages.
                 $adminItems = [
+                    ['route' => 'admin.dashboard', 'label' => 'Dashboard'],
                     ['route' => 'admin.clients.index', 'label' => 'Clients'],
                     ['route' => 'admin.activities.index', 'label' => 'Activities'],
                     [

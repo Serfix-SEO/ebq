@@ -73,6 +73,13 @@
              this pin every dashboard test 302s. The off-state is proven by
              SeoPlatformUiToggleTest flipping config() per test. -->
         <env name="SEO_PLATFORM_UI" value="true"/>
+        <!-- Same leak class as the provider keys below: phpunit only isolates
+             env it overrides, so the REAL Stripe secret reached tests — any
+             code path touching the Stripe API (admin dashboard snapshot,
+             price lookups, healStaleCustomer) made live API calls and "tested"
+             the unreachable-fallback against a reachable Stripe. Tests that
+             need Stripe mock it or assert the degraded state. -->
+        <env name="STRIPE_SECRET" value=""/>
         <!-- Image STORAGE, same leak class as the API keys above (found
              2026-07-21): phpunit pins only what it overrides, so
              CONTENT_IMAGES_DISK=content_s3 leaked from prod .env and
