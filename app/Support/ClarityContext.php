@@ -86,6 +86,53 @@ final class ClarityContext
         }
     }
 
+    /**
+     * Stable id for `clarity("identify", …)` — links a person's SESSIONS
+     * together in the dashboard.
+     *
+     * Clarity ends a session after ~30 minutes of inactivity while our own
+     * lasts 24h (SESSION_LIFETIME=1440), and this product is full of long
+     * waits — an article generation runs for minutes and people switch tabs.
+     * One visit therefore lands as several sessions. Identify does not merge
+     * them (deliberately: merging on our session boundary could produce
+     * day-long recordings), it makes them findable as one person's journey.
+     *
+     * Signed in → the user ULID. Pseudonymous, and Clarity hashes it again on
+     * their side. No friendlyName is passed: that field is NOT hashed, so a
+     * name or email there would hand PII to Microsoft.
+     *
+     * Anonymous onboarding → a one-way HMAC of the resume token, so a guest's
+     * wizard run still stitches together. NEVER the token itself: that is a
+     * capability that resumes someone else's onboarding.
+     */
+    public static function identity(): ?string
+    {
+        try {
+            $user = Auth::user();
+            if ($user !== null) {
+                return (string) $user->id;
+            }
+
+            $token = self::onboardingToken();
+
+            return $token === null
+                ? null
+                : 'anon-'.substr(hash_hmac('sha256', $token, (string) config('app.key')), 0, 24);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function onboardingToken(): ?string
+    {
+        if (! app()->bound('session') || ! app('session')->isStarted()) {
+            return null;
+        }
+        $token = (string) session('content_onboarding_token', '');
+
+        return $token === '' ? null : $token;
+    }
+
     public static function sessionType(): string
     {
         // An impersonated session is an ADMIN driving a client account — the

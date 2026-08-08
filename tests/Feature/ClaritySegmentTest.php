@@ -146,6 +146,45 @@ class ClaritySegmentTest extends TestCase
         $this->assertStringContainsString("window.clarityTag('staff_session', 'yes')", $adminHtml);
     }
 
+    // ── identify(): links a person's sessions together ──────────────────
+
+    public function test_a_signed_in_user_is_identified_by_ulid(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $this->assertSame((string) $user->id, ClarityContext::identity());
+
+        $html = $this->get(route('content.get-started'))->assertOk()->getContent();
+        $this->assertStringContainsString('clarity("identify", '."'".$user->id."'", $html);
+    }
+
+    public function test_guests_with_nothing_to_stitch_are_not_identified(): void
+    {
+        $this->assertNull(ClarityContext::identity());
+
+        $html = $this->get(route('landing'))->assertOk()->getContent();
+        $this->assertStringNotContainsString('clarity("identify"', $html);
+    }
+
+    /**
+     * An anonymous wizard run still stitches — but via a ONE-WAY hash. The
+     * onboarding token resumes someone else's onboarding, so it must never
+     * leave our server, and it must not be recoverable from what does.
+     */
+    public function test_an_anonymous_onboarding_run_is_stitched_without_leaking_the_token(): void
+    {
+        $token = 'super-secret-resume-token-123';
+        $this->withSession(['content_onboarding_token' => $token]);
+
+        // Any rendered page carries the partial; the wizard url itself 302s
+        // without a matching session row, and a redirect has no body.
+        $html = $this->get(route('landing'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('clarity("identify", '."'".'anon-', $html, 'the run is stitched');
+        $this->assertStringNotContainsString($token, $html, 'the resume token must never reach Clarity');
+    }
+
     /** No PII may reach Clarity — tag values are not hashed. */
     public function test_no_identifying_values_are_tagged(): void
     {

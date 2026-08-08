@@ -397,5 +397,24 @@ combinations as **Segments** (they apply to Recordings, Heatmaps and the Dashboa
   cached per user for 10 min (`clarity:tags:{id}`). This renders in the `<head>` of every page.
 - **No PII, ever.** Clarity hashes the `identify()` id but NOT tag values — no email, name or
   domain may appear. Pinned by `ClaritySegmentTest::test_no_identifying_values_are_tagged`.
+### identify() — one person's sessions, linked
+
+Clarity ends a session after ~30 min idle; our own lasts 24h (`SESSION_LIFETIME=1440`), and this
+product is full of multi-minute waits, so ONE visit lands as several Clarity sessions. That is
+Clarity's sessionization, not a misconfiguration — ruled out: single tag/project, `www.serfix.io`
+does not resolve, `ebq.io` 301s before any HTML so no session starts there.
+
+`ClarityContext::identity()` makes those sessions findable as one journey:
+
+- Signed in → the **user ULID**. Pseudonymous, hashed again by Clarity. To map a Clarity id back
+  to an account, open `/admin/clients?edit=<ulid>`.
+- Anonymous onboarding → **one-way HMAC** of `content_onboarding_token` (`anon-…`), so a guest's
+  wizard run stitches. ⚠️ NEVER the token itself — it resumes someone else's onboarding.
+  Pinned by `test_an_anonymous_onboarding_run_is_stitched_without_leaking_the_token`.
+- **No `friendlyName`** is passed: Clarity does not hash that field, so a name or email there
+  would hand PII to Microsoft.
+- Deliberately NOT merging sessions via `customSessionId`: on a 24h session lifetime that would
+  produce day-long recordings — worse than the split it fixes.
+
 - Still open: Clarity is NOT gated on the consent banner (GA/Ads are), and admin URLs carry
   customer emails in `?q=` — see the session notes; both untouched by this change.

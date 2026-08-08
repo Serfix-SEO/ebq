@@ -6,7 +6,10 @@
         y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
     })(window, document, "clarity", "script", "xgs6o38iho");
 </script>
-@php $clarityTags = \App\Support\ClarityContext::tags(); @endphp
+@php
+    $clarityTags = \App\Support\ClarityContext::tags();
+    $clarityIdentity = \App\Support\ClarityContext::identity();
+@endphp
 {{-- Custom tags → Clarity's "Filters → Custom tags", saveable as Segments that
      apply to Recordings, Heatmaps and the Dashboard.
 
@@ -25,6 +28,14 @@
     window.clarityEvent = function (name) {
         try { window.clarity("event", name); } catch (e) { /* ditto */ }
     };
+@if ($clarityIdentity !== null)
+    // identify() links this person's SESSIONS together. Clarity ends a session
+    // after ~30 min idle while ours lasts 24h, so one visit to a product full
+    // of multi-minute waits lands as several sessions — this makes them
+    // findable as one journey. Pseudonymous id only (Clarity hashes it again);
+    // no friendlyName, which Clarity does NOT hash.
+    try { window.clarity("identify", {{ Illuminate\Support\Js::from($clarityIdentity) }}); } catch (e) { /* never break a page */ }
+@endif
     @foreach ($clarityTags as $key => $value)
         window.clarityTag({{ Illuminate\Support\Js::from($key) }}, {{ Illuminate\Support\Js::from($value) }});
     @endforeach
