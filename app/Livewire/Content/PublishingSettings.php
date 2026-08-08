@@ -200,6 +200,28 @@ class PublishingSettings extends Component
         ])->save();
     }
 
+    /**
+     * Re-enter credentials for a broken integration.
+     *
+     * Opens the connect panel prefilled with the site URL already on file, so
+     * fixing a rejected password is "paste the new one" rather than retyping
+     * everything. Deliberately does NOT prefill the username: WordPress
+     * rejecting the credentials means either half could be wrong, and a
+     * pre-filled wrong username is the harder error to spot.
+     */
+    public function reconnect(string $integrationId): void
+    {
+        $integration = $this->integrationOrFail($integrationId);
+        if ($integration === null) {
+            return;
+        }
+
+        $this->platform = $integration->platform;
+        $this->wpSiteUrl = (string) (((array) $integration->credentials)['site_url'] ?? '');
+        $this->reset('wpUsername', 'wpAppPassword');
+        $this->showConnect = true;
+    }
+
     public function disconnect(string $integrationId): void
     {
         $this->integrationOrFail($integrationId)?->delete();

@@ -123,6 +123,64 @@ class WordPressConnectGuideTest extends TestCase
         }
     }
 
+    /**
+     * The case that motivated this: a site that connected once and LATER broke.
+     * The connect panel is closed, so the guide used to be nowhere on the page
+     * — the customer saw "WordPress rejected the username or application
+     * password" with no instructions and nothing to click (prod 2026-08-08).
+     */
+    public function test_a_broken_integration_shows_the_guide_and_a_fix_button(): void
+    {
+        $this->seed(PlanSeeder::class);
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+        app(ContentEntitlements::class)->startTrial($user, $website);
+        ContentIntegration::query()->create([
+            'website_id' => $website->id,
+            'platform' => ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD,
+            'credentials' => ['site_url' => 'https://client-site.test', 'username' => 'someone'],
+            'status' => ContentIntegration::STATUS_ERROR,
+            'last_error' => 'WordPress rejected the username or application password.',
+        ]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        // The connect panel is CLOSED — this is the state from the report.
+        $panel = Livewire::test(PublishingSettings::class);
+        $html = $panel->html();
+
+        $this->assertStringContainsString('How to get your WordPress application password', $html);
+        $this->assertStringContainsString('The connection didn’t go through', $html);
+        $this->assertStringContainsString('Fix the connection', $html);
+
+        // And the fix button opens the form with the site already filled in.
+        $panel->call('reconnect', ContentIntegration::query()->first()->id)
+            ->assertSet('showConnect', true)
+            ->assertSet('wpSiteUrl', 'https://client-site.test')
+            ->assertSet('wpAppPassword', '');
+    }
+
+    /** A healthy integration must not be nagged with the guide. */
+    public function test_a_connected_integration_does_not_show_the_guide(): void
+    {
+        $this->seed(PlanSeeder::class);
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+        app(ContentEntitlements::class)->startTrial($user, $website);
+        ContentIntegration::query()->create([
+            'website_id' => $website->id,
+            'platform' => ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD,
+            'credentials' => ['site_url' => 'https://ok.test'],
+            'status' => ContentIntegration::STATUS_CONNECTED,
+            'last_verified_at' => now(),
+        ]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        $html = Livewire::test(PublishingSettings::class)->html();
+
+        $this->assertStringNotContainsString('How to get your WordPress application password', $html);
+        $this->assertStringNotContainsString('Fix the connection', $html);
+    }
+
     /** The guide belongs to the WordPress tab, not the webhook/Laravel ones. */
     public function test_the_guide_is_scoped_to_the_wordpress_tab(): void
     {

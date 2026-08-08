@@ -91,6 +91,24 @@
                                 {{ __('Disconnect') }}
                             </button>
                         </div>
+
+                        {{-- A WordPress integration that has gone bad: show the
+                             walkthrough right here. The guide used to live only
+                             inside the connect panel, so an ALREADY-connected
+                             site that later broke displayed the error with no
+                             instructions and no way to act on it (2026-08-08) —
+                             and the fix is nearly always "make a fresh
+                             application password", which is step 2 below. --}}
+                        @if (! $integration->isConnected() && $integration->platform !== \App\Models\ContentIntegration::PLATFORM_WEBHOOK)
+                            <div wire:key="fix-{{ $integration->id }}">
+                                <button type="button" wire:click="reconnect('{{ $integration->id }}')"
+                                    class="mb-2 inline-flex items-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356m-4.992 4.992l3.181-3.183a8.25 8.25 0 00-13.803 3.7M4.031 9.865v4.99m0 0h4.99m-4.99 0l3.181 3.183a8.25 8.25 0 0013.803-3.7"/></svg>
+                                    {{ __('Fix the connection') }}
+                                </button>
+                                @include('partials.wp-connect-guide', ['guideForceOpen' => true])
+                            </div>
+                        @endif
                     @endforeach
                 </div>
 
