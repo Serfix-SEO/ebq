@@ -45,16 +45,15 @@ class SeoPlatformUiToggleTest extends TestCase
     }
 
     /**
-     * Both `/` and `/content-autopilot` serve the same page when off — they
-     * must canonicalize to ONE url (the root) or Google indexes a duplicate.
+     * `/` serves the content landing when off, so the old /content-autopilot
+     * address 302s home — one URL, no duplicate page for Google to index.
      */
-    public function test_both_landing_urls_canonicalize_to_the_root(): void
+    public function test_the_old_content_landing_url_redirects_home(): void
     {
         $this->off();
 
-        $canonical = '<link rel="canonical" href="'.url('/').'"';
-        $this->get('/')->assertOk()->assertSee($canonical, false);
-        $this->get('/content-autopilot')->assertOk()->assertSee($canonical, false);
+        $this->get('/')->assertOk()->assertSee('<link rel="canonical" href="'.url('/').'"', false);
+        $this->get('/content-autopilot')->assertRedirect(route('landing'));
     }
 
     public function test_seo_marketing_pages_redirect_when_off(): void
@@ -128,6 +127,7 @@ class SeoPlatformUiToggleTest extends TestCase
         $this->assertStringNotContainsString(route('rank-tracking.index'), $html, 'no Ranking link');
         $this->assertStringContainsString(route('billing.show'), $html, 'Billing stays');
         $this->assertStringContainsString(route('websites.index'), $html, 'Websites stays');
+        $this->assertStringNotContainsString(route('team.index'), $html, 'Team hidden (owner request)');
         // Content is THE product now — its items sit flat at the top level,
         // not collapsed behind a "Content" flyout group. The flyout JSON map is
         // empty when no labeled groups remain (the toggle-selector string

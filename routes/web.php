@@ -83,7 +83,11 @@ Route::get('/pricing', fn () => config('features.seo_platform_ui')
 Route::get('/trust-score', fn () => config('features.seo_platform_ui')
     ? view('trust-score')
     : redirect()->route('landing'))->name('trust-score');
-Route::view('/content-autopilot', 'content-landing')->name('content.landing');
+// With the SEO UI off, `/` serves this same page — one canonical URL, so the
+// old address 302s home instead of serving a duplicate.
+Route::get('/content-autopilot', fn () => config('features.seo_platform_ui')
+    ? view('content-landing')
+    : redirect()->route('landing'))->name('content.landing');
 // Content AI Autopilot is a separately-billed product, so it gets its own
 // pricing page — /pricing prices the SEO platform only (they used to share
 // one grid behind a toggle nobody noticed).
