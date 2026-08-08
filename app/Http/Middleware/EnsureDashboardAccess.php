@@ -61,9 +61,12 @@ class EnsureDashboardAccess
         $route = $request->route()?->getName() ?? '';
 
         // 1. Kill-switch: SEO UI off → every SEO surface goes to content.
+        // Applies to impersonating admins too: impersonation exists to see what
+        // the CLIENT sees, and exempting it showed the owner an SEO teaser
+        // selling a hidden product (2026-08-08). Admins debug SEO surfaces from
+        // their own account, which stays exempt via is_admin.
         if (! config('features.seo_platform_ui')
             && ! $user->is_admin
-            && ! $request->session()->has('impersonator_id')
             && ($this->matches($route, self::TEASER_PREFIXES) || $this->matches($route, self::SEO_ONLY_PREFIXES))) {
             // EnsureContentAccess cascades non-entitled users on to
             // content.get-started, so this single target fits everyone.

@@ -159,6 +159,39 @@ class SeoPlatformUiToggleTest extends TestCase
         $response->assertRedirect(route('content.get-started'));
     }
 
+    /**
+     * Impersonation exists to see what the CLIENT sees. Exempting it from the
+     * kill-switch showed the owner an SEO teaser selling a hidden product.
+     */
+    public function test_an_impersonating_admin_sees_the_client_view_not_the_seo_teaser(): void
+    {
+        $this->off();
+        $client = User::factory()->create();
+        $website = Website::factory()->for($client)->create();
+
+        $this->actingAs($client)->withSession([
+            'current_website_id' => $website->id,
+            'impersonator_id' => User::factory()->create(['is_admin' => true])->id,
+        ]);
+
+        $this->get(route('dashboard'))->assertRedirect(route('content.index'));
+    }
+
+    /** The winback strip promotes SEO plans — it goes with the product. */
+    public function test_the_winback_banner_is_hidden_when_off(): void
+    {
+        $this->off();
+        config(['services.stripe.winback_promo_code' => 'SAVE30', 'services.stripe.winback_promo_percent' => 30]);
+
+        $user = User::factory()->create(['created_at' => now()->subDays(60)]);
+        $website = Website::factory()->for($user)->create();
+
+        $html = $this->actingAs($user)->withSession(['current_website_id' => $website->id])
+            ->get(route('content.get-started'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('OFF any plan', $html);
+    }
+
     // ── Reversibility ───────────────────────────────────────────────────
 
     /** Flag on = the SEO product is fully back. Proven in-suite. */

@@ -68,6 +68,11 @@
         <env name="IDEOGRAM_MONTHLY_CAP_USD" value=""/>
         <!-- Prod .env hides the Content UI (operator gate); tests exercise it. -->
         <env name="CONTENT_AUTOPILOT_UI" value="true"/>
+        <!-- Tests run against the DEFAULT (SEO UI on) baseline regardless of
+             the box's .env — prod runs false since 2026-08-08, and without
+             this pin every dashboard test 302s. The off-state is proven by
+             SeoPlatformUiToggleTest flipping config() per test. -->
+        <env name="SEO_PLATFORM_UI" value="true"/>
         <!-- Image STORAGE, same leak class as the API keys above (found
              2026-07-21): phpunit pins only what it overrides, so
              CONTENT_IMAGES_DISK=content_s3 leaked from prod .env and

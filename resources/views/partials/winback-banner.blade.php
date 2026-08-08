@@ -6,6 +6,7 @@
 @php
     $wbBannerCode = (string) config('services.stripe.winback_promo_code');
     $wbBannerShow = $wbBannerCode !== ''
+        && config('features.seo_platform_ui') // it promotes SEO plans — gone with the product
         && auth()->check()
         && ! request()->routeIs('billing.*')
         && ! request()->routeIs('content.*') // dashboard-plan promo, not for Content AI
