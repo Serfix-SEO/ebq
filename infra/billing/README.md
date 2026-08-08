@@ -180,6 +180,23 @@ next request. The `/billing` page hides the plan grid + danger zone and shows an
 - `database/seeders/PlanSeeder.php`, `database/migrations/2026_0*_*plans*`, `*client_activities*`
 - Routes: `routes/web.php` (`/billing/*`, `cashier.webhook`, `/admin/{plans,billing,usage,website-features}`)
 
+## Stripe landmines (2026-08-08)
+
+Two silent nulls found on a live subscriber's billing page, both invisible in code review
+because the surrounding fields rendered perfectly:
+
+1. **`current_period_end` moved.** Up to API `2025-03-31` it sat on the Stripe Subscription;
+   from **`basil`** (this account runs `2025-08-27.basil`) it is gone from the Subscription and
+   lives on each subscription **ITEM**, since items can bill on different cycles. Reading the
+   old location returns null for *every* modern subscriber — "Next charge —" on both products.
+   `App\Support\StripePeriod::nextChargeAt()` reads items first, falls back to the
+   subscription-level field for older versions, and takes the EARLIEST item (that is when money
+   actually moves). Unit-tested without Stripe via `fromStripeSubscription()`.
+2. **`isset()` lies on a Cashier Invoice.** `Laravel\Cashier\Invoice` defines `__get` but **no
+   `__isset`**, so `isset($invoice->created)` is `false` while `$invoice->created` returns the
+   timestamp — `??` works, `isset()` does not. An invoice row rendered its amount and a "—" for
+   its date. Use the documented accessors: `date()`, `rawTotal()`.
+
 ## Consent Mode v2 + our own banner (2026-08-04)
 
 `partials/google-analytics.blade.php` sets the consent state, and

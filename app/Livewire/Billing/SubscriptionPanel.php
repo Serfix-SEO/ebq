@@ -5,8 +5,8 @@ namespace App\Livewire\Billing;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\Usage\UsageMeter;
+use App\Support\StripePeriod;
 use App\Support\TrialStatus;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -77,20 +77,14 @@ class SubscriptionPanel extends Component
 
         $endsAt = $subscription?->ends_at;          // set when cancelled at period end
         $trialEndsAt = $subscription?->trial_ends_at;
-        // Cashier doesn't expose period-end on the local model; pull
-        // straight from the Stripe object as a one-off when needed.
-        $nextChargeAt = null;
-        try {
-            if ($this->section !== 'plans' && $subscription && $subscription->valid() && ! $isCancelled) {
-                $stripeSub = $subscription->asStripeSubscription();
-                if (isset($stripeSub->current_period_end)) {
-                    $nextChargeAt = Carbon::createFromTimestamp((int) $stripeSub->current_period_end);
-                }
-            }
-        } catch (\Throwable $_) {
-            // Stripe API unreachable — fall through with null. UI shows
-            // "—" rather than failing the whole page render.
-        }
+        // Cashier doesn't expose period-end on the local model, and on Stripe's
+        // basil API version it moved off the subscription onto its ITEMS — so
+        // reading the old location returned null for every live subscriber.
+        // StripePeriod reads both; unreachable API → null and the UI shows "—"
+        // rather than failing the whole page render.
+        $nextChargeAt = ($this->section !== 'plans' && $subscription && $subscription->valid() && ! $isCancelled)
+            ? StripePeriod::nextChargeAt($subscription)
+            : null;
 
         // Recent invoices (best-effort). Cashier returns Stripe Invoice
         // objects; we only need date / amount / pdf-url.

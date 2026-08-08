@@ -5,6 +5,7 @@ namespace App\Livewire\Billing;
 use App\Models\User;
 use App\Services\Content\ContentEntitlements;
 use App\Support\ContentAutopilotConfig;
+use App\Support\StripePeriod;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -79,20 +80,13 @@ class ContentSubscriptionPanel extends Component
         $interval = $this->interval($sub?->stripe_price);
         [$amount, $currency] = $this->amount($user, $sub?->stripe_price, $interval);
 
-        // Cashier keeps period-end only on the Stripe object, same as the
-        // dashboard panel. Unreachable API → "—", never a failed page render.
+        // Period end comes from StripePeriod, which knows the field moved onto
+        // the subscription items in Stripe's basil API version. Unreachable
+        // API → "—", never a failed page render.
         $isCancelled = $sub !== null && $sub->canceled() && $sub->onGracePeriod();
-        $nextChargeAt = null;
-        try {
-            if ($this->section !== 'plans' && $sub !== null && $sub->valid() && ! $isCancelled) {
-                $stripeSub = $sub->asStripeSubscription();
-                if (isset($stripeSub->current_period_end)) {
-                    $nextChargeAt = Carbon::createFromTimestamp((int) $stripeSub->current_period_end);
-                }
-            }
-        } catch (\Throwable) {
-            $nextChargeAt = null;
-        }
+        $nextChargeAt = ($this->section !== 'plans' && $sub !== null && $sub->valid() && ! $isCancelled)
+            ? StripePeriod::nextChargeAt($sub)
+            : null;
 
         return view('livewire.billing.content-subscription-panel', [
             'show' => $this->section !== 'plans',
@@ -205,8 +199,12 @@ class ContentSubscriptionPanel extends Component
         }
 
         return $invoices->map(fn ($invoice) => [
-            'date' => isset($invoice->created) ? Carbon::createFromTimestamp((int) $invoice->created) : null,
-            'total' => (int) ($invoice->total ?? 0),
+            // date(), not `created`: Cashier's Invoice defines __get but NOT
+            // __isset, so isset($invoice->created) is FALSE even though the
+            // value is right there — the date rendered as "—" beside a
+            // perfectly good amount (prod 2026-08-08).
+            'date' => $invoice->date(),
+            'total' => (int) $invoice->rawTotal(),
             'currency' => strtoupper((string) ($invoice->currency ?? 'usd')),
             'url' => $invoice->invoice_pdf ?? $invoice->hosted_invoice_url ?? null,
         ])->values()->all();
