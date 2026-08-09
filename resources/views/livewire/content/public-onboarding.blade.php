@@ -4,17 +4,17 @@
 <div>
     @if ($capturingDomain)
         @php $recaptcha = \App\Support\Recaptcha::isEnabled() && ! auth()->check(); @endphp
-        <div class="mx-auto max-w-3xl px-6 py-12 sm:py-20">
-            <div class="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm sm:p-14">
-                <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
-                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+        <div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
+            <div class="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-14">
+                <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25 sm:h-14 sm:w-14">
+                    <svg class="h-6 w-6 sm:h-7 sm:w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
                 </span>
-                <h1 class="mt-6 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{{ __('Let’s set up your website') }}</h1>
+                <h1 class="mt-5 text-2xl font-extrabold tracking-tight text-slate-900 sm:mt-6 sm:text-3xl">{{ __('Let’s set up your website') }}</h1>
                 <p class="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-500 sm:text-base">
                     {{ __('We write articles about your business and publish them on your website — so more people find you on Google.') }}
                 </p>
 
-                <div class="mx-auto mt-8 flex max-w-lg flex-col gap-2 text-start text-sm text-slate-600 sm:flex-row sm:justify-center sm:gap-8">
+                <div class="mx-auto mt-6 flex max-w-lg flex-col gap-2.5 text-start text-sm text-slate-600 sm:mt-8 sm:flex-row sm:justify-center sm:gap-8">
                     <span class="inline-flex items-center gap-2"><span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[11px] font-bold text-orange-700">1</span>{{ __('Enter your website') }}</span>
                     <span class="inline-flex items-center gap-2"><span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[11px] font-bold text-orange-700">2</span>{{ __('Answer a few questions') }}</span>
                     <span class="inline-flex items-center gap-2"><span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[11px] font-bold text-orange-700">3</span>{{ __('We start writing') }}</span>
@@ -24,7 +24,7 @@
                      reCAPTCHA widget must never be DOM-diffed away, and every
                      controller error path returns via full redirect with
                      $errors + old('domain') intact. --}}
-                <form method="POST" action="{{ route('content.onboarding.begin') }}" class="mx-auto mt-8 max-w-xl text-start">
+                <form method="POST" action="{{ route('content.onboarding.begin') }}" class="mx-auto mt-6 max-w-xl text-start sm:mt-8">
                     @csrf
                     <div class="flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/5 sm:flex-row sm:items-center sm:rounded-full sm:p-2">
                         <div class="flex flex-1 items-center gap-2.5 ps-3">
@@ -51,7 +51,7 @@
                     {{-- Existing accounts should not have to walk the wizard to
                          step 8 just to sign in. Google creates-or-logs-in; a
                          website-less account lands back on its own domain form. --}}
-                    <div class="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-slate-100 pt-6 text-sm text-slate-500">
+                    <div class="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-slate-100 pt-5 text-sm text-slate-500 sm:mt-8 sm:pt-6">
                         <span>{{ __('Already have an account?') }}</span>
                         <a href="{{ route('login') }}" class="font-semibold text-slate-900 underline-offset-2 hover:underline">{{ __('Sign in') }}</a>
                         <a href="{{ route('google.sso.redirect', ['intent' => 'register']) }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50">
