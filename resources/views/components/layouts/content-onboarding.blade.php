@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" class="h-full">
+<html class="overflow-x-clip" lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" class="h-full">
 <head>
     <meta charset="utf-8">
     @include('partials.google-analytics')
@@ -15,7 +15,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
-<body class="min-h-full bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100 {{ app()->getLocale() === 'ar' ? 'font-arabic' : '' }}">
+<body class="overflow-x-clip min-h-full bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100 {{ app()->getLocale() === 'ar' ? 'font-arabic' : '' }}">
     {{-- Slim top bar --}}
     <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
         <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">

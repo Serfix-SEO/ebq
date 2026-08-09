@@ -36,7 +36,7 @@
     $jsonFlags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" class="h-full scroll-smooth">
+<html class="overflow-x-clip" lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" class="h-full scroll-smooth">
 <head>
     <meta charset="utf-8">
     @include('partials.google-analytics')
@@ -91,7 +91,7 @@
         @vite(['resources/css/app.css', 'resources/js/marketing.js'])
     @endif
 </head>
-<body class="min-h-full bg-white font-sans text-slate-900 antialiased selection:bg-slate-900 selection:text-white {{ app()->getLocale() === 'ar' ? 'font-arabic' : '' }}">
+<body class="overflow-x-clip min-h-full bg-white font-sans text-slate-900 antialiased selection:bg-slate-900 selection:text-white {{ app()->getLocale() === 'ar' ? 'font-arabic' : '' }}">
     @include('partials.locale-picker')
     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">{{ __('Skip to content') }}</a>
 

@@ -144,7 +144,7 @@
 
                 {{-- Right: the real content calendar, in a browser frame --}}
                 <div class="relative">
-                    <div class="pointer-events-none absolute -inset-6 rounded-[2rem] bg-gradient-to-tr from-orange-500/20 via-amber-300/10 to-transparent blur-2xl"></div>
+                    <div class="pointer-events-none absolute -inset-2 sm:-inset-6 rounded-[2rem] bg-gradient-to-tr from-orange-500/20 via-amber-300/10 to-transparent blur-2xl"></div>
                     <div class="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl shadow-slate-900/30">
                         <div class="flex items-center gap-2 border-b border-slate-800 px-4 py-3">
                             <span class="h-2.5 w-2.5 rounded-full bg-slate-600"></span>

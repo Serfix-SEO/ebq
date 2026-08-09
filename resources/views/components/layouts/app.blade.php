@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" x-data="{ dark: localStorage.getItem('dark') === 'true', sidebarOpen: false }" x-bind:class="{ 'dark': dark }" x-init="$watch('dark', v => localStorage.setItem('dark', v))">
+<html class="overflow-x-clip" lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" x-data="{ dark: localStorage.getItem('dark') === 'true', sidebarOpen: false }" x-bind:class="{ 'dark': dark }" x-init="$watch('dark', v => localStorage.setItem('dark', v))">
 <head>
     <meta charset="utf-8">
     @include('partials.clarity')
@@ -13,7 +13,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
-<body class="bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100 {{ app()->getLocale() === 'ar' ? 'font-arabic' : '' }}">
+<body class="overflow-x-clip bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100 {{ app()->getLocale() === 'ar' ? 'font-arabic' : '' }}">
     @include('partials.locale-picker')
     {{-- Mobile overlay --}}
     <div x-show="sidebarOpen" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition-opacity duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="sidebarOpen = false" class="fixed inset-0 z-30 bg-slate-900/40 md:hidden" style="display:none"></div>
