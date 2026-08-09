@@ -53,6 +53,9 @@ class PublicOnboarding extends Component
 
     public string $password_confirmation = '';
 
+    /** Guest arrived without a captured domain — show the domain step. */
+    public bool $capturingDomain = false;
+
     public function mount(ContentOnboardingConverter $converter)
     {
         // Signed-in users don't need the ACCOUNT step — but they may well have
@@ -115,9 +118,11 @@ class PublicOnboarding extends Component
             }
         }
 
-        // No captured domain → the visitor skipped the landing form. The domain
-        // is collected ONCE, on the landing page (with reCAPTCHA); send them there.
-        return $this->redirectRoute('content.landing', navigate: false);
+        // No captured domain yet — render the domain-entry step right here.
+        // This used to bounce through the landing (two 302s that ended on the
+        // homepage), which read as "nothing happened" from the nav CTA and as
+        // "why am I on a marketing page" from the login page's Create one.
+        $this->capturingDomain = true;
     }
 
     /** Persist wizard progress so a reload resumes where the visitor left off. */

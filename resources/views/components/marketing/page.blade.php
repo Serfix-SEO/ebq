@@ -97,11 +97,10 @@
 
     @php
         $seoUi = (bool) config('features.seo_platform_ui');
-        // Content-only mode: "Get started" enters the ONBOARDING funnel (the
-        // landing hero's domain form → wizard → account at the end), not the
-        // bare register form — registering first just lands people on the same
-        // domain question with an extra account step in between.
-        $signupUrl = $seoUi ? route('register') : route('landing').'#start';
+        // Content-only mode: "Get started" opens the wizard's own domain step
+        // (a focused page, not an anchor scroll that looked like nothing
+        // happened), then wizard → account at the end.
+        $signupUrl = $seoUi ? route('register') : route('content.onboarding');
     @endphp
     <header x-data="{ mobileOpen: false }" @keydown.escape.window="mobileOpen = false" class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 lg:px-8">

@@ -197,15 +197,49 @@ class ContentAuthedOnboardingFunnelTest extends TestCase
      */
     public function test_signup_ctas_point_at_the_funnel_not_the_register_form(): void
     {
+        // A focused page, not an anchor scroll (on the landing you are already
+        // AT the hero, so #start visibly did nothing).
         $landing = $this->get('/')->assertOk()->getContent();
-        $this->assertStringContainsString(route('landing').'#start', $landing);
+        $this->assertStringContainsString('href="'.route('content.onboarding').'"', $landing);
         $this->assertStringNotContainsString('href="'.route('register').'"', $landing);
 
         $login = $this->get(route('login'))->assertOk()->getContent();
-        $this->assertStringContainsString(route('landing').'#start', $login);
+        $this->assertStringContainsString('href="'.route('content.onboarding').'"', $login);
 
         config(['features.seo_platform_ui' => true]);
         $this->assertStringContainsString('href="'.route('register').'"', $this->get('/')->assertOk()->getContent());
+    }
+
+    /**
+     * A guest without a captured domain gets the DOMAIN STEP on the wizard
+     * url — not the old double-302 that ended on the homepage and read as
+     * "nothing happened".
+     */
+    public function test_a_domainless_guest_gets_the_domain_step_not_a_bounce(): void
+    {
+        $html = $this->get(route('content.onboarding'))->assertOk()->getContent();
+
+        $this->assertStringContainsString(route('content.onboarding.begin'), $html);
+        $this->assertStringContainsString('name="domain"', $html);
+        // Existing accounts get a way in without walking the wizard.
+        $this->assertStringContainsString(route('login'), $html);
+        $this->assertStringContainsString(__('Continue with Google'), $html);
+        // The wizard rail must NOT wrap this state.
+        $this->assertStringNotContainsString(__('First articles'), $html);
+
+        // Flag-independent: the guest wizard exists in both modes.
+        config(['features.seo_platform_ui' => true]);
+        $this->get(route('content.onboarding'))->assertOk();
+    }
+
+    /** A bad domain posts back to the step with the error, input preserved. */
+    public function test_a_bad_domain_returns_to_the_step_with_errors(): void
+    {
+        $this->from(route('content.onboarding'))
+            // Empty fails at normalizeDomain — past the stubbed SSRF guard.
+            ->post(route('content.onboarding.begin'), ['domain' => ''])
+            ->assertRedirect(route('content.onboarding'))
+            ->assertSessionHasErrors('domain');
     }
 
     // ── Flag-ON reversibility ───────────────────────────────────────────
