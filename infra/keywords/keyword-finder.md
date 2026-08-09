@@ -256,3 +256,26 @@ private `10.0.0.3`) — not a separate machine. Root SSH is password-auth (no sh
 - Migrations: `database/migrations/2026_06_13_100000_create_keyword_api_servers_table.php`,
   `..._100100_create_keyword_api_requests_table.php`, `..._100200_add_bid_range_to_keyword_metrics_table.php`
 </content>
+
+
+## Self-recovery (2026-08-09)
+
+The node's queue is IN-MEMORY: a headless-browser crash drops every queued job with no
+webhook, orphaning our `keyword_api_requests` rows (2026-08-09: an onboarding lead's whole
+keyword batch, recovered by hand). Three layers now make this self-healing:
+
+1. **`KeywordFinderPool::redispatch($request)`** — re-sends the stored payload on the SAME
+   row and `request_id` (pollers keep working, webhook maps back), **never metered** (the
+   customer paid on the first send), capped by `keyword_api_requests.attempts`
+   (`MAX_ATTEMPTS = 2` — the poison-pill guard: a payload that crashes the browser must not
+   loop).
+2. **Webhook transient retry** — `KeywordFinderWebhookController` retries once on
+   browser-infrastructure errors (`browser has been closed`, `page.*`, `Timeout Nms exceeded`).
+   `needsLogin` is NEVER retried — that flags the server unhealthy instead.
+3. **Fast orphan detection** — `ebq:detect-orphaned-keyword-requests` (every 3 min): if a
+   node reports `waiting: 0, running: 0` while we hold in-flight rows dispatched >3 min ago,
+   they are provably lost → redispatch immediately. Unreachable node = proves nothing → skip;
+   busy node = skip. The 15-min reaper (`ebq:reap-stuck-keyword-requests`) stays the backstop
+   and now also redispatches before marking failed.
+
+Pinned by `tests/Feature/KeywordRequestRecoveryTest.php`.

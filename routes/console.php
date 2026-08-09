@@ -95,6 +95,11 @@ Schedule::command('ebq:check-keyword-servers')->everyFiveMinutes();
 // Terminal backstop for keyword requests whose result webhook never arrived
 // (node crash / lost delivery): fail them so they don't sit `running` forever.
 Schedule::command('ebq:reap-stuck-keyword-requests')->everyTenMinutes()->withoutOverlapping();
+// Fast orphan detection: the node's queue is in-memory, so a browser crash
+// drops every queued job silently. When the node reports an EMPTY queue while
+// we hold in-flight rows, they are provably lost — redispatch within ~3
+// minutes instead of making customers wait out the 15-minute reaper.
+Schedule::command('ebq:detect-orphaned-keyword-requests')->everyThreeMinutes()->withoutOverlapping();
 
 // Smart per-domain crawl-rate controller (AIMD): ramp each crawling domain up while it's
 // healthy, back it off the moment latency climbs or it blocks. See DomainRateLimiter.

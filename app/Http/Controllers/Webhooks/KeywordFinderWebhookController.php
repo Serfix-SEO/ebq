@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DomainKeywordHarvest;
 use App\Models\KeywordApiRequest;
 use App\Models\KeywordMetric;
+use App\Services\KeywordFinder\KeywordFinderPool;
 use App\Services\KeywordMetricsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -77,6 +78,23 @@ class KeywordFinderWebhookController extends Controller
                     'last_error' => 'Browser session needs re-login',
                     'last_health_at' => now(),
                 ])->save();
+            }
+
+            // Transient infrastructure failures (the headless browser died or
+            // a page call timed out) get ONE automatic retry — the payload is
+            // fine, the browser wasn't. needsLogin is excluded: retrying into
+            // a logged-out browser just fails again and hides the real
+            // problem. Same request_id, never re-billed, capped by attempts.
+            $transient = ! $needsLogin
+                && $errorMessage !== null
+                && preg_match('/browser has been closed|target page|page\\.[a-z]|timeout \\d+ms exceeded/i', $errorMessage) === 1;
+            if ($transient && app(KeywordFinderPool::class)->redispatch($apiRequest)) {
+                Log::info('KeywordFinder webhook: transient failure redispatched', [
+                    'request_id' => $apiRequest->request_id,
+                    'error' => mb_substr($errorMessage, 0, 120),
+                ]);
+
+                return response()->json(['ok' => true, 'retried' => true]);
             }
 
             $apiRequest->markFailed($errorMessage ?? 'The keyword lookup failed on the server.');

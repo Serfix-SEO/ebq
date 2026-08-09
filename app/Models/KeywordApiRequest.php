@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Model;
+use App\Services\KeywordFinder\KeywordFinderPool;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Lifecycle + result record for one asynchronous call to the self-hosted
- * keyword API. Created when we dispatch ({@see \App\Services\KeywordFinder\KeywordFinderPool}),
+ * keyword API. Created when we dispatch ({@see KeywordFinderPool}),
  * completed when the server posts back to `/webhooks/keyword-finder`.
  *
  * @property string $request_id
@@ -23,12 +24,17 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 class KeywordApiRequest extends Model
 {
     use HasUlids;
+
     public const STATUS_QUEUED = 'queued';
+
     public const STATUS_RUNNING = 'running';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_FAILED = 'failed';
 
     public const TYPE_IDEAS = 'ideas';
+
     public const TYPE_VOLUME = 'volume';
 
     protected $fillable = [
@@ -37,6 +43,7 @@ class KeywordApiRequest extends Model
         'type',
         'mode',
         'payload',
+        'attempts',
         'status',
         'result',
         'error',
@@ -50,6 +57,7 @@ class KeywordApiRequest extends Model
     {
         return [
             'payload' => 'array',
+            'attempts' => 'integer',
             'result' => 'array',
             'dispatched_at' => 'datetime',
             'completed_at' => 'datetime',
@@ -126,5 +134,18 @@ class KeywordApiRequest extends Model
     public function isFinished(): bool
     {
         return in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_FAILED], true);
+    }
+
+    /** Max sends per request — the poison-pill cap for automatic retries. */
+    public const MAX_ATTEMPTS = 2;
+
+    /**
+     * May this request be automatically re-sent? Requires a payload to re-send
+     * and headroom under the cap. `attempts` counts SENDS (starts at 1), so a
+     * request that has been retried once is done.
+     */
+    public function canRetry(): bool
+    {
+        return ! empty($this->payload) && (int) $this->attempts < self::MAX_ATTEMPTS;
     }
 }

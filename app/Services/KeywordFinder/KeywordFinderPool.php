@@ -157,6 +157,69 @@ class KeywordFinderPool
      *
      * @param  array<string, mixed>  $payload
      */
+    /**
+     * Re-send an existing request after the node lost it (browser crash wipes
+     * its in-memory queue) or failed it transiently.
+     *
+     * SAME row, SAME request_id: whoever is polling this request keeps
+     * working, and the webhook maps the eventual result straight back onto
+     * it. Never metered — the customer paid on the first send, and a retry of
+     * the same work must not bill twice. Returns false when the cap is hit or
+     * no server accepts, leaving the row for the caller to markFailed().
+     */
+    public function redispatch(KeywordApiRequest $request): bool
+    {
+        if (! $request->canRetry()) {
+            return false;
+        }
+
+        $servers = KeywordApiServer::query()->routable()->get();
+        if ($servers->isEmpty()) {
+            return false;
+        }
+
+        $endpoint = $request->type === KeywordApiRequest::TYPE_IDEAS ? '/keywords/ideas' : '/keywords/volume';
+        $webhookUrl = url((string) config('services.keyword_finder.webhook_path', '/webhooks/keyword-finder'));
+
+        foreach ($servers as $server) {
+            $body = array_merge($request->payload, [
+                'request_id' => $request->request_id,
+                'webhook_url' => $webhookUrl,
+            ]);
+            unset($body['country_key'], $body['content_rank_harvest'], $body['harvest_country']);
+
+            $client = new KeywordFinderClient($server);
+            $outcome = $request->type === KeywordApiRequest::TYPE_IDEAS
+                ? $client->postIdeas($body)
+                : $client->postVolume($body);
+
+            if ($outcome['ok']) {
+                $request->forceFill([
+                    'keyword_api_server_id' => $server->id,
+                    'status' => KeywordApiRequest::STATUS_RUNNING,
+                    'attempts' => (int) $request->attempts + 1,
+                    'error' => null,
+                    'completed_at' => null,
+                    'dispatched_at' => now(),
+                ])->save();
+
+                Log::info('KeywordFinderPool redispatched request', [
+                    'request_id' => $request->request_id,
+                    'attempt' => $request->attempts,
+                    'server_id' => $server->id,
+                ]);
+
+                return true;
+            }
+
+            if (! ($outcome['transient'] ?? false)) {
+                return false; // same bad body would fail everywhere
+            }
+        }
+
+        return false;
+    }
+
     private function dispatch(string $type, ?string $mode, array $payload, ?string $userId, ?string $websiteId, ?KeywordApiServer $only = null, bool $meter = true): KeywordApiRequest
     {
         $request = KeywordApiRequest::create([

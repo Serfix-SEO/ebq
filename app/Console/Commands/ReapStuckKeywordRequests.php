@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\KeywordApiRequest;
+use App\Services\KeywordFinder\KeywordFinderPool;
 use Illuminate\Console\Command;
 
 /**
@@ -30,7 +31,17 @@ class ReapStuckKeywordRequests extends Command
             ->where('created_at', '<', $cutoff)
             ->get();
 
+        $pool = app(KeywordFinderPool::class);
         foreach ($stuck as $request) {
+            // Self-recovery first: a node browser crash wipes its in-memory
+            // queue, so a stuck row usually means the work was LOST, not slow.
+            // Re-send the stored payload (same request_id — pollers keep
+            // working, never re-billed) before declaring it dead.
+            if ($pool->redispatch($request)) {
+                $this->line("redispatched {$request->id} ({$request->type}, attempt {$request->attempts})");
+
+                continue;
+            }
             $request->markFailed('Timed out: no result from the keyword server. Please try again.');
             $this->line("reaped {$request->id} ({$request->type}, created {$request->created_at})");
         }
