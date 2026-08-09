@@ -95,7 +95,14 @@
     @include('partials.locale-picker')
     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">{{ __('Skip to content') }}</a>
 
-    @php $seoUi = (bool) config('features.seo_platform_ui'); @endphp
+    @php
+        $seoUi = (bool) config('features.seo_platform_ui');
+        // Content-only mode: "Get started" enters the ONBOARDING funnel (the
+        // landing hero's domain form → wizard → account at the end), not the
+        // bare register form — registering first just lands people on the same
+        // domain question with an extra account step in between.
+        $signupUrl = $seoUi ? route('register') : route('landing').'#start';
+    @endphp
     <header x-data="{ mobileOpen: false }" @keydown.escape.window="mobileOpen = false" class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
             <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="Serfix home">
@@ -159,7 +166,7 @@
                     <a href="{{ route('dashboard') }}" class="hidden items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:inline-flex">{{ __('Dashboard') }}</a>
                 @else
                     <a href="{{ route('login') }}" class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900 sm:inline-flex">{{ __('Sign in') }}</a>
-                    <a href="{{ route('register') }}" class="hidden items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:inline-flex">{{ __('Get started') }}</a>
+                    <a href="{{ $signupUrl }}" class="hidden items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:inline-flex">{{ __('Get started') }}</a>
                 @endauth
 
                 {{-- Mobile menu toggle: the nav above is `hidden md:flex`, and the CTA
@@ -211,7 +218,7 @@
                     </form>
                 @else
                     <a href="{{ route('login') }}" class="rounded-lg px-3 py-2.5 transition hover:bg-slate-50 hover:text-slate-900">{{ __('Sign in') }}</a>
-                    <a href="{{ route('register') }}" class="rounded-lg bg-slate-900 px-3 py-2.5 font-semibold text-white transition hover:bg-slate-800">{{ __('Get started') }}</a>
+                    <a href="{{ $signupUrl }}" class="rounded-lg bg-slate-900 px-3 py-2.5 font-semibold text-white transition hover:bg-slate-800">{{ __('Get started') }}</a>
                 @endauth
             </nav>
         </div>

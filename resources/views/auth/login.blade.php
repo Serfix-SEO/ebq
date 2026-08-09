@@ -96,6 +96,6 @@
 
     <p class="mt-3 text-center text-sm text-slate-600">
         {{ __('Don\'t have an account?') }}
-        <a href="{{ route('register') }}" class="font-semibold text-slate-900 underline-offset-2 hover:underline">{{ __('Create one') }}</a>
+        <a href="{{ config('features.seo_platform_ui') ? route('register') : route('landing').'#start' }}" class="font-semibold text-slate-900 underline-offset-2 hover:underline">{{ __('Create one') }}</a>
     </p>
 </x-layouts.guest>

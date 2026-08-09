@@ -189,6 +189,25 @@ class ContentAuthedOnboardingFunnelTest extends TestCase
         $this->assertSame('websites.index', User::factory()->create()->firstAccessibleRoute(null));
     }
 
+    /**
+     * The marketing "Get started" CTA and the login page's "Create one" enter
+     * the FUNNEL (landing domain form → wizard → account at the end), not the
+     * bare register form — registering first just lands people on the same
+     * domain question with an extra account step in between.
+     */
+    public function test_signup_ctas_point_at_the_funnel_not_the_register_form(): void
+    {
+        $landing = $this->get('/')->assertOk()->getContent();
+        $this->assertStringContainsString(route('landing').'#start', $landing);
+        $this->assertStringNotContainsString('href="'.route('register').'"', $landing);
+
+        $login = $this->get(route('login'))->assertOk()->getContent();
+        $this->assertStringContainsString(route('landing').'#start', $login);
+
+        config(['features.seo_platform_ui' => true]);
+        $this->assertStringContainsString('href="'.route('register').'"', $this->get('/')->assertOk()->getContent());
+    }
+
     // ── Flag-ON reversibility ───────────────────────────────────────────
 
     public function test_flag_on_keeps_the_instant_convert(): void
