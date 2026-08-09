@@ -7,21 +7,34 @@
         <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-600/25">
             <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
         </span>
-        <h1 class="mt-5 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Content Autopilot') }}</h1>
-        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {{ __('An expert SEO article for :site — written, optimized, illustrated and published for you, on autopilot.', ['site' => $website?->domain ?? __('your website')]) }}
-        </p>
+        @if ($state === 'no_website')
+            <h1 class="mt-5 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Let’s set up your website') }}</h1>
+            <p class="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
+                {{ __('We write articles about your business and publish them on your website — so more people find you on Google.') }}
+            </p>
+        @else
+            <h1 class="mt-5 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Content Autopilot') }}</h1>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                {{ __('An expert SEO article for :site — written, optimized, illustrated and published for you, on autopilot.', ['site' => $website?->domain ?? __('your website')]) }}
+            </p>
+        @endif
 
         @if ($state === 'no_website')
             {{-- Nothing to activate ON. Every other CTA here operates on a
                  website, so without one the button did nothing at all. --}}
-            <div class="mx-auto mt-6 max-w-md rounded-xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-                @if ($freeSlots > 0)
+            @if ($freeSlots > 0)
+                <div class="mx-auto mt-6 max-w-md rounded-xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
                     {{ trans_choice('{1}You have 1 free website slot ready — add a website to use it.|[2,*]You have :count free website slots ready — add a website to use them.', $freeSlots, ['count' => $freeSlots]) }}
-                @else
-                    {{ __('Add a website to get started with Content Autopilot.') }}
-                @endif
-            </div>
+                </div>
+            @else
+                {{-- What happens after the form, in plain words — the form
+                     itself already says "enter your website". --}}
+                <div class="mx-auto mt-6 flex max-w-md flex-col gap-2 text-start text-sm text-slate-600 dark:text-slate-300 sm:flex-row sm:justify-center sm:gap-6">
+                    <span class="inline-flex items-center gap-2"><span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[11px] font-bold text-orange-700 dark:bg-orange-950 dark:text-orange-300">1</span>{{ __('Enter your website') }}</span>
+                    <span class="inline-flex items-center gap-2"><span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[11px] font-bold text-orange-700 dark:bg-orange-950 dark:text-orange-300">2</span>{{ __('Answer a few questions') }}</span>
+                    <span class="inline-flex items-center gap-2"><span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[11px] font-bold text-orange-700 dark:bg-orange-950 dark:text-orange-300">3</span>{{ __('We start writing') }}</span>
+                </div>
+            @endif
             @if (config('features.seo_platform_ui'))
                 <a href="{{ route('websites.index') }}" wire:navigate
                     class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
@@ -49,6 +62,9 @@
                         </button>
                     </div>
                     @error('domain') <p class="mt-2.5 text-sm font-medium text-error">{{ $message }}</p> @enderror
+                    <p class="mt-2.5 text-center text-xs text-slate-400 dark:text-slate-500">
+                        {{ __('Takes about 2 minutes · Free trial, no card needed') }}
+                    </p>
                 </form>
             @endif
 
