@@ -22,11 +22,35 @@
                     {{ __('Add a website to get started with Content Autopilot.') }}
                 @endif
             </div>
-            <a href="{{ route('websites.index') }}" wire:navigate
-                class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
-                {{ __('Add your website') }}
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-            </a>
+            @if (config('features.seo_platform_ui'))
+                <a href="{{ route('websites.index') }}" wire:navigate
+                    class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                    {{ __('Add your website') }}
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                </a>
+            @else
+                {{-- Content-only mode: enter the domain HERE and go straight into
+                     the onboarding wizard. The old link led to /websites, which
+                     EnsureOnboarded bounced back to this very page — a closed
+                     loop where a no-website user could not add a website at all
+                     (found 2026-08-08). Plain POST, same target as the landing
+                     hero; reCAPTCHA is waived for signed-in users. --}}
+                <form method="POST" action="{{ route('content.onboarding.begin') }}" class="mx-auto mt-6 max-w-md text-start">
+                    @csrf
+                    <div class="flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/5 sm:flex-row sm:items-center sm:rounded-full sm:p-2 dark:border-slate-700 dark:bg-slate-900">
+                        <div class="flex flex-1 items-center gap-2.5 ps-3">
+                            <svg class="h-5 w-5 flex-none text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5-2.5 3.75-5.75 3.75-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.75-5.75-3.75-9S9.5 5.5 12 3M3.6 9h16.8M3.6 15h16.8" /></svg>
+                            <input type="text" name="domain" value="{{ old('domain') }}" placeholder="yourwebsite.com" aria-label="{{ __('Your website') }}"
+                                class="w-full border-0 bg-transparent py-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 dark:text-slate-100" />
+                        </div>
+                        <button type="submit" class="inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/30 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-orange-500/40">
+                            {{ __('Get started') }}
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                        </button>
+                    </div>
+                    @error('domain') <p class="mt-2.5 text-sm font-medium text-error">{{ $message }}</p> @enderror
+                </form>
+            @endif
 
         @elseif ($state === 'trial')
             <div class="mx-auto mt-6 max-w-md rounded-xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">

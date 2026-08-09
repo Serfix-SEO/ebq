@@ -418,3 +418,32 @@ does not resolve, `ebq.io` 301s before any HTML so no session starts there.
 
 - Still open: Clarity is NOT gated on the consent banner (GA/Ads are), and admin URLs carry
   customer emails in `?q=` — see the session notes; both untouched by this change.
+
+
+## Onboarding funnel — content-only mode (2026-08-08)
+
+Every signup path funnels a no-website user into the content onboarding wizard. Before this,
+the get-started "Add your website" CTA was a CLOSED LOOP (get-started → /websites →
+EnsureOnboarded → /onboarding → kill-switch → get-started): a no-website user could not add a
+website at all. All changes flag-gated (`features.seo_platform_ui`); flag ON = old flows exactly.
+
+- **get-started `no_website` state** is a domain form POSTing to `content.onboarding.begin`
+  (`livewire/content/get-started.blade.php`). reCAPTCHA waived for signed-in users
+  (`PublicOnboardingStartController` — rate limits still apply).
+- **Authed users walk the SAME public wizard as guests** (steps 1–7; no account step):
+  `PublicOnboarding::mount()` hydrates from the pending session instead of converting;
+  `finish()` converts at step 7 with the typed profile. This also fixes the instant convert
+  that shipped an ACTIVE plan with an EMPTY profile (topic jobs fired with no business
+  description) — that shortcut now only runs flag-ON.
+- **Login/SSO resume**: `AuthenticatedSessionController::store()` and `GoogleOAuthController`
+  redirect to `content.onboarding` when the session carries an unconverted
+  `content_onboarding_token` — a mid-wizard guest who signs in no longer loses the run.
+- **Chain-A closures**: `EnsureOnboarded` and `User::firstAccessibleRoute()` fall back to
+  `content.get-started` when the flag is off (was `onboarding`/`websites.index`);
+  `GoogleOAuthController` no-website fallbacks flag-aware; `WebsitesList::addWebsite` post-create
+  → `content.settings` when off.
+- ⚠️ `content.get-started` is the ONLY terminal page for a website-less user (exempt by name in
+  EnsureFeatureAccess, via `content.*` in EnsureOnboarded, unmatched in EnsureDashboardAccess).
+  Any new middleware touching that chain must keep it terminal — the regression test walks the
+  redirect chain hop by hop and fails on any revisited URL
+  (`ContentAuthedOnboardingFunnelTest::test_a_no_website_user_never_loops`).

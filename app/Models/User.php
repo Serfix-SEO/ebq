@@ -298,7 +298,10 @@ class User extends Authenticatable implements MustVerifyEmail
             }
         }
 
-        return 'websites.index';
+        // Content-only mode: websites.index requires onboarding, which a
+        // no-website user can never satisfy — get-started is the only terminal
+        // page for them (it carries the domain form into the content wizard).
+        return config('features.seo_platform_ui') ? 'websites.index' : 'content.get-started';
     }
 
     public function canManageTeamFor(string $websiteId): bool

@@ -1,7 +1,7 @@
 <x-layouts.guest>
     <div>
         <h1 class="text-2xl font-bold tracking-tight text-slate-900">{{ __('Create your account') }}</h1>
-        <p class="mt-2 text-sm text-slate-600">{{ __('Start tracking your SEO performance today') }}</p>
+        <p class="mt-2 text-sm text-slate-600">{{ config('features.seo_platform_ui') ? __('Start tracking your SEO performance today') : __('Expert SEO articles written and published for you, on autopilot') }}</p>
     </div>
 
     @php

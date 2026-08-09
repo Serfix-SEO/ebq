@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\ContentOnboardingSession;
 use App\Services\ClientActivityLogger;
+use App\Services\WebsiteAttachService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -42,6 +44,17 @@ class AuthenticatedSessionController extends Controller
             return redirect()->to($redirect);
         }
 
+        // An in-flight content-onboarding run survives the login: a guest who
+        // starts the wizard and then signs in via the header link used to lose
+        // the captured domain and every completed step (the token was simply
+        // never read here). Send them back to the wizard — mount() converts
+        // (flag on) or resumes at the saved step (content-only mode).
+        $onboardingToken = (string) $request->session()->get('content_onboarding_token', '');
+        if ($onboardingToken !== '' && ContentOnboardingSession::query()
+            ->where('token', $onboardingToken)->whereNull('converted_at')->exists()) {
+            return redirect()->route('content.onboarding');
+        }
+
         // Came from the homepage "Analyze website" funnel → back to that report.
         // Attach the domain only for accounts with NO websites yet (a signup
         // that never completed the funnel); users with existing sites are
@@ -50,7 +63,7 @@ class AuthenticatedSessionController extends Controller
         $analyzeDomain = (string) $request->session()->pull('analyze_domain', '');
         if ($analyzeDomain !== '') {
             if ($user && ! $user->hasAccessibleWebsites()) {
-                app(\App\Services\WebsiteAttachService::class)->attach($user, $analyzeDomain);
+                app(WebsiteAttachService::class)->attach($user, $analyzeDomain);
             }
 
             return redirect()->route('report.view', ['url' => $analyzeDomain]);

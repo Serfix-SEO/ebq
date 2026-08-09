@@ -34,8 +34,10 @@ class PublicOnboardingStartController extends Controller
         // normal flow runs below: the site is created, then converted onto
         // their account at the end of this method.
 
-        // reCAPTCHA (standard form field g-recaptcha-response).
-        if (Recaptcha::isEnabled()) {
+        // reCAPTCHA (standard form field g-recaptcha-response) — guests only:
+        // a signed-in user posting from the Get started domain form already
+        // cleared it at registration, and the rate limits below still apply.
+        if (Recaptcha::isEnabled() && ! Auth::check()) {
             $request->validate(
                 ['g-recaptcha-response' => ['required', 'string', new ValidRecaptcha]],
                 ['g-recaptcha-response.required' => __('Please complete the reCAPTCHA to continue.')]
@@ -92,7 +94,13 @@ class PublicOnboardingStartController extends Controller
         // must not be left with an unattached provisional site: convert now so
         // the domain they entered becomes THEIR website, covered by a free
         // slot / subscription / trial where they're entitled to one.
-        if (Auth::check()) {
+        //
+        // Content-only mode does NOT take this shortcut: converting here ships
+        // an ACTIVE plan with an EMPTY profile (topic generation fired with no
+        // business description). Signed-in users walk the same wizard as
+        // guests instead — PublicOnboarding::mount() hydrates from the token,
+        // and finish() converts at step 7 with the typed profile.
+        if (Auth::check() && config('features.seo_platform_ui')) {
             $result = $converter->convert($session, Auth::user(), []);
             session(['current_website_id' => $result['website']->id]);
             session()->forget('content_onboarding_token');

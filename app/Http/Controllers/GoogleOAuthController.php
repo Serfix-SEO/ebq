@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\ContentOnboardingSession;
 use App\Models\User;
 use App\Models\WebsiteInvitation;
+use App\Services\ClientActivityLogger;
 use App\Services\Content\ContentOnboardingConverter;
 use App\Services\Google\GoogleOAuthService;
-use App\Services\ClientActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -147,7 +147,20 @@ class GoogleOAuthController extends Controller
         }
 
         if (! $user->hasAccessibleWebsites()) {
-            return redirect()->route('onboarding');
+            // A mid-wizard guest who signed in with the GENERIC Google button
+            // (not the wizard's own SSO step) still carries the onboarding
+            // token — resume the wizard rather than dropping their run.
+            $onboardingToken = (string) session('content_onboarding_token', '');
+            if ($onboardingToken !== '' && ContentOnboardingSession::query()
+                ->where('token', $onboardingToken)->whereNull('converted_at')->exists()) {
+                return redirect()->route('content.onboarding');
+            }
+
+            // Content-only mode: the SEO wizard is hidden; get-started carries
+            // the domain form into the content wizard.
+            return redirect()->route(
+                config('features.seo_platform_ui') ? 'onboarding' : 'content.get-started',
+            );
         }
 
         $fallback = $user->firstAccessibleRoute($websiteId);
@@ -238,7 +251,7 @@ class GoogleOAuthController extends Controller
      * The callback distinguishes this flow from the standard sync flow
      * by reading `google_oauth.intent` from the session, set here.
      */
-    public function redirectMailScope(\Illuminate\Http\Request $request): RedirectResponse
+    public function redirectMailScope(Request $request): RedirectResponse
     {
         $request->session()->put('google_oauth.intent', 'mail_send');
 
@@ -257,7 +270,7 @@ class GoogleOAuthController extends Controller
             ->redirect();
     }
 
-    public function callback(GoogleOAuthService $oauthService, \Illuminate\Http\Request $request): RedirectResponse
+    public function callback(GoogleOAuthService $oauthService, Request $request): RedirectResponse
     {
         // `stateless()` is intentional — Socialite's session-state check
         // can fail across the OAuth round-trip when the host runs behind
@@ -286,6 +299,8 @@ class GoogleOAuthController extends Controller
                 ->with('status', 'Google account connected. Pick the property or site you want to track.');
         }
 
-        return redirect()->route('onboarding');
+        return redirect()->route(
+            config('features.seo_platform_ui') ? 'onboarding' : 'content.get-started',
+        );
     }
 }

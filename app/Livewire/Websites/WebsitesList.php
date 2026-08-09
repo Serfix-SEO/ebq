@@ -3,6 +3,9 @@
 namespace App\Livewire\Websites;
 
 use App\Models\Website;
+use App\Models\WebsiteReportSnapshot;
+use App\Services\Reports\AuthorityScoreCalculator;
+use App\Services\WebsiteAttachService;
 use App\Support\GoogleSourcePool;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -14,8 +17,11 @@ class WebsitesList extends Component
 
     /** "accountId|value" picker values, mirroring onboarding. */
     public string $gaSelection = '';
+
     public string $gscSelection = '';
+
     public bool $showForm = false;
+
     public string $fetchError = '';
 
     /** @var array<int, array{id: string, name: string, account_id: int, account_label: string}> */
@@ -62,7 +68,7 @@ class WebsitesList extends Component
         // The user can connect data sources later in Settings. The attach
         // service runs the full recipe: create + historical import + shared
         // crawl subscription + current-website pin.
-        $result = app(\App\Services\WebsiteAttachService::class)->attach(Auth::user(), $this->domain, [
+        $result = app(WebsiteAttachService::class)->attach(Auth::user(), $this->domain, [
             'ga_property_id' => $gaPropertyId,
             'ga_google_account_id' => $gaPropertyId !== '' ? $gaAccountId : null,
             'gsc_site_url' => $gscSiteUrl,
@@ -93,7 +99,9 @@ class WebsitesList extends Component
             // background, and the Site Health / Statistics tabs show their
             // real processing / needs-action pills for whatever isn't
             // connected.
-            $this->redirectRoute('website-overview', ['tab' => 'explorer']);
+            config('features.seo_platform_ui')
+                ? $this->redirectRoute('website-overview', ['tab' => 'explorer'])
+                : $this->redirectRoute('content.settings');
 
             return;
         }
@@ -140,9 +148,9 @@ class WebsitesList extends Component
             return [];
         }
 
-        $calc = new \App\Services\Reports\AuthorityScoreCalculator();
+        $calc = new AuthorityScoreCalculator;
         $out = [];
-        \App\Models\WebsiteReportSnapshot::query()
+        WebsiteReportSnapshot::query()
             ->whereIn('normalized_domain', $domains)
             ->where('status', 'ready')
             ->get(['normalized_domain', 'payload'])

@@ -1,8 +1,11 @@
         {{-- ══ Setup wizard (5 steps) ══════════════════════════════════ --}}
         @php
             $publicOnboarding = $publicOnboarding ?? false;
+            // Signed-in users walking the public wizard skip the account step;
+            // their step 7 ends with finish() instead (see PublicOnboarding).
+            $authedFinish = $authedFinish ?? false;
             $steps = [1 => __('Business'), 2 => __('Offerings'), 3 => __('How it works'), 4 => __('Images'), 5 => __('Competitors'), 6 => __('Keyword research'), 7 => __('First articles')];
-            if ($publicOnboarding) {
+            if ($publicOnboarding && ! $authedFinish) {
                 $steps[8] = __('Create account');
             }
             $maxUnlocked = $draftPlanId !== null ? 6 : 2;
@@ -51,7 +54,7 @@
                 {{-- Transition overlay: step moves can be slow (they persist the plan,
                      dispatch research, and the next step's first render pulls live data).
                      Show an interactive "working" state so the click never feels dead. --}}
-                <div wire:loading.flex wire:target="analyzeSite,toOfferings,toHowItWorks,toImages,toCompetitors,loadCompetitors,toKeywordResearch,toFirstArticles,toAccount,createAccount,goToStep"
+                <div wire:loading.flex wire:target="analyzeSite,toOfferings,toHowItWorks,toImages,toCompetitors,loadCompetitors,toKeywordResearch,toFirstArticles,toAccount,createAccount,finish,goToStep"
                      class="absolute inset-0 z-30 hidden flex-col items-center rounded-3xl bg-white/85 text-center backdrop-blur-sm dark:bg-slate-900/85">
                     {{-- Sticky, not centered-in-card: tall steps make the card much
                          taller than the viewport, so center-of-card sat below the
@@ -69,6 +72,7 @@
                             <span wire:loading wire:target="toKeywordResearch">{{ __('Researching keywords for your site…') }}</span>
                             <span wire:loading wire:target="toFirstArticles">{{ __('Lining up your first articles…') }}</span>
                             <span wire:loading wire:target="createAccount">{{ __('Creating your account…') }}</span>
+                            <span wire:loading wire:target="finish">{{ __('Launching your content plan…') }}</span>
                             <span wire:loading wire:target="toImages,goToStep">{{ __('One moment…') }}</span>
                         </p>
                         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('This can take a few seconds — please keep this tab open.') }}</p>
@@ -1171,7 +1175,16 @@
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                             {{ __('Back') }}
                         </button>
-                        @if ($publicOnboarding)
+                        @if ($publicOnboarding && $authedFinish)
+                            {{-- Signed-in: no account step. Never gated on async
+                                 research — topics keep generating in the dashboard. --}}
+                            <button wire:click="finish" wire:loading.attr="disabled" wire:target="finish"
+                                class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
+                                <svg wire:loading wire:target="finish" class="-ms-1 me-1 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                {{ __('Looks good — launch') }}
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                            </button>
+                        @elseif ($publicOnboarding)
                             {{-- Never gate account creation on async research — topics keep
                                  generating after signup, in the dashboard. --}}
                             <button wire:click="toAccount" wire:loading.attr="disabled" wire:target="toAccount"

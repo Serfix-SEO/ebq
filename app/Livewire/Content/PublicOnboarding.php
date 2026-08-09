@@ -63,7 +63,24 @@ class PublicOnboarding extends Component
         // covered (subscription, comped free slot, or trial) before routing.
         if (Auth::check()) {
             $pending = $this->pendingSession();
-            if ($pending !== null) {
+
+            // Content-only mode: a signed-in user with a captured domain walks
+            // the SAME wizard as a guest (steps 1-7, then finish() converts).
+            // The instant convert below shipped an ACTIVE plan with an EMPTY
+            // profile — topic generation fired with no business description.
+            if ($pending !== null
+                && ! config('features.seo_platform_ui')
+                && Website::query()->whereKey($pending->website_id)->exists()) {
+                $this->token = $pending->token;
+                $this->domain = (string) $pending->domain;
+                $this->websiteId = $pending->website_id;
+                $this->wizardStep = max(1, (int) $pending->step);
+                $this->bootWizard();
+
+                return;
+            }
+
+            if ($pending !== null && Website::query()->whereKey($pending->website_id)->exists()) {
                 $result = $converter->convert($pending, Auth::user(), []);
                 session(['current_website_id' => $result['website']->id]);
                 session()->forget('content_onboarding_token');
@@ -72,6 +89,12 @@ class PublicOnboarding extends Component
                     $result['covered'] ? 'content.index' : 'content.get-started',
                     navigate: false,
                 );
+            }
+
+            // Stale token (GC'd provisional site) — drop it so the next visit
+            // starts clean instead of hitting the same dead session.
+            if ($pending !== null) {
+                session()->forget('content_onboarding_token');
             }
 
             return $this->redirectRoute('content.get-started', navigate: false);
@@ -181,11 +204,7 @@ class PublicOnboarding extends Component
             return;
         }
 
-        $result = $converter->convert($session, $user, [
-            'business_description' => $this->businessDescription,
-            'sell' => $this->sellItems,
-            'dont_sell' => $this->dontSellItems,
-        ]);
+        $result = $converter->convert($session, $user, $this->builtProfile());
 
         session(['current_website_id' => $result['website']->id]);
         session()->forget('content_onboarding_token');
@@ -194,6 +213,43 @@ class PublicOnboarding extends Component
         // Uncovered (trial already used, or subscription full) → Get started,
         // where they pay for this additional site.
         $this->redirectRoute($result['covered'] ? 'content.index' : 'content.get-started', navigate: false);
+    }
+
+    /**
+     * Step-7 finish for a user who is ALREADY signed in (they entered through
+     * the Get started domain form, or logged in mid-wizard). Same convert as
+     * createAccount(), minus the account step the wizard hides for them.
+     */
+    public function finish(ContentOnboardingConverter $converter): void
+    {
+        if (! Auth::check() || $this->token === null) {
+            return;
+        }
+
+        $session = $this->session();
+        if ($session === null || $session->converted_at !== null) {
+            // Converted in another tab, or GC'd — nothing left to finish here.
+            $this->redirectRoute('content.get-started', navigate: false);
+
+            return;
+        }
+
+        $result = $converter->convert($session, Auth::user(), $this->builtProfile());
+
+        session(['current_website_id' => $result['website']->id]);
+        session()->forget('content_onboarding_token');
+
+        $this->redirectRoute($result['covered'] ? 'content.index' : 'content.get-started', navigate: false);
+    }
+
+    /** The wizard-typed profile convert() persists onto the plan. */
+    private function builtProfile(): array
+    {
+        return [
+            'business_description' => $this->businessDescription,
+            'sell' => $this->sellItems,
+            'dont_sell' => $this->dontSellItems,
+        ];
     }
 
     // ── helpers ─────────────────────────────────────────────────────────
@@ -220,6 +276,8 @@ class PublicOnboarding extends Component
     {
         return view('livewire.content.public-onboarding', [
             'publicOnboarding' => true,
+            // Signed-in users skip the account step; step 7 ends with finish().
+            'authedFinish' => Auth::check(),
             'wizard' => $this->websiteId !== null ? $this->wizardViewData() : [],
             'countryOptions' => KeywordFinderLocations::countryOptions(),
         ]);

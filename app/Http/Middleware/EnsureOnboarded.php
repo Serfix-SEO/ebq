@@ -17,7 +17,13 @@ class EnsureOnboarded
     {
         $user = $request->user();
         if ($user && ! $user->hasAccessibleWebsites() && ! $request->routeIs('onboarding*', 'google.*', 'content.*', 'settings*', 'billing.*', 'cashier.*', 'verification.*', 'logout')) {
-            return redirect()->route('onboarding');
+            // Content-only mode: the SEO GSC/GA wizard is hidden, and sending
+            // a no-website user there bounced them in a loop (kill-switch →
+            // get-started → /websites → here → onboarding → …). Get started
+            // carries the domain form that enters the content wizard.
+            return redirect()->route(
+                config('features.seo_platform_ui') ? 'onboarding' : 'content.get-started',
+            );
         }
 
         return $next($request);
