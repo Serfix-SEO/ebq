@@ -16,6 +16,7 @@ class PublishDriverFactory
             ContentIntegration::PLATFORM_HUBSPOT => app(HubSpotDriver::class),
             ContentIntegration::PLATFORM_WEBFLOW => app(WebflowDriver::class),
             ContentIntegration::PLATFORM_SANITY => app(SanityDriver::class),
+            ContentIntegration::PLATFORM_WIX => app(WixDriver::class),
             // PLATFORM_WORDPRESS (our plugin's v2.1 receive endpoint) is
             // still deferred.
             default => null,
