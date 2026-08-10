@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\FleetController;
 use App\Http\Controllers\Admin\FleetTestController;
 use App\Http\Controllers\Admin\KeywordApiServerController as AdminKeywordApiServerController;
 use App\Http\Controllers\Admin\LeadController;
+use App\Http\Controllers\Admin\LifecycleController as AdminLifecycleController;
 use App\Http\Controllers\Admin\LinkGraphController;
 use App\Http\Controllers\Admin\MarketingController as AdminMarketingController;
 use App\Http\Controllers\Admin\OpsController;
@@ -34,6 +35,7 @@ use App\Http\Controllers\ClientReportExportController;
 use App\Http\Controllers\CompetitorsController;
 use App\Http\Controllers\Content\PublicOnboardingStartController;
 use App\Http\Controllers\ContentBillingController;
+use App\Http\Controllers\EmailUnsubscribeController;
 use App\Http\Controllers\GoogleCapController;
 use App\Http\Controllers\GoogleOAuthController;
 use App\Http\Controllers\GuestAuditController;
@@ -278,6 +280,16 @@ Route::get('/wordpress/embed/reports', [WordPressEmbedController::class, 'report
 Route::get('/wordpress/embed/page-audit', [WordPressEmbedController::class, 'pageAudit'])
     ->middleware(['web', 'signed'])
     ->name('wordpress.embed.page-audit');
+
+// Signed unsubscribe link carried by lifecycle/marketing emails. GET confirms
+// (mail scanners prefetch — must not mutate), POST stamps the opt-out. POST is
+// also the RFC 8058 one-click target, hence CSRF-exempt in bootstrap/app.php.
+Route::get('/email/unsubscribe/{user}', [EmailUnsubscribeController::class, 'show'])
+    ->middleware(['web', 'signed'])
+    ->name('email.unsubscribe');
+Route::post('/email/unsubscribe/{user}', [EmailUnsubscribeController::class, 'store'])
+    ->middleware(['web', 'signed'])
+    ->name('email.unsubscribe.store');
 
 Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->middleware('feature:dashboard')->name('dashboard');
@@ -534,6 +546,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/marketing', [AdminMarketingController::class, 'index'])->name('marketing.index');
     Route::get('/marketing/sends', [AdminMarketingController::class, 'sends'])->name('marketing.sends');
     Route::post('/marketing/{website}/send', [AdminMarketingController::class, 'send'])->name('marketing.send');
+
+    // Lifecycle emails: segment report + send log + kill switches + test send.
+    Route::get('/lifecycle', [AdminLifecycleController::class, 'index'])->name('lifecycle.index');
+    Route::put('/lifecycle/settings', [AdminLifecycleController::class, 'settings'])->name('lifecycle.settings');
+    Route::post('/lifecycle/test-send', [AdminLifecycleController::class, 'testSend'])->name('lifecycle.test-send');
 
     Route::get('/leads', [LeadController::class, 'index'])->name('leads.index');
     Route::get('/bug-reports', [BugReportController::class, 'index'])->name('bug-reports.index');

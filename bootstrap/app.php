@@ -28,6 +28,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // Self-hosted keyword API posts results server-to-server; the body
             // is HMAC-verified in KeywordFinderWebhookController.
             'webhooks/keyword-finder',
+            // RFC 8058 one-click unsubscribe: mail providers POST with no
+            // cookies. The route is protected by a signed URL instead.
+            'email/unsubscribe/*',
         ]);
 
         $middleware->alias([

@@ -146,6 +146,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'content_comp_sites' => 'integer',
             'content_comp_until' => 'datetime',
             'is_system' => 'boolean',
+            'marketing_emails_opted_out_at' => 'datetime',
         ];
     }
 

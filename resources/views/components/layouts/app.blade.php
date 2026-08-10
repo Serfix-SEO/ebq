@@ -197,6 +197,11 @@
                         'label' => 'Marketing',
                         'match_routes' => ['admin.marketing.'],
                     ],
+                    [
+                        'route' => 'admin.lifecycle.index',
+                        'label' => 'Lifecycle',
+                        'match_routes' => ['admin.lifecycle.'],
+                    ],
                     ['route' => 'admin.leads.index', 'label' => 'Leads'],
                     ['route' => 'admin.bug-reports.index', 'label' => 'Bug Reports'],
                     ['route' => 'admin.usage.index', 'label' => 'API Usage'],

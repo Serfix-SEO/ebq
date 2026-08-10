@@ -9,7 +9,7 @@
 EBQ is a self-hosted **SEO platform**: it crawls a client's website, pulls their Google
 (Search Console + Analytics) data, and turns both into findings, growth reports, keyword &
 rank tracking, backlink/competitive intelligence, an AI content suite, and a WordPress-plugin
-API. Laravel 11, PHP 8.3, MariaDB + Redis, two-box deploy (see the topology docs).
+API. Laravel 12, PHP 8.3, MariaDB + Redis, two-box deploy (see the topology docs).
 
 ---
 
@@ -144,6 +144,9 @@ features; `client_activities` + `UsageMeter` track spend.
 ### Accounts, onboarding, teams ✅
 [accounts/](./accounts/README.md) — auth (login errors as banner), Google SSO + source connect,
 website selection, teams via `website_user` + `TeamPermissions` (null = full access).
+[accounts/lifecycle-emails.md](./accounts/lifecycle-emails.md) — segment-matched onboarding
+emails (daily `ebq:send-lifecycle-emails`, 4 segments + follow-ups, unsubscribe infra,
+`/admin/lifecycle` report).
 
 ### Admin panel ✅
 [admin/](./admin/README.md) — `is_admin` gating + per-Livewire-action re-check, impersonation,
@@ -281,6 +284,13 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-10 — Lifecycle emails + /admin/lifecycle.** Segment-matched onboarding emails
+  (4 segments: no-website / strategy-unfinished / not-connected / articles-flowing, each with
+  a 2-3d follow-up), sent daily by `ebq:send-lifecycle-emails` (10:05, capped ramp, unique
+  (user,segment,stage) log key = idempotency), Reply-To fuaad@serfix.io. First unsubscribe
+  infra in the app (`users.marketing_emails_opted_out_at`, signed `email.unsubscribe` routes,
+  RFC 8058 one-click). Admin report/controls at `/admin/lifecycle`.
+  Docs: [accounts/lifecycle-emails.md](./accounts/lifecycle-emails.md).
 - **2026-08-08 — SEO-platform UI kill-switch** (`SEO_PLATFORM_UI` env, `config('features.seo_platform_ui')`,
   default true; **prod runs false**): the app is Content-AI-focused. `/` serves the content landing
   (canonical → root on both URLs), SEO marketing + free-tool pages 302 away, authed SEO surfaces

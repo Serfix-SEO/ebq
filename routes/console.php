@@ -41,6 +41,12 @@ Schedule::command('ebq:content-onboarding-gc')->hourly()->withoutOverlapping();
 // same offer via the h24 countdown email above instead.
 Schedule::command('ebq:send-trial-discount-emails')->dailyAt('09:15')->withoutOverlapping();
 
+// Segment-matched lifecycle emails (activation / resume-strategy / connect /
+// feedback) + follow-ups + conversion stamping. Daily-capped launch ramp;
+// admin controls live at /admin/lifecycle. After the trial-discount send so
+// the two never race for the same inbox on the same morning.
+Schedule::command('ebq:send-lifecycle-emails')->dailyAt('10:05')->withoutOverlapping();
+
 // Failed-job visibility (2026-07-06 incident: crawl jobs died on the worker for
 // 3 days, seen only in failed_jobs). Queue::failing() on every box buffers into
 // shared Redis; this drains + mails admins a digest. Empty buffer = no mail.
