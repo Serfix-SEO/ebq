@@ -24,6 +24,14 @@ class ContentIntegration extends Model
 
     public const PLATFORM_SHOPIFY = 'shopify';
 
+    public const PLATFORM_WEBFLOW = 'webflow';
+
+    public const PLATFORM_WIX = 'wix';
+
+    public const PLATFORM_SANITY = 'sanity';
+
+    public const PLATFORM_HUBSPOT = 'hubspot';
+
     public const PLATFORM_WEBHOOK = 'webhook';
 
     public const STATUS_PENDING = 'pending';
@@ -59,6 +67,10 @@ class ContentIntegration extends Model
         return match ($this->platform) {
             self::PLATFORM_WORDPRESS, self::PLATFORM_WORDPRESS_APP_PASSWORD => 'WordPress',
             self::PLATFORM_SHOPIFY => 'Shopify',
+            self::PLATFORM_WEBFLOW => 'Webflow',
+            self::PLATFORM_WIX => 'Wix',
+            self::PLATFORM_SANITY => 'Sanity',
+            self::PLATFORM_HUBSPOT => 'HubSpot',
             self::PLATFORM_WEBHOOK => __('Custom integration'),
             default => ucfirst((string) $this->platform),
         };

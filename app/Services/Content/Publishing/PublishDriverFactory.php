@@ -12,8 +12,10 @@ class PublishDriverFactory
         return match ($integration->platform) {
             ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD => app(WordPressAppPasswordDriver::class),
             ContentIntegration::PLATFORM_WEBHOOK => app(WebhookDriver::class),
-            // PLATFORM_WORDPRESS (our plugin's v2.1 receive endpoint) and
-            // PLATFORM_SHOPIFY land in later phases.
+            ContentIntegration::PLATFORM_SHOPIFY => app(ShopifyDriver::class),
+            ContentIntegration::PLATFORM_HUBSPOT => app(HubSpotDriver::class),
+            // PLATFORM_WORDPRESS (our plugin's v2.1 receive endpoint) is
+            // still deferred.
             default => null,
         };
     }
