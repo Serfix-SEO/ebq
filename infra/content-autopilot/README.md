@@ -1225,6 +1225,24 @@ exactly `['content_autopilot']`.
 
 Tests: `ContentFrozenWebsiteTest`, `ContentProductIndependenceTest`.
 
+**Leak #5 — usage meters, not freeze (prod 2026-08-10).** `ProduceContentArticleJob`
+failed every 15 minutes for a full day with `QuotaExceededException: used all 100
+keyword-tracking lookups`: the article-research SERP (`AiContentBriefService::brief`
+→ `SerperSearchClient`) was billed against the SEO plan's `serp_api` cap
+(`UsageMeter::assertCanSpend`), so a content-only account with an exhausted
+dashboard cap could not produce articles at all. Fix mirrors the LLM `__unmetered`
+isolation: `SerperSearchClient::query()` honours `'__unmetered' => true` — skips
+`assertCanSpend` and logs the activity under the non-pool provider label
+**`serp_api:unmetered`** (invisible to the dashboard meter, still visible in the
+raw activity log). Set at the three content-product call sites: the article
+research brief (`ContentArticleProducer` → brief input `__unmetered`), the wizard
+people-also-ask (`ContentKeywordInsights`), and the keyword tracker's rank check
+(`ContentSerpChecker` — it has its own 500-keyword capacity meter). Plugin-writer
+briefs and the competitive keyword gap stay metered. **Extended rule:** dashboard
+USAGE caps (`UsageMeter` providers) are SEO-plan concepts — every external call
+made by the content pipeline must pass `__unmetered` and be capped by content's
+own meters/entitlements instead. Test: `ContentSerpUnmeteredTest`.
+
 ### 🔥 Image-storage + worker-box incident (prod, 2026-07-20)
 
 Prod articles had **zero images** for two days. Three independent faults,
