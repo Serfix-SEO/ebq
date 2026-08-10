@@ -41,6 +41,7 @@ class SerperSearchClient
         ?string $websiteId = null,
         ?string $ownerUserId = null,
         ?string $source = null,
+        bool $unmetered = false,
     ): ?array {
         return $this->query([
             'q' => $query,
@@ -50,6 +51,7 @@ class SerperSearchClient
             '__website_id' => $websiteId,
             '__owner_user_id' => $ownerUserId,
             '__source' => $source,
+            '__unmetered' => $unmetered,
         ]);
     }
 
@@ -134,12 +136,21 @@ class SerperSearchClient
             $body['tbs'] = trim($params['tbs']);
         }
 
-        $billedUser = $this->resolveBilledUser(
-            isset($params['__website_id']) ? (string) $params['__website_id'] : null,
-            isset($params['__owner_user_id']) ? (string) $params['__owner_user_id'] : null,
-        );
-        if ($billedUser !== null) {
-            app(UsageMeter::class)->assertCanSpend($billedUser, 'serp_api', 1);
+        // Content Autopilot is a separately-billed product: its SERP calls
+        // (article research, wizard PAA, keyword tracker) must never consume
+        // or be blocked by the SEO plan's serp_api cap — same isolation as
+        // the LLM `__unmetered` flag (content-seo-product-independence).
+        // Content spend is capped by its own entitlements/capacity meters.
+        $unmetered = ! empty($params['__unmetered']);
+
+        if (! $unmetered) {
+            $billedUser = $this->resolveBilledUser(
+                isset($params['__website_id']) ? (string) $params['__website_id'] : null,
+                isset($params['__owner_user_id']) ? (string) $params['__owner_user_id'] : null,
+            );
+            if ($billedUser !== null) {
+                app(UsageMeter::class)->assertCanSpend($billedUser, 'serp_api', 1);
+            }
         }
 
         try {
@@ -189,7 +200,10 @@ class SerperSearchClient
             'api_usage.serp_api',
             userId: $ownerUserId ?? Auth::id(),
             websiteId: $websiteId ?: null,
-            provider: 'serp_api',
+            // Non-pool provider label keeps unmetered calls out of the
+            // dashboard serp_api meter while staying visible in the raw
+            // activity log (same pattern as `{provider}:unmetered` for LLMs).
+            provider: $unmetered ? 'serp_api:unmetered' : 'serp_api',
             meta: $meta,
             unitsConsumed: 1,
         );

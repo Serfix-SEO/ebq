@@ -1046,6 +1046,7 @@ class ContentKeywordInsights
                 '__website_id' => $plan->website_id,
                 '__owner_user_id' => $plan->website?->user_id,
                 '__source' => 'content_autopilot.people_also',
+                '__unmetered' => true, // content product — not the SEO serp_api cap
             ]);
             if (! is_array($json)) {
                 return $empty;

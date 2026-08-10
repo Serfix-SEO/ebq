@@ -114,6 +114,10 @@ class AiContentBriefService
             return $cached;
         }
 
+        // `__unmetered` = caller is the separately-billed Content Autopilot
+        // pipeline; its SERP research must not consume the SEO serp_api cap.
+        $unmetered = ! empty($input['__unmetered']);
+
         $serp = $this->serper->search(
             $keyword,
             10,
@@ -121,7 +125,8 @@ class AiContentBriefService
             $language,
             websiteId: $website->id,
             ownerUserId: $website->user_id,
-            source: 'plugin_writer',
+            source: $unmetered ? 'content_autopilot.brief' : 'plugin_writer',
+            unmetered: $unmetered,
         );
         if (! is_array($serp) || empty($serp['organic'])) {
             return ['ok' => false, 'error' => 'no_serp_data'];

@@ -53,6 +53,9 @@ class ContentSerpChecker
             '__website_id' => $website->id,
             '__owner_user_id' => $website->user_id,
             '__source' => 'content_tracker',
+            // Content tracker has its OWN capacity meter (500 keywords) —
+            // the SEO serp_api cap must not silently stall rank checks.
+            '__unmetered' => true,
         ]);
 
         // Not an array = no API key or a hard failure → leave the row untouched

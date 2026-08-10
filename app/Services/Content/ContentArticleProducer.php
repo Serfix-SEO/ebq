@@ -77,6 +77,10 @@ class ContentArticleProducer
             'focus_keyword' => $topic->target_keyword,
             'country' => strtolower((string) ($plan->country ?: 'us')),
             'language' => strtolower((string) ($plan->language ?: 'en')),
+            // Content product: SERP research must not consume (or be blocked
+            // by) the SEO plan's serp_api cap — killed article production at
+            // 100 lookups (prod 2026-08-10).
+            '__unmetered' => true,
         ]);
         if (! ($brief['ok'] ?? false)) {
             // A missing SERP is not fatal — the writer can work from the
