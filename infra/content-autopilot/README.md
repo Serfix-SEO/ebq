@@ -941,6 +941,58 @@ now driven by `mode`, not plan status — see the Calendar/Settings split above.
   `{url}` response for the live link; retries live in the job, not the driver.
   Credentials `{endpoint_url, secret}`.
 
+### Five token-paste destinations (2026-08-10): Shopify, HubSpot, Webflow, Sanity, Wix
+
+All follow the WP-driver conventions (timeouts 20/8 verify · 45 publish · 60
+media, 401/403 → hard, 429/5xx/network → transient, error bodies truncated to
+200 chars, secrets only in the encrypted `credentials` cast, non-secret picks
+in plain `config`). No OAuth anywhere — the customer pastes a token, exactly
+like the WP application password. `PublishContentArticleJob`, the dispatcher,
+the banner and the schema needed **zero changes**.
+
+| Driver | API | credentials | config | external_url |
+|---|---|---|---|---|
+| `ShopifyDriver` | GraphQL Admin `2026-07` (`{store}.myshopify.com/admin/api/2026-07/graphql.json`, `X-Shopify-Access-Token`; REST is closed to new custom apps). `articleCreate`/`articleUpdate`; `userErrors` → hard, `THROTTLED` → transient. Store domain strictly `*.myshopify.com` + SafeHttpGuard (the one user-supplied host). | store_domain, access_token (shpat_) | blog_id/blog_handle (picker), shop_url, available_blogs, post_status | `{shop_url}/blogs/{blog}/{handle}` (deterministic Online Store route; null in draft mode) |
+| `HubSpotDriver` | CMS Blog Posts v3 (`api.hubapi.com/cms/v3/blogs/posts`, private-app `pat-…`, scope `content`). `postBody` = raw HTML. **State is set in the CREATE call** — a separate publish-PATCH would duplicate drafts when a retry re-enters `publish()`. Verify auto-reuses the first blog author or creates one named after the site. | token | content_group_id (picker), blog_url, blog_author_id, available_blogs, post_status | response `url` |
+| `WebflowDriver` | Data API v2, Bearer site token. Live `POST /v2/collections/{id}/items/live`, draft `POST …/items` + `isDraft`, update `PATCH …/items/{id}[/live]`. RichText accepts our HTML; image field takes `{url}` Webflow fetches. Collection select auto-maps fields from the schema: body = first RichText (**required**, hard error otherwise), image = first Image, summary = first PlainText ≠ name/slug. | api_token | site_id/site_domain + collection_id/collection_slug + body/image/summary_field (2-step picker), available_*, post_status | `https://{site_domain}/{collection_slug}/{slug}` — 404s until the designer builds a collection template page (guide warns; live-verify stays best-effort) |
+| `SanityDriver` | HTTP Mutations API `v2025-02-19` (`{project}.api.sanity.io`, Bearer Editor token; project_id regex-guarded `[a-z0-9-]+` since it forms the hostname). **`createOrReplace` with deterministic `_id` `serfix-{article ulid}` (`drafts.` prefix in draft mode) = create AND update in one call.** Body = Portable Text via the shared converter; images uploaded as bytes (`/assets/images/{dataset}`) exactly like the WP sideload. Standard blog schema fields (title/slug/excerpt/mainImage/body/publishedAt); `doc_type` is the only mapping knob — custom field maps are a v1 non-goal. | project_id, token | dataset (picker), doc_type, url_pattern?, available_datasets, post_status | null (headless) unless `url_pattern` (`…/{slug}`) is set — without it there is NO live verify, NO Google indexing, NO tracker auto-add, NO social share |
+| `WixDriver` | REST Blog v3 (`wixapis.com`, **raw** `Authorization: <account api key>` + `wix-site-id` header; site_id GUID-guarded). No HTML path — body ships as **Ricos** via the shared converter. Flow: media-manager import by URL (best-effort; failures degrade to alt-text paragraphs) → `POST /blog/v3/draft-posts` → `POST …/{id}/publish`; republishing a live draft updates in place, so update() = PATCH + republish. Verify probes `GET /blog/v3/posts` (404 → "install the Wix Blog app" hard error) and best-effort lists members for an author picker; a 400 mentioning `memberId` becomes an actionable "pick an author" hard error. | api_key, site_id | member_id? (picker when Members API readable), available_authors, post_status | `GET /blog/v3/posts/{id}?fieldsets=URL` → `url.base+path` (best-effort) |
+
+**Shared rich-text converter** `app/Services/Content/Publishing/RichText/`:
+`HtmlBlockParser` (DOMDocument, bounded to the generator's tags — h2/h3, p,
+ul/ol, a/strong/em, img/figure, blockquote, table; unknown tag → plain-text
+paragraph, never dropped) → block model → `RicosAdapter` (Wix; LIST_ITEM wraps
+a PARAGRAPH, tables degrade to "cell — cell" row paragraphs since Ricos TABLE
+is plugin-gated) and `PortableTextAdapter` (Sanity; listItem blocks, link
+markDefs, tables same row fallback). `ImageRefResolver` callback maps local
+image URLs to platform refs (Wix media ids / Sanity asset `_id`s); unresolved
+image → node dropped + alt text emitted as an italic paragraph. Unit-tested
+against `tests/Fixtures/content/converter-article.html`.
+
+**Two-step connect (`ProvidesTargets`)** — drivers whose destination needs a
+choice (Shopify/HubSpot blog, Webflow site→collection, Sanity dataset, Wix
+author) implement `targets()`/`selectTarget()` alongside the untouched
+`PublishDriver`. Convention: `verify()` caches option lists in
+`config.available_*`; `PublishingSettings::resolveTargets()` auto-selects
+single-option steps and renders a dropdown for the rest (`pendingTarget` +
+`chooseTarget()`), keeping the integration `pending` — credentials are already
+saved, tokens never echo back. The connect panel is now an 8-tile platform
+grid with per-platform partials under
+`resources/views/partials/content-connect/` (incl. shared `post-status`
+publish/draft select → `config.post_status`, honoured by every new driver).
+
+**Inline-image tradeoff (v1):** Shopify/Webflow/HubSpot receive our HTML with
+inline `<img>` still pointing at our public storage; only the featured image
+is re-hosted (by-URL fetch on those platforms). Wix + Sanity get REAL
+re-hosting because their formats force asset references. Follow-up idea:
+Shopify `stagedUploadsCreate` sideload.
+
+Tests: `tests/Feature/Content/{Shopify,HubSpot,Webflow,Sanity,Wix}DriverTest`
+(shared scaffolding in `PublishDriverTestCase`: no-network SafeHttpGuard,
+scheduled article, featured-image fixture, encryption-at-rest assertion),
+`ContentConnectPlatformsTest` (Livewire two-step flows), converter units in
+`tests/Unit/Content/`.
+
 **`PublishContentArticleJob`** (queue `content`, tries=3 backoff 60/300 —
 publishing is idempotent so retrying is safe, unlike the tries=1 LLM jobs):
 claims the unique `content_publications` (article, integration) row BEFORE

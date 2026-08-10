@@ -284,6 +284,16 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-10 — Content publish destinations ×5: Shopify, HubSpot, Webflow, Sanity, Wix.**
+  Token-paste drivers on the existing `PublishDriver` contract (no job/schema changes):
+  Shopify = GraphQL Admin only (REST closed to new custom apps), HubSpot = raw-HTML `postBody`
+  with state-on-create (avoids duplicate drafts on retry), Webflow = live collection items +
+  field auto-map, Sanity = `createOrReplace` deterministic `_id` (create≡update) + Portable
+  Text, Wix = Ricos rich content + media-manager import. Shared bounded HTML→blocks converter
+  (`Publishing/RichText/`) with Ricos + Portable Text adapters. New `ProvidesTargets`
+  interface + Livewire two-step connect (blog/collection/dataset/author pickers, single-option
+  auto-select); connect panel is now an 8-tile grid with per-platform token guides.
+  Docs: [content-autopilot/README.md](./content-autopilot/README.md) § Publishing.
 - **2026-08-10 — Lifecycle emails + /admin/lifecycle.** Segment-matched onboarding emails
   (4 segments: no-website / strategy-unfinished / not-connected / articles-flowing, each with
   a 2-3d follow-up), sent daily by `ebq:send-lifecycle-emails` (10:05, capped ramp, unique
