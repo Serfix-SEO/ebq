@@ -14,6 +14,7 @@ class PublishDriverFactory
             ContentIntegration::PLATFORM_WEBHOOK => app(WebhookDriver::class),
             ContentIntegration::PLATFORM_SHOPIFY => app(ShopifyDriver::class),
             ContentIntegration::PLATFORM_HUBSPOT => app(HubSpotDriver::class),
+            ContentIntegration::PLATFORM_WEBFLOW => app(WebflowDriver::class),
             // PLATFORM_WORDPRESS (our plugin's v2.1 receive endpoint) is
             // still deferred.
             default => null,
