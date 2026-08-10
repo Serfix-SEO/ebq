@@ -84,6 +84,11 @@
             <p>{{ __('Right now, you can connect using:') }}</p>
             <ul>
                 <li>{{ __('WordPress plugin') }}</li>
+                <li>{{ __('Shopify') }}</li>
+                <li>{{ __('Webflow') }}</li>
+                <li>{{ __('Wix') }}</li>
+                <li>{{ __('HubSpot') }}</li>
+                <li>{{ __('Sanity') }}</li>
                 <li>{{ __('Laravel') }}</li>
                 <li>{{ __('Webhooks') }}</li>
             </ul>
@@ -96,7 +101,7 @@
             <p>{{ __('Quick question about your SERFIX setup.') }}</p>
             <p>{{ __("You've already started building your strategy, but your website isn't connected for publishing yet.") }}</p>
             <p class="question">{{ __('What platform is your website built on?') }}</p>
-            <p>{{ __("Right now SERFIX supports WordPress, Laravel and webhooks, and we're deciding which integrations to add next.") }}</p>
+            <p>{{ __('SERFIX connects to WordPress, Shopify, Webflow, Wix, HubSpot, Sanity, Laravel and custom webhooks.') }}</p>
             <p>{{ __("If you're already using one of those and something made the connection difficult, I'd also love to know what happened.") }}</p>
             <p>{{ __('A one-line reply is enough.') }}</p>
         @endif

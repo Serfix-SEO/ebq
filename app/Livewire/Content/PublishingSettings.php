@@ -6,6 +6,7 @@ use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\Website;
+use App\Services\Content\Publishing\ProvidesTargets;
 use App\Services\Content\Publishing\PublishDriverFactory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -51,7 +52,42 @@ class PublishingSettings extends Component
 
     public string $whSecret = '';
 
+    public string $shopifyStoreDomain = '';
+
+    public string $shopifyToken = '';
+
+    public string $webflowToken = '';
+
+    public string $wixApiKey = '';
+
+    public string $wixSiteId = '';
+
+    public string $sanityProjectId = '';
+
+    public string $sanityToken = '';
+
+    public string $sanityUrlPattern = '';
+
+    public string $hubspotToken = '';
+
+    /** Publish live vs save as draft — stored as config.post_status. */
+    public string $postStatus = 'publish';
+
     public bool $showConnect = false;
+
+    /**
+     * Two-step connect state: when a verified destination still needs a
+     * choice (which blog / collection / dataset), the pending step renders as
+     * a dropdown while the integration stays `pending`. Credentials are
+     * already saved — the token is never echoed back.
+     *
+     * @var array{key: string, label: string, options: list<array{id: string, label: string}>}|null
+     */
+    public ?array $pendingTarget = null;
+
+    public ?string $pendingIntegrationId = null;
+
+    public string $chosenTargetId = '';
 
     public function mount(): void
     {
@@ -84,6 +120,7 @@ class PublishingSettings extends Component
     {
         $this->platform = $platform;
         $this->resetErrorBag();
+        $this->reset('pendingTarget', 'pendingIntegrationId', 'chosenTargetId');
 
         if ($platform === self::FLAVOR_LARAVEL && trim($this->whEndpoint) === '') {
             $this->whEndpoint = $this->suggestedLaravelEndpoint();
@@ -104,8 +141,18 @@ class PublishingSettings extends Component
     {
         $this->websiteId = $websiteId;
         $this->reset('wpSiteUrl', 'wpUsername', 'wpAppPassword', 'whEndpoint', 'whSecret', 'showConnect');
+        $this->resetPlatformFields();
         $this->wpSiteUrl = (string) ($this->website()?->domain ?? '');
         $this->whSecret = $this->generatedSecret();
+    }
+
+    private function resetPlatformFields(): void
+    {
+        $this->reset(
+            'shopifyStoreDomain', 'shopifyToken', 'webflowToken', 'wixApiKey', 'wixSiteId',
+            'sanityProjectId', 'sanityToken', 'sanityUrlPattern', 'hubspotToken', 'postStatus',
+            'pendingTarget', 'pendingIntegrationId', 'chosenTargetId',
+        );
     }
 
     public function connect(): void
@@ -114,6 +161,9 @@ class PublishingSettings extends Component
         if ($website === null) {
             return;
         }
+        $this->reset('pendingTarget', 'pendingIntegrationId', 'chosenTargetId');
+
+        $config = null;
 
         if ($this->platform === ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD) {
             $this->validate([
@@ -126,6 +176,59 @@ class PublishingSettings extends Component
                 'username' => trim($this->wpUsername),
                 'app_password' => trim($this->wpAppPassword),
             ];
+        } elseif ($this->platform === ContentIntegration::PLATFORM_SHOPIFY) {
+            $this->validate([
+                'shopifyStoreDomain' => 'required|string|max:255',
+                'shopifyToken' => 'required|string|max:255',
+            ], [], ['shopifyStoreDomain' => __('store domain'), 'shopifyToken' => __('access token')]);
+            $credentials = [
+                'store_domain' => trim($this->shopifyStoreDomain),
+                'access_token' => trim($this->shopifyToken),
+            ];
+            $config = $this->postStatusConfig();
+        } elseif ($this->platform === ContentIntegration::PLATFORM_WEBFLOW) {
+            $this->validate([
+                'webflowToken' => 'required|string|max:500',
+            ], [], ['webflowToken' => __('API token')]);
+            $credentials = ['api_token' => trim($this->webflowToken)];
+            $config = $this->postStatusConfig();
+        } elseif ($this->platform === ContentIntegration::PLATFORM_WIX) {
+            $this->validate([
+                'wixApiKey' => 'required|string|max:2000',
+                'wixSiteId' => ['required', 'string', 'regex:/^[0-9a-f-]{30,40}$/i'],
+            ], [
+                'wixSiteId.regex' => __('That does not look like a Wix site ID — copy the GUID from your dashboard URL (…/dashboard/{site-id}/…).'),
+            ], ['wixApiKey' => __('API key'), 'wixSiteId' => __('site ID')]);
+            $credentials = [
+                'api_key' => trim($this->wixApiKey),
+                'site_id' => trim($this->wixSiteId),
+            ];
+            $config = $this->postStatusConfig();
+        } elseif ($this->platform === ContentIntegration::PLATFORM_SANITY) {
+            $this->validate([
+                'sanityProjectId' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9-]+$/i'],
+                'sanityToken' => 'required|string|max:500',
+                'sanityUrlPattern' => 'nullable|url|starts_with:https://|max:600',
+            ], [
+                'sanityProjectId.regex' => __('That does not look like a Sanity project ID (letters and numbers only).'),
+            ], ['sanityProjectId' => __('project ID'), 'sanityToken' => __('token'), 'sanityUrlPattern' => __('public URL pattern')]);
+            $pattern = trim($this->sanityUrlPattern);
+            if ($pattern !== '' && ! str_contains($pattern, '{slug}')) {
+                $this->addError('sanityUrlPattern', __('The URL pattern needs a {slug} placeholder, e.g. https://your-site.com/blog/{slug}.'));
+
+                return;
+            }
+            $credentials = [
+                'project_id' => strtolower(trim($this->sanityProjectId)),
+                'token' => trim($this->sanityToken),
+            ];
+            $config = $this->postStatusConfig() + array_filter(['url_pattern' => $pattern]);
+        } elseif ($this->platform === ContentIntegration::PLATFORM_HUBSPOT) {
+            $this->validate([
+                'hubspotToken' => 'required|string|max:255',
+            ], [], ['hubspotToken' => __('private app token')]);
+            $credentials = ['token' => trim($this->hubspotToken)];
+            $config = $this->postStatusConfig();
         } else {
             // https ONLY: the signature stops forgery, not disclosure. Over
             // plain http every article — and the site's whole content plan —
@@ -150,11 +253,19 @@ class PublishingSettings extends Component
                 'endpoint_url' => trim($this->whEndpoint),
                 'secret' => trim($this->whSecret),
             ];
+            if ($flavor !== null) {
+                $config = ['flavor' => $flavor];
+            }
         }
 
         $attributes = ['credentials' => $credentials, 'status' => ContentIntegration::STATUS_PENDING, 'last_error' => null];
-        if (isset($flavor) && $flavor !== null) {
-            $attributes['config'] = ['flavor' => $flavor];
+        if ($config !== null) {
+            // Merge over what's already stored so a reconnect keeps earlier
+            // choices (blog/collection/dataset) when the config key survives.
+            $existing = ContentIntegration::query()
+                ->where('website_id', $website->id)->where('platform', $this->platform)
+                ->value('config');
+            $attributes['config'] = array_merge((array) ($existing ?? []), $config);
         }
 
         $integration = ContentIntegration::query()->updateOrCreate(
@@ -175,6 +286,82 @@ class PublishingSettings extends Component
             return;
         }
 
+        $this->resolveTargets($integration, $driver);
+    }
+
+    /** @return array{post_status: string} */
+    private function postStatusConfig(): array
+    {
+        return ['post_status' => in_array($this->postStatus, ['publish', 'draft'], true) ? $this->postStatus : 'publish'];
+    }
+
+    /**
+     * Walk the driver's remaining target steps: auto-select any step with
+     * exactly one option; stop on the first step that needs a human choice
+     * (renders as a dropdown, integration stays pending); flip to connected
+     * when nothing is left to choose.
+     */
+    private function resolveTargets(ContentIntegration $integration, \App\Services\Content\Publishing\PublishDriver $driver): void
+    {
+        if ($driver instanceof ProvidesTargets) {
+            // Bounded: each iteration either consumes a step or returns.
+            for ($i = 0; $i < 5; $i++) {
+                $steps = $driver->targets($integration->refresh());
+                if ($steps === []) {
+                    break;
+                }
+                $step = $steps[0];
+                if (count($step['options']) === 1) {
+                    $picked = $driver->selectTarget($integration, $step['key'], $step['options'][0]['id']);
+                    if (! $picked->ok) {
+                        $this->addError('connect', (string) $picked->error);
+
+                        return;
+                    }
+
+                    continue;
+                }
+
+                $this->pendingTarget = $step;
+                $this->pendingIntegrationId = $integration->id;
+                $this->chosenTargetId = '';
+                $this->showConnect = true;
+
+                return;
+            }
+        }
+
+        $this->markConnected($integration);
+    }
+
+    /** The user picked an option for the pending target step. */
+    public function chooseTarget(): void
+    {
+        if ($this->pendingTarget === null || $this->pendingIntegrationId === null || $this->chosenTargetId === '') {
+            return;
+        }
+        $integration = $this->integrationOrFail($this->pendingIntegrationId);
+        if ($integration === null) {
+            return;
+        }
+        $driver = app(PublishDriverFactory::class)->for($integration);
+        if (! $driver instanceof ProvidesTargets) {
+            return;
+        }
+
+        $result = $driver->selectTarget($integration, (string) $this->pendingTarget['key'], $this->chosenTargetId);
+        if (! $result->ok) {
+            $this->addError('connect', (string) $result->error);
+
+            return;
+        }
+
+        $this->reset('pendingTarget', 'pendingIntegrationId', 'chosenTargetId');
+        $this->resolveTargets($integration, $driver);
+    }
+
+    private function markConnected(ContentIntegration $integration): void
+    {
         $integration->forceFill([
             'status' => ContentIntegration::STATUS_CONNECTED,
             'last_verified_at' => now(),
@@ -182,6 +369,7 @@ class PublishingSettings extends Component
         ])->save();
 
         $this->reset('wpUsername', 'wpAppPassword', 'whEndpoint', 'whSecret', 'showConnect');
+        $this->resetPlatformFields();
         session()->flash('publishing-status', __('Connected. Approved articles will now publish automatically.'));
     }
 
@@ -217,8 +405,15 @@ class PublishingSettings extends Component
         }
 
         $this->platform = $integration->platform;
-        $this->wpSiteUrl = (string) (((array) $integration->credentials)['site_url'] ?? '');
-        $this->reset('wpUsername', 'wpAppPassword');
+        $creds = (array) $integration->credentials;
+        // Prefill only the NON-secret half of each credential pair; the
+        // secret (password/token/key) always has to be re-pasted.
+        $this->wpSiteUrl = (string) ($creds['site_url'] ?? '');
+        $this->shopifyStoreDomain = (string) ($creds['store_domain'] ?? '');
+        $this->wixSiteId = (string) ($creds['site_id'] ?? '');
+        $this->sanityProjectId = (string) ($creds['project_id'] ?? '');
+        $this->reset('wpUsername', 'wpAppPassword', 'shopifyToken', 'webflowToken', 'wixApiKey', 'sanityToken', 'hubspotToken');
+        $this->postStatus = (string) (($integration->config['post_status'] ?? 'publish') ?: 'publish');
         $this->showConnect = true;
     }
 

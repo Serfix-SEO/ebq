@@ -47,7 +47,7 @@
                     </span>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-bold text-amber-900 dark:text-amber-200">{{ __('Auto-publish is on, but no destination is connected') }}</p>
-                        <p class="mt-0.5 text-sm text-amber-800 dark:text-amber-300">{{ __('Approved articles will be held and won\'t go live until you connect a publishing destination below — WordPress, Laravel, or a custom webhook.') }}</p>
+                        <p class="mt-0.5 text-sm text-amber-800 dark:text-amber-300">{{ __('Approved articles will be held and won\'t go live until you connect a publishing destination below.') }}</p>
                     </div>
                 </div>
             @endif
@@ -66,14 +66,14 @@
                             </span>
                             <div class="min-w-0 flex-1">
                                 <div class="text-sm font-bold text-slate-900 dark:text-slate-100">
-                                    @if ($integration->platform !== \App\Models\ContentIntegration::PLATFORM_WEBHOOK)
-                                        {{ __('WordPress') }}
                                     {{-- Laravel is a webhook under the hood; the flavour recorded at
                                          connect time is what lets us name it properly here. --}}
-                                    @elseif (($integration->config['flavor'] ?? null) === \App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL)
+                                    @if ($integration->platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK && ($integration->config['flavor'] ?? null) === \App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL)
                                         {{ __('Laravel') }}
-                                    @else
+                                    @elseif ($integration->platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK)
                                         {{ __('Custom (webhook)') }}
+                                    @else
+                                        {{ $integration->platformLabel() }}
                                     @endif
                                 </div>
                                 <div class="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -106,7 +106,11 @@
                                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356m-4.992 4.992l3.181-3.183a8.25 8.25 0 00-13.803 3.7M4.031 9.865v4.99m0 0h4.99m-4.99 0l3.181 3.183a8.25 8.25 0 0013.803-3.7"/></svg>
                                     {{ __('Fix the connection') }}
                                 </button>
-                                @include('partials.wp-connect-guide', ['guideForceOpen' => true])
+                                {{-- The illustrated walkthrough is WordPress-specific; other
+                                     platforms get their step guide inside the connect panel. --}}
+                                @if ($integration->platform === \App\Models\ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD || $integration->platform === \App\Models\ContentIntegration::PLATFORM_WORDPRESS)
+                                    @include('partials.wp-connect-guide', ['guideForceOpen' => true])
+                                @endif
                             </div>
                         @endif
                     @endforeach
@@ -136,28 +140,76 @@
                     @php
                         $isLaravel = $platform === \App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL;
                         $isWebhook = $platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK;
-                        $isWordPress = ! $isLaravel && ! $isWebhook;
-                        $tabOn = 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300';
-                        $tabOff = 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800';
+                        $isShopify = $platform === \App\Models\ContentIntegration::PLATFORM_SHOPIFY;
+                        $isWebflow = $platform === \App\Models\ContentIntegration::PLATFORM_WEBFLOW;
+                        $isWix = $platform === \App\Models\ContentIntegration::PLATFORM_WIX;
+                        $isSanity = $platform === \App\Models\ContentIntegration::PLATFORM_SANITY;
+                        $isHubSpot = $platform === \App\Models\ContentIntegration::PLATFORM_HUBSPOT;
+                        $isWordPress = ! $isLaravel && ! $isWebhook && ! $isShopify && ! $isWebflow && ! $isWix && ! $isSanity && ! $isHubSpot;
+                        $tiles = [
+                            [\App\Models\ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD, 'WordPress', $isWordPress],
+                            [\App\Models\ContentIntegration::PLATFORM_SHOPIFY, 'Shopify', $isShopify],
+                            [\App\Models\ContentIntegration::PLATFORM_WEBFLOW, 'Webflow', $isWebflow],
+                            [\App\Models\ContentIntegration::PLATFORM_WIX, 'Wix', $isWix],
+                            [\App\Models\ContentIntegration::PLATFORM_HUBSPOT, 'HubSpot', $isHubSpot],
+                            [\App\Models\ContentIntegration::PLATFORM_SANITY, 'Sanity', $isSanity],
+                            [\App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL, 'Laravel', $isLaravel],
+                            [\App\Models\ContentIntegration::PLATFORM_WEBHOOK, __('Custom (webhook)'), $isWebhook],
+                        ];
                     @endphp
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" wire:click="selectPlatform('{{ \App\Models\ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD }}')"
-                            class="rounded-xl px-4 py-2 text-sm font-bold {{ $isWordPress ? $tabOn : $tabOff }}">
-                            {{ __('WordPress') }}
-                        </button>
-                        <button type="button" wire:click="selectPlatform('{{ \App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL }}')"
-                            class="rounded-xl px-4 py-2 text-sm font-bold {{ $isLaravel ? $tabOn : $tabOff }}">
-                            {{ __('Laravel') }}
-                        </button>
-                        <button type="button" wire:click="selectPlatform('{{ \App\Models\ContentIntegration::PLATFORM_WEBHOOK }}')"
-                            class="rounded-xl px-4 py-2 text-sm font-bold {{ $isWebhook ? $tabOn : $tabOff }}">
-                            {{ __('Custom (webhook)') }}
-                        </button>
+
+                    @if ($pendingTarget !== null)
+                        {{-- Step 2 of connect: credentials verified, the destination
+                             still needs a choice (which blog / collection / dataset).
+                             The integration stays pending until this resolves. --}}
+                        <div>
+                            <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('One more step') }}</p>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $pendingTarget['label'] }}</p>
+
+                            @error('connect') <p class="mt-3 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">{{ $message }}</p> @enderror
+
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                <select wire:model="chosenTargetId"
+                                    class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                    <option value="">{{ __('Choose…') }}</option>
+                                    @foreach ($pendingTarget['options'] as $option)
+                                        <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="mt-4 flex items-center justify-end gap-2">
+                                <button type="button" wire:click="$set('showConnect', false)" class="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">{{ __('Cancel') }}</button>
+                                <button type="button" wire:click="chooseTarget" class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                                    <span wire:loading.remove wire:target="chooseTarget">{{ __('Continue') }}</span>
+                                    <span wire:loading wire:target="chooseTarget">{{ __('Checking…') }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    @else
+                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        @foreach ($tiles as [$tilePlatform, $tileLabel, $tileActive])
+                            <button type="button" wire:click="selectPlatform('{{ $tilePlatform }}')" wire:key="tile-{{ $tilePlatform }}"
+                                class="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-start text-sm font-bold transition {{ $tileActive ? 'border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-500 dark:bg-orange-950 dark:text-orange-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800' }}">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-extrabold {{ $tileActive ? 'bg-orange-600 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300' }}">{{ mb_substr($tileLabel === __('Custom (webhook)') ? 'API' : $tileLabel, 0, $tileLabel === __('Custom (webhook)') ? 3 : 2) }}</span>
+                                <span class="truncate">{{ $tileLabel }}</span>
+                            </button>
+                        @endforeach
                     </div>
 
                     @error('connect') <p class="mt-3 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">{{ $message }}</p> @enderror
 
-                    @if ($isWordPress)
+                    @if ($isShopify)
+                        @include('partials.content-connect.shopify')
+                    @elseif ($isWebflow)
+                        @include('partials.content-connect.webflow')
+                    @elseif ($isWix)
+                        @include('partials.content-connect.wix')
+                    @elseif ($isSanity)
+                        @include('partials.content-connect.sanity')
+                    @elseif ($isHubSpot)
+                        @include('partials.content-connect.hubspot')
+                    @elseif ($isWordPress)
                         <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ __('In WordPress go to Users → Profile → Application Passwords, create one named "Serfix", and paste it here. The account needs to be an Author or above.') }}</p>
                         {{-- The one-line instruction above assumes the reader already
                              knows what an application password is; this is the
@@ -269,6 +321,7 @@ CONTENT_AI_ROUTE_PREFIX=blog</pre>
                             <span wire:loading wire:target="connect">{{ __('Checking…') }}</span>
                         </button>
                     </div>
+                    @endif {{-- pendingTarget --}}
                 </div>
             @endif
         </div>
