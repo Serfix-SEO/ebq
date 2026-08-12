@@ -299,21 +299,38 @@ class ContentResearchTest extends TestCase
             ->assertSee(__('In your calendar'));
     }
 
-    public function test_full_calendar_blocks_adding(): void
+    public function test_full_month_blocks_its_days_but_next_month_stays_open(): void
     {
         [$user, $website, $plan] = $this->planFixture();
         $this->keywordRow($plan, 'best coffee grinder');
-        ContentTopic::factory()->count((int) ContentAutopilotConfig::monthlyArticlesPerWebsite())->create([
-            'plan_id' => $plan->id,
-            'website_id' => $website->id,
-            'status' => ContentTopic::STATUS_APPROVED,
-        ]);
+        // Fill NEXT month to the cap (current month may have too few days
+        // left to reach the cap depending on today's date).
+        $cap = (int) ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $monthStart = now()->addMonthNoOverflow()->startOfMonth();
+        for ($i = 0; $i < $cap; $i++) {
+            ContentTopic::factory()->create([
+                'plan_id' => $plan->id,
+                'website_id' => $website->id,
+                'status' => ContentTopic::STATUS_APPROVED,
+                'scheduled_for' => $monthStart->copy()->addDays($i % 28),
+            ]);
+        }
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
-        $this->addViaDatePicker($plan, 'best coffee grinder', 1200);
+        $dates = app(\App\Services\Content\ContentTopicPlanner::class)->availableDates($plan, 120);
+        $fullMonth = $monthStart->format('Y-m');
+        foreach ($dates as $d) {
+            $this->assertNotSame($fullMonth, substr($d, 0, 7), "date $d offered inside a full month");
+        }
+        // Months around the full one still have open days.
+        $this->assertNotEmpty($dates);
 
-        $this->assertSame(0, $plan->topics()->where('target_keyword', 'best coffee grinder')->count());
+        // And adding on an open day still works.
+        Livewire::test(ContentResearch::class)
+            ->call('addToCalendar', 'best coffee grinder', 1200)
+            ->call('confirmDate', $dates[0]);
+        $this->assertSame(1, $plan->topics()->where('target_keyword', 'best coffee grinder')->count());
     }
 
     public function test_tenant_scoping_hides_other_plans_keywords(): void

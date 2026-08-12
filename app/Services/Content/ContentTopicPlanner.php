@@ -597,18 +597,24 @@ class ContentTopicPlanner
         }
         $days = array_slice($days, 0, $perWeek);
 
-        $used = $plan->topics()
+        $scheduled = $plan->topics()
             ->whereNotNull('scheduled_for')
             ->whereNot('status', ContentTopic::STATUS_SKIPPED)
             ->pluck('scheduled_for')
-            ->map(fn ($d) => Carbon::parse($d)->toDateString())
-            ->flip()->all();
+            ->map(fn ($d) => Carbon::parse($d)->toDateString());
+        $used = $scheduled->flip()->all();
+        // The plan cap is PER CALENDAR MONTH — a full current month must not
+        // block scheduling into the next one.
+        $monthCounts = $scheduled->countBy(fn (string $d) => substr($d, 0, 7))->all();
+        $cap = ContentAutopilotConfig::monthlyArticlesPerWebsite();
 
         $out = [];
         $cursor = now()->addDay()->startOfDay();
         for ($i = 0; $i < $horizonDays; $i++) {
             $key = $cursor->toDateString();
-            if (in_array($cursor->isoWeekday(), $days, true) && ! isset($used[$key])) {
+            if (in_array($cursor->isoWeekday(), $days, true)
+                && ! isset($used[$key])
+                && ($monthCounts[substr($key, 0, 7)] ?? 0) < $cap) {
                 $out[] = $key;
             }
             $cursor->addDay();

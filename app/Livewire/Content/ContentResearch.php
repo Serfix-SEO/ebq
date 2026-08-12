@@ -13,7 +13,6 @@ use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentKeywordTracker;
 use App\Services\Content\ContentTopicPlanner;
 use App\Services\Content\KeywordWinnability;
-use App\Support\ContentAutopilotConfig;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -136,6 +135,11 @@ class ContentResearch extends Component
         }
 
         $available = array_flip(app(ContentTopicPlanner::class)->availableDates($plan));
+        if ($available === []) {
+            session()->flash('content-error', __('Your calendar is full for the coming months — publish or skip an article to make room.'));
+
+            return;
+        }
         $months = [];
         $cursor = now()->startOfMonth();
         for ($m = 0; $m < 3; $m++) {
@@ -197,7 +201,11 @@ class ContentResearch extends Component
         }
     }
 
-    /** Duplicate + planned-pool guards shared by the picker and the create. */
+    /**
+     * Duplicate guard shared by the picker and the create. Capacity is NOT
+     * checked here — the monthly cap lives in the date availability itself
+     * (a full month simply has no selectable days; later months stay open).
+     */
     private function guardAdd(ContentPlan $plan, string $keyword): bool
     {
         $existing = $plan->topics()
@@ -206,15 +214,6 @@ class ContentResearch extends Component
             ->exists();
         if ($existing) {
             session()->flash('content-status', __('Already on your calendar.'));
-
-            return false;
-        }
-
-        $pool = $plan->topics()
-            ->whereNotIn('status', [ContentTopic::STATUS_PUBLISHED, ContentTopic::STATUS_SKIPPED])
-            ->count();
-        if ($pool >= ContentAutopilotConfig::monthlyArticlesPerWebsite()) {
-            session()->flash('content-error', __('Your calendar is full for now — publish or skip an article to make room.'));
 
             return false;
         }
