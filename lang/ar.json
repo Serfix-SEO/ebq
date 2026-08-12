@@ -4578,5 +4578,8 @@
     "Edit endpoint URL": "تعديل رابط نقطة الاستقبال",
     "The signing secret stays the same — only the URL changes.": "سر التوقيع يبقى كما هو — يتغير الرابط فقط.",
     "Endpoint updated and verified.": "تم تحديث نقطة الاستقبال والتحقق منها.",
-    "Endpoint saved, but verification failed — check the URL and use the tester below.": "تم حفظ نقطة الاستقبال لكن التحقق فشل — راجع الرابط واستخدم أداة الاختبار بالأسفل."
+    "Endpoint saved, but verification failed — check the URL and use the tester below.": "تم حفظ نقطة الاستقبال لكن التحقق فشل — راجع الرابط واستخدم أداة الاختبار بالأسفل.",
+    "Testing only — nothing about your saved integration changes. Leave blank to test your connected endpoint, or paste any https URL (like webhook.site) to inspect the exact payload we send.": "للاختبار فقط — لا يتغير شيء في التكامل المحفوظ. اتركه فارغاً لاختبار نقطة الاستقبال المتصلة، أو الصق أي رابط https (مثل webhook.site) لفحص الحمولة التي نرسلها بالضبط.",
+    "The test URL must use https://.": "يجب أن يستخدم رابط الاختبار https://.",
+    "test URL": "رابط الاختبار"
 }

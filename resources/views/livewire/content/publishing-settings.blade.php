@@ -130,34 +130,20 @@
                         </p>
                         @foreach ($webhookIntegrations as $integration)
                             <div class="mt-3" wire:key="whtest-{{ $integration->id }}">
-                                @if ($editingEndpointId === $integration->id)
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <input wire:model="editEndpointUrl" wire:keydown.enter="saveEndpoint" type="text" placeholder="https://your-site.com/serfix-content"
-                                            class="w-full max-w-md rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                                        <button type="button" wire:click="saveEndpoint"
-                                            class="inline-flex items-center gap-1 rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-700">
-                                            <span wire:loading.remove wire:target="saveEndpoint">{{ __('Save & verify') }}</span>
-                                            <span wire:loading wire:target="saveEndpoint">{{ __('Checking…') }}</span>
-                                        </button>
-                                        <button type="button" wire:click="cancelEditEndpoint" class="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400">{{ __('Cancel') }}</button>
-                                    </div>
-                                    @error('editEndpointUrl') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
-                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('The signing secret stays the same — only the URL changes.') }}</p>
-                                @else
-                                    <div class="flex flex-wrap items-center gap-3">
-                                        <code class="truncate rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ ((array) $integration->credentials)['endpoint_url'] ?? '' }}</code>
-                                        <button type="button" wire:click="editEndpoint('{{ $integration->id }}')" title="{{ __('Edit endpoint URL') }}"
-                                            class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-orange-600 dark:text-slate-400">
-                                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
-                                            {{ __('Edit') }}
-                                        </button>
-                                        <button type="button" wire:click="testWebhook('{{ $integration->id }}')"
-                                            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
-                                            <span wire:loading.remove wire:target="testWebhook">{{ __('Send test article') }}</span>
-                                            <span wire:loading wire:target="testWebhook">{{ __('Sending…') }}</span>
-                                        </button>
-                                    </div>
-                                @endif
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <input wire:model="testUrl" wire:keydown.enter="testWebhook('{{ $integration->id }}')" type="text"
+                                        placeholder="{{ ((array) $integration->credentials)['endpoint_url'] ?? 'https://webhook.site/…' }}"
+                                        class="w-full max-w-md rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                                    <button type="button" wire:click="testWebhook('{{ $integration->id }}')"
+                                        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                                        <span wire:loading.remove wire:target="testWebhook">{{ __('Send test article') }}</span>
+                                        <span wire:loading wire:target="testWebhook">{{ __('Sending…') }}</span>
+                                    </button>
+                                </div>
+                                @error('testUrl') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    {{ __('Testing only — nothing about your saved integration changes. Leave blank to test your connected endpoint, or paste any https URL (like webhook.site) to inspect the exact payload we send.') }}
+                                </p>
                                 @if ($webhookTest !== null && $webhookTest['integration_id'] === $integration->id)
                                     @if ($webhookTest['ok'] && $webhookTest['url'])
                                         <div class="mt-2 rounded-xl border border-success/25 bg-success/5 px-4 py-3 text-xs">

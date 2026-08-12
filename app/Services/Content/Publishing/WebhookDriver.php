@@ -59,11 +59,26 @@ class WebhookDriver implements PublishDriver
      * verbatim to the client (status + returned url), because "verify says
      * OK but articles vanish" is exactly the failure this exists to catch.
      */
-    public function testDelivery(ContentIntegration $integration): PublishResult
+    public function testDelivery(ContentIntegration $integration, ?string $overrideUrl = null): PublishResult
     {
         [$endpoint, $secret, $err] = $this->connection($integration);
         if ($err !== null) {
             return PublishResult::failure($err);
+        }
+
+        // Optional test-only target (e.g. webhook.site to inspect the
+        // payload) — signed with the SAME secret, and never persisted:
+        // the saved integration is untouched.
+        if ($overrideUrl !== null) {
+            $overrideUrl = trim($overrideUrl);
+            if (! str_starts_with(strtolower($overrideUrl), 'https://')) {
+                return PublishResult::failure('The test URL must use https://.');
+            }
+            $check = $this->guard->check($overrideUrl);
+            if (! ($check['ok'] ?? false)) {
+                return PublishResult::failure('The test URL is not reachable from our servers.');
+            }
+            $endpoint = $overrideUrl;
         }
 
         $html = '<h2>This is a test delivery</h2>'
