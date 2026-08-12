@@ -422,6 +422,51 @@ class PublishingSettings extends Component
         $this->integrationOrFail($integrationId)?->delete();
     }
 
+    /**
+     * Webhook tester result, shown inline on the integrations page.
+     *
+     * @var array{integration_id: string, ok: bool, status: ?int, url: ?string, id: ?string, error: ?string}|null
+     */
+    public ?array $webhookTest = null;
+
+    /**
+     * Send a sample article through the REAL webhook delivery path (full
+     * payload, real HMAC) so the client can prove their receiver stores
+     * articles — a verify-only 200 hides exactly that failure.
+     */
+    public function testWebhook(string $integrationId): void
+    {
+        $this->webhookTest = null;
+        $integration = $this->integrationOrFail($integrationId);
+        if ($integration === null || $integration->platform !== ContentIntegration::PLATFORM_WEBHOOK) {
+            return;
+        }
+
+        // Don't let a stuck client hammer their own endpoint.
+        $key = 'webhook-test:'.$integration->id;
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 10)) {
+            $this->webhookTest = [
+                'integration_id' => $integration->id, 'ok' => false, 'status' => null,
+                'url' => null, 'id' => null,
+                'error' => __('Too many test deliveries — wait a few minutes and try again.'),
+            ];
+
+            return;
+        }
+        \Illuminate\Support\Facades\RateLimiter::hit($key, 600);
+
+        $result = app(\App\Services\Content\Publishing\WebhookDriver::class)->testDelivery($integration);
+
+        $this->webhookTest = [
+            'integration_id' => $integration->id,
+            'ok' => $result->ok,
+            'status' => $result->response['status'] ?? null,
+            'url' => $result->externalUrl,
+            'id' => $result->externalId ?: null,
+            'error' => $result->error,
+        ];
+    }
+
     public function toggleAutoPublish(): void
     {
         $plan = $this->plan();

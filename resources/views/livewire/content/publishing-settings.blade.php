@@ -116,6 +116,56 @@
                     @endforeach
                 </div>
 
+                {{-- Webhook tester — always visible while a custom-webhook
+                     integration exists (connected or not): "verify says OK"
+                     doesn't prove the receiver actually STORES articles, so
+                     this sends a full sample article through the real signed
+                     delivery path. --}}
+                @php $webhookIntegrations = $integrations->where('platform', \App\Models\ContentIntegration::PLATFORM_WEBHOOK); @endphp
+                @if ($webhookIntegrations->isNotEmpty())
+                    <div class="mt-4 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                        <div class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Test your webhook') }}</div>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            {{ __('Sends a sample article ("Serfix test article — safe to delete") to your endpoint with a real signature — exactly like a scheduled publish. If it shows up on your site, the integration works end to end.') }}
+                        </p>
+                        @foreach ($webhookIntegrations as $integration)
+                            <div class="mt-3" wire:key="whtest-{{ $integration->id }}">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <code class="truncate rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ ((array) $integration->credentials)['endpoint_url'] ?? '' }}</code>
+                                    <button type="button" wire:click="testWebhook('{{ $integration->id }}')"
+                                        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                                        <span wire:loading.remove wire:target="testWebhook">{{ __('Send test article') }}</span>
+                                        <span wire:loading wire:target="testWebhook">{{ __('Sending…') }}</span>
+                                    </button>
+                                </div>
+                                @if ($webhookTest !== null && $webhookTest['integration_id'] === $integration->id)
+                                    @if ($webhookTest['ok'] && $webhookTest['url'])
+                                        <div class="mt-2 rounded-xl border border-success/25 bg-success/5 px-4 py-3 text-xs">
+                                            <p class="font-bold text-slate-900 dark:text-slate-100">{{ __('Your endpoint accepted the test article.') }}</p>
+                                            <p class="mt-1 text-slate-600 dark:text-slate-300">
+                                                {{ __('It returned this page link — open it to confirm the test post exists, then delete the post:') }}
+                                                <a href="{{ $webhookTest['url'] }}" target="_blank" rel="noopener" class="font-semibold text-orange-600 underline dark:text-orange-400">{{ $webhookTest['url'] }}</a>
+                                            </p>
+                                        </div>
+                                    @elseif ($webhookTest['ok'])
+                                        <div class="mt-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs dark:border-amber-800/60 dark:bg-amber-950/40">
+                                            <p class="font-bold text-amber-900 dark:text-amber-200">{{ __('Your endpoint answered OK, but returned no page link.') }}</p>
+                                            <p class="mt-1 text-amber-800 dark:text-amber-300">
+                                                {{ __('Check your site for a post titled "Serfix test article". If it\'s not there, your receiver accepts deliveries without storing them. Also return {"url": "..."} — without it we can\'t link the live page, submit it to Google, or track rankings.') }}
+                                            </p>
+                                        </div>
+                                    @else
+                                        <div class="mt-2 rounded-xl border border-error/25 bg-error/5 px-4 py-3 text-xs">
+                                            <p class="font-bold text-error">{{ __('The test delivery failed.') }}</p>
+                                            <p class="mt-1 text-slate-600 dark:text-slate-300">{{ $webhookTest['error'] }}</p>
+                                        </div>
+                                    @endif
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
                 {{-- Hands-off mode --}}
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700">
                     <div>

@@ -4562,5 +4562,15 @@
     "Republish": "إعادة نشر",
     "Republish to your site": "إعادة النشر إلى موقعك",
     "Send this article to your site again? Destinations that already have it get the latest version.": "إرسال هذا المقال إلى موقعك مرة أخرى؟ الوجهات التي لديها المقال بالفعل تحصل على أحدث نسخة.",
-    "Republishing — the latest version is being sent to your site.": "جارٍ إعادة النشر — يتم إرسال أحدث نسخة إلى موقعك."
+    "Republishing — the latest version is being sent to your site.": "جارٍ إعادة النشر — يتم إرسال أحدث نسخة إلى موقعك.",
+    "Test your webhook": "اختبر الـ Webhook الخاص بك",
+    "Sends a sample article (\"Serfix test article — safe to delete\") to your endpoint with a real signature — exactly like a scheduled publish. If it shows up on your site, the integration works end to end.": "يرسل مقالاً تجريبياً (\"Serfix test article — safe to delete\") إلى نقطة الاستقبال لديك بتوقيع حقيقي — تماماً مثل النشر المجدول. إذا ظهر على موقعك فالتكامل يعمل من البداية للنهاية.",
+    "Send test article": "إرسال مقال تجريبي",
+    "Your endpoint accepted the test article.": "نقطة الاستقبال لديك قبلت المقال التجريبي.",
+    "It returned this page link — open it to confirm the test post exists, then delete the post:": "أعادت رابط الصفحة التالي — افتحه للتأكد من وجود المقال التجريبي ثم احذفه:",
+    "Your endpoint answered OK, but returned no page link.": "نقطة الاستقبال ردت بنجاح لكنها لم تُرجع رابط الصفحة.",
+    "Check your site for a post titled \"Serfix test article\". If it.s not there, your receiver accepts deliveries without storing them. Also return {\"url\": \"...\"} — without it we can.t link the live page, submit it to Google, or track rankings.": "تحقق من موقعك عن مقال بعنوان \"Serfix test article\". إن لم يكن موجوداً فمستقبِلك يقبل الإرسال دون تخزينه. أعد أيضاً {\"url\": \"...\"} — بدونه لا يمكننا ربط الصفحة أو إرسالها إلى Google أو تتبع الترتيب.",
+    "The test delivery failed.": "فشل الإرسال التجريبي.",
+    "Too many test deliveries — wait a few minutes and try again.": "محاولات اختبار كثيرة — انتظر بضع دقائق وحاول مجدداً.",
+    "Check your site for a post titled \"Serfix test article\". If it's not there, your receiver accepts deliveries without storing them. Also return {\"url\": \"...\"} — without it we can't link the live page, submit it to Google, or track rankings.": "تحقق من موقعك عن مقال بعنوان \"Serfix test article\". إن لم يكن موجوداً فمستقبِلك يقبل الإرسال دون تخزينه. أعد أيضاً {\"url\": \"...\"} — بدونه لا يمكننا ربط الصفحة أو إرسالها إلى Google أو تتبع الترتيب."
 }

@@ -50,6 +50,70 @@ class WebhookDriver implements PublishDriver
         return $this->push($article, $integration, $externalId);
     }
 
+    /**
+     * Send a clearly-marked SAMPLE article through the real delivery path —
+     * same payload shape, same HMAC signature — so the client can test their
+     * receiver end-to-end from the integrations page. A receiver that stores
+     * it will create a post titled "Serfix test article"; the `test: true`
+     * flag lets receivers skip storing instead. Response is surfaced
+     * verbatim to the client (status + returned url), because "verify says
+     * OK but articles vanish" is exactly the failure this exists to catch.
+     */
+    public function testDelivery(ContentIntegration $integration): PublishResult
+    {
+        [$endpoint, $secret, $err] = $this->connection($integration);
+        if ($err !== null) {
+            return PublishResult::failure($err);
+        }
+
+        $html = '<h2>This is a test delivery</h2>'
+            .'<p>Serfix sent this sample article to confirm your webhook receiver stores and displays articles correctly. '
+            .'It is <strong>safe to delete</strong>.</p>'
+            .'<ul><li>If you can see this as a post on your site, your integration works end to end.</li>'
+            .'<li>If your endpoint answered OK but no post appeared, your receiver accepts deliveries without storing them.</li></ul>';
+
+        $payload = [
+            'event' => 'article.published',
+            'external_id' => null,
+            'test' => true,
+            'article' => [
+                'h1' => 'Serfix test article — safe to delete',
+                'slug' => 'serfix-connection-test',
+                'html' => $html,
+                'markdown' => '',
+                'meta_title' => 'Serfix test article — safe to delete',
+                'meta_description' => 'A sample delivery sent from the Serfix integrations page. Safe to delete.',
+                'word_count' => 60,
+                'language' => 'en',
+                'target_keyword' => 'serfix connection test',
+                'secondary_keywords' => [],
+                'focus_keyword' => 'serfix connection test',
+                'canonical_url' => '',
+                'robots_noindex' => true,
+                'robots_nofollow' => true,
+                'og_title' => '',
+                'og_description' => '',
+                'og_image' => '',
+                'twitter_title' => '',
+                'twitter_description' => '',
+                'twitter_image' => '',
+                'twitter_card' => '',
+            ],
+            'sent_at' => now()->toIso8601String(),
+        ];
+
+        $result = $this->post($endpoint, $secret, $payload);
+        if (! $result->ok) {
+            return $result;
+        }
+
+        return PublishResult::success(
+            (string) ($result->response['id'] ?? ''),
+            (string) ($result->response['url'] ?? '') ?: null,
+            $result->response,
+        );
+    }
+
     // ── internals ───────────────────────────────────────────────────────
 
     private function push(ContentArticle $article, ContentIntegration $integration, ?string $externalId): PublishResult
