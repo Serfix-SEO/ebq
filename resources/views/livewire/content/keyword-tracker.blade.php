@@ -92,21 +92,27 @@
                     </div>
                     <div class="flex flex-wrap items-end gap-4">
                         {{-- Where the live SERP checks run from — saved per website. --}}
-                        {{-- SERP country — one bordered control: globe inside the
-                             dropdown box, native select arrow, spinner while saving.
-                             All flexbox, nothing absolutely positioned. --}}
-                        <label title="{{ __('SERP country') }} — {{ __('the country your Google rank checks run from. Saved for this website.') }}"
-                            class="flex w-56 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
-                            <svg class="h-4 w-4 shrink-0 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'/></svg>
-                            <select wire:model="serpCountry" wire:change="saveSerpCountry" wire:loading.attr="disabled" wire:target="saveSerpCountry"
-                                aria-label="{{ __('SERP country') }}"
-                                class="w-full border-0 bg-transparent p-0 text-sm font-medium text-slate-800 focus:outline-none focus:ring-0 disabled:opacity-50 dark:text-slate-100">
-                                @foreach ($countryOptions as $code => $label)
-                                    <option value="{{ $code }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            <svg wire:loading wire:target="saveSerpCountry" class="h-4 w-4 shrink-0 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                        </label>
+                        {{-- SERP country — globe inside the dropdown box. The global
+                             forms reset already gives <select> its chevron + padding;
+                             we only strip its border and lean on the wrapper's. --}}
+                        <div>
+                            <label title="{{ __('SERP country') }} — {{ __('the country your Google rank checks run from. Saved for this website.') }}"
+                                class="flex w-60 cursor-pointer items-center rounded-xl border border-slate-300 bg-white ps-3 shadow-sm transition focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
+                                <svg class="h-4 w-4 shrink-0 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'/></svg>
+                                <select wire:model="serpCountry" wire:change="saveSerpCountry" wire:loading.attr="disabled" wire:target="saveSerpCountry"
+                                    aria-label="{{ __('SERP country') }}"
+                                    class="w-full cursor-pointer rounded-xl border-0 text-sm font-medium text-slate-800 focus:ring-0 disabled:opacity-50 dark:bg-slate-800 dark:text-slate-100">
+                                    @foreach ($countryOptions as $code => $countryLabel)
+                                        <option value="{{ $code }}">{{ $countryLabel }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <p class="mt-1 flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+                                <svg wire:loading wire:target="saveSerpCountry" class="h-3 w-3 shrink-0 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                                <span wire:loading.remove wire:target="saveSerpCountry">{{ __('Your keyword positions are checked in this country\'s Google results.') }}</span>
+                                <span wire:loading wire:target="saveSerpCountry" class="font-semibold text-orange-600 dark:text-orange-400">{{ __('Updating…') }}</span>
+                            </p>
+                        </div>
                         <div class="text-sm font-medium text-slate-500 dark:text-slate-400">
                             {{ trans_choice('{0}No slots left|{1}:count slot left|[2,*]:count slots left', $remaining, ['count' => number_format($remaining)]) }}
                         </div>
