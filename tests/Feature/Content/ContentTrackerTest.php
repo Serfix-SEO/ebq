@@ -170,6 +170,35 @@ class ContentTrackerTest extends TestCase
         \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\CheckTrackedKeywordSerpJob::class);
     }
 
+    public function test_tracker_shows_article_value_totals_and_discovered_phrases_inline(): void
+    {
+        $user = $this->trialUser();
+        $website = $this->siteFor($user);
+        $topic = $this->topicFor($website, 'luxury branding dubai');
+        $page = 'https://example.com/blog/post';
+        \App\Models\ContentTrackedKeyword::create([
+            'website_id' => $website->id, 'topic_id' => $topic->id,
+            'keyword' => 'luxury branding dubai', 'normalized_keyword' => 'luxury branding dubai',
+            'source' => 'auto', 'is_primary' => true, 'page_url' => $page,
+        ]);
+        \App\Models\SearchConsoleData::create([
+            'website_id' => $website->id, 'date' => now()->subDays(3)->toDateString(),
+            'query' => 'brand development plans dubai', 'page' => $page,
+            'clicks' => 4, 'impressions' => 16, 'position' => 8.0,
+        ]);
+        session(['current_website_id' => $website->id]);
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(\App\Livewire\Content\KeywordTracker::class)
+            // Site-total hero
+            ->assertSee(__('What your articles brought you'))
+            ->assertSee(__('Visits from Google'))
+            // Discovered phrase inline in the keyword list, without opening performance
+            ->assertSee(__('More searches this article shows up for'))
+            ->assertSee('brand development plans dubai')
+            ->assertSee(__('Track'));
+    }
+
     public function test_quota_is_3_on_trial_and_500_when_comped_per_website(): void
     {
         $quota = app(KeywordTrackerQuota::class);

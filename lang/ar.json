@@ -4592,5 +4592,19 @@
     "No slots": "لا خانات",
     ":keyword is now tracked — checking its live position now.": "أصبحت :keyword متتبَّعة الآن — يجري فحص موقعها المباشر.",
     "You've reached your tracking limit. Remove a keyword to make room, then try again.": "لقد بلغت حد التتبع. احذف كلمة مفتاحية لإفساح المجال ثم حاول مجدداً.",
-    "SERP": "SERP"
+    "SERP": "SERP",
+    "What your articles brought you": "ما الذي حققته لك مقالاتك",
+    "Combined Google performance of your published articles over the last 30 days.": "الأداء المجمّع لمقالاتك المنشورة في Google خلال آخر 30 يوماً.",
+    "Visits from Google": "زيارات من Google",
+    "Times shown in Google": "مرات الظهور في Google",
+    "Visitors on your site": "زوّار على موقعك",
+    "Articles working for you": "مقالات تعمل لصالحك",
+    ":n visit/mo|:n visits/mo": ":n زيارة/شهر|:n زيارات/شهر",
+    ":n impression/mo|:n impressions/mo": ":n ظهور/شهر|:n ظهورات/شهر",
+    ":n visitor/mo|:n visitors/mo": ":n زائر/شهر|:n زوّار/شهر",
+    "Clicks from Google search in the last 30 days": "نقرات من بحث Google خلال آخر 30 يوماً",
+    "How often this article appeared in Google search in the last 30 days": "عدد مرات ظهور هذا المقال في بحث Google خلال آخر 30 يوماً",
+    "Visitors this article brought to your site in the last 30 days": "الزوّار الذين جلبهم هذا المقال لموقعك خلال آخر 30 يوماً",
+    "More searches this article shows up for": "المزيد من عمليات البحث التي يظهر فيها هذا المقال",
+    "real Google searches from the last 4 weeks. Track the ones that matter to you.": "عمليات بحث حقيقية في Google خلال آخر 4 أسابيع. تتبّع ما يهمك منها."
 }

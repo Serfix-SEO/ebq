@@ -181,6 +181,66 @@ class ContentPerformanceService
         });
     }
 
+    /**
+     * 30-day traffic totals for a set of article pages in ONE pass — powers
+     * the per-article "what this brought you" pills and the tracker's site
+     * total. Clicks/impressions from GSC; visitors from GA when connected.
+     *
+     * @param  list<string>  $pageUrls
+     * @return array<string, array{clicks: int, impressions: int, visitors: int}> keyed by the normalized URL
+     */
+    public function pagesTotals(Website $website, array $pageUrls, int $days = 30): array
+    {
+        $pages = array_values(array_unique(array_filter(array_map(
+            fn ($u) => UrlNormalizer::normalize((string) $u),
+            $pageUrls,
+        ))));
+        if ($pages === []) {
+            return [];
+        }
+        $end = $this->windowEnd($website->id);
+        $start = $end->copy()->subDays(max(1, $days) - 1);
+        $key = sprintf('content_perf:pagetotals:v1:%s:%d:%s:%s', $website->id, ReportCache::version($website->id), $start->toDateString(), md5(implode('|', $pages)));
+
+        return Cache::remember($key, self::TTL, function () use ($website, $pages, $start, $end) {
+            $out = [];
+            foreach ($pages as $p) {
+                $out[$p] = ['clicks' => 0, 'impressions' => 0, 'visitors' => 0];
+            }
+
+            $gsc = SearchConsoleData::query()
+                ->where('website_id', $website->id)
+                ->whereIn('page', $pages)
+                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+                ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions')
+                ->groupBy('page')
+                ->get();
+            foreach ($gsc as $r) {
+                $p = (string) $r->page;
+                if (isset($out[$p])) {
+                    $out[$p]['clicks'] = (int) $r->clicks;
+                    $out[$p]['impressions'] = (int) $r->impressions;
+                }
+            }
+
+            $ga = ContentPageAnalytics::query()
+                ->where('website_id', $website->id)
+                ->whereIn('page', $pages)
+                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+                ->selectRaw('page, SUM(sessions) as sessions')
+                ->groupBy('page')
+                ->get();
+            foreach ($ga as $r) {
+                $p = (string) $r->page;
+                if (isset($out[$p])) {
+                    $out[$p]['visitors'] = (int) $r->sessions;
+                }
+            }
+
+            return $out;
+        });
+    }
+
     public function pageSeries(Website $website, string $pageUrl, int $days = 30): array
     {
         $page = UrlNormalizer::normalize($pageUrl);

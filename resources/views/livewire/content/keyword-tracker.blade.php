@@ -140,6 +140,44 @@
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Publish an article, or open an article and add its keywords, to start tracking performance here.') }}</p>
                 </div>
             @else
+                {{-- What your articles brought in — 30-day traffic value across all articles. --}}
+                @if (($siteTotals['articles'] ?? 0) > 0)
+                    <div class="relative overflow-hidden rounded-2xl border border-orange-200/70 bg-gradient-to-br from-orange-50 via-white to-white p-6 shadow-sm dark:border-orange-900/50 dark:from-orange-950/30 dark:via-slate-900 dark:to-slate-900">
+                        <div class="pointer-events-none absolute -end-10 -top-10 h-40 w-40 rounded-full bg-orange-500/10 blur-2xl"></div>
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <div class="flex items-center gap-2 text-sm font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+                                    <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md shadow-orange-600/25">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.256-1.011M21.75 6.75v5.25M21.75 6.75h-5.25"/></svg>
+                                    </span>
+                                    {{ __('What your articles brought you') }}
+                                </div>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Combined Google performance of your published articles over the last 30 days.') }}</p>
+                            </div>
+                            <div class="flex flex-wrap gap-6">
+                                <div>
+                                    <div class="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($siteTotals['clicks']) }}</div>
+                                    <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ __('Visits from Google') }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($siteTotals['impressions']) }}</div>
+                                    <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ __('Times shown in Google') }}</div>
+                                </div>
+                                @if ($siteTotals['visitors'] > 0)
+                                    <div>
+                                        <div class="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($siteTotals['visitors']) }}</div>
+                                        <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ __('Visitors on your site') }}</div>
+                                    </div>
+                                @endif
+                                <div>
+                                    <div class="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($siteTotals['articles']) }}</div>
+                                    <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ __('Articles working for you') }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 <div class="space-y-4">
                     @foreach ($groups as $group)
                         @php
@@ -160,6 +198,25 @@
                                         <div class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Other keywords') }}</div>
                                     @endif
                                 </div>
+                                @if (! empty($group['totals']) && ($group['totals']['clicks'] + $group['totals']['impressions']) > 0)
+                                    {{-- The article's 30-day value at a glance. --}}
+                                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 font-bold text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" title="{{ __('Clicks from Google search in the last 30 days') }}">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59"/></svg>
+                                            {{ trans_choice(':n visit/mo|:n visits/mo', $group['totals']['clicks'], ['n' => number_format($group['totals']['clicks'])]) }}
+                                        </span>
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300" title="{{ __('How often this article appeared in Google search in the last 30 days') }}">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                            {{ trans_choice(':n impression/mo|:n impressions/mo', $group['totals']['impressions'], ['n' => number_format($group['totals']['impressions'])]) }}
+                                        </span>
+                                        @if ($group['totals']['visitors'] > 0)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" title="{{ __('Visitors this article brought to your site in the last 30 days') }}">
+                                                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                                                {{ trans_choice(':n visitor/mo|:n visitors/mo', $group['totals']['visitors'], ['n' => number_format($group['totals']['visitors'])]) }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                @endif
                                 @if ($group['page_url'])
                                     <button type="button" wire:click="togglePerformance('{{ $gid }}')"
                                         class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
@@ -225,55 +282,6 @@
                                             @endif
                                         </div>
 
-                                        {{-- Where the impressions come from: the REAL phrases Google
-                                             shows this article for, each one-click trackable. --}}
-                                        @if (! empty($selectedQueries))
-                                            <div class="mt-4 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-                                                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-                                                    <div>
-                                                        <div class="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
-                                                            <svg class="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
-                                                            {{ __('Searches this article shows up for') }}
-                                                        </div>
-                                                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Real Google searches from the last 4 weeks — track the ones that matter to you.') }}</p>
-                                                    </div>
-                                                </div>
-                                                <div class="hidden items-center gap-3 bg-slate-50/80 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 sm:flex dark:bg-slate-800/40 dark:text-slate-400">
-                                                    <span class="min-w-0 flex-1">{{ __('Search phrase') }}</span>
-                                                    <span class="w-20 text-center">{{ __('Impressions') }}</span>
-                                                    <span class="w-14 text-center">{{ __('Clicks') }}</span>
-                                                    <span class="w-16 text-center">{{ __('Position') }}</span>
-                                                    <span class="w-24 text-end" aria-hidden="true"></span>
-                                                </div>
-                                                <div class="divide-y divide-slate-100 dark:divide-slate-800">
-                                                    @foreach ($selectedQueries as $q)
-                                                        <div class="flex flex-wrap items-center gap-3 px-4 py-2.5 transition hover:bg-slate-50/60 dark:hover:bg-slate-800/40" wire:key="pq-{{ md5($q['query']) }}">
-                                                            <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $q['query'] }}</span>
-                                                            <span class="w-20 text-center text-sm font-semibold tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($q['impressions']) }}</span>
-                                                            <span class="w-14 text-center text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ number_format($q['clicks']) }}</span>
-                                                            <span class="w-16 text-center text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ $q['position'] !== null ? '#'.$q['position'] : '—' }}</span>
-                                                            <span class="w-24 text-end">
-                                                                @if ($q['tracked'])
-                                                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                                                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                                                        {{ __('Tracked') }}
-                                                                    </span>
-                                                                @elseif ($exhausted)
-                                                                    <span class="text-xs text-slate-400" title="{{ __('You\'ve reached your tracking limit. Remove a keyword below to make room for a new one.') }}">{{ __('No slots') }}</span>
-                                                                @else
-                                                                    <button type="button" wire:click="trackQuery({{ json_encode($q['query']) }})" wire:loading.attr="disabled" wire:target="trackQuery"
-                                                                        class="inline-flex items-center gap-1 rounded-lg border border-orange-200 px-2.5 py-1 text-xs font-bold text-orange-600 transition hover:bg-orange-50 disabled:opacity-50 dark:border-orange-900 dark:text-orange-400 dark:hover:bg-orange-950">
-                                                                        <svg wire:loading.remove wire:target="trackQuery" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                                                                        <svg wire:loading wire:target="trackQuery" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                                                                        {{ __('Track') }}
-                                                                    </button>
-                                                                @endif
-                                                            </span>
-                                                        </div>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-                                        @endif
                                     @endif
                                 </div>
                             @endif
@@ -342,6 +350,49 @@
                                     </div>
                                 @endforeach
                             </div>
+
+                            {{-- More searches this article shows up for — real Google
+                                 phrases (last 4 weeks) not yet tracked, one-click add. --}}
+                            @if (! empty($group['discovered']))
+                                <div class="border-t border-slate-100 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-950/30">
+                                    <div class="flex flex-wrap items-center gap-2 px-5 pb-1 pt-3.5">
+                                        <svg class="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+                                        <span class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('More searches this article shows up for') }}</span>
+                                        <span class="text-xs text-slate-500 dark:text-slate-400">— {{ __('real Google searches from the last 4 weeks. Track the ones that matter to you.') }}</span>
+                                    </div>
+                                    <div class="divide-y divide-slate-100 dark:divide-slate-800">
+                                        @foreach ($group['discovered'] as $q)
+                                            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-2.5 transition hover:bg-white dark:hover:bg-slate-900/60" wire:key="dq-{{ $gid }}-{{ md5($q['query']) }}">
+                                                <span class="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-300">{{ $q['query'] }}</span>
+                                                <span class="w-24 text-center" title="{{ __('How often this article appeared in Google search in the last 30 days') }}">
+                                                    <span class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Impressions') }}</span>
+                                                    <span class="text-sm font-bold tabular-nums text-slate-800 dark:text-slate-200">{{ number_format($q['impressions']) }}</span>
+                                                </span>
+                                                <span class="w-14 text-center">
+                                                    <span class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Clicks') }}</span>
+                                                    <span class="text-sm tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($q['clicks']) }}</span>
+                                                </span>
+                                                <span class="w-16 text-center">
+                                                    <span class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Position') }}</span>
+                                                    <span class="text-sm tabular-nums text-slate-600 dark:text-slate-300">{{ $q['position'] !== null ? '#'.$q['position'] : '—' }}</span>
+                                                </span>
+                                                <span class="w-24 text-end">
+                                                    @if ($exhausted)
+                                                        <span class="text-xs text-slate-400" title="{{ __('You\'ve reached your tracking limit. Remove a keyword below to make room for a new one.') }}">{{ __('No slots') }}</span>
+                                                    @else
+                                                        <button type="button" wire:click="trackQuery({{ json_encode($q['query']) }})" wire:loading.attr="disabled" wire:target="trackQuery"
+                                                            class="inline-flex items-center gap-1 rounded-lg border border-orange-200 px-2.5 py-1 text-xs font-bold text-orange-600 transition hover:bg-orange-50 disabled:opacity-50 dark:border-orange-900 dark:text-orange-400 dark:hover:bg-orange-950">
+                                                            <svg wire:loading.remove wire:target="trackQuery" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                                                            <svg wire:loading wire:target="trackQuery" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                                                            {{ __('Track') }}
+                                                        </button>
+                                                    @endif
+                                                </span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     @endforeach
                 </div>

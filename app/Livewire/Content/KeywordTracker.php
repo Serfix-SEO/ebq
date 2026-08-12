@@ -206,21 +206,42 @@ class KeywordTracker extends Component
             $groups[$key]['keywords'][] = $row;
         }
 
+        // Per-article traffic value (30d) + the real search phrases each
+        // article appears for. One batched totals query; per-page query
+        // lists are 6h-cached.
+        $pageUrls = array_values(array_filter(array_map(fn ($g) => $g['page_url'], $groups)));
+        $totalsByPage = $pageUrls !== [] ? $perf->pagesTotals($website, $pageUrls) : [];
+        $trackedSet = $tracked->pluck('normalized_keyword')->flip();
+        $siteTotals = ['clicks' => 0, 'impressions' => 0, 'visitors' => 0, 'articles' => 0];
+        foreach ($groups as $key => $g) {
+            $groups[$key]['totals'] = null;
+            $groups[$key]['discovered'] = [];
+            if (! $g['page_url']) {
+                continue;
+            }
+            $normalized = \App\Support\UrlNormalizer::normalize($g['page_url']);
+            $totals = $totalsByPage[$normalized] ?? null;
+            if ($totals !== null) {
+                $groups[$key]['totals'] = $totals;
+                $siteTotals['clicks'] += $totals['clicks'];
+                $siteTotals['impressions'] += $totals['impressions'];
+                $siteTotals['visitors'] += $totals['visitors'];
+                $siteTotals['articles']++;
+            }
+            foreach ($perf->pageQueries($website, $g['page_url']) as $row) {
+                if (! $trackedSet->has(ContentTrackedKeyword::normalize($row['query']))) {
+                    $groups[$key]['discovered'][] = $row;
+                }
+            }
+        }
+
         // Selected article performance series (published articles only).
         $selectedSeries = null;
         $selectedGroup = null;
-        $selectedQueries = [];
         if ($this->selectedTopicId !== null && isset($groups[$this->selectedTopicId])) {
             $selectedGroup = $groups[$this->selectedTopicId];
             if ($selectedGroup['page_url']) {
                 $selectedSeries = $perf->pageSeries($website, $selectedGroup['page_url']);
-                // The real phrases this page appears for, flagged with
-                // whether each is already in the tracker.
-                $trackedSet = $tracked->pluck('normalized_keyword')->flip();
-                foreach ($perf->pageQueries($website, $selectedGroup['page_url']) as $row) {
-                    $row['tracked'] = $trackedSet->has(ContentTrackedKeyword::normalize($row['query']));
-                    $selectedQueries[] = $row;
-                }
             }
         }
 
@@ -238,7 +259,7 @@ class KeywordTracker extends Component
             'summaries' => $summaries,
             'selectedSeries' => $selectedSeries,
             'selectedGroup' => $selectedGroup,
-            'selectedQueries' => $selectedQueries,
+            'siteTotals' => $siteTotals,
             'countryOptions' => \App\Support\KeywordFinderLocations::countryOptions(),
         ])->layoutData(['title' => __('Tracker')]);
     }
