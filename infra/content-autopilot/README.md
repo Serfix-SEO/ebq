@@ -969,6 +969,17 @@ image URLs to platform refs (Wix media ids / Sanity asset `_id`s); unresolved
 image → node dropped + alt text emitted as an italic paragraph. Unit-tested
 against `tests/Fixtures/content/converter-article.html`.
 
+**Republish (2026-08-12).** Published topics get a small "Republish" action on
+the calendar (grid cell + list row, `ContentCalendar::republish`): re-arms the
+topic's `content_publications` claims back to `queued` — **keeping
+`external_id`, so destinations that already have the post receive an UPDATE,
+never a duplicate** — then `enterStage(PUBLISHING)` + dispatches
+`PublishContentArticleJob`. This is the recovery path for receivers that lost
+a delivery (e.g. a webhook that 200-OK'd but dropped the article) and for
+pushing post-publish edits; before it existed, published topics could never be
+re-sent (the dispatcher and Publish-now only touch ready/scheduled). Test:
+`ContentRepublishTest`.
+
 **Two-step connect (`ProvidesTargets`)** — drivers whose destination needs a
 choice (Shopify/HubSpot blog, Webflow site→collection, Sanity dataset, Wix
 author) implement `targets()`/`selectTarget()` alongside the untouched
