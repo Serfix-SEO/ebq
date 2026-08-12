@@ -4,20 +4,17 @@ namespace App\Livewire\Content;
 
 use App\Jobs\Content\RefineTopicSecondaryKeywordsJob;
 use App\Jobs\PrepareContentKeywordInsightsJob;
-use App\Jobs\ProduceContentArticleJob;
 use App\Models\ContentPlan;
 use App\Models\ContentPlanKeyword;
 use App\Models\ContentTopic;
 use App\Models\ContentTrackedKeyword;
 use App\Models\Website;
-use App\Services\Content\ContentEntitlements;
 use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentKeywordTracker;
 use App\Services\Content\ContentTopicPlanner;
 use App\Services\Content\KeywordWinnability;
 use App\Support\ContentAutopilotConfig;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -28,7 +25,7 @@ use Livewire\Component;
  * keyword the always-on research has vetted for this site (competitor gap,
  * the site's own rankings, the client's wizard picks), each with volume, a
  * difficulty label calibrated to THIS site's authority (KeywordWinnability),
- * intent, and one-click Add-to-calendar / Write-now. Plus striking-distance
+ * intent, and Add-to-calendar with a pick-a-date step. Plus striking-distance
  * queries straight from the client's own Search Console and popular questions.
  *
  * Client-copy invariant: no internal datasource/vendor names, no pipeline
@@ -115,41 +112,117 @@ class ContentResearch extends Component
     }
 
     /**
-     * Add a researched keyword to the calendar as an approved topic on the next
-     * free publish day. Safe to call with any string — the plan is resolved
-     * server-side and duplicates are refused.
+     * Date-picker state for "Add to calendar": the keyword being added plus
+     * three months of day cells, each flagged selectable or not (publish-day
+     * + one-article-per-day rules from the planner).
+     *
+     * @var array{keyword: string, volume: ?int, months: list<array{label: string, weeks: list<list<?array{d: int, date: string, enabled: bool}>>}>}|null
+     */
+    public ?array $datePicker = null;
+
+    /**
+     * "Add to calendar" step 1: run the duplicate/pool guards, then open the
+     * date picker so the client chooses which free publish day it lands on.
      */
     public function addToCalendar(string $keyword, ?int $volume = null): void
     {
-        $topic = $this->createTopicFor($keyword, $volume);
+        $plan = $this->plan();
+        $keyword = mb_strtolower(trim($keyword));
+        if ($plan === null || $keyword === '' || mb_strlen($keyword) > 200) {
+            return;
+        }
+        if ($this->guardAdd($plan, $keyword) !== true) {
+            return; // guard already flashed the reason
+        }
+
+        $available = array_flip(app(ContentTopicPlanner::class)->availableDates($plan));
+        $months = [];
+        $cursor = now()->startOfMonth();
+        for ($m = 0; $m < 3; $m++) {
+            $month = $cursor->copy()->addMonths($m);
+            $weeks = [];
+            $week = array_fill(0, 7, null);
+            $day = $month->copy()->startOfMonth();
+            while ($day->month === $month->month) {
+                $idx = $day->isoWeekday() - 1;
+                $date = $day->toDateString();
+                $week[$idx] = ['d' => $day->day, 'date' => $date, 'enabled' => isset($available[$date])];
+                if ($idx === 6) {
+                    $weeks[] = $week;
+                    $week = array_fill(0, 7, null);
+                }
+                $day->addDay();
+            }
+            if ($week !== array_fill(0, 7, null)) {
+                $weeks[] = $week;
+            }
+            $months[] = ['label' => $month->translatedFormat('F Y'), 'weeks' => $weeks];
+        }
+
+        $this->datePicker = ['keyword' => $keyword, 'volume' => $volume, 'months' => $months];
+    }
+
+    public function closeDatePicker(): void
+    {
+        $this->datePicker = null;
+    }
+
+    /** Step 2: the client picked a day — validate it's still free and add. */
+    public function confirmDate(string $date): void
+    {
+        if ($this->datePicker === null) {
+            return;
+        }
+        $plan = $this->plan();
+        if ($plan === null || preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            return;
+        }
+        // Re-checked server-side: the picker's enabled flags are advisory.
+        if (! in_array($date, app(ContentTopicPlanner::class)->availableDates($plan), true)) {
+            session()->flash('content-error', __('That day is no longer available — pick another date.'));
+
+            return;
+        }
+
+        $topic = $this->createTopicFor(
+            $this->datePicker['keyword'],
+            $this->datePicker['volume'],
+            \Illuminate\Support\Carbon::parse($date)->startOfDay(),
+        );
+        $this->datePicker = null;
         if ($topic !== null) {
             // Async AI polish of the instant token-overlap secondaries — fails
-            // open, never blocks the click. Skipped on the Write path (the
-            // producer claims the topic immediately and does its own research).
+            // open, never blocks the click.
             RefineTopicSecondaryKeywordsJob::dispatch($topic->id);
         }
     }
 
-    /** Add to the calendar AND start writing immediately (entitlement-gated). */
-    public function addAndWrite(string $keyword, ?int $volume = null): void
+    /** Duplicate + planned-pool guards shared by the picker and the create. */
+    private function guardAdd(ContentPlan $plan, string $keyword): bool
     {
-        $topic = $this->createTopicFor($keyword, $volume);
-        if ($topic === null) {
-            return;
-        }
-        if (($reason = app(ContentEntitlements::class)->blockReason($topic)) !== null) {
-            // Topic stays on the calendar; generation is what's blocked.
-            session()->flash('content-error', ContentCalendar::generationBlockMessage($reason));
+        $existing = $plan->topics()
+            ->whereRaw('LOWER(target_keyword) = ?', [$keyword])
+            ->whereNot('status', ContentTopic::STATUS_SKIPPED)
+            ->exists();
+        if ($existing) {
+            session()->flash('content-status', __('Already on your calendar.'));
 
-            return;
+            return false;
         }
-        $topic->forceFill(['stage_started_at' => now()])->save();
-        Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
-        ProduceContentArticleJob::dispatch($topic->id);
-        $this->redirect(route('content.review', $topic->id), navigate: true);
+
+        $pool = $plan->topics()
+            ->whereNotIn('status', [ContentTopic::STATUS_PUBLISHED, ContentTopic::STATUS_SKIPPED])
+            ->count();
+        if ($pool >= ContentAutopilotConfig::monthlyArticlesPerWebsite()) {
+            session()->flash('content-error', __('Your calendar is full for now — publish or skip an article to make room.'));
+
+            return false;
+        }
+
+        return true;
     }
 
-    private function createTopicFor(string $keyword, ?int $volume): ?ContentTopic
+    private function createTopicFor(string $keyword, ?int $volume, ?\Illuminate\Support\Carbon $date = null): ?ContentTopic
     {
         $plan = $this->plan();
         $website = $this->website();
@@ -158,23 +231,7 @@ class ContentResearch extends Component
             return null;
         }
 
-        $existing = $plan->topics()
-            ->whereRaw('LOWER(target_keyword) = ?', [$keyword])
-            ->whereNot('status', ContentTopic::STATUS_SKIPPED)
-            ->exists();
-        if ($existing) {
-            session()->flash('content-status', __('Already on your calendar.'));
-
-            return null;
-        }
-
-        // Keep the planned pool bounded — same cap the planner honours.
-        $pool = $plan->topics()
-            ->whereNotIn('status', [ContentTopic::STATUS_PUBLISHED, ContentTopic::STATUS_SKIPPED])
-            ->count();
-        if ($pool >= ContentAutopilotConfig::monthlyArticlesPerWebsite()) {
-            session()->flash('content-error', __('Your calendar is full for now — publish or skip an article to make room.'));
-
+        if (! $this->guardAdd($plan, $keyword)) {
             return null;
         }
 
@@ -185,7 +242,7 @@ class ContentResearch extends Component
                 ->value('search_volume');
         }
 
-        $date = app(ContentTopicPlanner::class)->nextDates($plan, 1)[0] ?? now()->addDays(2)->startOfDay();
+        $date ??= app(ContentTopicPlanner::class)->nextDates($plan, 1)[0] ?? now()->addDays(2)->startOfDay();
 
         $topic = $plan->topics()->create([
             'website_id' => $website->id,

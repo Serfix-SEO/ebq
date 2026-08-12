@@ -4616,5 +4616,17 @@
     "Visits this article page received in the last 30 days. Source: Google Analytics.": "الزيارات التي تلقتها صفحة هذا المقال خلال آخر 30 يوماً. المصدر: Google Analytics.",
     "Your keyword positions are checked in this country's Google results.": "تُفحص مواقع كلماتك المفتاحية في نتائج Google الخاصة بهذه الدولة.",
     "Positions are checked in this country's Google results and refresh every 7 days. Changing the country rechecks all keywords — new positions can take a few minutes to appear.": "تُفحص المواقع في نتائج Google الخاصة بهذه الدولة وتتجدد كل 7 أيام. تغيير الدولة يعيد فحص كل الكلمات المفتاحية — قد تستغرق المواقع الجديدة بضع دقائق لتظهر.",
-    "SERP country saved — all keyword positions are being rechecked for the new market. This can take a few minutes; positions then refresh automatically every 7 days.": "تم حفظ دولة نتائج البحث — يُعاد الآن فحص مواقع جميع الكلمات المفتاحية للسوق الجديد. قد يستغرق ذلك بضع دقائق؛ ثم تتجدد المواقع تلقائياً كل 7 أيام."
+    "SERP country saved — all keyword positions are being rechecked for the new market. This can take a few minutes; positions then refresh automatically every 7 days.": "تم حفظ دولة نتائج البحث — يُعاد الآن فحص مواقع جميع الكلمات المفتاحية للسوق الجديد. قد يستغرق ذلك بضع دقائق؛ ثم تتجدد المواقع تلقائياً كل 7 أيام.",
+    "Pick a publish day": "اختر يوم النشر",
+    "“:keyword” will be written and scheduled for the day you choose.": "سيُكتب \":keyword\" ويُجدول لليوم الذي تختاره.",
+    "Mo": "ن",
+    "Tu": "ث",
+    "We": "ر",
+    "Th": "خ",
+    "Fr": "ج",
+    "Sa": "س",
+    "Su": "ح",
+    "Available days follow your publishing schedule — one article per day, past days and taken days are blocked.": "الأيام المتاحة تتبع جدول النشر الخاص بك — مقال واحد في اليوم، والأيام الماضية والمحجوزة محظورة.",
+    "Adding to your calendar…": "جارٍ الإضافة إلى تقويمك…",
+    "That day is no longer available — pick another date.": "لم يعد هذا اليوم متاحاً — اختر تاريخاً آخر."
 }

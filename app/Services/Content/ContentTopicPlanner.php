@@ -575,6 +575,49 @@ class ContentTopicPlanner
     }
 
     /**
+     * Every date a topic COULD be scheduled on within the horizon — the same
+     * rules scheduleDates() applies: starts tomorrow, must be one of the
+     * plan's publish weekdays, and one article per day (days that already
+     * hold a topic are excluded). Powers the research page's date picker.
+     *
+     * @return list<string> Y-m-d
+     */
+    public function availableDates(ContentPlan $plan, int $horizonDays = 84): array
+    {
+        $perWeek = max(1, min(7, (int) $plan->articles_per_week));
+        $days = array_values(array_filter(array_map('intval', (array) ($plan->publish_days ?? []))));
+        if ($days === []) {
+            $days = match (true) {
+                $perWeek >= 7 => [1, 2, 3, 4, 5, 6, 7],
+                $perWeek === 5 => [1, 2, 3, 4, 5],
+                $perWeek === 3 => [1, 3, 5],
+                $perWeek === 2 => [2, 4],
+                default => [2],
+            };
+        }
+        $days = array_slice($days, 0, $perWeek);
+
+        $used = $plan->topics()
+            ->whereNotNull('scheduled_for')
+            ->whereNot('status', ContentTopic::STATUS_SKIPPED)
+            ->pluck('scheduled_for')
+            ->map(fn ($d) => Carbon::parse($d)->toDateString())
+            ->flip()->all();
+
+        $out = [];
+        $cursor = now()->addDay()->startOfDay();
+        for ($i = 0; $i < $horizonDays; $i++) {
+            $key = $cursor->toDateString();
+            if (in_array($cursor->isoWeekday(), $days, true) && ! isset($used[$key])) {
+                $out[] = $key;
+            }
+            $cursor->addDay();
+        }
+
+        return $out;
+    }
+
+    /**
      * Replace stale years with the current one. LLMs leak their training
      * cutoff ("Best X in 2024" generated in 2026 — owner QA find). Only
      * recent-past years are rewritten; older ones (2019 and earlier) are

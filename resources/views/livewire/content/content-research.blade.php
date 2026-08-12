@@ -231,14 +231,9 @@
                                     </span>
                                 @else
                                     <button type="button" wire:click="addToCalendar(@js($row['keyword']), @js($row['volume']))" wire:loading.attr="disabled"
-                                        class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-orange-300 hover:text-orange-700 dark:border-slate-700 dark:text-slate-200 dark:hover:text-orange-300">
-                                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                                        class="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-orange-700">
+                                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
                                         {{ __('Add to calendar') }}
-                                    </button>
-                                    <button type="button" wire:click="addAndWrite(@js($row['keyword']), @js($row['volume']))" wire:loading.attr="disabled"
-                                        class="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-orange-700" title="{{ __('Write now') }}">
-                                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
-                                        {{ __('Write') }}
                                     </button>
                                 @endif
                             </div>
@@ -292,6 +287,67 @@
                             @endif
                         </span>
                     @endforeach
+                </div>
+            </div>
+        @endif
+
+        {{-- ── Pick-a-date modal for "Add to calendar" ─────────────────
+             Only days matching the plan's publishing schedule with a free
+             slot are clickable; everything else is visibly blocked. --}}
+        @if ($datePicker !== null)
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+                <div class="absolute inset-0 bg-slate-900/50" wire:click="closeDatePicker"></div>
+                <div class="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <h3 class="text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Pick a publish day') }}</h3>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                {{ __('“:keyword” will be written and scheduled for the day you choose.', ['keyword' => $datePicker['keyword']]) }}
+                            </p>
+                        </div>
+                        <button type="button" wire:click="closeDatePicker" class="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800" aria-label="{{ __('Cancel') }}">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        @foreach ($datePicker['months'] as $mi => $month)
+                            <div wire:key="dpm-{{ $mi }}">
+                                <div class="text-center text-sm font-bold text-slate-900 dark:text-slate-100">{{ $month['label'] }}</div>
+                                <div class="mt-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                    <span>{{ __('Mo') }}</span><span>{{ __('Tu') }}</span><span>{{ __('We') }}</span><span>{{ __('Th') }}</span><span>{{ __('Fr') }}</span><span>{{ __('Sa') }}</span><span>{{ __('Su') }}</span>
+                                </div>
+                                @foreach ($month['weeks'] as $wi => $week)
+                                    <div class="mt-1 grid grid-cols-7 gap-1" wire:key="dpw-{{ $mi }}-{{ $wi }}">
+                                        @foreach ($week as $di => $cell)
+                                            @if ($cell === null)
+                                                <span wire:key="dpc-{{ $mi }}-{{ $wi }}-{{ $di }}"></span>
+                                            @elseif ($cell['enabled'])
+                                                <button type="button" wire:key="dpc-{{ $mi }}-{{ $wi }}-{{ $di }}"
+                                                    wire:click="confirmDate('{{ $cell['date'] }}')" wire:loading.attr="disabled" wire:target="confirmDate"
+                                                    class="flex h-8 items-center justify-center rounded-lg bg-orange-50 text-sm font-bold text-orange-700 ring-1 ring-orange-200 transition hover:bg-orange-600 hover:text-white disabled:opacity-50 dark:bg-orange-950 dark:text-orange-300 dark:ring-orange-900 dark:hover:bg-orange-600 dark:hover:text-white">
+                                                    {{ $cell['d'] }}
+                                                </button>
+                                            @else
+                                                <span wire:key="dpc-{{ $mi }}-{{ $wi }}-{{ $di }}" class="flex h-8 cursor-not-allowed items-center justify-center rounded-lg text-sm text-slate-300 line-through decoration-slate-300/60 dark:text-slate-600">{{ $cell['d'] }}</span>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+                        <p class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <span class="inline-flex h-4 w-4 items-center justify-center rounded bg-orange-50 ring-1 ring-orange-200 dark:bg-orange-950 dark:ring-orange-900"></span>
+                            {{ __('Available days follow your publishing schedule — one article per day, past days and taken days are blocked.') }}
+                        </p>
+                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 dark:text-orange-400" wire:loading wire:target="confirmDate">
+                            <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                            {{ __('Adding to your calendar…') }}
+                        </span>
+                    </div>
                 </div>
             </div>
         @endif

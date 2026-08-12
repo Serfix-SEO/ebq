@@ -36,6 +36,15 @@ class ContentResearchTest extends TestCase
         Queue::fake(); // mount() kicks research jobs; never run them here
     }
 
+    /** Two-step add: open the date picker, then confirm the first free day. */
+    private function addViaDatePicker(ContentPlan $plan, string $keyword, ?int $volume = null): void
+    {
+        $date = app(\App\Services\Content\ContentTopicPlanner::class)->availableDates($plan)[0];
+        Livewire::test(ContentResearch::class)
+            ->call('addToCalendar', $keyword, $volume)
+            ->call('confirmDate', $date);
+    }
+
     /** @return array{0: User, 1: Website, 2: ContentPlan} */
     private function planFixture(): array
     {
@@ -94,7 +103,7 @@ class ContentResearchTest extends TestCase
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
-        Livewire::test(ContentResearch::class)->call('addToCalendar', 'best coffee grinder', 1200);
+        $this->addViaDatePicker($plan, 'best coffee grinder', 1200);
 
         $topic = $plan->topics()->where('target_keyword', 'best coffee grinder')->first();
         $this->assertNotNull($topic);
@@ -105,8 +114,76 @@ class ContentResearchTest extends TestCase
         $this->assertTrue($topic->scheduled_for->isFuture());
 
         // Second add is refused, not duplicated.
-        Livewire::test(ContentResearch::class)->call('addToCalendar', 'best coffee grinder', 1200);
+        $this->addViaDatePicker($plan, 'best coffee grinder', 1200);
         $this->assertSame(1, $plan->topics()->where('target_keyword', 'best coffee grinder')->count());
+    }
+
+    public function test_date_picker_opens_with_only_free_publish_days_enabled(): void
+    {
+        [$user, $website, $plan] = $this->planFixture(); // 7 days/week
+        $this->keywordRow($plan, 'best coffee grinder');
+        // Tomorrow is taken by an existing topic → must be disabled.
+        $taken = now()->addDay()->startOfDay();
+        ContentTopic::factory()->create([
+            'plan_id' => $plan->id, 'website_id' => $website->id,
+            'status' => ContentTopic::STATUS_APPROVED, 'scheduled_for' => $taken,
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        $lw = Livewire::test(ContentResearch::class)->call('addToCalendar', 'best coffee grinder', 1200);
+        $picker = $lw->get('datePicker');
+        $this->assertSame('best coffee grinder', $picker['keyword']);
+        $this->assertCount(3, $picker['months']);
+
+        $byDate = [];
+        foreach ($picker['months'] as $month) {
+            foreach ($month['weeks'] as $week) {
+                foreach ($week as $cell) {
+                    if ($cell !== null) {
+                        $byDate[$cell['date']] = $cell['enabled'];
+                    }
+                }
+            }
+        }
+        $this->assertFalse($byDate[now()->toDateString()]);            // today blocked
+        $this->assertFalse($byDate[$taken->toDateString()]);            // taken day blocked
+        $this->assertTrue($byDate[now()->addDays(2)->toDateString()]);  // free future day enabled
+    }
+
+    public function test_confirm_date_rejects_a_taken_day(): void
+    {
+        [$user, $website, $plan] = $this->planFixture();
+        $this->keywordRow($plan, 'best coffee grinder');
+        $taken = now()->addDay()->startOfDay();
+        ContentTopic::factory()->create([
+            'plan_id' => $plan->id, 'website_id' => $website->id,
+            'status' => ContentTopic::STATUS_APPROVED, 'scheduled_for' => $taken,
+        ]);
+
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        Livewire::test(ContentResearch::class)
+            ->call('addToCalendar', 'best coffee grinder', 1200)
+            ->call('confirmDate', $taken->toDateString());
+
+        $this->assertSame(0, $plan->topics()->where('target_keyword', 'best coffee grinder')->count());
+    }
+
+    public function test_chosen_date_is_used_for_the_topic(): void
+    {
+        [$user, $website, $plan] = $this->planFixture();
+        $this->keywordRow($plan, 'best coffee grinder');
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        $date = app(\App\Services\Content\ContentTopicPlanner::class)->availableDates($plan)[3];
+        Livewire::test(ContentResearch::class)
+            ->call('addToCalendar', 'best coffee grinder', 1200)
+            ->call('confirmDate', $date)
+            ->assertSet('datePicker', null);
+
+        $topic = $plan->topics()->where('target_keyword', 'best coffee grinder')->firstOrFail();
+        $this->assertSame($date, $topic->scheduled_for->toDateString());
     }
 
     public function test_add_to_calendar_enriches_secondary_keywords_from_library(): void
@@ -119,7 +196,7 @@ class ContentResearchTest extends TestCase
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
-        Livewire::test(ContentResearch::class)->call('addToCalendar', 'best coffee grinder', 1200);
+        $this->addViaDatePicker($plan, 'best coffee grinder', 1200);
 
         $topic = $plan->topics()->where('target_keyword', 'best coffee grinder')->first();
         $secondary = (array) $topic->secondary_keywords;
@@ -234,7 +311,7 @@ class ContentResearchTest extends TestCase
 
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
-        Livewire::test(ContentResearch::class)->call('addToCalendar', 'best coffee grinder', 1200);
+        $this->addViaDatePicker($plan, 'best coffee grinder', 1200);
 
         $this->assertSame(0, $plan->topics()->where('target_keyword', 'best coffee grinder')->count());
     }
