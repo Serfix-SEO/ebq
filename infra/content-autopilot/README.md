@@ -969,6 +969,19 @@ image URLs to platform refs (Wix media ids / Sanity asset `_id`s); unresolved
 image → node dropped + alt text emitted as an italic paragraph. Unit-tested
 against `tests/Fixtures/content/converter-article.html`.
 
+**Webhook tester (2026-08-12).** /content/integrations shows a permanent
+"Test your webhook" section whenever a `PLATFORM_WEBHOOK` integration exists
+(any status): `WebhookDriver::testDelivery()` sends a full sample article
+(`event: article.published`, `test: true`, slug `serfix-connection-test`,
+robots_noindex, "safe to delete" body) through the REAL signed delivery path.
+UI states: accepted + `{"url"}` returned → green with the link to open;
+accepted without url → amber ("check your site for the test post; return
+{\"url\"} or we can't verify/index/track"); failed → red with the error.
+Rate-limited 10/10min per integration
+(`PublishingSettings::testWebhook`). Exists because verify-only 200s hide
+receivers that drop articles (the aegiscoworking failure). Test:
+`ContentWebhookTesterTest`.
+
 **Republish (2026-08-12).** Published topics get a small "Republish" action on
 the calendar (grid cell + list row, `ContentCalendar::republish`): re-arms the
 topic's `content_publications` claims back to `queued` — **keeping
