@@ -622,6 +622,14 @@
                                             {{ __('Publish now') }}
                                         </button>
                                     @endif
+                                    @if ($publishConnected && ! $imgPending && $topic->status === \App\Models\ContentTopic::STATUS_PUBLISHED && $topic->currentArticle)
+                                        <button wire:click="republish('{{ $topic->id }}')" wire:confirm="{{ __('Send this article to your site again? Destinations that already have it get the latest version.') }}" draggable="false"
+                                                title="{{ __('Republish to your site') }}"
+                                                class="mt-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] font-semibold text-slate-400 hover:text-orange-600 dark:text-slate-500 dark:hover:text-orange-400">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356m-4.992 4.992l3.181-3.183a8.25 8.25 0 00-13.803 3.7M4.031 9.865v4.99m0 0h4.99m-4.99 0l3.181 3.183a8.25 8.25 0 0013.803-3.7"/></svg>
+                                            {{ __('Republish') }}
+                                        </button>
+                                    @endif
                                     </div>
                                 </div>
                             @endforeach
@@ -759,6 +767,14 @@
                                 @else
                                     <a href="{{ route('content.integrations') }}" wire:navigate class="text-xs font-medium text-orange-600 hover:text-orange-700">{{ __('Connect a site to publish →') }}</a>
                                 @endif
+                            @endif
+                            @if ($publishConnected && ! $imgPending && $topic->status === \App\Models\ContentTopic::STATUS_PUBLISHED && $topic->currentArticle)
+                                <button wire:click="republish('{{ $topic->id }}')" wire:confirm="{{ __('Send this article to your site again? Destinations that already have it get the latest version.') }}"
+                                        title="{{ __('Republish to your site') }}"
+                                        class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-slate-400 hover:text-orange-600 dark:text-slate-500 dark:hover:text-orange-400">
+                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356m-4.992 4.992l3.181-3.183a8.25 8.25 0 00-13.803 3.7M4.031 9.865v4.99m0 0h4.99m-4.99 0l3.181 3.183a8.25 8.25 0 0013.803-3.7"/></svg>
+                                    {{ __('Republish') }}
+                                </button>
                             @endif
                             @if (in_array($topic->status, ['suggested', 'approved', 'ready'], true))
                                 <button wire:click="skip('{{ $topic->id }}')" class="text-sm text-slate-400 hover:text-slate-600">{{ __('Skip') }}</button>

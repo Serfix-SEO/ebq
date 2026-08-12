@@ -4558,5 +4558,9 @@
     "Message": "الرسالة",
     "Closed": "مغلقة",
     "Link URL (https://…)": "رابط URL ‏(https://…)",
-    "Write a reply first.": "اكتب رداً أولاً."
+    "Write a reply first.": "اكتب رداً أولاً.",
+    "Republish": "إعادة نشر",
+    "Republish to your site": "إعادة النشر إلى موقعك",
+    "Send this article to your site again? Destinations that already have it get the latest version.": "إرسال هذا المقال إلى موقعك مرة أخرى؟ الوجهات التي لديها المقال بالفعل تحصل على أحدث نسخة.",
+    "Republishing — the latest version is being sent to your site.": "جارٍ إعادة النشر — يتم إرسال أحدث نسخة إلى موقعك."
 }

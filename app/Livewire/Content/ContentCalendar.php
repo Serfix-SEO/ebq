@@ -1124,6 +1124,36 @@ class ContentCalendar extends Component
     }
 
     /**
+     * Re-send an already-published article to the connected destination(s) —
+     * for when the destination lost it (receiver bug, disconnect/reconnect)
+     * or the client edited the article after publishing. Existing delivery
+     * claims are re-armed but keep their external ids, so destinations that
+     * already have the post get an UPDATE, never a duplicate.
+     */
+    public function republish(string $topicId): void
+    {
+        $topic = $this->topicOrFail($topicId);
+        if ($topic === null
+            || $topic->status !== ContentTopic::STATUS_PUBLISHED
+            || $topic->currentArticle === null) {
+            return;
+        }
+        if (! $this->hasPublishDestination()) {
+            session()->flash('content-error', __('Connect a site in Settings → Integrations before publishing.'));
+
+            return;
+        }
+
+        \App\Models\ContentPublication::query()
+            ->where('article_id', $topic->currentArticle->id)
+            ->update(['status' => \App\Models\ContentPublication::STATUS_QUEUED]);
+
+        $topic->enterStage(ContentTopic::STATUS_PUBLISHING);
+        PublishContentArticleJob::dispatch($topic->id);
+        session()->flash('content-status', __('Republishing — the latest version is being sent to your site.'));
+    }
+
+    /**
      * Human label for a plan's auto-publish window, e.g. "9:00–11:00 (Karachi)".
      * When start==end it's a single hour. Timezone shown as its short city name.
      */
