@@ -197,6 +197,9 @@
                                                 <div class="text-lg font-extrabold text-slate-900 dark:text-slate-100">{{ number_format($totViews) }}</div>
                                             </div>
                                         </div>
+                                        <p class="mt-2 text-xs text-slate-400 dark:text-slate-500">
+                                            {{ __('These totals count every Google search this article appears for — including phrases you aren\'t tracking. The keyword rows below only count searches of that exact phrase, so they can be lower.') }}
+                                        </p>
                                         <div class="mt-4 grid gap-4 md:grid-cols-2">
                                             @if ($clicksChart)
                                                 <div class="rounded-lg bg-white p-3 dark:bg-slate-900">

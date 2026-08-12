@@ -4584,5 +4584,6 @@
     "test URL": "رابط الاختبار",
     "SERP country": "دولة نتائج البحث",
     "SERP country saved — rechecking all keyword positions for the new market now.": "تم حفظ دولة نتائج البحث — يُعاد الآن فحص مواقع جميع الكلمات المفتاحية للسوق الجديد.",
-    "Updating…": "جارٍ التحديث…"
+    "Updating…": "جارٍ التحديث…",
+    "These totals count every Google search this article appears for — including phrases you aren't tracking. The keyword rows below only count searches of that exact phrase, so they can be lower.": "هذه الإجماليات تحسب كل بحث في Google يظهر فيه هذا المقال — بما في ذلك عبارات لا تتتبعها. صفوف الكلمات المفتاحية بالأسفل تحسب فقط عمليات البحث عن العبارة نفسها بالضبط، لذا قد تكون أقل."
 }
