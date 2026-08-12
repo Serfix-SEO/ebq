@@ -93,23 +93,22 @@
                     <div class="flex flex-wrap items-end gap-4">
                         {{-- Where the live SERP checks run from — saved per website. --}}
                         <div>
-                            <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                                <svg class="h-3.5 w-3.5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'/></svg>
-                                {{ __('SERP country') }}
+                            <label class="flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                <svg class="h-3.5 w-3.5 shrink-0 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'/></svg>
+                                <span>{{ __('SERP country') }}</span>
                                 <span wire:loading wire:target="saveSerpCountry" class="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400">
                                     <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
                                     {{ __('Updating…') }}
                                 </span>
                             </label>
-                            <div class="relative mt-1">
-                                <select wire:model="serpCountry" wire:change="saveSerpCountry" wire:loading.attr="disabled" wire:target="saveSerpCountry"
-                                    class="w-48 appearance-none rounded-xl border border-slate-300 bg-white py-2 pe-8 ps-3 text-sm font-medium shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                                    @foreach ($countryOptions as $code => $label)
-                                        <option value="{{ $code }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                <svg class="pointer-events-none absolute end-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
-                            </div>
+                            {{-- Native select arrow on purpose — a custom absolutely-
+                                 positioned chevron rendered detached on cached CSS. --}}
+                            <select wire:model="serpCountry" wire:change="saveSerpCountry" wire:loading.attr="disabled" wire:target="saveSerpCountry"
+                                class="mt-1 w-48 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                @foreach ($countryOptions as $code => $label)
+                                    <option value="{{ $code }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
                         </div>
                         <div class="text-sm font-medium text-slate-500 dark:text-slate-400">
                             {{ trans_choice('{0}No slots left|{1}:count slot left|[2,*]:count slots left', $remaining, ['count' => number_format($remaining)]) }}
