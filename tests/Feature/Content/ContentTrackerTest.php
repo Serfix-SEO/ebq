@@ -157,10 +157,11 @@ class ContentTrackerTest extends TestCase
         ]);
         session(['current_website_id' => $website->id]);
 
+        // Inline Track buttons pass their group's topic id — no performance
+        // panel open (regression: keywords used to file under "Other keywords").
         \Livewire\Livewire::actingAs($user)
             ->test(\App\Livewire\Content\KeywordTracker::class)
-            ->call('togglePerformance', $topic->id)
-            ->call('trackQuery', 'brand development plans dubai');
+            ->call('trackQuery', 'brand development plans dubai', $topic->id);
 
         $row = \App\Models\ContentTrackedKeyword::query()
             ->where('normalized_keyword', 'brand development plans dubai')->firstOrFail();

@@ -380,7 +380,7 @@
                                                     @if ($exhausted)
                                                         <span class="text-xs text-slate-400" title="{{ __('You\'ve reached your tracking limit. Remove a keyword below to make room for a new one.') }}">{{ __('No slots') }}</span>
                                                     @else
-                                                        <button type="button" wire:click="trackQuery({{ json_encode($q['query']) }})" wire:loading.attr="disabled" wire:target="trackQuery"
+                                                        <button type="button" wire:click="trackQuery({{ json_encode($q['query']) }}, '{{ $gid }}')" wire:loading.attr="disabled" wire:target="trackQuery"
                                                             class="inline-flex items-center gap-1 rounded-lg border border-orange-200 px-2.5 py-1 text-xs font-bold text-orange-600 transition hover:bg-orange-50 disabled:opacity-50 dark:border-orange-900 dark:text-orange-400 dark:hover:bg-orange-950">
                                                             <svg wire:loading.remove wire:target="trackQuery" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                                                             <svg wire:loading wire:target="trackQuery" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>

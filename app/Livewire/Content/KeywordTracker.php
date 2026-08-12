@@ -127,7 +127,7 @@ class KeywordTracker extends Component
      * groups under the article; quota-checked; the new keyword gets its live
      * SERP position immediately (track() dispatches the check).
      */
-    public function trackQuery(string $keyword): void
+    public function trackQuery(string $keyword, ?string $topicId = null): void
     {
         $website = $this->website();
         $keyword = trim($keyword);
@@ -135,11 +135,14 @@ class KeywordTracker extends Component
             return;
         }
 
+        // The article the phrase was discovered under — passed from the row's
+        // group so the new keyword files there (not into "Other keywords").
+        $topicId = $topicId ?? $this->selectedTopicId;
         $topic = null;
-        if ($this->selectedTopicId !== null && $this->selectedTopicId !== '_manual') {
+        if ($topicId !== null && $topicId !== '_manual') {
             $topic = \App\Models\ContentTopic::query()
                 ->where('website_id', $website->id)
-                ->whereKey($this->selectedTopicId)
+                ->whereKey($topicId)
                 ->first();
         }
 
