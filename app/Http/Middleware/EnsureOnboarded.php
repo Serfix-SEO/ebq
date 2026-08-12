@@ -16,7 +16,7 @@ class EnsureOnboarded
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if ($user && ! $user->hasAccessibleWebsites() && ! $request->routeIs('onboarding*', 'google.*', 'content.*', 'settings*', 'billing.*', 'cashier.*', 'verification.*', 'logout')) {
+        if ($user && ! $user->hasAccessibleWebsites() && ! $request->routeIs('onboarding*', 'google.*', 'content.*', 'settings*', 'billing.*', 'cashier.*', 'verification.*', 'support.*', 'logout')) {
             // Content-only mode: the SEO GSC/GA wizard is hidden, and sending
             // a no-website user there bounced them in a loop (kill-switch →
             // get-started → /websites → here → onboarding → …). Get started

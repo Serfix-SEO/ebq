@@ -284,6 +284,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-12 — Support tickets (client /support + /admin/support).** Threaded client↔team
+  conversations: `support_tickets`/`support_ticket_messages`, status = whose-turn tracker
+  (open/answered/closed, client reply always re-opens), mails both directions, RateLimiter on
+  create. **Bug reports ARE support tickets**: `SupportTicket::createFromBugReport` bridge +
+  `bug_reports.support_ticket_id` link, modal creates a thread, resolve mirrors the note into
+  it, one-time `ebq:backfill-bug-report-tickets`. `support.*` added to EnsureOnboarded's
+  allowlist (help reachable with zero websites). Docs:
+  [accounts/support-tickets.md](./accounts/support-tickets.md).
 - **2026-08-10 — Content publish destinations ×5: Shopify, HubSpot, Webflow, Sanity, Wix.**
   Token-paste drivers on the existing `PublishDriver` contract (no job/schema changes):
   Shopify = GraphQL Admin only (REST closed to new custom apps), HubSpot = raw-HTML `postBody`

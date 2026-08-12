@@ -52,6 +52,8 @@ class BugReportController extends Controller
     {
         if ($bugReport->status === BugReport::STATUS_RESOLVED) {
             $bugReport->update(['status' => BugReport::STATUS_NEW, 'resolved_at' => null]);
+            \App\Models\SupportTicket::query()->whereKey($bugReport->support_ticket_id)
+                ->update(['status' => \App\Models\SupportTicket::STATUS_OPEN]);
 
             return back();
         }
@@ -65,6 +67,21 @@ class BugReportController extends Controller
             'resolution_note' => $validated['resolution_note'],
             'resolved_at' => now(),
         ]);
+
+        // Mirror the resolution into the report's support-ticket thread so
+        // the client sees it (and can follow up) on /support too.
+        $ticket = \App\Models\SupportTicket::query()->whereKey($bugReport->support_ticket_id)->first();
+        if ($ticket !== null) {
+            $ticket->messages()->create([
+                'user_id' => (string) $request->user()->id,
+                'is_admin' => true,
+                'body' => $validated['resolution_note'],
+            ]);
+            $ticket->forceFill([
+                'status' => \App\Models\SupportTicket::STATUS_ANSWERED,
+                'last_reply_at' => now(),
+            ])->save();
+        }
 
         try {
             $email = $bugReport->user?->email;

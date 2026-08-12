@@ -100,6 +100,7 @@ class GuestRankCheckTest extends TestCase
                 ?string $websiteId = null,
                 ?string $ownerUserId = null,
                 ?string $source = null,
+            bool $unmetered = false,
             ): ?array {
                 return [
                     'organic' => [
@@ -136,6 +137,7 @@ class GuestRankCheckTest extends TestCase
                 ?string $websiteId = null,
                 ?string $ownerUserId = null,
                 ?string $source = null,
+            bool $unmetered = false,
             ): ?array {
                 return ['organic' => [['position' => 1, 'title' => 'Other', 'link' => 'https://other.com/']]];
             }

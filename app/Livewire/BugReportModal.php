@@ -75,6 +75,14 @@ class BugReportModal extends Component
             'status' => BugReport::STATUS_NEW,
         ]);
 
+        // Bug reports ARE support tickets — the client follows up (and we
+        // reply) in the /support thread, not in a dead-end modal.
+        try {
+            \App\Models\SupportTicket::createFromBugReport($report);
+        } catch (\Throwable $e) {
+            Log::warning("BugReportModal: ticket creation failed for report {$report->id}: {$e->getMessage()}");
+        }
+
         // Mail trouble must never break the user's submit.
         try {
             $admins = User::query()->where('is_admin', true)->pluck('email')->filter()->values();

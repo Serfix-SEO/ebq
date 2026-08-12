@@ -396,6 +396,11 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     }
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
 
+    // Support tickets — per-user (not per-website), always reachable.
+    Route::view('/support', 'support.index')->name('support.index');
+    Route::get('/support/{ticket}', fn (string $ticket) => view('support.show', ['ticketId' => $ticket]))
+        ->name('support.show');
+
     // `feature.enabled:ai_studio` is the global beta kill-switch (config
     // features.ai_studio); `feature:ai_studio` is the per-team permission gate.
     // Route names stay registered even when disabled so firstAccessibleRoute()
@@ -553,6 +558,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/lifecycle/test-send', [AdminLifecycleController::class, 'testSend'])->name('lifecycle.test-send');
 
     Route::get('/leads', [LeadController::class, 'index'])->name('leads.index');
+    Route::get('/support', [\App\Http\Controllers\Admin\SupportTicketController::class, 'index'])->name('support.index');
+    Route::get('/support/{ticket}', [\App\Http\Controllers\Admin\SupportTicketController::class, 'show'])->name('support.show');
+    Route::post('/support/{ticket}/reply', [\App\Http\Controllers\Admin\SupportTicketController::class, 'reply'])->name('support.reply');
+    Route::post('/support/{ticket}/status', [\App\Http\Controllers\Admin\SupportTicketController::class, 'setStatus'])->name('support.status');
+
     Route::get('/bug-reports', [BugReportController::class, 'index'])->name('bug-reports.index');
     Route::get('/bug-reports/{bugReport}/screenshot', [BugReportController::class, 'screenshot'])->name('bug-reports.screenshot');
     Route::post('/bug-reports/{bugReport}/resolve', [BugReportController::class, 'resolve'])->name('bug-reports.resolve');
