@@ -51,6 +51,32 @@ class ContentTrackerTest extends TestCase
         return $topic;
     }
 
+    public function test_tracking_a_keyword_dispatches_an_immediate_serp_check(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $user = $this->trialUser();
+        $website = $this->siteFor($user);
+
+        app(\App\Services\Content\ContentKeywordTracker::class)->track($website, ['digital marketing']);
+
+        \Illuminate\Support\Facades\Queue::assertPushed(
+            \App\Jobs\CheckTrackedKeywordSerpJob::class,
+            fn ($job) => $job->websiteId === $website->id,
+        );
+    }
+
+    public function test_tracking_only_duplicates_dispatches_no_check(): void
+    {
+        $user = $this->trialUser();
+        $website = $this->siteFor($user);
+        app(\App\Services\Content\ContentKeywordTracker::class)->track($website, ['digital marketing']);
+
+        \Illuminate\Support\Facades\Queue::fake();
+        app(\App\Services\Content\ContentKeywordTracker::class)->track($website, ['digital marketing']);
+
+        \Illuminate\Support\Facades\Queue::assertNothingPushed();
+    }
+
     public function test_quota_is_3_on_trial_and_500_when_comped_per_website(): void
     {
         $quota = app(KeywordTrackerQuota::class);

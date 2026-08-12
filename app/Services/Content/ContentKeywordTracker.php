@@ -92,6 +92,15 @@ class ContentKeywordTracker
             }
         }
 
+        // Freshly tracked keywords get their live position right away instead
+        // of waiting for the next daily run — the UI shows "Checking…" from
+        // the moment of adding, so make that true. The job is unique per
+        // website and only queries never-checked/stale rows, so double
+        // dispatches (e.g. the publish job dispatches too) are harmless.
+        if ($added > 0) {
+            \App\Jobs\CheckTrackedKeywordSerpJob::dispatch($website->id);
+        }
+
         return ['added' => $added, 'skipped' => $skipped, 'capped' => $capped];
     }
 
