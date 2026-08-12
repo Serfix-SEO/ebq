@@ -137,6 +137,38 @@ class SupportTicketTest extends TestCase
         Mail::assertSent(SupportTicketActivity::class, fn ($mail) => $mail->isNew === false);
     }
 
+    public function test_rich_reply_is_sanitized_but_keeps_formatting(): void
+    {
+        $user = $this->user();
+        $ticket = $this->ticketFor($user);
+
+        Livewire::actingAs($user)
+            ->test(TicketThread::class, ['ticketId' => $ticket->id])
+            ->set('reply', '<p>Still <strong>broken</strong></p><script>alert(1)</script><p onclick="x()">see <a href="javascript:evil()">this</a></p>')
+            ->call('send')
+            ->assertHasNoErrors();
+
+        $body = $ticket->messages()->orderByDesc('id')->first()->body;
+        $this->assertStringContainsString('<strong>broken</strong>', $body);
+        $this->assertStringNotContainsString('script', $body);
+        $this->assertStringNotContainsString('onclick', $body);
+        $this->assertStringNotContainsString('javascript:', $body);
+    }
+
+    public function test_markup_only_reply_is_rejected(): void
+    {
+        $user = $this->user();
+        $ticket = $this->ticketFor($user);
+
+        Livewire::actingAs($user)
+            ->test(TicketThread::class, ['ticketId' => $ticket->id])
+            ->set('reply', '<p><br></p>')
+            ->call('send')
+            ->assertHasErrors(['reply']);
+
+        $this->assertSame(1, $ticket->messages()->count());
+    }
+
     public function test_client_can_close_their_ticket(): void
     {
         $user = $this->user();

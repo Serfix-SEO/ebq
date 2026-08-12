@@ -4556,5 +4556,7 @@
     "reply": "الرد",
     "Subject": "الموضوع",
     "Message": "الرسالة",
-    "Closed": "مغلقة"
+    "Closed": "مغلقة",
+    "Link URL (https://…)": "رابط URL ‏(https://…)",
+    "Write a reply first.": "اكتب رداً أولاً."
 }

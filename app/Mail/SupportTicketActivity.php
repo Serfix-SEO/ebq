@@ -7,7 +7,6 @@ use App\Models\SupportTicketMessage;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Support\Str;
 
 /**
  * Sent to ADMINS when a customer opens a ticket or replies to one.
@@ -32,7 +31,8 @@ class SupportTicketActivity extends Mailable
     {
         $email = e($this->ticket->user?->email ?? 'unknown');
         $subject = e($this->ticket->subject);
-        $body = nl2br(e(Str::limit($this->message->body, 1500)));
+        // Already whitelist-sanitized (HtmlSanitizer) — safe to embed as-is.
+        $body = $this->message->bodyHtml();
         $domain = e($this->ticket->website?->domain ?? '—');
         $appUrl = rtrim(config('app.public_url', config('app.url')), '/');
         $adminUrl = $appUrl.'/admin/support/'.$this->ticket->id;

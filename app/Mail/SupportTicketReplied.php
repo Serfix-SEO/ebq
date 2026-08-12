@@ -33,7 +33,8 @@ class SupportTicketReplied extends Mailable
     {
         $name = e($this->ticket->user?->name ?: 'there');
         $subject = e($this->ticket->subject);
-        $reply = nl2br(e($this->message->body));
+        // Already whitelist-sanitized (HtmlSanitizer) — safe to embed as-is.
+        $reply = $this->message->bodyHtml();
         $appUrl = rtrim(config('app.public_url', config('app.url')), '/');
         $ticketUrl = $appUrl.'/support/'.$this->ticket->id;
 

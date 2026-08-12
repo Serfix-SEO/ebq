@@ -34,13 +34,22 @@ class TicketThread extends Component
         }
 
         $this->validate([
-            'reply' => 'required|string|min:2|max:10000',
+            'reply' => 'required|string|max:20000',
         ], [], ['reply' => __('reply')]);
+
+        // The reply arrives as editor HTML — sanitize to the small whitelist
+        // and validate length on the visible text, not the markup.
+        $body = $this->sanitizedBody($this->reply);
+        if ($body === null) {
+            $this->addError('reply', __('Write a reply first.'));
+
+            return;
+        }
 
         $msg = $ticket->messages()->create([
             'user_id' => (string) Auth::id(),
             'is_admin' => false,
-            'body' => trim($this->reply),
+            'body' => $body,
         ]);
         // A client reply always puts the ball back in our court — including
         // re-opening a closed ticket.
@@ -59,6 +68,17 @@ class TicketThread extends Component
         }
 
         $this->reset('reply');
+        $this->dispatch('support-editor-clear');
+    }
+
+    /** Sanitized message body, or null when nothing readable was written. */
+    private function sanitizedBody(string $raw): ?string
+    {
+        $body = preg_match('/<[a-z][^>]*>/i', $raw) === 1
+            ? \App\Support\HtmlSanitizer::clean($raw)
+            : trim($raw);
+
+        return mb_strlen(\App\Support\HtmlSanitizer::text($body)) >= 2 ? $body : null;
     }
 
     public function close(): void

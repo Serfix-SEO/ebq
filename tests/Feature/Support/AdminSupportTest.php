@@ -88,6 +88,28 @@ class AdminSupportTest extends TestCase
         Mail::assertSent(SupportTicketReplied::class, fn ($mail) => $mail->hasTo($ticket->user->email));
     }
 
+    public function test_admin_rich_reply_is_sanitized_and_emailed_with_formatting(): void
+    {
+        $ticket = $this->ticket();
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.support.reply', $ticket), [
+                'body' => '<p>Fix is <b>live</b></p><script>alert(1)</script><ul><li>step one</li></ul>',
+            ])
+            ->assertRedirect();
+
+        $body = $ticket->messages()->where('is_admin', true)->first()->body;
+        $this->assertStringContainsString('<b>live</b>', $body);
+        $this->assertStringContainsString('<li>step one</li>', $body);
+        $this->assertStringNotContainsString('script', $body);
+
+        Mail::assertSent(SupportTicketReplied::class, function ($mail) {
+            $html = $mail->content()->htmlString;
+
+            return str_contains($html, '<b>live</b>') && ! str_contains($html, '<script');
+        });
+    }
+
     public function test_status_can_be_closed_and_reopened(): void
     {
         $ticket = $this->ticket();

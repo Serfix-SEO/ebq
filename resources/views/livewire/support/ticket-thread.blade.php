@@ -1,4 +1,13 @@
 <div class="mx-auto w-full max-w-4xl space-y-6">
+    {{-- Rich message bodies: Tailwind preflight strips list/link styling. --}}
+    <style>
+        .ticket-body ul { list-style: disc; padding-inline-start: 1.25rem; margin: 0.25rem 0; }
+        .ticket-body ol { list-style: decimal; padding-inline-start: 1.25rem; margin: 0.25rem 0; }
+        .ticket-body p { margin: 0.25rem 0; }
+        .ticket-body a { color: #C44E0E; text-decoration: underline; }
+        .ticket-body blockquote { border-inline-start: 3px solid #E2E8F0; padding-inline-start: 0.75rem; margin: 0.25rem 0; }
+        .support-editor:empty::before { content: attr(data-placeholder); color: #94A3B8; }
+    </style>
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
             <a href="{{ route('support.index') }}" class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-orange-600 dark:text-slate-400">
@@ -35,7 +44,7 @@
                         {{ $msg->is_admin ? __('Serfix team') : __('You') }}
                         <span class="font-normal text-slate-400">{{ $msg->created_at->diffForHumans() }}</span>
                     </div>
-                    <div class="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-slate-800 dark:text-slate-200">{{ $msg->body }}</div>
+                    <div class="ticket-body mt-1.5 text-sm leading-relaxed text-slate-800 dark:text-slate-200">{!! $msg->bodyHtml() !!}</div>
                 </div>
             </div>
         @endforeach
@@ -45,8 +54,9 @@
         @if ($ticket->isClosed())
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('This ticket is closed — replying will re-open it.') }}</p>
         @endif
-        <textarea wire:model="reply" rows="4" placeholder="{{ __('Write a reply…') }}"
-            class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"></textarea>
+        <div class="mt-2" wire:ignore>
+            <x-support.html-editor name="reply" wire:model="reply" :placeholder="__('Write a reply…')" />
+        </div>
         @error('reply') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
         <div class="mt-3 flex justify-end">
             <button type="button" wire:click="send" class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">

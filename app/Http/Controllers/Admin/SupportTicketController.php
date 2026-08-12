@@ -59,12 +59,21 @@ class SupportTicketController extends Controller
 
     public function reply(Request $request, SupportTicket $ticket): RedirectResponse
     {
-        $data = $request->validate(['body' => 'required|string|min:2|max:10000']);
+        $data = $request->validate(['body' => 'required|string|max:20000']);
+
+        // Editor HTML → whitelist-sanitized; length checked on visible text.
+        $body = preg_match('/<[a-z][^>]*>/i', $data['body']) === 1
+            ? \App\Support\HtmlSanitizer::clean($data['body'])
+            : trim($data['body']);
+        if (mb_strlen(\App\Support\HtmlSanitizer::text($body)) < 2) {
+            return redirect()->route('admin.support.show', $ticket)
+                ->withErrors(['body' => 'Write a reply first.']);
+        }
 
         $message = $ticket->messages()->create([
             'user_id' => (string) Auth::id(),
             'is_admin' => true,
-            'body' => trim($data['body']),
+            'body' => $body,
         ]);
         $ticket->forceFill([
             'status' => SupportTicket::STATUS_ANSWERED,
