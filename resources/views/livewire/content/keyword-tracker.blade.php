@@ -65,7 +65,21 @@
                 $barColor = $exhausted ? 'bg-rose-500' : ($nearCap ? 'bg-amber-500' : 'bg-orange-500');
             @endphp
             @if (session('tracker-status'))
-                <div class="rounded-xl border border-success/25 bg-success/5 px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ session('tracker-status') }}</div>
+                <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 8000)"
+                    x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                    x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                    class="relative flex items-start gap-3 overflow-hidden rounded-2xl border border-orange-200 bg-white p-4 ps-5 shadow-sm ring-1 ring-orange-500/10 dark:border-orange-900 dark:bg-slate-900">
+                    <span class="absolute inset-y-0 start-0 w-1 bg-gradient-to-b from-orange-500 to-orange-600"></span>
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-300">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                    </span>
+                    <div class="min-w-0 flex-1 pt-0.5">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ session('tracker-status') }}</p>
+                    </div>
+                    <button type="button" @click="show = false" class="shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800" aria-label="{{ __('Dismiss') }}">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
             @endif
 
             <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -79,13 +93,23 @@
                     <div class="flex flex-wrap items-end gap-4">
                         {{-- Where the live SERP checks run from — saved per website. --}}
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('SERP country') }}</label>
-                            <select wire:model="serpCountry" wire:change="saveSerpCountry"
-                                class="mt-1 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                                @foreach ($countryOptions as $code => $label)
-                                    <option value="{{ $code }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
+                            <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                <svg class="h-3.5 w-3.5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'/></svg>
+                                {{ __('SERP country') }}
+                                <span wire:loading wire:target="saveSerpCountry" class="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400">
+                                    <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                                    {{ __('Updating…') }}
+                                </span>
+                            </label>
+                            <div class="relative mt-1">
+                                <select wire:model="serpCountry" wire:change="saveSerpCountry" wire:loading.attr="disabled" wire:target="saveSerpCountry"
+                                    class="w-48 appearance-none rounded-xl border border-slate-300 bg-white py-2 pe-8 ps-3 text-sm font-medium shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                    @foreach ($countryOptions as $code => $label)
+                                        <option value="{{ $code }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <svg class="pointer-events-none absolute end-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+                            </div>
                         </div>
                         <div class="text-sm font-medium text-slate-500 dark:text-slate-400">
                             {{ trans_choice('{0}No slots left|{1}:count slot left|[2,*]:count slots left', $remaining, ['count' => number_format($remaining)]) }}

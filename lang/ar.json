@@ -4583,5 +4583,6 @@
     "The test URL must use https://.": "يجب أن يستخدم رابط الاختبار https://.",
     "test URL": "رابط الاختبار",
     "SERP country": "دولة نتائج البحث",
-    "SERP country saved — rechecking all keyword positions for the new market now.": "تم حفظ دولة نتائج البحث — يُعاد الآن فحص مواقع جميع الكلمات المفتاحية للسوق الجديد."
+    "SERP country saved — rechecking all keyword positions for the new market now.": "تم حفظ دولة نتائج البحث — يُعاد الآن فحص مواقع جميع الكلمات المفتاحية للسوق الجديد.",
+    "Updating…": "جارٍ التحديث…"
 }
