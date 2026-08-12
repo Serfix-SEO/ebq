@@ -109,7 +109,7 @@
                             </label>
                             <p class="mt-1 flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
                                 <svg wire:loading wire:target="saveSerpCountry" class="h-3 w-3 shrink-0 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                                <span wire:loading.remove wire:target="saveSerpCountry">{{ __('Your keyword positions are checked in this country\'s Google results.') }}</span>
+                                <span wire:loading.remove wire:target="saveSerpCountry">{{ __('Positions are checked in this country\'s Google results and refresh every 7 days. Changing the country rechecks all keywords — new positions can take a few minutes to appear.') }}</span>
                                 <span wire:loading wire:target="saveSerpCountry" class="font-semibold text-orange-600 dark:text-orange-400">{{ __('Updating…') }}</span>
                             </p>
                         </div>

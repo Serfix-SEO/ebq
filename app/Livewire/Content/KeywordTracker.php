@@ -90,7 +90,7 @@ class KeywordTracker extends Component
             ->update(['serp_checked_at' => null]);
         \App\Jobs\CheckTrackedKeywordSerpJob::dispatch($website->id);
 
-        session()->flash('tracker-status', __('SERP country saved — rechecking all keyword positions for the new market now.'));
+        session()->flash('tracker-status', __('SERP country saved — all keyword positions are being rechecked for the new market. This can take a few minutes; positions then refresh automatically every 7 days.'));
     }
 
     private function website(): ?Website
