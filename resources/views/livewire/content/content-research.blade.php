@@ -124,10 +124,12 @@
                                     {{ __('In your calendar') }}
                                 </span>
                             @else
-                                <button type="button" wire:click="addToCalendar(@js($row['query']))"
-                                    class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 hover:border-orange-300 hover:text-orange-700 dark:border-slate-700 dark:text-slate-200 dark:hover:text-orange-300">
-                                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                                    {{ __('Add to calendar') }}
+                                <button type="button" wire:click="addToCalendar(@js($row['query']))" wire:loading.attr="disabled" wire:target="addToCalendar"
+                                    class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 hover:border-orange-300 hover:text-orange-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:text-orange-300">
+                                    <svg wire:loading.remove wire:target="addToCalendar" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                                    <svg wire:loading wire:target="addToCalendar" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                                    <span wire:loading.remove wire:target="addToCalendar">{{ __('Add to calendar') }}</span>
+                                    <span wire:loading wire:target="addToCalendar">{{ __('Loading days…') }}</span>
                                 </button>
                             @endif
                         </div>
@@ -230,10 +232,12 @@
                                         {{ __('In your calendar') }}
                                     </span>
                                 @else
-                                    <button type="button" wire:click="addToCalendar(@js($row['keyword']), @js($row['volume']))" wire:loading.attr="disabled"
-                                        class="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-orange-700">
-                                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
-                                        {{ __('Add to calendar') }}
+                                    <button type="button" wire:click="addToCalendar(@js($row['keyword']), @js($row['volume']))" wire:loading.attr="disabled" wire:target="addToCalendar"
+                                        class="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-orange-700 disabled:opacity-60">
+                                        <svg wire:loading.remove wire:target="addToCalendar" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                                        <svg wire:loading wire:target="addToCalendar" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                                        <span wire:loading.remove wire:target="addToCalendar">{{ __('Add to calendar') }}</span>
+                                        <span wire:loading wire:target="addToCalendar">{{ __('Loading days…') }}</span>
                                     </button>
                                 @endif
                             </div>
@@ -281,8 +285,10 @@
                                 <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                             @else
                                 <button type="button" wire:click="addToCalendar(@js($q['keyword']), @js($q['volume']))" title="{{ __('Add to calendar') }}"
-                                    class="flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-white hover:bg-orange-700">
-                                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                                    wire:loading.attr="disabled" wire:target="addToCalendar"
+                                    class="flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60">
+                                    <svg wire:loading.remove wire:target="addToCalendar" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                                    <svg wire:loading wire:target="addToCalendar" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
                                 </button>
                             @endif
                         </span>

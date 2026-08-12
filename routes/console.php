@@ -15,6 +15,9 @@ Schedule::command('ebq:track-rankings')->hourly();
 // Monthly refresh of report snapshots for paid-owned domains (30-day cadence).
 // Free/anonymous domains refresh lazily on query (90-day TTL) instead.
 Schedule::command('ebq:refresh-paid-reports')->dailyAt('04:15');
+// Pre-computes the research page's 10-20s GSC aggregation so no client
+// request pays it (FPM-starvation incident 2026-08-12).
+Schedule::command('ebq:warm-research-cache')->dailyAt('06:20')->withoutOverlapping();
 // Free-feed refresh of the accumulating domain-intelligence store (Open
 // PageRank bulk + local CC sidecar) — independent of client lifecycle.
 Schedule::command('ebq:refresh-domain-metrics')->monthlyOn(3, '02:40')->withoutOverlapping();

@@ -14,6 +14,7 @@ use App\Services\Content\ContentKeywordTracker;
 use App\Services\Content\ContentTopicPlanner;
 use App\Services\Content\KeywordWinnability;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -297,15 +298,20 @@ class ContentResearch extends Component
             return [];
         }
         try {
-            return DB::table('search_console_data')
-                ->where('website_id', $website->id)
-                ->where('date', '>=', now()->subDays(90)->toDateString())
-                ->whereIn('query', $keywords)
-                ->groupBy('query')
-                ->selectRaw('query, AVG(position) as position')
-                ->pluck('position', 'query')
-                ->map(fn ($p) => max(1, (int) round((float) $p)))
-                ->all();
+            // Cached per page-of-keywords: re-rendered on every interaction.
+            return Cache::remember(
+                'content_research:gscpos:v1:'.$website->id.':'.now()->toDateString().':'.md5(implode('|', $keywords)),
+                21600,
+                fn () => DB::table('search_console_data')
+                    ->where('website_id', $website->id)
+                    ->where('date', '>=', now()->subDays(90)->toDateString())
+                    ->whereIn('query', $keywords)
+                    ->groupBy('query')
+                    ->selectRaw('query, AVG(position) as position')
+                    ->pluck('position', 'query')
+                    ->map(fn ($p) => max(1, (int) round((float) $p)))
+                    ->all(),
+            );
         } catch (\Throwable) {
             return [];
         }
@@ -437,25 +443,17 @@ class ContentResearch extends Component
                 return [];
             }
 
-            return DB::table('search_console_data')
-                ->where('website_id', $website->id)
-                ->where('date', '>=', now()->subDays(90)->toDateString())
-                ->groupBy('query')
-                ->havingRaw('SUM(impressions) >= 20')
-                ->orderByRaw('SUM(impressions) DESC')
-                ->selectRaw('query, SUM(impressions) as impressions, AVG(position) as position')
-                ->limit(60)
-                ->get()
-                ->filter(fn ($r) => (float) $r->position >= 6.0 && (float) $r->position <= 30.0)
-                ->take(10)
-                ->map(fn ($r) => [
-                    'query' => (string) $r->query,
-                    'impressions' => (int) $r->impressions,
-                    'position' => round((float) $r->position, 1),
-                    'planned' => isset($plannedSet[mb_strtolower(trim((string) $r->query))]),
-                ])
-                ->values()
-                ->all();
+            // Heavy 90-day aggregation lives behind a daily-warmed cache
+            // (ContentResearchAggregates) — Livewire re-renders on every
+            // keystroke/filter/picker interaction, and uncached this starved
+            // the shared FPM pool (prod lag incident 2026-08-12). The
+            // `planned` flag is applied OUTSIDE the cache so adding a topic
+            // updates the checkmarks instantly.
+            $rows = app(\App\Services\Content\ContentResearchAggregates::class)->strikingQueries($website);
+
+            return array_map(fn (array $r) => $r + [
+                'planned' => isset($plannedSet[mb_strtolower(trim($r['query']))]),
+            ], $rows);
         } catch (\Throwable) {
             return [];
         }
