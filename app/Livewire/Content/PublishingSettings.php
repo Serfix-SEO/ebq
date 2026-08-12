@@ -422,6 +422,67 @@ class PublishingSettings extends Component
         $this->integrationOrFail($integrationId)?->delete();
     }
 
+    /** Inline endpoint-URL edit state (webhook integrations only). */
+    public ?string $editingEndpointId = null;
+
+    public string $editEndpointUrl = '';
+
+    public function editEndpoint(string $integrationId): void
+    {
+        $integration = $this->integrationOrFail($integrationId);
+        if ($integration === null || $integration->platform !== ContentIntegration::PLATFORM_WEBHOOK) {
+            return;
+        }
+        $this->editingEndpointId = $integration->id;
+        $this->editEndpointUrl = (string) (((array) $integration->credentials)['endpoint_url'] ?? '');
+        $this->resetErrorBag('editEndpointUrl');
+    }
+
+    public function cancelEditEndpoint(): void
+    {
+        $this->reset('editingEndpointId', 'editEndpointUrl');
+        $this->resetErrorBag('editEndpointUrl');
+    }
+
+    /**
+     * Change ONLY the endpoint URL — the signing secret stays, so the client
+     * can move their receiver without re-wiring the secret on both ends. The
+     * new URL is live-verified before the integration stays connected.
+     */
+    public function saveEndpoint(): void
+    {
+        if ($this->editingEndpointId === null) {
+            return;
+        }
+        $integration = $this->integrationOrFail($this->editingEndpointId);
+        if ($integration === null || $integration->platform !== ContentIntegration::PLATFORM_WEBHOOK) {
+            return;
+        }
+
+        $this->validate([
+            'editEndpointUrl' => 'required|url|starts_with:https://|max:600',
+        ], [
+            'editEndpointUrl.starts_with' => __('The endpoint URL must use https:// — articles are sent over the public internet.'),
+        ], ['editEndpointUrl' => __('endpoint URL')]);
+
+        $credentials = (array) $integration->credentials;
+        $credentials['endpoint_url'] = trim($this->editEndpointUrl);
+        $integration->forceFill(['credentials' => $credentials])->save();
+
+        $result = app(PublishDriverFactory::class)->for($integration)?->verify($integration);
+        $ok = $result?->ok ?? false;
+        $integration->forceFill([
+            'status' => $ok ? ContentIntegration::STATUS_CONNECTED : ContentIntegration::STATUS_ERROR,
+            'last_verified_at' => $ok ? now() : $integration->last_verified_at,
+            'last_error' => $ok ? null : mb_substr((string) ($result?->error ?? 'Verification failed.'), 0, 500),
+        ])->save();
+
+        $this->reset('editingEndpointId', 'editEndpointUrl', 'webhookTest');
+        session()->flash('publishing-status', $ok
+            ? __('Endpoint updated and verified.')
+            : __('Endpoint saved, but verification failed — check the URL and use the tester below.'));
+    }
+
     /**
      * Webhook tester result, shown inline on the integrations page.
      *

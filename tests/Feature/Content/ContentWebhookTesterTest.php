@@ -116,6 +116,68 @@ class ContentWebhookTesterTest extends TestCase
             ->assertSee(__('The test delivery failed.'));
     }
 
+    public function test_endpoint_url_is_editable_keeping_the_secret_and_reverifies(): void
+    {
+        Http::fake(['newhost.test/*' => Http::response(['ok' => true])]);
+        $integration = $this->webhookIntegration();
+
+        Livewire::actingAs($this->user)
+            ->test(PublishingSettings::class)
+            ->call('editEndpoint', $integration->id)
+            ->assertSet('editEndpointUrl', 'https://client.test/receive')
+            ->set('editEndpointUrl', 'https://newhost.test/hooks/serfix')
+            ->call('saveEndpoint')
+            ->assertHasNoErrors();
+
+        $integration->refresh();
+        $creds = (array) $integration->credentials;
+        $this->assertSame('https://newhost.test/hooks/serfix', $creds['endpoint_url']);
+        $this->assertSame(self::SECRET, $creds['secret']); // secret untouched
+        $this->assertSame(ContentIntegration::STATUS_CONNECTED, $integration->status);
+
+        // The save re-verified against the NEW endpoint with a signed probe.
+        Http::assertSent(function (Request $r) {
+            $expected = 'sha256='.hash_hmac('sha256', $r->body(), self::SECRET);
+
+            return str_starts_with((string) $r->url(), 'https://newhost.test/hooks/serfix')
+                && json_decode($r->body(), true)['event'] === 'verify'
+                && $r->header('X-Serfix-Signature')[0] === $expected;
+        });
+    }
+
+    public function test_endpoint_edit_rejects_plain_http(): void
+    {
+        Http::fake();
+        $integration = $this->webhookIntegration();
+
+        Livewire::actingAs($this->user)
+            ->test(PublishingSettings::class)
+            ->call('editEndpoint', $integration->id)
+            ->set('editEndpointUrl', 'http://insecure.test/hook')
+            ->call('saveEndpoint')
+            ->assertHasErrors(['editEndpointUrl']);
+
+        $this->assertSame('https://client.test/receive', ((array) $integration->refresh()->credentials)['endpoint_url']);
+        Http::assertNothingSent();
+    }
+
+    public function test_failed_verification_of_the_new_url_marks_the_integration_errored(): void
+    {
+        Http::fake(['deadhost.test/*' => Http::response('nope', 500)]);
+        $integration = $this->webhookIntegration();
+
+        Livewire::actingAs($this->user)
+            ->test(PublishingSettings::class)
+            ->call('editEndpoint', $integration->id)
+            ->set('editEndpointUrl', 'https://deadhost.test/hook')
+            ->call('saveEndpoint');
+
+        $integration->refresh();
+        $this->assertSame('https://deadhost.test/hook', ((array) $integration->credentials)['endpoint_url']);
+        $this->assertSame(ContentIntegration::STATUS_ERROR, $integration->status);
+        $this->assertNotNull($integration->last_error);
+    }
+
     public function test_non_webhook_integrations_are_ignored(): void
     {
         Http::fake();

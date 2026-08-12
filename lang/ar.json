@@ -4572,5 +4572,11 @@
     "Check your site for a post titled \"Serfix test article\". If it.s not there, your receiver accepts deliveries without storing them. Also return {\"url\": \"...\"} — without it we can.t link the live page, submit it to Google, or track rankings.": "تحقق من موقعك عن مقال بعنوان \"Serfix test article\". إن لم يكن موجوداً فمستقبِلك يقبل الإرسال دون تخزينه. أعد أيضاً {\"url\": \"...\"} — بدونه لا يمكننا ربط الصفحة أو إرسالها إلى Google أو تتبع الترتيب.",
     "The test delivery failed.": "فشل الإرسال التجريبي.",
     "Too many test deliveries — wait a few minutes and try again.": "محاولات اختبار كثيرة — انتظر بضع دقائق وحاول مجدداً.",
-    "Check your site for a post titled \"Serfix test article\". If it's not there, your receiver accepts deliveries without storing them. Also return {\"url\": \"...\"} — without it we can't link the live page, submit it to Google, or track rankings.": "تحقق من موقعك عن مقال بعنوان \"Serfix test article\". إن لم يكن موجوداً فمستقبِلك يقبل الإرسال دون تخزينه. أعد أيضاً {\"url\": \"...\"} — بدونه لا يمكننا ربط الصفحة أو إرسالها إلى Google أو تتبع الترتيب."
+    "Check your site for a post titled \"Serfix test article\". If it's not there, your receiver accepts deliveries without storing them. Also return {\"url\": \"...\"} — without it we can't link the live page, submit it to Google, or track rankings.": "تحقق من موقعك عن مقال بعنوان \"Serfix test article\". إن لم يكن موجوداً فمستقبِلك يقبل الإرسال دون تخزينه. أعد أيضاً {\"url\": \"...\"} — بدونه لا يمكننا ربط الصفحة أو إرسالها إلى Google أو تتبع الترتيب.",
+    "Save & verify": "حفظ وتحقق",
+    "Edit": "تعديل",
+    "Edit endpoint URL": "تعديل رابط نقطة الاستقبال",
+    "The signing secret stays the same — only the URL changes.": "سر التوقيع يبقى كما هو — يتغير الرابط فقط.",
+    "Endpoint updated and verified.": "تم تحديث نقطة الاستقبال والتحقق منها.",
+    "Endpoint saved, but verification failed — check the URL and use the tester below.": "تم حفظ نقطة الاستقبال لكن التحقق فشل — راجع الرابط واستخدم أداة الاختبار بالأسفل."
 }
