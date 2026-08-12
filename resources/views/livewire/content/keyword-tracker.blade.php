@@ -64,6 +64,10 @@
                 $pct = $limit > 0 ? min(100, (int) round($used / $limit * 100)) : 0;
                 $barColor = $exhausted ? 'bg-rose-500' : ($nearCap ? 'bg-amber-500' : 'bg-orange-500');
             @endphp
+            @if (session('tracker-status'))
+                <div class="rounded-xl border border-success/25 bg-success/5 px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ session('tracker-status') }}</div>
+            @endif
+
             <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex flex-wrap items-end justify-between gap-2">
                     <div>
@@ -72,8 +76,20 @@
                             {{ number_format($used) }}<span class="text-base font-semibold text-slate-400"> / {{ number_format($limit) }}</span>
                         </div>
                     </div>
-                    <div class="text-sm font-medium text-slate-500 dark:text-slate-400">
-                        {{ trans_choice('{0}No slots left|{1}:count slot left|[2,*]:count slots left', $remaining, ['count' => number_format($remaining)]) }}
+                    <div class="flex flex-wrap items-end gap-4">
+                        {{-- Where the live SERP checks run from — saved per website. --}}
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">{{ __('SERP country') }}</label>
+                            <select wire:model="serpCountry" wire:change="saveSerpCountry"
+                                class="mt-1 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                @foreach ($countryOptions as $code => $label)
+                                    <option value="{{ $code }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="text-sm font-medium text-slate-500 dark:text-slate-400">
+                            {{ trans_choice('{0}No slots left|{1}:count slot left|[2,*]:count slots left', $remaining, ['count' => number_format($remaining)]) }}
+                        </div>
                     </div>
                 </div>
                 <div class="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">

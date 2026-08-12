@@ -77,6 +77,47 @@ class ContentTrackerTest extends TestCase
         \Illuminate\Support\Facades\Queue::assertNothingPushed();
     }
 
+    public function test_serp_country_saves_and_forces_a_full_recheck(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $user = $this->trialUser();
+        $website = $this->siteFor($user);
+        ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE, 'country' => 'us']);
+        $kw = \App\Models\ContentTrackedKeyword::create([
+            'website_id' => $website->id, 'keyword' => 'digital marketing',
+            'normalized_keyword' => 'digital marketing', 'source' => 'manual',
+            'serp_checked_at' => now(), 'serp_position' => 5,
+        ]);
+        session(['current_website_id' => $website->id]);
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(\App\Livewire\Content\KeywordTracker::class)
+            ->assertSet('serpCountry', 'us')
+            ->set('serpCountry', 'ae')
+            ->call('saveSerpCountry');
+
+        $this->assertSame('ae', ContentPlan::query()->where('website_id', $website->id)->value('serp_country'));
+        $this->assertNull($kw->refresh()->serp_checked_at); // staleness window bypassed
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\CheckTrackedKeywordSerpJob::class);
+    }
+
+    public function test_serp_check_uses_the_saved_country_override(): void
+    {
+        config(['services.serper.key' => 'test-key']);
+        \Illuminate\Support\Facades\Http::fake(['google.serper.dev/*' => \Illuminate\Support\Facades\Http::response(['organic' => []], 200)]);
+        $user = $this->trialUser();
+        $website = $this->siteFor($user);
+        ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE, 'country' => 'us', 'serp_country' => 'ae']);
+        $kw = \App\Models\ContentTrackedKeyword::create([
+            'website_id' => $website->id, 'keyword' => 'digital marketing',
+            'normalized_keyword' => 'digital marketing', 'source' => 'manual',
+        ]);
+
+        app(\App\Services\Content\ContentSerpChecker::class)->check($kw);
+
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => ($r->data()['gl'] ?? null) === 'ae');
+    }
+
     public function test_quota_is_3_on_trial_and_500_when_comped_per_website(): void
     {
         $quota = app(KeywordTrackerQuota::class);

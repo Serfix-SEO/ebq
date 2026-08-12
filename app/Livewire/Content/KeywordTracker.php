@@ -28,12 +28,16 @@ class KeywordTracker extends Component
     /** Article (topic) whose full performance chart is expanded, if any. */
     public ?string $selectedTopicId = null;
 
+    /** Country the live SERP checks run from — saved on the content plan. */
+    public string $serpCountry = 'global';
+
     public function mount(): void
     {
         $this->websiteId = session('current_website_id');
         if (! $this->websiteId) {
             $this->websiteId = Auth::user()?->accessibleWebsitesQuery()->value('id');
         }
+        $this->loadSerpCountry();
     }
 
     #[On('website-changed')]
@@ -41,6 +45,52 @@ class KeywordTracker extends Component
     {
         $this->websiteId = $websiteId;
         $this->selectedTopicId = null;
+        $this->loadSerpCountry();
+    }
+
+    private function loadSerpCountry(): void
+    {
+        $plan = $this->websiteId
+            ? \App\Models\ContentPlan::query()->where('website_id', $this->websiteId)->first()
+            : null;
+        $this->serpCountry = (string) ($plan?->serp_country ?: $plan?->country ?: 'global');
+    }
+
+    /**
+     * Persist the SERP-check country for this website and re-check every
+     * tracked keyword against the new market right away (positions differ per
+     * country, so yesterday's numbers no longer apply).
+     */
+    public function saveSerpCountry(): void
+    {
+        $website = $this->website();
+        if ($website === null) {
+            return;
+        }
+        if (! array_key_exists($this->serpCountry, \App\Support\KeywordFinderLocations::countryOptions())) {
+            $this->loadSerpCountry();
+
+            return;
+        }
+
+        $plan = \App\Models\ContentPlan::query()->where('website_id', $website->id)->first();
+        if ($plan === null) {
+            return;
+        }
+        if ((string) ($plan->serp_country ?: $plan->country ?: 'global') === $this->serpCountry) {
+            return; // unchanged
+        }
+
+        $plan->forceFill(['serp_country' => $this->serpCountry])->save();
+
+        // Positions are per-market: mark everything unchecked so the re-check
+        // isn't skipped by the weekly staleness window, then run it now.
+        ContentTrackedKeyword::query()
+            ->where('website_id', $website->id)
+            ->update(['serp_checked_at' => null]);
+        \App\Jobs\CheckTrackedKeywordSerpJob::dispatch($website->id);
+
+        session()->flash('tracker-status', __('SERP country saved — rechecking all keyword positions for the new market now.'));
     }
 
     private function website(): ?Website
@@ -134,6 +184,7 @@ class KeywordTracker extends Component
             'summaries' => $summaries,
             'selectedSeries' => $selectedSeries,
             'selectedGroup' => $selectedGroup,
+            'countryOptions' => \App\Support\KeywordFinderLocations::countryOptions(),
         ])->layoutData(['title' => __('Tracker')]);
     }
 }

@@ -188,13 +188,24 @@ class ContentSerpChecker
         return str_starts_with($host, 'www.') ? substr($host, 4) : $host;
     }
 
-    /** @return array{0:?string,1:?string} [gl, hl] from the website's content plan. */
+    /**
+     * [gl, hl] for the SERP query. The tracker-specific `serp_country`
+     * override wins over the plan's article-targeting country; 'global' (or
+     * anything that isn't a country code) means no geo-targeting.
+     *
+     * @return array{0:?string,1:?string}
+     */
     private function locale(Website $website): array
     {
         $plan = ContentPlan::query()->where('website_id', $website->id)->first();
-        $country = $plan?->country;
+        $country = strtolower(trim((string) ($plan?->serp_country ?: $plan?->country)));
+        // Our country pickers use the legacy 'uk' short code; Google's gl
+        // parameter wants ISO 'gb'.
+        if ($country === 'uk') {
+            $country = 'gb';
+        }
         $lang = (string) ($plan?->language ?? 'en');
-        $gl = (is_string($country) && strlen($country) === 2) ? strtolower($country) : null;
+        $gl = (strlen($country) === 2 && ctype_alpha($country)) ? $country : null;
         $hl = substr(strtolower($lang), 0, 2) ?: 'en';
 
         return [$gl, $hl];

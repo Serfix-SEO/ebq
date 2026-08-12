@@ -4581,5 +4581,7 @@
     "Endpoint saved, but verification failed — check the URL and use the tester below.": "تم حفظ نقطة الاستقبال لكن التحقق فشل — راجع الرابط واستخدم أداة الاختبار بالأسفل.",
     "Testing only — nothing about your saved integration changes. Leave blank to test your connected endpoint, or paste any https URL (like webhook.site) to inspect the exact payload we send.": "للاختبار فقط — لا يتغير شيء في التكامل المحفوظ. اتركه فارغاً لاختبار نقطة الاستقبال المتصلة، أو الصق أي رابط https (مثل webhook.site) لفحص الحمولة التي نرسلها بالضبط.",
     "The test URL must use https://.": "يجب أن يستخدم رابط الاختبار https://.",
-    "test URL": "رابط الاختبار"
+    "test URL": "رابط الاختبار",
+    "SERP country": "دولة نتائج البحث",
+    "SERP country saved — rechecking all keyword positions for the new market now.": "تم حفظ دولة نتائج البحث — يُعاد الآن فحص مواقع جميع الكلمات المفتاحية للسوق الجديد."
 }
