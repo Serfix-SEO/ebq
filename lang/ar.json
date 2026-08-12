@@ -4606,5 +4606,12 @@
     "How often this article appeared in Google search in the last 30 days": "عدد مرات ظهور هذا المقال في بحث Google خلال آخر 30 يوماً",
     "Visitors this article brought to your site in the last 30 days": "الزوّار الذين جلبهم هذا المقال لموقعك خلال آخر 30 يوماً",
     "More searches this article shows up for": "المزيد من عمليات البحث التي يظهر فيها هذا المقال",
-    "real Google searches from the last 4 weeks. Track the ones that matter to you.": "عمليات بحث حقيقية في Google خلال آخر 4 أسابيع. تتبّع ما يهمك منها."
+    "real Google searches from the last 4 weeks. Track the ones that matter to you.": "عمليات بحث حقيقية في Google خلال آخر 4 أسابيع. تتبّع ما يهمك منها.",
+    "the country your Google rank checks run from. Saved for this website.": "الدولة التي تُجرى منها فحوصات الترتيب في Google. محفوظة لهذا الموقع.",
+    "People who clicked through to your articles from Google search results in the last 30 days. Source: Google Search Console.": "أشخاص نقروا للوصول إلى مقالاتك من نتائج بحث Google خلال آخر 30 يوماً. المصدر: Google Search Console.",
+    "How often your articles appeared in Google search results in the last 30 days. Source: Google Search Console.": "عدد مرات ظهور مقالاتك في نتائج بحث Google خلال آخر 30 يوماً. المصدر: Google Search Console.",
+    "Visits your article pages received in the last 30 days. Source: Google Analytics.": "الزيارات التي تلقتها صفحات مقالاتك خلال آخر 30 يوماً. المصدر: Google Analytics.",
+    "Your published articles that had Google data in the last 30 days.": "مقالاتك المنشورة التي كانت لها بيانات في Google خلال آخر 30 يوماً.",
+    "How often this article appeared in Google search results in the last 30 days. Source: Google Search Console.": "عدد مرات ظهور هذا المقال في نتائج بحث Google خلال آخر 30 يوماً. المصدر: Google Search Console.",
+    "Visits this article page received in the last 30 days. Source: Google Analytics.": "الزيارات التي تلقتها صفحة هذا المقال خلال آخر 30 يوماً. المصدر: Google Analytics."
 }

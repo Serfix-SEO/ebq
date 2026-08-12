@@ -92,24 +92,21 @@
                     </div>
                     <div class="flex flex-wrap items-end gap-4">
                         {{-- Where the live SERP checks run from — saved per website. --}}
-                        <div>
-                            <label class="flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-400">
-                                <svg class="h-3.5 w-3.5 shrink-0 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'/></svg>
-                                <span>{{ __('SERP country') }}</span>
-                                <span wire:loading wire:target="saveSerpCountry" class="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400">
-                                    <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                                    {{ __('Updating…') }}
-                                </span>
-                            </label>
-                            {{-- Native select arrow on purpose — a custom absolutely-
-                                 positioned chevron rendered detached on cached CSS. --}}
+                        {{-- SERP country — one bordered control: globe inside the
+                             dropdown box, native select arrow, spinner while saving.
+                             All flexbox, nothing absolutely positioned. --}}
+                        <label title="{{ __('SERP country') }} — {{ __('the country your Google rank checks run from. Saved for this website.') }}"
+                            class="flex w-56 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
+                            <svg class="h-4 w-4 shrink-0 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418'/></svg>
                             <select wire:model="serpCountry" wire:change="saveSerpCountry" wire:loading.attr="disabled" wire:target="saveSerpCountry"
-                                class="mt-1 w-48 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                aria-label="{{ __('SERP country') }}"
+                                class="w-full border-0 bg-transparent p-0 text-sm font-medium text-slate-800 focus:outline-none focus:ring-0 disabled:opacity-50 dark:text-slate-100">
                                 @foreach ($countryOptions as $code => $label)
                                     <option value="{{ $code }}">{{ $label }}</option>
                                 @endforeach
                             </select>
-                        </div>
+                            <svg wire:loading wire:target="saveSerpCountry" class="h-4 w-4 shrink-0 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                        </label>
                         <div class="text-sm font-medium text-slate-500 dark:text-slate-400">
                             {{ trans_choice('{0}No slots left|{1}:count slot left|[2,*]:count slots left', $remaining, ['count' => number_format($remaining)]) }}
                         </div>
@@ -153,22 +150,33 @@
                                 </div>
                                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Combined Google performance of your published articles over the last 30 days.') }}</p>
                             </div>
+                            {{-- Every tile names its data source on hover — clients
+                                 shouldn't have to guess where a number comes from. --}}
                             <div class="flex flex-wrap gap-6">
-                                <div>
+                                <div class="cursor-help" title="{{ __('People who clicked through to your articles from Google search results in the last 30 days. Source: Google Search Console.') }}">
                                     <div class="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($siteTotals['clicks']) }}</div>
-                                    <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ __('Visits from Google') }}</div>
+                                    <div class="flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                        {{ __('Visits from Google') }}
+                                        <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+                                    </div>
                                 </div>
-                                <div>
+                                <div class="cursor-help" title="{{ __('How often your articles appeared in Google search results in the last 30 days. Source: Google Search Console.') }}">
                                     <div class="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($siteTotals['impressions']) }}</div>
-                                    <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ __('Times shown in Google') }}</div>
+                                    <div class="flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                        {{ __('Times shown in Google') }}
+                                        <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+                                    </div>
                                 </div>
                                 @if ($siteTotals['visitors'] > 0)
-                                    <div>
+                                    <div class="cursor-help" title="{{ __('Visits your article pages received in the last 30 days. Source: Google Analytics.') }}">
                                         <div class="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($siteTotals['visitors']) }}</div>
-                                        <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ __('Visitors on your site') }}</div>
+                                        <div class="flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                            {{ __('Visitors on your site') }}
+                                            <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+                                        </div>
                                     </div>
                                 @endif
-                                <div>
+                                <div class="cursor-help" title="{{ __('Your published articles that had Google data in the last 30 days.') }}">
                                     <div class="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{{ number_format($siteTotals['articles']) }}</div>
                                     <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ __('Articles working for you') }}</div>
                                 </div>
@@ -200,16 +208,16 @@
                                 @if (! empty($group['totals']) && ($group['totals']['clicks'] + $group['totals']['impressions']) > 0)
                                     {{-- The article's 30-day value at a glance. --}}
                                     <div class="flex flex-wrap items-center gap-2 text-xs">
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 font-bold text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" title="{{ __('Clicks from Google search in the last 30 days') }}">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 font-bold text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" title="{{ __('People who clicked through to your articles from Google search results in the last 30 days. Source: Google Search Console.') }}">
                                             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59"/></svg>
                                             {{ trans_choice(':n visit/mo|:n visits/mo', $group['totals']['clicks'], ['n' => number_format($group['totals']['clicks'])]) }}
                                         </span>
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300" title="{{ __('How often this article appeared in Google search in the last 30 days') }}">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300" title="{{ __('How often this article appeared in Google search results in the last 30 days. Source: Google Search Console.') }}">
                                             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                             {{ trans_choice(':n impression/mo|:n impressions/mo', $group['totals']['impressions'], ['n' => number_format($group['totals']['impressions'])]) }}
                                         </span>
                                         @if ($group['totals']['visitors'] > 0)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" title="{{ __('Visitors this article brought to your site in the last 30 days') }}">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" title="{{ __('Visits this article page received in the last 30 days. Source: Google Analytics.') }}">
                                                 <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
                                                 {{ trans_choice(':n visitor/mo|:n visitors/mo', $group['totals']['visitors'], ['n' => number_format($group['totals']['visitors'])]) }}
                                             </span>
@@ -363,7 +371,7 @@
                                         @foreach ($group['discovered'] as $q)
                                             <div class="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-2.5 transition hover:bg-white dark:hover:bg-slate-900/60" wire:key="dq-{{ $gid }}-{{ md5($q['query']) }}">
                                                 <span class="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-300">{{ $q['query'] }}</span>
-                                                <span class="w-24 text-center" title="{{ __('How often this article appeared in Google search in the last 30 days') }}">
+                                                <span class="w-24 text-center" title="{{ __('How often this article appeared in Google search results in the last 30 days. Source: Google Search Console.') }}">
                                                     <span class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Impressions') }}</span>
                                                     <span class="text-sm font-bold tabular-nums text-slate-800 dark:text-slate-200">{{ number_format($q['impressions']) }}</span>
                                                 </span>
