@@ -81,11 +81,21 @@ class WebhookDriver implements PublishDriver
             $endpoint = $overrideUrl;
         }
 
+        // Every field carries a realistic sample value (not empty strings/
+        // arrays) so a developer looking at the captured payload immediately
+        // sees the full shape their receiver should handle.
+        $appUrl = rtrim((string) config('app.public_url', config('app.url')), '/');
+        $sampleImage = $appUrl.'/logo.png';
+
         $html = '<h2>This is a test delivery</h2>'
             .'<p>Serfix sent this sample article to confirm your webhook receiver stores and displays articles correctly. '
             .'It is <strong>safe to delete</strong>.</p>'
+            .'<figure><img src="'.$sampleImage.'" alt="Sample inline image — real articles embed their generated images like this"><figcaption>Inline images arrive as normal img tags inside the html.</figcaption></figure>'
             .'<ul><li>If you can see this as a post on your site, your integration works end to end.</li>'
-            .'<li>If your endpoint answered OK but no post appeared, your receiver accepts deliveries without storing them.</li></ul>';
+            .'<li>If your endpoint answered OK but no post appeared, your receiver accepts deliveries without storing them.</li></ul>'
+            .'<h3>What to check</h3>'
+            .'<p>Store the <em>html</em> as the post body, use <em>meta_title</em>/<em>meta_description</em> for SEO tags, '
+            .'honour the <em>robots_*</em> flags, and reply with <code>{"url": "..."}</code> pointing at the created page.</p>';
 
         $payload = [
             'event' => 'article.published',
@@ -95,24 +105,26 @@ class WebhookDriver implements PublishDriver
                 'h1' => 'Serfix test article — safe to delete',
                 'slug' => 'serfix-connection-test',
                 'html' => $html,
-                'markdown' => '',
+                'markdown' => "## This is a test delivery\n\nSerfix sent this sample article to confirm your webhook receiver stores and displays articles correctly. It is **safe to delete**.",
                 'meta_title' => 'Serfix test article — safe to delete',
                 'meta_description' => 'A sample delivery sent from the Serfix integrations page. Safe to delete.',
-                'word_count' => 60,
+                'word_count' => 90,
                 'language' => 'en',
                 'target_keyword' => 'serfix connection test',
-                'secondary_keywords' => [],
+                'secondary_keywords' => ['webhook integration test', 'sample article payload'],
                 'focus_keyword' => 'serfix connection test',
-                'canonical_url' => '',
+                'canonical_url' => 'https://your-site.com/blog/serfix-connection-test',
+                // The test article must never be indexed — but real articles
+                // send false here unless the client toggled them on.
                 'robots_noindex' => true,
                 'robots_nofollow' => true,
-                'og_title' => '',
-                'og_description' => '',
-                'og_image' => '',
-                'twitter_title' => '',
-                'twitter_description' => '',
-                'twitter_image' => '',
-                'twitter_card' => '',
+                'og_title' => 'Serfix test article — safe to delete',
+                'og_description' => 'Sample Open Graph description — real articles carry their social preview text here.',
+                'og_image' => $sampleImage,
+                'twitter_title' => 'Serfix test article — safe to delete',
+                'twitter_description' => 'Sample Twitter/X card description.',
+                'twitter_image' => $sampleImage,
+                'twitter_card' => 'summary_large_image',
             ],
             'sent_at' => now()->toIso8601String(),
         ];

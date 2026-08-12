@@ -80,13 +80,22 @@ class ContentWebhookTesterTest extends TestCase
 
         Http::assertSent(function (Request $r) {
             $payload = json_decode($r->body(), true);
+            $article = $payload['article'];
             $expected = 'sha256='.hash_hmac('sha256', $r->body(), self::SECRET);
+
+            // Every field must carry a non-empty sample value so the captured
+            // payload documents the full shape.
+            $allFilled = collect($article)->every(fn ($v) => $v !== '' && $v !== []);
 
             return $payload['event'] === 'article.published'
                 && $payload['test'] === true
-                && $payload['article']['slug'] === 'serfix-connection-test'
-                && $payload['article']['robots_noindex'] === true
-                && str_contains($payload['article']['h1'], 'safe to delete')
+                && $article['slug'] === 'serfix-connection-test'
+                && $article['robots_noindex'] === true
+                && $allFilled
+                && count($article['secondary_keywords']) > 0
+                && str_contains($article['html'], '<img')
+                && $article['twitter_card'] === 'summary_large_image'
+                && str_contains($article['h1'], 'safe to delete')
                 && $r->header('X-Serfix-Signature')[0] === $expected;
         });
     }
