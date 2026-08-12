@@ -121,6 +121,52 @@ class KeywordTracker extends Component
         $this->selectedTopicId = $this->selectedTopicId === $topicId ? null : $topicId;
     }
 
+    /**
+     * Track one of the article's real search phrases (from the "where the
+     * impressions come from" list). Attached to the article's topic so it
+     * groups under the article; quota-checked; the new keyword gets its live
+     * SERP position immediately (track() dispatches the check).
+     */
+    public function trackQuery(string $keyword): void
+    {
+        $website = $this->website();
+        $keyword = trim($keyword);
+        if ($website === null || $keyword === '' || mb_strlen($keyword) > 200) {
+            return;
+        }
+
+        $topic = null;
+        if ($this->selectedTopicId !== null && $this->selectedTopicId !== '_manual') {
+            $topic = \App\Models\ContentTopic::query()
+                ->where('website_id', $website->id)
+                ->whereKey($this->selectedTopicId)
+                ->first();
+        }
+
+        // Inherit the article's page URL so the new keyword joins the same
+        // article group with a working performance link.
+        $pageUrl = $topic !== null
+            ? ContentTrackedKeyword::query()->where('topic_id', $topic->id)->whereNotNull('page_url')->value('page_url')
+            : null;
+
+        $result = app(ContentKeywordTracker::class)->track(
+            $website,
+            [$keyword],
+            topic: $topic,
+            source: ContentTrackedKeyword::SOURCE_MANUAL,
+            user: Auth::user(),
+            primaryKeyword: '', // never steal the primary flag from the article's target
+            pageUrl: $pageUrl,
+        );
+
+        if ($result['capped']) {
+            session()->flash('tracker-status', __('You\'ve reached your tracking limit. Remove a keyword to make room, then try again.'));
+        } elseif ($result['added'] > 0) {
+            session()->flash('tracker-status', __(':keyword is now tracked — checking its live position now.', ['keyword' => $keyword]));
+        }
+        $this->dispatch('tracker-changed');
+    }
+
     public function render()
     {
         $website = $this->website();
@@ -163,10 +209,18 @@ class KeywordTracker extends Component
         // Selected article performance series (published articles only).
         $selectedSeries = null;
         $selectedGroup = null;
+        $selectedQueries = [];
         if ($this->selectedTopicId !== null && isset($groups[$this->selectedTopicId])) {
             $selectedGroup = $groups[$this->selectedTopicId];
             if ($selectedGroup['page_url']) {
                 $selectedSeries = $perf->pageSeries($website, $selectedGroup['page_url']);
+                // The real phrases this page appears for, flagged with
+                // whether each is already in the tracker.
+                $trackedSet = $tracked->pluck('normalized_keyword')->flip();
+                foreach ($perf->pageQueries($website, $selectedGroup['page_url']) as $row) {
+                    $row['tracked'] = $trackedSet->has(ContentTrackedKeyword::normalize($row['query']));
+                    $selectedQueries[] = $row;
+                }
             }
         }
 
@@ -184,6 +238,7 @@ class KeywordTracker extends Component
             'summaries' => $summaries,
             'selectedSeries' => $selectedSeries,
             'selectedGroup' => $selectedGroup,
+            'selectedQueries' => $selectedQueries,
             'countryOptions' => \App\Support\KeywordFinderLocations::countryOptions(),
         ])->layoutData(['title' => __('Tracker')]);
     }

@@ -118,6 +118,58 @@ class ContentTrackerTest extends TestCase
         \Illuminate\Support\Facades\Http::assertSent(fn ($r) => ($r->data()['gl'] ?? null) === 'ae');
     }
 
+    public function test_page_queries_aggregates_real_search_phrases_by_impressions(): void
+    {
+        $user = $this->trialUser();
+        $website = $this->siteFor($user);
+        $page = 'https://example.com/blog/post';
+        foreach ([
+            ['q' => 'brand development plans dubai', 'i' => 16, 'c' => 2, 'p' => 8.0, 'd' => 3],
+            ['q' => 'brand development plans dubai', 'i' => 4, 'c' => 0, 'p' => 10.0, 'd' => 4],
+            ['q' => 'luxury property branding', 'i' => 1, 'c' => 0, 'p' => 40.0, 'd' => 3],
+        ] as $row) {
+            \App\Models\SearchConsoleData::create([
+                'website_id' => $website->id, 'date' => now()->subDays($row['d'])->toDateString(),
+                'query' => $row['q'], 'page' => $page,
+                'clicks' => $row['c'], 'impressions' => $row['i'], 'position' => $row['p'],
+            ]);
+        }
+
+        $out = app(\App\Services\Content\ContentPerformanceService::class)->pageQueries($website, $page);
+
+        $this->assertSame('brand development plans dubai', $out[0]['query']);
+        $this->assertSame(20, $out[0]['impressions']);
+        $this->assertSame(2, $out[0]['clicks']);
+        $this->assertEqualsWithDelta(8.4, $out[0]['position'], 0.1); // impression-weighted
+        $this->assertSame('luxury property branding', $out[1]['query']);
+    }
+
+    public function test_track_query_adds_the_phrase_under_the_article_group(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $user = $this->trialUser();
+        $website = $this->siteFor($user);
+        $topic = $this->topicFor($website, 'luxury branding dubai');
+        \App\Models\ContentTrackedKeyword::create([
+            'website_id' => $website->id, 'topic_id' => $topic->id,
+            'keyword' => 'luxury branding dubai', 'normalized_keyword' => 'luxury branding dubai',
+            'source' => 'auto', 'is_primary' => true, 'page_url' => 'https://example.com/blog/post',
+        ]);
+        session(['current_website_id' => $website->id]);
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(\App\Livewire\Content\KeywordTracker::class)
+            ->call('togglePerformance', $topic->id)
+            ->call('trackQuery', 'brand development plans dubai');
+
+        $row = \App\Models\ContentTrackedKeyword::query()
+            ->where('normalized_keyword', 'brand development plans dubai')->firstOrFail();
+        $this->assertSame($topic->id, $row->topic_id);
+        $this->assertSame('https://example.com/blog/post', $row->page_url);
+        $this->assertFalse((bool) $row->is_primary);
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\CheckTrackedKeywordSerpJob::class);
+    }
+
     public function test_quota_is_3_on_trial_and_500_when_comped_per_website(): void
     {
         $quota = app(KeywordTrackerQuota::class);

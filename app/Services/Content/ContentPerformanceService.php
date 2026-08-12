@@ -141,6 +141,46 @@ class ContentPerformanceService
      *
      * @return array{window:array{start:string,end:string}, days:array<int,array{date:string,clicks:int,impressions:int,position:?float,pageviews:int,sessions:int,users:int}>, has_gsc:bool, has_ga:bool}
      */
+    /**
+     * The REAL search phrases a page appears for in Google, ranked by
+     * impressions — the "where do this article's impressions come from"
+     * answer, and the pool of candidate keywords worth tracking.
+     *
+     * @return list<array{query: string, clicks: int, impressions: int, position: ?float}>
+     */
+    public function pageQueries(Website $website, string $pageUrl, int $days = 28, int $limit = 12): array
+    {
+        $page = UrlNormalizer::normalize($pageUrl);
+        $end = $this->windowEnd($website->id);
+        $start = $end->copy()->subDays(max(1, $days) - 1);
+        $key = sprintf('content_perf:pagequeries:v1:%s:%d:%s:%s', $website->id, ReportCache::version($website->id), $start->toDateString(), md5($page));
+
+        return Cache::remember($key, self::TTL, function () use ($website, $page, $start, $end, $limit) {
+            $rows = SearchConsoleData::query()
+                ->where('website_id', $website->id)
+                ->where('page', $page)
+                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+                ->selectRaw('`query`, SUM(clicks) as clicks, SUM(impressions) as impressions, SUM(position * impressions) as pos_weight')
+                ->groupBy('query')
+                ->orderByDesc('impressions')
+                ->limit($limit)
+                ->get();
+
+            $out = [];
+            foreach ($rows as $r) {
+                $impressions = (int) $r->impressions;
+                $out[] = [
+                    'query' => (string) $r->query,
+                    'clicks' => (int) $r->clicks,
+                    'impressions' => $impressions,
+                    'position' => $impressions > 0 ? round($r->pos_weight / $impressions, 1) : null,
+                ];
+            }
+
+            return $out;
+        });
+    }
+
     public function pageSeries(Website $website, string $pageUrl, int $days = 30): array
     {
         $page = UrlNormalizer::normalize($pageUrl);

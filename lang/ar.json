@@ -4585,5 +4585,12 @@
     "SERP country": "دولة نتائج البحث",
     "SERP country saved — rechecking all keyword positions for the new market now.": "تم حفظ دولة نتائج البحث — يُعاد الآن فحص مواقع جميع الكلمات المفتاحية للسوق الجديد.",
     "Updating…": "جارٍ التحديث…",
-    "These totals count every Google search this article appears for — including phrases you aren't tracking. The keyword rows below only count searches of that exact phrase, so they can be lower.": "هذه الإجماليات تحسب كل بحث في Google يظهر فيه هذا المقال — بما في ذلك عبارات لا تتتبعها. صفوف الكلمات المفتاحية بالأسفل تحسب فقط عمليات البحث عن العبارة نفسها بالضبط، لذا قد تكون أقل."
+    "These totals count every Google search this article appears for — including phrases you aren't tracking. The keyword rows below only count searches of that exact phrase, so they can be lower.": "هذه الإجماليات تحسب كل بحث في Google يظهر فيه هذا المقال — بما في ذلك عبارات لا تتتبعها. صفوف الكلمات المفتاحية بالأسفل تحسب فقط عمليات البحث عن العبارة نفسها بالضبط، لذا قد تكون أقل.",
+    "Searches this article shows up for": "عمليات البحث التي يظهر فيها هذا المقال",
+    "Real Google searches from the last 4 weeks — track the ones that matter to you.": "عمليات بحث حقيقية في Google خلال آخر 4 أسابيع — تتبّع ما يهمك منها.",
+    "Search phrase": "عبارة البحث",
+    "No slots": "لا خانات",
+    ":keyword is now tracked — checking its live position now.": "أصبحت :keyword متتبَّعة الآن — يجري فحص موقعها المباشر.",
+    "You've reached your tracking limit. Remove a keyword to make room, then try again.": "لقد بلغت حد التتبع. احذف كلمة مفتاحية لإفساح المجال ثم حاول مجدداً.",
+    "SERP": "SERP"
 }
