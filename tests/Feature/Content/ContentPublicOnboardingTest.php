@@ -53,6 +53,20 @@ class ContentPublicOnboardingTest extends TestCase
         return Livewire::test(PublicOnboarding::class);
     }
 
+    public function test_empty_domain_gets_a_clear_error_message(): void
+    {
+        $this->from(route('content.landing'))
+            ->post(route('content.onboarding.begin'), ['domain' => ''])
+            ->assertRedirect(route('content.landing'))
+            ->assertSessionHasErrors(['domain']);
+
+        $this->assertSame(
+            __('Please enter your website address to get started.'),
+            session('errors')->first('domain'),
+        );
+        $this->assertSame(0, ContentOnboardingSession::query()->count());
+    }
+
     public function test_domain_step_creates_provisional_site_under_system_user(): void
     {
         Queue::fake();

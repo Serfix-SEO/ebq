@@ -34,6 +34,14 @@ class PublicOnboardingStartController extends Controller
         // normal flow runs below: the site is created, then converted onto
         // their account at the end of this method.
 
+        // An empty domain gets its own friendly message FIRST — before the
+        // captcha error can mask it. The form inputs also carry `required`,
+        // but that's browser-side only.
+        $request->validate(
+            ['domain' => ['required', 'string', 'max:255']],
+            ['domain.required' => __('Please enter your website address to get started.')],
+        );
+
         // reCAPTCHA (standard form field g-recaptcha-response) — guests only:
         // a signed-in user posting from the Get started domain form already
         // cleared it at registration, and the rate limits below still apply.
