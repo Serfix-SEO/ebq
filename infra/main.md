@@ -284,6 +284,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-14 — Admin client detail page + mobile-friendly client list.** New
+  `/admin/clients/{user}` (`ClientController@show` + `App\Services\Admin\ClientProfileService`)
+  puts an account's whole story on one screen: account facts, billing/entitlements, every website
+  with its Content Autopilot plan + integrations + 28-day GSC/GA numbers, production stats,
+  tracked-keyword position spread, API spend (MTD/lifetime/6-month trend), support tickets,
+  lifecycle emails and the activity feed. Aggregation is service-side and the only 2M-row table
+  (`search_console_data`) is cached 30min per client. The clients LIST now renders cards below
+  `md` and the table above it from shared partials, and ULID ids reach Alpine via `@js()` — the
+  old `(int)` cast made `isSelected(01m0…)` a JS syntax error, so bulk select never worked.
+  Docs: [admin/README.md](./admin/README.md).
+
 - **2026-08-12 — Support tickets (client /support + /admin/support).** Threaded client↔team
   conversations: `support_tickets`/`support_ticket_messages`, status = whose-turn tracker
   (open/answered/closed, client reply always re-opens), mails both directions, RateLimiter on

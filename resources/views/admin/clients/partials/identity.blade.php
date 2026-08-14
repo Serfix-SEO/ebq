@@ -8,7 +8,7 @@
         </span>
         <div class="min-w-0">
             <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                <span class="truncate">{{ $client->name }}</span>
+                <a href="{{ route('admin.clients.show', $client) }}" class="truncate hover:text-orange-700 hover:underline">{{ $client->name }}</a>
                 <span class="text-[10px] font-normal tabular-nums text-slate-400">#{{ $client->id }}</span>
             </div>
             <div class="flex items-center gap-1.5 truncate text-xs text-slate-500">

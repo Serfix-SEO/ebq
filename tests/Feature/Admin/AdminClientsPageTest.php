@@ -139,4 +139,52 @@ class AdminClientsPageTest extends TestCase
         $this->assertStringContainsString("isSelected('".$client->id."')", $html, 'ids must reach Alpine quoted');
         $this->assertStringNotContainsString('isSelected('.$client->id.')', $html);
     }
+
+    public function test_client_detail_page_renders_the_full_profile(): void
+    {
+        $client = User::factory()->create(['name' => 'Detail Client', 'email' => 'detail@example.com']);
+        $site = Website::factory()->create(['user_id' => $client->id, 'domain' => 'detail-site.test']);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.clients.show', $client))
+            ->assertOk()
+            ->assertSee('Detail Client')
+            ->assertSee('detail@example.com')
+            ->assertSee('detail-site.test')
+            // Section headings — the page is one screen, no tabs to click through.
+            ->assertSee('Billing &amp; entitlements', false)
+            ->assertSee('Websites')
+            ->assertSee('Content production')
+            ->assertSee('Keyword rankings')
+            ->assertSee('API usage &amp; spend', false)
+            ->assertSee('Support tickets')
+            ->assertSee('Admin controls');
+    }
+
+    public function test_client_detail_page_is_admin_only(): void
+    {
+        $client = User::factory()->create();
+
+        $this->actingAs(User::factory()->create(['is_admin' => false]))
+            ->get(route('admin.clients.show', $client))
+            ->assertForbidden();
+    }
+
+    /** Saving from the detail page must come back to it, not bounce to the list. */
+    public function test_editing_from_the_detail_page_returns_to_the_detail_page(): void
+    {
+        $this->seed(\Database\Seeders\PlanSeeder::class);
+        $client = User::factory()->create();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.clients.update', $client), [
+                'name' => 'Renamed Here',
+                'email' => $client->email,
+                'plan_slug' => 'trial',
+                'return_to' => 'show',
+            ])
+            ->assertRedirect(route('admin.clients.show', $client));
+
+        $this->assertSame('Renamed Here', $client->fresh()->name);
+    }
 }

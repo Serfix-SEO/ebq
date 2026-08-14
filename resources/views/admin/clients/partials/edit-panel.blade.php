@@ -7,6 +7,8 @@
 <form method="POST" action="{{ route('admin.clients.update', $client) }}" class="space-y-3">
     @csrf
     @method('PUT')
+    {{-- Set on the client detail page so saving returns there, not to the list. --}}
+    @isset($returnTo) <input type="hidden" name="return_to" value="{{ $returnTo }}" /> @endisset
     <div class="grid gap-3 md:grid-cols-3">
         <label class="flex flex-col gap-1 text-xs text-slate-600">
             <span class="font-medium">Name</span>
@@ -102,7 +104,9 @@
             View this client's API usage →
         </a>
         <div class="flex justify-end gap-2">
-            <a href="{{ route('admin.clients.index', array_merge(request()->query(), ['edit' => 0])) }}"
+            <a href="{{ ($returnTo ?? null) === 'show'
+                        ? route('admin.clients.show', $client)
+                        : route('admin.clients.index', array_merge(request()->query(), ['edit' => 0])) }}"
                class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</a>
             <button class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700">Save changes</button>
         </div>

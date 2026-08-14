@@ -7,6 +7,7 @@ use App\Models\ClientActivity;
 use App\Models\CrawlSite;
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\Admin\ClientProfileService;
 use App\Services\ClientActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -144,6 +145,29 @@ class ClientController extends Controller
             ],
             'editId' => (string) $request->query('edit', ''),
             'showCreate' => (bool) $request->query('new', 0) || $request->old('_create_open'),
+        ]);
+    }
+
+    /**
+     * Full profile for one client: account, billing + entitlements, every
+     * website with its Content Autopilot plan / integration / performance,
+     * production stats, tracked-keyword ranking spread, API spend, support
+     * history and the last activity feed — plus the same inline editor the
+     * list uses (shared partial, so the two can't drift).
+     *
+     * Query cost lives in ClientProfileService; the only big table it reads
+     * (search_console_data) is cached there.
+     */
+    public function show(User $user, ClientProfileService $profiles): View
+    {
+        $plans = Plan::query()
+            ->orderBy('display_order')
+            ->get(['slug', 'name', 'price_yearly_usd', 'is_active']);
+
+        return view('admin.clients.show', [
+            'client' => $user,
+            'plans' => $plans,
+            'profile' => $profiles->profile($user),
         ]);
     }
 
@@ -309,7 +333,13 @@ class ClientController extends Controller
                 .($newCompUntil ? ' (until '.\Illuminate\Support\Carbon::parse($newCompUntil)->toDateString().')' : ' (permanent)').'.';
         }
 
-        return redirect()->route('admin.clients.index')->with('status', $msg);
+        // The same editor renders on the client detail page; `return_to=show`
+        // keeps the operator there instead of bouncing them to the list.
+        $back = $request->input('return_to') === 'show'
+            ? redirect()->route('admin.clients.show', $user)
+            : redirect()->route('admin.clients.index');
+
+        return $back->with('status', $msg);
     }
 
     /**
