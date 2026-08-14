@@ -26,7 +26,7 @@ during impersonation so the client's id never pollutes the actor column.
 
 | Panel | Controller / Component | What it does |
 |---|---|---|
-| Clients | `app/Http/Controllers/Admin/ClientController.php:17` | Paginated user list w/ per-user website count, last activity, KE/SERP spend MTD (correlated sub-selects). Create/update, bulk enable/disable, **force-apply (comp) a plan**, admin recrawl. |
+| Clients | `app/Http/Controllers/Admin/ClientController.php:17` | Paginated user list w/ per-user website count, last activity, KE/SERP spend MTD (correlated sub-selects). Create/update, bulk enable/disable, **force-apply (comp) a plan**, admin recrawl. The list renders **twice** — cards below `md`, table from `md` up (`resources/views/admin/clients/index.blade.php`) — sharing `partials/{identity,status-badges,edit-panel}.blade.php` so the layouts can't drift. User ids are ULIDs: every id entering an Alpine expression goes through `@js()` (an `(int)` cast made `isSelected(01m0…)` a JS syntax error and bulk select silently did nothing until 2026-08-14). |
 | Impersonation | `app/Http/Controllers/Admin/ClientImpersonationController.php:14` | `start`: stash `impersonator_id` + return URL, `Auth::login(client)`, regenerate session. `stop`: `loginUsingId` back, restore URL. |
 | Marketing | `app/Http/Controllers/Admin/MarketingController.php:27` | Lists sites with a completed crawl + open findings; emails the owner a numbers + top-3-examples crawl summary; records every send in `crawl_report_sends`. |
 | Leads | `app/Http/Controllers/Admin/LeadController.php:10` | Read-only list of marketing `leads` (converted/pending filter, links to guest page audits). |

@@ -116,4 +116,27 @@ class AdminClientsPageTest extends TestCase
         $this->assertSame(1, (int) $client->content_comp_sites);
         $this->assertNull($client->content_comp_until, 'blank date = permanent');
     }
+
+    /**
+     * The list renders twice: cards below the md breakpoint, the table above
+     * it. Both must carry the client, and every id crossing into an Alpine
+     * expression must be a quoted JS string — an (int) cast on ULIDs made
+     * `isSelected(01m0…)` a syntax error and killed bulk select.
+     */
+    public function test_list_renders_mobile_cards_and_desktop_table(): void
+    {
+        $client = User::factory()->create(['email' => 'layout-check@example.com']);
+
+        $html = $this->actingAs($this->admin())
+            ->get(route('admin.clients.index'))
+            ->assertOk()
+            ->assertSee('layout-check@example.com')
+            ->getContent();
+
+        $this->assertStringContainsString('id="row-m-'.$client->id.'"', $html, 'mobile card missing');
+        $this->assertStringContainsString('space-y-2 md:hidden', $html, 'cards must hide from md up');
+        $this->assertStringContainsString('hidden overflow-x-auto', $html, 'table must hide below md');
+        $this->assertStringContainsString("isSelected('".$client->id."')", $html, 'ids must reach Alpine quoted');
+        $this->assertStringNotContainsString('isSelected('.$client->id.')', $html);
+    }
 }
