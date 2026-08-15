@@ -350,10 +350,18 @@ class ContentCompetitorsTest extends TestCase
 
     /**
      * Owner decision 2026-07-22: SERP discovery is the PRIMARY competitor
-     * source (layer 1, kept in SERP order), mega-platforms are filtered from
-     * every source, and the step shows up to 10.
+     * source (layer 1, kept in SERP order) and the step shows up to 10.
+     *
+     * Giant handling moved on 2026-07-27 (commit a975cc4, "keep the giants in
+     * the list, don't hide them"): ContentSetupInsights no longer filters
+     * mega-platforms — whatever reaches the cache is shown as-is, and the
+     * filtering happens upstream where the list is BUILT
+     * (ReportEnrichmentService::tallyCompetitors, covered by
+     * ReportEnrichmentTest::test_discover_competitors_filters_out_giant_platforms).
+     * This test seeds the cache by hand, i.e. downstream of that filter, so a
+     * giant in the seed is expected to survive here.
      */
-    public function test_serp_competitors_are_the_primary_source_in_serp_order_giants_filtered(): void
+    public function test_serp_competitors_are_the_primary_source_in_serp_order(): void
     {
         $user = User::factory()->create();
         $website = Website::factory()->for($user)->create(['normalized_domain' => 'mysite.test']);
@@ -370,11 +378,10 @@ class ContentCompetitorsTest extends TestCase
 
         $this->assertNotNull($insights, 'SERP rows alone render the step — no paid report required');
         $domains = array_column($insights['competitors'], 'domain');
-        $this->assertNotContains('amazon.com', $domains);
-        $this->assertNotContains('netflix.com', $domains);
         $this->assertCount(10, $domains, 'capped at 10 for the competitors step');
-        // SERP order preserved — no authority re-sort.
-        $this->assertSame('rival-1.com', $domains[0]);
-        $this->assertSame('rival-10.com', $domains[9]);
+        // SERP order preserved verbatim — no authority re-sort and no giant
+        // hiding at this layer, so the seeded rows come back in seed order.
+        $this->assertSame(['amazon.com', 'rival-1.com', 'netflix.com'], array_slice($domains, 0, 3));
+        $this->assertSame('rival-8.com', $domains[9]);
     }
 }

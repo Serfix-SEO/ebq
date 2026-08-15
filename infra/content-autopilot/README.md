@@ -498,6 +498,18 @@ sites keep SERP order, no YOU row.
 
 Tests: `ContentPeerClassesTest` (3).
 
+**Where giants are filtered.** `ContentSetupInsights::competitorAuthority()`
+does NOT drop mega-platforms — that filter was removed on 2026-07-27
+(`a975cc4`, owner: "keep the giants in the list, don't hide them"). The only
+mega-platform filter is upstream, where the list is BUILT:
+`ReportEnrichmentService::tallyCompetitors()` skips `GiantDomains::isGiant()`
+hosts before the SERP tally is cached under `content:serp-competitors:<id>`.
+Regression test lives there too
+(`ReportEnrichmentTest::test_discover_competitors_filters_out_giant_platforms`);
+`ContentCompetitorsTest` seeds that cache by hand, i.e. downstream of the
+filter, so a giant in the seed is expected to survive. A stale assertion of the
+old behaviour left that test red from 07-27 until 2026-08-15.
+
 ## Guard evolution (Phase E, 2026-07-23)
 
 - **Policy modes** — `CompetitorMentionGuard::mode($plan)`: explicit

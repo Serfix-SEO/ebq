@@ -678,6 +678,42 @@ class ReportEnrichmentTest extends TestCase
         $this->assertEquals('rival.ae', $result['competitors'][0]['domain']);
     }
 
+    /**
+     * Mega-platforms are dropped where the competitor list is BUILT, not where
+     * it is displayed: ContentSetupInsights stopped hiding giants on 2026-07-27
+     * (commit a975cc4, owner: "keep the giants in the list, don't hide them"),
+     * so this tally-level filter is the only thing standing between a client
+     * and "your competitor is amazon.com".
+     */
+    public function test_discover_competitors_filters_out_giant_platforms(): void
+    {
+        config(['services.report.enrichment.serp_query_cap' => 5]);
+
+        $llm = Mockery::mock(LlmClient::class);
+        $llm->shouldReceive('completeJson')->once()->andReturn(['genuine' => true]);
+        $fetcher = Mockery::mock(CrawlFetcher::class);
+        $fetcher->shouldReceive('fetch')->never();
+        $serp = Mockery::mock(SerpCache::class);
+        // 1 query × 2 SERP pages (1 surviving rival < 3 → page-2 widening).
+        $serp->shouldReceive('organic')->twice()->andReturn(['organic' => [
+            ['position' => 1, 'link' => 'https://www.amazon.com/dp/123'],
+            ['position' => 2, 'link' => 'https://rival.com/x'],
+            ['position' => 3, 'link' => 'https://netflix.com/title/9'],
+        ]]);
+        $opr = Mockery::mock(OpenPageRankClient::class);
+        $opr->shouldReceive('metricsFor')->andReturn(['rival.com' => ['rank' => 100, 'score' => 5.0, 'history' => []]]);
+
+        $service = $this->makeService(['llm' => $llm, 'fetcher' => $fetcher, 'serp' => $serp, 'opr' => $opr]);
+        $result = $service->discoverCompetitorsFor('newsite.com', [
+            ['keyword' => 'oak dining table', 'volume' => 900],
+        ]);
+
+        $domains = array_column($result['competitors'], 'domain');
+        $this->assertContains('rival.com', $domains);
+        $this->assertNotContains('amazon.com', $domains);
+        $this->assertNotContains('netflix.com', $domains);
+    }
+
     public function test_website_tab_status_reflects_enriching_and_partial(): void
     {
         $user = User::factory()->create();
