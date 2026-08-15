@@ -126,6 +126,7 @@ class AdminClientsPageTest extends TestCase
     public function test_list_renders_mobile_cards_and_desktop_table(): void
     {
         $client = User::factory()->create(['email' => 'layout-check@example.com']);
+        Website::factory()->create(['user_id' => $client->id, 'domain' => 'detail-site.test']);
 
         $html = $this->actingAs($this->admin())
             ->get(route('admin.clients.index'))
@@ -134,6 +135,8 @@ class AdminClientsPageTest extends TestCase
             ->getContent();
 
         $this->assertStringContainsString('id="row-m-'.$client->id.'"', $html, 'mobile card missing');
+        // Admins recognise accounts by domain — it must be on the row itself.
+        $this->assertStringContainsString('detail-site.test', $html, 'website domain missing from the row');
         $this->assertStringContainsString('space-y-2 md:hidden', $html, 'cards must hide from md up');
         $this->assertStringContainsString('hidden overflow-x-auto', $html, 'table must hide below md');
         $this->assertStringContainsString("isSelected('".$client->id."')", $html, 'ids must reach Alpine quoted');
@@ -264,5 +267,23 @@ class AdminClientsPageTest extends TestCase
         $this->assertSame(1, (int) $rows['connected@example.com']->integrations_connected);
         $this->assertSame(1, (int) $rows['broken@example.com']->integrations_error);
         $this->assertSame(0, (int) $rows['broken@example.com']->integrations_connected);
+    }
+
+    public function test_extra_websites_fold_into_a_plus_n_chip(): void
+    {
+        $client = User::factory()->create();
+        foreach (['one.test', 'two.test', 'three.test'] as $domain) {
+            Website::factory()->create(['user_id' => $client->id, 'domain' => $domain]);
+        }
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.clients.index'))
+            ->assertOk()
+            ->assertSee('one.test')
+            ->assertSee('two.test')
+            ->assertSee('+1')
+            // the folded domain is not a chip of its own — it survives only in
+            // the +N tooltip listing every domain
+            ->assertSee('three.test');
     }
 }

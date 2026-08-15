@@ -1,5 +1,9 @@
-{{-- Client identity cell: avatar, name, id, email, plan badge and trial clock.
-     Shared by the desktop table row and the mobile card.
+{{-- Client identity cell: avatar, name, id, email, plan badge, trial clock and
+     the client's website domains. Shared by the desktop table row and the
+     mobile card.
+
+     Domains come from the listing's eager-loaded `websites` relation (already
+     loaded for the recrawl picker) — never a query per row.
 
      Expects: $client, $initialsFor, $avatarBg --}}
     <div class="flex items-center gap-2.5">
@@ -57,5 +61,22 @@
                     @endif
                 @endif
             </div>
+            @if ($client->relationLoaded('websites') && $client->websites->isNotEmpty())
+                {{-- Admins recognise accounts by domain, not by email. Two shown
+                     inline, the rest folded into a +N with the full list on hover. --}}
+                <div class="mt-1 flex flex-wrap items-center gap-1">
+                    @foreach ($client->websites->take(2) as $site)
+                        <a href="https://{{ $site->domain }}" target="_blank" rel="noopener noreferrer"
+                           class="inline-flex max-w-[12rem] items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-orange-50 hover:text-orange-700">
+                            <svg class="h-2.5 w-2.5 flex-none opacity-60" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5-2.5 3.75-5.75 3.75-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.75-5.75-3.75-9S9.5 5.5 12 3M3.6 9h16.8M3.6 15h16.8"/></svg>
+                            <span class="truncate">{{ $site->domain }}</span>
+                        </a>
+                    @endforeach
+                    @if ($client->websites->count() > 2)
+                        <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500"
+                              title="{{ $client->websites->pluck('domain')->join(', ') }}">+{{ $client->websites->count() - 2 }}</span>
+                    @endif
+                </div>
+            @endif
         </div>
     </div>
