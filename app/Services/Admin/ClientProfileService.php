@@ -53,6 +53,7 @@ class ClientProfileService
         $plans = $ids === [] ? collect() : ContentPlan::query()->whereIn('website_id', $ids)->get()->keyBy('website_id');
         $integrations = $ids === [] ? collect() : ContentIntegration::query()->whereIn('website_id', $ids)->get()->groupBy('website_id');
 
+        $pubStats = $this->publicationStatsByIntegration($integrations->flatten()->pluck('id')->all());
         $topicCounts = $this->topicCountsByWebsite($ids);
         $trackedCounts = $this->trackedCountsByWebsite($ids);
         $gsc = $this->gscTotals($client, $ids);
@@ -78,6 +79,8 @@ class ClientProfileService
 
         return [
             'websites' => $rows,
+            // integration_id => delivery counters, shared by every website row.
+            'publications' => $pubStats,
             'content' => $this->contentSummary($ids),
             'keywords' => $this->keywordSummary($ids),
             'spend' => $this->spend($client),
@@ -101,6 +104,37 @@ class ClientProfileService
                 'has_content_access' => $this->entitlements->hasContentAccess($client),
             ],
         ];
+    }
+
+    /**
+     * Delivery record per publishing integration: how many articles were sent,
+     * how many failed, and when the last one landed. Support's first question
+     * about a live site is always "did it actually reach the destination?".
+     *
+     * @return array<string, array{confirmed:int, sent:int, failed:int, queued:int, last_at:?Carbon}>
+     */
+    private function publicationStatsByIntegration(array $integrationIds): array
+    {
+        if ($integrationIds === []) {
+            return [];
+        }
+
+        $out = [];
+        DB::table('content_publications')
+            ->whereIn('integration_id', $integrationIds)
+            ->selectRaw('integration_id, status, COUNT(*) AS c, MAX(published_at) AS last_at')
+            ->groupBy('integration_id', 'status')
+            ->get()
+            ->each(function ($row) use (&$out) {
+                $bucket = $out[$row->integration_id] ?? ['confirmed' => 0, 'sent' => 0, 'failed' => 0, 'queued' => 0, 'last_at' => null];
+                $bucket[$row->status] = (int) $row->c;
+                if ($row->last_at && (! $bucket['last_at'] || Carbon::parse($row->last_at)->gt($bucket['last_at']))) {
+                    $bucket['last_at'] = Carbon::parse($row->last_at);
+                }
+                $out[$row->integration_id] = $bucket;
+            });
+
+        return $out;
     }
 
     /** @return array<string, array<string, int>> website_id => [status => count] */

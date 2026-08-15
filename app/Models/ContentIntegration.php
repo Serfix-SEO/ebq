@@ -75,4 +75,63 @@ class ContentIntegration extends Model
             default => ucfirst((string) $this->platform),
         };
     }
+
+    /**
+     * Where this integration publishes, as label => value pairs safe to render
+     * in an admin screen.
+     *
+     * SECRETS ARE NEVER INCLUDED. `credentials` is an encrypted cast holding
+     * tokens, API keys, app passwords and webhook signing secrets; only the
+     * addressing parts (site URL, endpoint, store/project/site identifiers)
+     * are surfaced, because support needs to answer "where did this article
+     * go?" without ever reading a credential. Anything added to a driver's
+     * credentials later is opt-in here — do not switch this to a blanket dump.
+     *
+     * @return array<string, string>
+     */
+    public function targetSummary(): array
+    {
+        $creds = $this->credentials;
+        $config = (array) ($this->config ?? []);
+        $get = fn (string $key) => trim((string) ($creds[$key] ?? ''));
+        $cfg = fn (string $key) => trim((string) ($config[$key] ?? ''));
+
+        $out = match ($this->platform) {
+            self::PLATFORM_WORDPRESS, self::PLATFORM_WORDPRESS_APP_PASSWORD => [
+                __('Site URL') => $get('site_url'),
+            ],
+            self::PLATFORM_WEBHOOK => [
+                __('Endpoint') => $get('endpoint_url'),
+                __('Signed') => $get('secret') !== '' ? __('Yes') : __('No'),
+            ],
+            self::PLATFORM_SHOPIFY => [
+                __('Store') => $cfg('shop_url') ?: $get('store_domain'),
+                __('Blog') => $cfg('blog_handle'),
+            ],
+            self::PLATFORM_WEBFLOW => [
+                __('Site') => $cfg('site_domain'),
+                __('Collection') => $cfg('collection_slug'),
+            ],
+            self::PLATFORM_WIX => [
+                __('Site ID') => $get('site_id'),
+                __('Author ID') => $cfg('member_id'),
+            ],
+            self::PLATFORM_SANITY => [
+                __('Project') => $get('project_id'),
+                __('Dataset') => $cfg('dataset'),
+                __('Document type') => $cfg('doc_type'),
+            ],
+            self::PLATFORM_HUBSPOT => [
+                __('Blog URL') => $cfg('blog_url'),
+                __('Blog ID') => $cfg('content_group_id'),
+            ],
+            default => [],
+        };
+
+        if (($status = $cfg('post_status')) !== '') {
+            $out[__('Publishes as')] = $status;
+        }
+
+        return array_filter($out, fn ($v) => $v !== '');
+    }
 }

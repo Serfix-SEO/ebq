@@ -187,4 +187,34 @@ class AdminClientsPageTest extends TestCase
 
         $this->assertSame('Renamed Here', $client->fresh()->name);
     }
+
+    /**
+     * The integrations block must answer "where do this client's articles go?"
+     * — and must never leak a credential. `credentials` is an encrypted cast
+     * holding webhook secrets, tokens and app passwords.
+     */
+    public function test_detail_page_shows_publishing_integrations_without_credentials(): void
+    {
+        $client = User::factory()->create();
+        $site = Website::factory()->create(['user_id' => $client->id, 'domain' => 'publish-target.test']);
+
+        \App\Models\ContentIntegration::create([
+            'website_id' => $site->id,
+            'platform' => \App\Models\ContentIntegration::PLATFORM_WEBHOOK,
+            'status' => \App\Models\ContentIntegration::STATUS_CONNECTED,
+            'credentials' => ['endpoint_url' => 'https://hooks.example.test/serfix', 'secret' => 'super-secret-value'],
+            'config' => ['post_status' => 'publish'],
+            'last_verified_at' => now(),
+        ]);
+
+        $html = $this->actingAs($this->admin())
+            ->get(route('admin.clients.show', $client))
+            ->assertOk()
+            ->assertSee('Publishing integrations')
+            ->assertSee('Custom integration')
+            ->assertSee('https://hooks.example.test/serfix')
+            ->getContent();
+
+        $this->assertStringNotContainsString('super-secret-value', $html, 'credentials must never render');
+    }
 }

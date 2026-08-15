@@ -294,18 +294,12 @@
                             <p class="mt-0.5 text-[11px] text-slate-400">Added {{ $date($w['created_at']) }}</p>
                         </div>
                         <div class="flex flex-wrap gap-1.5">
-                            @foreach ($w['integrations'] as $integration)
-                                <span @class([
-                                    'inline-flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-semibold',
-                                    'border-emerald-200 bg-emerald-50 text-emerald-700' => $integration->status === \App\Models\ContentIntegration::STATUS_CONNECTED,
-                                    'border-rose-200 bg-rose-50 text-rose-700' => $integration->status === \App\Models\ContentIntegration::STATUS_ERROR,
-                                    'border-slate-200 bg-slate-50 text-slate-500' => ! in_array($integration->status, [\App\Models\ContentIntegration::STATUS_CONNECTED, \App\Models\ContentIntegration::STATUS_ERROR], true),
-                                ]) @if ($integration->last_error) title="{{ \Illuminate\Support\Str::limit($integration->last_error, 200) }}" @endif>
-                                    {{ $integration->platformLabel() }} · {{ $integration->status }}
-                                </span>
-                            @endforeach
                             @if ($w['integrations']->isEmpty())
                                 <span class="inline-flex items-center rounded border border-dashed border-slate-300 px-2 py-1 text-[10px] font-semibold text-slate-400">No publishing integration</span>
+                            @else
+                                <span class="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                                    {{ $w['integrations']->count() }} {{ \Illuminate\Support\Str::plural('integration', $w['integrations']->count()) }}
+                                </span>
                             @endif
                         </div>
                     </div>
@@ -349,6 +343,77 @@
                             <p class="font-bold tabular-nums text-slate-800">{{ $w['ga'] ? $fmtN($w['ga']['sessions']) : '—' }}</p>
                         </div>
                     </div>
+
+                    {{-- Publishing integrations. Shows WHERE articles go and whether they
+                         landed — never a credential: targetSummary() opts in the addressing
+                         fields only (tokens/keys/app passwords/webhook secrets stay in the
+                         encrypted cast and are never rendered). --}}
+                    @if ($w['integrations']->isNotEmpty())
+                        <div class="border-t border-slate-100 p-3">
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Publishing integrations</p>
+                            <div class="mt-2 grid gap-2 lg:grid-cols-2">
+                                @foreach ($w['integrations'] as $integration)
+                                    @php
+                                        $stats = $profile['publications'][$integration->id] ?? null;
+                                        $delivered = (int) (($stats['confirmed'] ?? 0) + ($stats['sent'] ?? 0));
+                                        $failedDeliveries = (int) ($stats['failed'] ?? 0);
+                                        $isError = $integration->status === \App\Models\ContentIntegration::STATUS_ERROR;
+                                        $isConnected = $integration->status === \App\Models\ContentIntegration::STATUS_CONNECTED;
+                                    @endphp
+                                    <div @class([
+                                        'min-w-0 rounded-lg border px-3 py-2.5',
+                                        'border-emerald-200 bg-emerald-50/40' => $isConnected,
+                                        'border-rose-200 bg-rose-50/40' => $isError,
+                                        'border-slate-200 bg-slate-50/60' => ! $isConnected && ! $isError,
+                                    ])>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="text-sm font-bold text-slate-800">{{ $integration->platformLabel() }}</span>
+                                            <span @class([
+                                                'inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                                                'bg-emerald-100 text-emerald-700' => $isConnected,
+                                                'bg-rose-100 text-rose-700' => $isError,
+                                                'bg-slate-200 text-slate-600' => ! $isConnected && ! $isError,
+                                            ])>{{ $integration->status }}</span>
+                                            <span class="ms-auto text-[11px] text-slate-400">
+                                                {{ $integration->last_verified_at ? 'Verified '.$rel($integration->last_verified_at) : 'Never verified' }}
+                                            </span>
+                                        </div>
+
+                                        @php $target = $integration->targetSummary(); @endphp
+                                        @if ($target !== [])
+                                            <dl class="mt-2 space-y-1 text-xs">
+                                                @foreach ($target as $k => $v)
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <dt class="flex-none text-slate-500">{{ $k }}</dt>
+                                                        <dd class="min-w-0 flex-1 break-all text-end font-medium text-slate-800">{{ $v }}</dd>
+                                                    </div>
+                                                @endforeach
+                                            </dl>
+                                        @endif
+
+                                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                                            <span class="font-semibold text-slate-700">{{ $fmtN($delivered) }} delivered</span>
+                                            @if ($failedDeliveries > 0)
+                                                <span class="font-semibold text-rose-600">{{ $fmtN($failedDeliveries) }} failed</span>
+                                            @endif
+                                            @if (($stats['queued'] ?? 0) > 0)
+                                                <span class="text-amber-600">{{ $fmtN($stats['queued']) }} queued</span>
+                                            @endif
+                                            <span class="text-slate-400">Last delivery {{ $rel($stats['last_at'] ?? null) }}</span>
+                                        </div>
+
+                                        @if ($integration->last_error)
+                                            <p class="mt-2 break-words rounded bg-rose-50 px-2 py-1.5 text-[11px] text-rose-700">
+                                                {{ \Illuminate\Support\Str::limit($integration->last_error, 300) }}
+                                            </p>
+                                        @endif
+
+                                        <p class="mt-2 text-[10px] text-slate-400">Connected {{ $date($integration->created_at) }}</p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @empty
                 <p class="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">

@@ -297,7 +297,10 @@ known gaps were flagged during the sweep:
   puts an account's whole story on one screen: account facts, billing/entitlements, every website
   with its Content Autopilot plan + integrations + 28-day GSC/GA numbers, production stats,
   tracked-keyword position spread, API spend (MTD/lifetime/6-month trend), support tickets,
-  lifecycle emails and the activity feed. Aggregation is service-side and the only 2M-row table
+  lifecycle emails and the activity feed — including each website's publishing
+  integrations (destination address, verification state, delivered/failed counts,
+  last error) via `ContentIntegration::targetSummary()`, an allow-list that never
+  exposes the encrypted credentials. Aggregation is service-side and the only 2M-row table
   (`search_console_data`) is cached 30min per client. The clients LIST now renders cards below
   `md` and the table above it from shared partials, and ULID ids reach Alpine via `@js()` — the
   old `(int)` cast made `isSelected(01m0…)` a JS syntax error, so bulk select never worked.
