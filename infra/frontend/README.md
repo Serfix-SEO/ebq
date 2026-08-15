@@ -255,6 +255,23 @@ prose wrapper carries `prose-code:break-all` (`legal/privacy.blade.php`); (3) de
 tool-page heroes). Re-check with the puppeteer overflow sweep (scrollWidth vs clientWidth
 per page) rather than eyeballing screenshots.
 
+**Caveat added 2026-08-15:** the app layout sets `overflow-x-clip` on `<html>` and
+`<body>`, so on IN-APP pages that sweep reports **0 even when content overflows** —
+the overflow is clipped, not scrolled, and values silently vanish off-screen. For
+`components/layouts/app.blade.php` pages, walk the DOM instead and flag any element
+whose `getBoundingClientRect().right` exceeds the viewport width.
+
+**Squeezed-row pattern (2026-08-15, `/settings` and the admin clients list).** A
+`flex items-center justify-between` header row — label on the left, action button on
+the right — is the single most common in-app mobile defect: at 390px the button
+loses its own width and its label wraps to two lines while the copy beside it breaks
+one word per line. The fix everywhere is the same: `flex flex-col gap-3
+sm:flex-row sm:items-center sm:justify-between`, with the button
+`w-full … sm:w-auto` + `whitespace-nowrap`, and `h-9 sm:h-8` so the tap target is
+real on a phone. Applied in `livewire/settings/{integrations-panel,wordpress-plugin}`;
+the segmented tabs in `settings/index.blade.php` drop their icons below `420px`
+(`min-[420px]:block`) rather than truncating "Integrations" to "Integra…".
+
 ## Key files
 
 - Layouts — `resources/views/components/layouts/{app,guest}.blade.php`,
