@@ -284,6 +284,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-14 — Content calendar is usable on a phone.** Below `sm` the month
+  view renders an agenda (one dated card per day) instead of the 7-column,
+  56rem-wide grid that squeezed each cell to ~120px, and list-view rows stack
+  instead of fighting a fixed `w-40` date column. The topic card is now the
+  shared partial `livewire/content/partials/topic-card.blade.php` used by both
+  the desktop grid and the agenda. Docs:
+  [content-autopilot/README.md](./content-autopilot/README.md).
+
 - **2026-08-14 — Admin client detail page + mobile-friendly client list.** New
   `/admin/clients/{user}` (`ClientController@show` + `App\Services\Admin\ClientProfileService`)
   puts an account's whole story on one screen: account facts, billing/entitlements, every website

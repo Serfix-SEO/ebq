@@ -1456,6 +1456,31 @@ previously failed-and-retried it is net cheaper (no more 21k-token
 zero-output attempts). Pipeline tests' `fakeLlm()` speaks the chunked
 protocol (PLANNING STEP / "write ONLY section N" markers).
 
+## Calendar on phones — agenda, not a squeezed grid (2026-08-14)
+
+The month view is a 7-column grid pinned to `min-width:56rem` inside a
+horizontal scroller. On a phone that makes each day cell ~120px: the title
+clipped to a couple of words, the status chip wrapped under it and the "Write"
+button was cut in half. Fix in `content-calendar.blade.php`:
+
+- The 7-column grid is now `hidden … sm:block`. Below `sm` the same month
+  renders as an **agenda** — one dated card per day that has topics, full
+  width, in date order (empty days are skipped).
+- The topic card moved to
+  `resources/views/livewire/content/partials/topic-card.blade.php` and is
+  included by BOTH the grid cell and the agenda, so they cannot drift. It takes
+  `$draggable` (default `true`); the agenda passes `false` because there are no
+  drop targets there and `drag.id` only exists in the grid's `x-data` scope.
+  Card internals scale with the breakpoint (`h-24 sm:h-14` hero, `text-sm
+  sm:text-xs` title, larger tap targets below `sm`).
+- The action row inside the card wraps (`flex-wrap`) — in a narrow desktop grid
+  cell the chip + date button + Write button did not fit on one line and the
+  button was clipped.
+- **List view** rows stack below `sm` (`flex-col … sm:flex-row`): the fixed
+  `w-40` date column beside a `flex-1` title squeezed the title to ~90px and
+  broke it one word per line. The trailing status + actions sit in a wrapper
+  that is `sm:contents`, so the desktop row layout is unchanged.
+
 ## "Connect a destination" banner (renamed 2026-07-22)
 
 `resources/views/components/content/connect-integration.blade.php` (was

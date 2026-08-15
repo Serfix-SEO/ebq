@@ -475,7 +475,36 @@
                     <span>{{ __('No articles planned this month yet.') }} {{ __('Use the month arrows to browse your planned articles.') }}</span>
                 </div>
             @endif
-            <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            {{-- Phones get an agenda instead of the month grid: seven columns in a
+                 56rem-wide scroller squeezes each cell to ~120px, which clipped the
+                 title, the badge and the Write button into an unreadable stack. --}}
+            <div class="space-y-3 sm:hidden">
+                @foreach ($days as $day)
+                    @php $dayTopics = $topicsByDate->get($day->toDateString(), collect()); @endphp
+                    @continue ($dayTopics->isEmpty())
+                    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+                            @if ($day->isToday())
+                                <span class="flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-orange-600 px-1.5 text-xs font-bold text-white">{{ $day->day }}</span>
+                            @else
+                                <span class="flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $day->day }}</span>
+                            @endif
+                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $day->translatedFormat('D, M j') }}</span>
+                            @if ($day->isToday())
+                                <span class="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-700 dark:bg-orange-950/60 dark:text-orange-400">{{ __('Today') }}</span>
+                            @endif
+                            <span class="ms-auto text-xs text-slate-400">{{ trans_choice('{1} :count article|[2,*] :count articles', $dayTopics->count(), ['count' => $dayTopics->count()]) }}</span>
+                        </div>
+                        <div class="space-y-2 p-3">
+                            @foreach ($dayTopics as $topic)
+                                @include('livewire.content.partials.topic-card', ['topic' => $topic, 'draggable' => false])
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm sm:block dark:border-slate-800 dark:bg-slate-900">
                 <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400" style="min-width:56rem">
                     @foreach ([__('Mon'), __('Tue'), __('Wed'), __('Thu'), __('Fri'), __('Sat'), __('Sun')] as $dow)
                         <div class="px-2 py-2.5">{{ $dow }}</div>
@@ -504,134 +533,7 @@
                                 @endif
                             </div>
                             @foreach ($dayTopics as $topic)
-                                @php
-                                    $p = \App\Livewire\Content\ContentCalendar::statusPresentation($topic->status);
-                                    $imgPending = \App\Livewire\Content\ContentCalendar::imagesPending($topic);
-                                    $cellInFlight = in_array($topic->status, \App\Models\ContentTopic::IN_FLIGHT, true) || $imgPending;
-                                    $canWrite = ! $cellInFlight && in_array($topic->status, ['suggested', 'approved', 'failed'], true);
-                                    $canDrag = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true);
-                                    $overCap = in_array($topic->id, $overCapIds ?? [], true);
-                                    $hero = \App\Livewire\Content\ContentCalendar::heroImage($topic);
-                                    $cellScore = $topic->currentArticle?->seo_score;
-                                    $cellScoreColor = $cellScore >= 80 ? 'emerald' : ($cellScore >= 60 ? 'amber' : 'rose');
-                                    $cellImages = $topic->currentArticle?->images?->count() ?? 0;
-                                    $cellWords = $topic->currentArticle?->word_count ?? 0;
-                                @endphp
-                                {{-- The WHOLE card opens the topic page — people click the
-                                     image and the card body, not just the 2-line title (rage
-                                     clicks, 2026-08-08). The guard skips the card's own
-                                     controls and text selection; drag is untouched because
-                                     the handler fires on plain clicks only. --}}
-                                <div wire:key="cell-{{ $topic->id }}" x-data="{ pick: false, opening: false, newDate: '{{ $topic->scheduled_for?->toDateString() }}' }"
-                                     @if($canDrag) draggable="true"
-                                        x-on:dragstart="drag.id = '{{ $topic->id }}'; $event.dataTransfer.setData('text/plain', '{{ $topic->id }}'); $event.dataTransfer.effectAllowed = 'move'"
-                                        x-on:dragend="drag.id = null" @endif
-                                     x-on:click="if (! $event.target.closest('button, a, input, [role=switch]') && ! window.getSelection()?.toString()) { opening = true; window.location = '{{ route('content.review', $topic->id) }}' }"
-                                     x-on:pageshow.window="opening = false"
-                                     role="link" tabindex="0" aria-label="{{ $topic->title }}"
-                                     x-on:keydown.enter="opening = true; window.location = '{{ route('content.review', $topic->id) }}'"
-                                     class="relative mb-1.5 cursor-pointer overflow-hidden rounded-lg border shadow-sm transition-shadow hover:shadow-md hover:border-orange-300 dark:hover:border-orange-500/50 {{ $overCap ? 'border-error/60 bg-error/5 dark:border-error/50' : ($cellInFlight ? 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800') }} {{ $canDrag ? 'active:cursor-grabbing' : '' }}">
-                                    {{-- Opening feedback: navigation to the article page is not
-                                         instant, and a silent click reads as broken (the rage-
-                                         click report). pageshow resets it when the page is
-                                         restored from the back/forward cache. --}}
-                                    <div x-show="opening" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/70">
-                                        <svg class="h-5 w-5 animate-spin text-orange-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                                    </div>
-                                    {{-- Hero image strip (featured first, else newest) — gradient placeholder when none. --}}
-                                    <div class="relative h-14 w-full bg-gradient-to-br from-orange-50 to-slate-100 dark:from-orange-950/40 dark:to-slate-800">
-                                        @if ($hero?->url())
-                                            <img src="{{ $hero->url() }}" alt="{{ $hero->alt_text ?? $topic->title }}"
-                                                 loading="lazy" decoding="async" draggable="false"
-                                                 class="h-14 w-full object-cover" onerror="this.remove()">
-                                        @else
-                                            <span class="absolute inset-0 flex items-center justify-center text-slate-400 opacity-40 dark:text-slate-500">
-                                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z"/></svg>
-                                            </span>
-                                        @endif
-                                    </div>
-                                    <div class="p-1.5">
-                                    @if ($topic->currentArticle || $cellInFlight)
-                                        <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80" x-on:click="opening = true">
-                                            <span class="break-words text-xs font-semibold text-slate-800 line-clamp-2 dark:text-slate-100">{{ $topic->title }}</span>
-                                        </a>
-                                    @else
-                                        <a href="{{ route('content.review', $topic->id) }}" wire:navigate draggable="false" class="block hover:opacity-80" x-on:click="opening = true">
-                                            <span class="break-words text-xs font-semibold text-slate-800 line-clamp-2 dark:text-slate-100">{{ $topic->title }}</span>
-                                        </a>
-                                    @endif
-                                    @if ($cellScore || $cellImages > 0 || $cellWords > 0)
-                                        <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400 dark:text-slate-500">
-                                            @if ($cellScore)
-                                                <span class="inline-flex items-center rounded-full px-1.5 py-px font-bold {{ $chipClasses[$cellScoreColor] }}" title="{{ __('SEO score') }}">{{ __('SEO') }} {{ $cellScore }}</span>
-                                            @endif
-                                            @if ($cellWords > 0)
-                                                <span>{{ number_format($cellWords) }} {{ __('words') }}</span>
-                                            @endif
-                                            @if ($cellImages > 0)
-                                                <span class="inline-flex items-center gap-0.5" title="{{ __('Images') }}">
-                                                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z"/></svg>
-                                                    {{ $cellImages }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                    @endif
-                                    <div class="mt-1 flex items-center justify-between gap-1">
-                                        @php $chipColor = $imgPending ? 'amber' : $p['color']; @endphp
-                                        <span class="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-semibold {{ $chipClasses[$chipColor] ?? $chipClasses['slate'] }}">
-                                            @if ($cellInFlight)
-                                                <svg class="h-2.5 w-2.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                                            @endif
-                                            {{ $imgPending ? __('Finalizing images…') : $p['label'] }}
-                                        </span>
-                                        <span class="flex items-center gap-1">
-                                            @if ($canDrag)
-                                                {{-- Calendar icon → inline date picker (move to any day, incl. a 2nd on one day). --}}
-                                                <button type="button" draggable="false" x-on:click="pick = !pick" title="{{ __('Change date') }}"
-                                                        class="inline-flex shrink-0 items-center justify-center rounded-md p-0.5 text-slate-400 hover:text-orange-600">
-                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path stroke-linecap="round" d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>
-                                                </button>
-                                            @endif
-                                            @if ($canWrite)
-                                                <button wire:click="writeNow('{{ $topic->id }}')" wire:loading.attr="disabled" wire:target="writeNow('{{ $topic->id }}')"
-                                                        class="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-orange-700" title="{{ __('Write now') }}">
-                                                    <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
-                                                    {{ __('Write') }}
-                                                </button>
-                                            @endif
-                                        </span>
-                                    </div>
-                                    @if ($canDrag)
-                                        <div x-show="pick" x-cloak class="mt-1 flex items-center gap-1">
-                                            <input type="date" draggable="false" x-model="newDate" min="{{ now()->toDateString() }}"
-                                                   class="w-full rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" />
-                                            <button type="button" draggable="false" wire:key="gsave-{{ $topic->id }}"
-                                                    x-on:click="$wire.reschedule('{{ $topic->id }}', newDate); pick = false"
-                                                    class="inline-flex shrink-0 items-center justify-center rounded-md bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-orange-700" title="{{ __('Save date') }}">
-                                                {{ __('Save') }}
-                                            </button>
-                                        </div>
-                                    @endif
-                                    @if ($overCap)
-                                        <p class="mt-1 text-[10px] font-semibold text-error">{{ __('Over monthly limit') }}</p>
-                                    @endif
-                                    @if ($publishConnected && ! $imgPending && \App\Livewire\Content\ContentCalendar::publishableNow($topic))
-                                        <button wire:click="publishNow('{{ $topic->id }}')" wire:confirm="{{ __('Publish this article to your site now?') }}" draggable="false"
-                                                class="mt-1 inline-flex w-full items-center justify-center gap-0.5 rounded-md bg-success px-1.5 py-0.5 text-[10px] font-bold text-white hover:brightness-110">
-                                            <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
-                                            {{ __('Publish now') }}
-                                        </button>
-                                    @endif
-                                    @if ($publishConnected && ! $imgPending && $topic->status === \App\Models\ContentTopic::STATUS_PUBLISHED && $topic->currentArticle)
-                                        <button wire:click="republish('{{ $topic->id }}')" wire:confirm="{{ __('Send this article to your site again? Destinations that already have it get the latest version.') }}" draggable="false"
-                                                title="{{ __('Republish to your site') }}"
-                                                class="mt-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] font-semibold text-slate-400 hover:text-orange-600 dark:text-slate-500 dark:hover:text-orange-400">
-                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356m-4.992 4.992l3.181-3.183a8.25 8.25 0 00-13.803 3.7M4.031 9.865v4.99m0 0h4.99m-4.99 0l3.181 3.183a8.25 8.25 0 0013.803-3.7"/></svg>
-                                            {{ __('Republish') }}
-                                        </button>
-                                    @endif
-                                    </div>
-                                </div>
+                                @include('livewire.content.partials.topic-card', ['topic' => $topic])
                             @endforeach
                         </div>
                     @endforeach
@@ -659,12 +561,15 @@
                              x-on:pageshow.window="opening = false"
                              role="link" tabindex="0" aria-label="{{ $topic->title }}"
                              x-on:keydown.enter="opening = true; window.location = '{{ route('content.review', $topic->id) }}'"
-                             class="relative flex cursor-pointer flex-wrap items-center gap-3 px-4 py-4 transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/30 {{ $overCap ? 'bg-error/5' : '' }}">
+                             {{-- Below sm the row stacks: the fixed w-40 date column plus a
+                                  flex-1 title in a wrapping row squeezed the title to ~90px
+                                  and broke it one word per line on a phone. --}}
+                             class="relative flex cursor-pointer flex-col gap-2 px-4 py-4 transition-colors hover:bg-slate-50/70 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 dark:hover:bg-slate-800/30 {{ $overCap ? 'bg-error/5' : '' }}">
                             <div x-show="opening" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/70">
                                 <svg class="h-5 w-5 animate-spin text-orange-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                             </div>
                             @php $canMove = in_array($topic->status, ['suggested', 'approved', 'ready', 'scheduled'], true); @endphp
-                            <div class="w-40 shrink-0">
+                            <div class="w-full shrink-0 sm:w-40">
                                 @if ($canMove)
                                     {{-- Pick a date, then Save to move it (any day/month). --}}
                                     <div class="flex items-center gap-1" x-data="{ d: '{{ $topic->scheduled_for?->toDateString() }}' }" wire:key="resched-{{ $topic->id }}">
@@ -696,7 +601,7 @@
                                     </span>
                                 @endif
                             </div>
-                            <div class="min-w-0 flex-1">
+                            <div class="w-full min-w-0 sm:flex-1">
                                 <div class="break-words text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $topic->title }}</div>
                                 <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                                     <span>{{ $topic->target_keyword }}@if($topic->keyword_volume) · {{ number_format($topic->keyword_volume) }} {{ __('searches/mo') }}@endif</span>
@@ -728,6 +633,10 @@
                                 </div>
                             </div>
                             @php $chipColor = $imgPending ? 'amber' : $p['color']; @endphp
+                            {{-- One wrapping strip of status + actions on phones; on sm+
+                                 `contents` dissolves this wrapper so the desktop row layout
+                                 is byte-for-byte what it was. --}}
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-2 sm:contents">
                             <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $chipClasses[$chipColor] ?? $chipClasses['slate'] }}">{{ $imgPending ? __('Finalizing images…') : $p['label'] }}</span>
                             @if ($overCap)
                                 <span class="rounded-full bg-error/10 px-2 py-0.5 text-xs font-bold text-error">{{ __('Over monthly limit') }}</span>
@@ -779,6 +688,7 @@
                             @if (in_array($topic->status, ['suggested', 'approved', 'ready'], true))
                                 <button wire:click="skip('{{ $topic->id }}')" class="text-sm text-slate-400 hover:text-slate-600">{{ __('Skip') }}</button>
                             @endif
+                            </div>
                         </div>
                     @empty
                         <div class="flex flex-col items-center gap-3 px-4 py-14 text-center">
