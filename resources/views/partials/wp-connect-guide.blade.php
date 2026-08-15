@@ -2,7 +2,9 @@
     "How to connect WordPress" — the step-by-step for creating an Application
     Password, shown inside the WordPress tab of the publishing connect panel.
 
-    Screens are REAL screenshots from a WordPress admin (public/guide/wordpress/).
+    Screens are REAL screenshots from a WordPress admin (public/images/wp-guide/ —
+    moved out of public/guide/ 2026-08-15: a physical /guide directory shadowed the
+    /guide ROUTE at the Apache layer, 301→403 for the whole public guide page).
     Each one degrades to a drawn SVG if the file is missing, so a lost asset
     never leaves a step unillustrated. Annotations are HTML over/under the
     image rather than text baked into the PNG: translatable, crisp at any zoom,
@@ -12,8 +14,8 @@
 --}}
 @php
     $guideForceOpen = $guideForceOpen ?? false;
-    $shot = fn (string $file) => is_file(public_path('guide/wordpress/'.$file))
-        ? asset('guide/wordpress/'.$file)
+    $shot = fn (string $file) => is_file(public_path('images/wp-guide/'.$file))
+        ? asset('images/wp-guide/'.$file)
         : null;
     $imgClass = 'w-full max-w-xl rounded-lg border border-slate-200 shadow-sm dark:border-slate-700';
     $ink = 'fill-slate-700 dark:fill-slate-200';
