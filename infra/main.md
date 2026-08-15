@@ -304,6 +304,8 @@ known gaps were flagged during the sweep:
   (`search_console_data`) is cached 30min per client. The clients LIST now renders cards below
   `md` and the table above it from shared partials, and ULID ids reach Alpine via `@js()` — the
   old `(int)` cast made `isSelected(01m0…)` a JS syntax error, so bulk select never worked.
+  The clients LIST also gained a **Publishing** column with the same rollup
+  (has this account wired a destination, and is it healthy?).
   Docs: [admin/README.md](./admin/README.md).
 
 - **2026-08-12 — Support tickets (client /support + /admin/support).** Threaded client↔team

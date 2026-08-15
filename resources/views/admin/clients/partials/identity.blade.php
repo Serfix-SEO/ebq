@@ -9,7 +9,10 @@
         <div class="min-w-0">
             <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                 <a href="{{ route('admin.clients.show', $client) }}" class="truncate hover:text-orange-700 hover:underline">{{ $client->name }}</a>
-                <span class="text-[10px] font-normal tabular-nums text-slate-400">#{{ $client->id }}</span>
+                {{-- Short ULID tail: the full 26-char id ate ~130px of the row and
+                     pushed the Actions column out of view. Full id in the tooltip
+                     and on the client detail page. --}}
+                <span class="font-mono text-[10px] font-normal text-slate-400" title="{{ $client->id }}">#{{ \Illuminate\Support\Str::substr($client->id, -6) }}</span>
             </div>
             <div class="flex items-center gap-1.5 truncate text-xs text-slate-500">
                 <span class="truncate">{{ $client->email }}</span>

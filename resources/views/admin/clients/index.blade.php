@@ -230,6 +230,7 @@
                         <div class="min-w-0 flex-1 space-y-2">
                             @include('admin.clients.partials.identity')
                             @include('admin.clients.partials.status-badges')
+                            @include('admin.clients.partials.publishing-status')
                         </div>
                     </div>
 
@@ -316,10 +317,11 @@
                         </th>
                         <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Client</th>
                         <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                        <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Publishing</th>
                         <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Sites</th>
                         <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Spend MTD</th>
                         <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Last activity</th>
-                        <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Joined</th>
+                        <th class="hidden px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 2xl:table-cell">Joined</th>
                         <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
                     </tr>
                 </thead>
@@ -357,6 +359,9 @@
                             <td class="px-3 py-2.5">
                                 @include('admin.clients.partials.status-badges')
                             </td>
+                            <td class="max-w-[10rem] px-3 py-2.5">
+                                @include('admin.clients.partials.publishing-status')
+                            </td>
                             <td class="px-3 py-2.5 text-right">
                                 <span @class(['tabular-nums', 'font-semibold text-slate-800' => $client->websites_count > 0, 'text-slate-400' => $client->websites_count === 0])>
                                     {{ $fmtN($client->websites_count) }}
@@ -372,11 +377,11 @@
                                     <span class="text-slate-300">—</span>
                                 @endif
                             </td>
-                            <td class="px-3 py-2.5 text-xs text-slate-600" title="{{ $client->last_activity_at ?? '' }}">
+                            <td class="whitespace-nowrap px-3 py-2.5 text-xs text-slate-600" title="{{ $client->last_activity_at ?? '' }}">
                                 {{ $relTime($client->last_activity_at) }}
                             </td>
-                            <td class="px-3 py-2.5 text-xs text-slate-500" title="{{ format_user_datetime($client->created_at, 'M j, Y g:i A T') }}">
-                                {{ format_user_datetime($client->created_at, 'M j, Y g:i A') }}
+                            <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs text-slate-500 2xl:table-cell" title="{{ format_user_datetime($client->created_at, 'M j, Y g:i A T') }}">
+                                {{ format_user_datetime($client->created_at, 'M j, Y') }}
                             </td>
                             <td class="px-3 py-2.5 text-right">
                                 <div class="inline-flex items-center gap-1">
@@ -398,7 +403,7 @@
                                                     class="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
                                                     title="Impersonate this client">
                                                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.375a4.125 4.125 0 118.25 0 4.125 4.125 0 01-8.25 0zM2.25 19.125a7.125 7.125 0 0114.25 0v.003l-.001.119a.75.75 0 01-.363.63 13.067 13.067 0 01-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 01-.364-.63l-.001-.122zM18.75 7.5a.75.75 0 00-1.5 0v2.25H15a.75.75 0 000 1.5h2.25v2.25a.75.75 0 001.5 0v-2.25H21a.75.75 0 000-1.5h-2.25V7.5z"/></svg>
-                                                Impersonate
+                                                <span class="hidden 2xl:inline">Impersonate</span>
                                             </button>
                                         </form>
                                     @endif
@@ -409,14 +414,14 @@
                         {{-- Inline expanded edit row --}}
                         @if ($isExpanded)
                             <tr id="row-{{ $client->id }}" class="border-t border-slate-100 bg-slate-50/40">
-                                <td colspan="8" class="px-3 py-3">
+                                <td colspan="9" class="px-3 py-3">
                                     @include('admin.clients.partials.edit-panel')
                                 </td>
                             </tr>
                         @endif
                     @empty
                         <tr>
-                            <td colspan="8" class="px-3 py-12 text-center">
+                            <td colspan="9" class="px-3 py-12 text-center">
                                 <p class="text-sm text-slate-500">
                                     No clients match.
                                     @if ($q !== '' || $status !== 'all')

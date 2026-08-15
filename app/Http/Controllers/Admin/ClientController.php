@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClientActivity;
+use App\Models\ContentIntegration;
 use App\Models\CrawlSite;
 use App\Models\Plan;
 use App\Models\User;
@@ -88,6 +89,32 @@ class ClientController extends Controller
                     ->where('stripe_status', 'active'),
                 'active_subs_count'
             )
+            // Publishing connection, rolled up across the client's websites:
+            // "has this account actually wired a destination, and is it healthy?"
+            // Sub-selects (not a join) so the row count stays one-per-user.
+            ->selectSub(
+                fn ($q) => $q->from('content_integrations')
+                    ->join('websites', 'websites.id', '=', 'content_integrations.website_id')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('websites.user_id', 'users.id')
+                    ->where('content_integrations.status', ContentIntegration::STATUS_CONNECTED),
+                'integrations_connected'
+            )
+            ->selectSub(
+                fn ($q) => $q->from('content_integrations')
+                    ->join('websites', 'websites.id', '=', 'content_integrations.website_id')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('websites.user_id', 'users.id')
+                    ->where('content_integrations.status', ContentIntegration::STATUS_ERROR),
+                'integrations_error'
+            )
+            ->selectSub(
+                fn ($q) => $q->from('content_integrations')
+                    ->join('websites', 'websites.id', '=', 'content_integrations.website_id')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('websites.user_id', 'users.id'),
+                'integrations_total'
+            )
             ->selectSub(
                 fn ($q) => $q->from('client_activities')
                     ->selectRaw('COALESCE(SUM(units_consumed), 0)')
@@ -120,7 +147,10 @@ class ClientController extends Controller
             ->when($sort === 'email', fn ($query) => $query->orderBy('email'))
             ->when($sort === 'spend', fn ($query) => $query->orderByRaw('(ke_units_mtd + serp_units_mtd) DESC'))
             ->when(! in_array($sort, ['name', 'email', 'spend'], true), fn ($query) => $query->orderByDesc('created_at'))
-            ->with('websites:id,user_id,domain') // for the admin recrawl picker
+            // websites: the admin recrawl picker. contentIntegrations: the
+            // Publishing column names the platform, so the per-row lookup must
+            // not turn into 25 queries.
+            ->with(['websites:id,user_id,domain', 'websites.contentIntegrations:id,website_id,platform,status'])
             ->paginate(25)
             ->withQueryString();
 

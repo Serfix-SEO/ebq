@@ -217,4 +217,52 @@ class AdminClientsPageTest extends TestCase
 
         $this->assertStringNotContainsString('super-secret-value', $html, 'credentials must never render');
     }
+
+    /**
+     * The Publishing column answers "has this account wired a destination, and
+     * is it healthy?" without opening each client. Rolled up across every
+     * website they own, so it must distinguish no-website from
+     * website-but-never-connected from broken.
+     */
+    public function test_list_shows_the_publishing_connection_state_per_client(): void
+    {
+        $noSite = User::factory()->create(['email' => 'nosite@example.com']);
+
+        $unconnected = User::factory()->create(['email' => 'unconnected@example.com']);
+        Website::factory()->create(['user_id' => $unconnected->id]);
+
+        $connected = User::factory()->create(['email' => 'connected@example.com']);
+        $connectedSite = Website::factory()->create(['user_id' => $connected->id]);
+        \App\Models\ContentIntegration::create([
+            'website_id' => $connectedSite->id,
+            'platform' => \App\Models\ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD,
+            'status' => \App\Models\ContentIntegration::STATUS_CONNECTED,
+        ]);
+
+        $broken = User::factory()->create(['email' => 'broken@example.com']);
+        $brokenSite = Website::factory()->create(['user_id' => $broken->id]);
+        \App\Models\ContentIntegration::create([
+            'website_id' => $brokenSite->id,
+            'platform' => \App\Models\ContentIntegration::PLATFORM_WEBHOOK,
+            'status' => \App\Models\ContentIntegration::STATUS_ERROR,
+        ]);
+
+        $response = $this->actingAs($this->admin())->get(route('admin.clients.index'));
+        $response->assertOk()
+            ->assertSee('Publishing')
+            ->assertSee('No website')
+            ->assertSee('Not connected')
+            ->assertSee('Connected')
+            ->assertSee('Connection error')
+            // Platform names come from the eager-loaded relation, not a query per row.
+            ->assertSee('WordPress');
+
+        // Counts are computed in SQL — assert them rather than trusting the copy.
+        $rows = $response->viewData('clients')->getCollection()->keyBy('email');
+        $this->assertSame(0, (int) $rows['nosite@example.com']->integrations_total);
+        $this->assertSame(0, (int) $rows['unconnected@example.com']->integrations_total);
+        $this->assertSame(1, (int) $rows['connected@example.com']->integrations_connected);
+        $this->assertSame(1, (int) $rows['broken@example.com']->integrations_error);
+        $this->assertSame(0, (int) $rows['broken@example.com']->integrations_connected);
+    }
 }
