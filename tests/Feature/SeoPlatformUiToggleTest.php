@@ -61,9 +61,13 @@ class SeoPlatformUiToggleTest extends TestCase
         $this->off();
 
         $this->get('/pricing')->assertRedirect(route('content.pricing'));
-        foreach (['/features', '/wordpress-plugin', '/trust-score', '/website-revamp', '/guide'] as $url) {
+        foreach (['/features', '/wordpress-plugin', '/trust-score', '/website-revamp'] as $url) {
             $this->get($url)->assertRedirect(route('landing'));
         }
+
+        // The guide is Content-AI documentation since 2026-08-15: it must stay
+        // reachable in BOTH platform modes, never bounce to the landing page.
+        $this->get('/guide')->assertOk();
     }
 
     public function test_the_free_tool_pages_redirect_when_off(): void

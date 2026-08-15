@@ -284,6 +284,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-15 — Public /guide rebuilt as the Content-AI client guide.** Full rewrite of
+  `resources/views/guide.blade.php`: hero, sticky TOC, sections for onboarding, calendar,
+  review/editor, all 8 publishing destinations (+ webhook tester), research, tracker,
+  settings, auto-share and support — each with **annotated real screenshots**
+  (`public/images/guide/*.webp`, demo-brand fixtures, orange rings + numbered badges) —
+  plus a large troubleshooting section (per-platform connect issues, duplicate featured
+  image, missed publish window, tracker states…) and FAQ. Route now serves the guide in
+  both platform modes (was redirecting home with the SEO UI off). Full ar.json coverage
+  (170 new strings). Docs: [frontend/README.md](./frontend/README.md);
+  tests: `GuideContentTest` + `SeoPlatformUiToggleTest`.
+
 - **2026-08-14 — Content calendar is usable on a phone.** Below `sm` the month
   view renders an agenda (one dated card per day) instead of the 7-column,
   56rem-wide grid that squeezed each cell to ~120px, and list-view rows stack

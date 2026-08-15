@@ -1,0 +1,197 @@
+[
+ {
+  "name": "calendar",
+  "fixture": "calendar",
+  "maxH": 1500,
+  "annotations": [
+   {
+    "sel": "h2"
+   },
+   {
+    "sel": "button",
+    "text": "List"
+   },
+   {
+    "sel": "span",
+    "text": "Auto-publishes daily"
+   },
+   {
+    "sel": "button",
+    "text": "Write",
+    "minW": 30,
+    "minH": 14
+   }
+  ]
+ },
+ {
+  "name": "calendar-list",
+  "fixture": "calendar-list",
+  "maxH": 1150,
+  "annotations": [
+   {
+    "sel": "a",
+    "text": "Review",
+    "minW": 20
+   },
+   {
+    "sel": "button",
+    "text": "Republish",
+    "minW": 30
+   }
+  ]
+ },
+ {
+  "name": "article-review",
+  "fixture": "article",
+  "maxH": 1500,
+  "annotations": [
+   {
+    "sel": "div",
+    "text": "Content quality",
+    "up": 2
+   },
+   {
+    "sel": "button",
+    "text": "Track these keywords"
+   },
+   {
+    "sel": "div",
+    "text": "Search preview",
+    "up": 1
+   },
+   {
+    "sel": "a",
+    "text": "Edit article",
+    "minW": 40
+   }
+  ]
+ },
+ {
+  "name": "article-feedback",
+  "fixture": "article",
+  "target": {
+   "sel": "div",
+   "text": "Do you like this article?",
+   "up": 1
+  },
+  "padBottom": 8,
+  "annotations": []
+ },
+ {
+  "name": "research",
+  "fixture": "research",
+  "maxH": 1250,
+  "annotations": [
+   {
+    "sel": "button",
+    "text": "Add to calendar"
+   }
+  ]
+ },
+ {
+  "name": "tracker",
+  "fixture": "tracker",
+  "maxH": 1400,
+  "annotations": [
+   {
+    "sel": "select"
+   },
+   {
+    "sel": "div",
+    "text": "What your articles brought you"
+   }
+  ]
+ },
+ {
+  "name": "rank-history",
+  "fixture": "rank-history",
+  "maxH": 950,
+  "annotations": []
+ },
+ {
+  "name": "integrations",
+  "fixture": "integrations",
+  "maxH": 1300,
+  "annotations": [
+   {
+    "sel": "div",
+    "text": "Hands-off publishing",
+    "up": 1
+   },
+   {
+    "sel": "button",
+    "text": "Webflow"
+   }
+  ]
+ },
+ {
+  "name": "webhook-tester",
+  "fixture": "integrations-webhook",
+  "target": {
+   "sel": "div",
+   "text": "Test your webhook",
+   "minH": 130
+  },
+  "padBottom": 10,
+  "annotations": [
+   {
+    "sel": "button",
+    "text": "Send test article",
+    "minW": 40
+   }
+  ]
+ },
+ {
+  "name": "settings-structure",
+  "fixture": "settings",
+  "maxH": 1000,
+  "prep": "const p=document.querySelector(`[x-show=\"tab === 'structure'\"]`);if(p){p.removeAttribute('x-cloak');}const prof=document.querySelector(`[x-show=\"tab === 'profile'\"]`);if(prof)prof.style.display='none';const b=window.__byText('button','Article structure');if(b){b.classList.add('bg-orange-600','text-white');}",
+  "annotations": [
+   {
+    "sel": "div",
+    "text": "Featured image in article"
+   }
+  ]
+ },
+ {
+  "name": "settings-images",
+  "fixture": "settings",
+  "maxH": 1000,
+  "prep": "const p=document.querySelector(`[x-show=\"tab === 'images'\"]`);if(p){p.removeAttribute('x-cloak');}const prof=document.querySelector(`[x-show=\"tab === 'profile'\"]`);if(prof)prof.style.display='none';const b=window.__byText('button','Images');if(b){b.classList.add('bg-orange-600','text-white');}",
+  "annotations": [
+   {
+    "sel": "button[role=switch]"
+   }
+  ]
+ },
+ {
+  "name": "settings-publishing",
+  "fixture": "settings",
+  "maxH": 1100,
+  "prep": "const p=document.querySelector(`[x-show=\"tab === 'publishing'\"]`);if(p){p.removeAttribute('x-cloak');}const prof=document.querySelector(`[x-show=\"tab === 'profile'\"]`);if(prof)prof.style.display='none';const b=window.__byText('button','Publishing');if(b){b.classList.add('bg-orange-600','text-white');}",
+  "annotations": []
+ },
+ {
+  "name": "support",
+  "fixture": "support",
+  "maxH": 800,
+  "annotations": [
+   {
+    "sel": "button",
+    "text": "New ticket"
+   }
+  ]
+ },
+ {
+  "name": "wizard-business",
+  "fixture": "wizard-step1",
+  "maxH": 1150,
+  "annotations": []
+ },
+ {
+  "name": "wizard-images",
+  "fixture": "wizard-step4",
+  "maxH": 1150,
+  "annotations": []
+ }
+]

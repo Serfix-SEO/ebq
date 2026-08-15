@@ -339,6 +339,62 @@ class MarketingShotsTest extends TestCase
         }
         $this->dump('rank-history', Livewire::test(KeywordRankHistory::class, ['keywordId' => $tracked[0]->id])->html());
 
+        // ── Guide shots (2026-08-15): the public /guide page uses the same
+        //    demo world for its annotated screenshots ────────────────────────
+
+        // Integrations page — connected WordPress card + the 8-platform picker
+        // open (showConnect), which is the state the guide explains.
+        $this->dump('integrations', Livewire::test(\App\Livewire\Content\PublishingSettings::class)
+            ->set('showConnect', true)->html());
+
+        // Same page with a CONNECTED custom webhook, so the tester section
+        // (sample-payload sender + free-form test URL) is in the shot.
+        ContentIntegration::create([
+            'website_id' => $website->id,
+            'platform' => ContentIntegration::PLATFORM_WEBHOOK,
+            'status' => ContentIntegration::STATUS_CONNECTED,
+            'credentials' => ['endpoint_url' => 'https://brightpathdigital.com/serfix/webhook', 'secret' => str_repeat('x', 48)],
+            'last_verified_at' => now()->subDay(),
+        ]);
+        $this->dump('integrations-webhook', Livewire::test(\App\Livewire\Content\PublishingSettings::class)->html());
+
+        // Content Settings (tabbed) — the render script switches the Alpine tab
+        // per shot, so one dump serves profile/structure/images/publishing.
+        // (The earlier 'settings' dump IS this page: plan is active, so
+        // mode=settings renders the tab view, not the wizard.)
+
+        // Support — one answered thread so the guide can show the flow.
+        $ticket = \App\Models\SupportTicket::create([
+            'user_id' => $user->id, 'website_id' => $website->id,
+            'subject' => 'Can I move an article to next month?',
+            'status' => \App\Models\SupportTicket::STATUS_ANSWERED,
+            'last_reply_at' => now()->subHours(2),
+        ]);
+        \App\Models\SupportTicketMessage::create([
+            'ticket_id' => $ticket->id, 'user_id' => $user->id, 'is_admin' => false,
+            'body' => '<p>I want to push the local SEO article into next month — how do I do that without losing it?</p>',
+        ]);
+        \App\Models\SupportTicketMessage::create([
+            'ticket_id' => $ticket->id, 'user_id' => $user->id, 'is_admin' => true,
+            'body' => '<p>Open the calendar in List view, pick a new date next to the article and hit Save — any future date works, including next month.</p>',
+        ]);
+        $this->dump('support', Livewire::test(\App\Livewire\Support\Tickets::class)->html());
+
+        // Onboarding wizard — a SECOND site whose plan is still a draft renders
+        // the wizard instead of the settings tabs. Step 1 (business profile)
+        // and step 4 (image style picker) are the two the guide shows.
+        $siteB = Website::factory()->for($user)->create(['domain' => 'demo-onboarding.com']);
+        ContentPlan::factory()->create([
+            'website_id' => $siteB->id,
+            'status' => ContentPlan::STATUS_DRAFT,
+            'business_description' => 'Brightpath Digital is a small SEO agency that runs audits, technical fixes and reporting for service businesses.',
+            'offerings' => ['sell' => ['SEO audits', 'Technical SEO retainers'], 'dont_sell' => []],
+        ]);
+        session(['current_website_id' => $siteB->id]);
+        $this->dump('wizard-step1', Livewire::test(ContentCalendar::class, ['mode' => 'settings'])->set('wizardStep', 1)->html());
+        $this->dump('wizard-step4', Livewire::test(ContentCalendar::class, ['mode' => 'settings'])->set('wizardStep', 4)->html());
+        session(['current_website_id' => $website->id]);
+
         $this->assertTrue(true, 'fixtures written to '.$this->out);
     }
     private function sampleArticleHtml(): string

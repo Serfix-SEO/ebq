@@ -173,6 +173,20 @@ naming both destinations (mobile nav + footer list both explicitly).
 - The demo article in that fixture is tuned to score 100 on the real `ContentSeoScorer`;
   if the scorer's weights change the shot may need re-tuning (dump failing checks from the
   fixture's `article-score.json`).
+- **The public `/guide` page** (rebuilt 2026-08-15, Content-AI-only, reachable in BOTH
+  platform modes — the route no longer checks `seo_platform_ui`) uses the same fixture
+  world for its **annotated** screenshots in `public/images/guide/*.webp`: the shots test
+  also dumps integrations (+ webhook tester), settings tabs, support and wizard step 1;
+  the renderer (`tests/fixtures/marketing/guide-render.mjs` + `guide-shots.json`,
+  checked in) loads each fixture with the built
+  CSS, switches Alpine tabs per shot, draws orange rings + numbered badges anchored to
+  selectors, and screenshots a clipped region. Convert PNG→webp with PHP GD
+  (`imagewebp`, no cwebp on this box). Statically-rendered Alpine needs care:
+  `[x-cloak]`/`[wire:loading]` are force-hidden in the harness, and any shot whose state
+  lives in `$wire.*` bindings (e.g. the wizard image-style checkmarks) renders every
+  branch at once — prefer server-rendered screens for such shots.
+  `tests/Feature/GuideContentTest.php` pins: every section anchor, screenshots exist on
+  disk, and **no supplier name ever appears** on the page.
 - ⚠️ New Blade files are NOT in the last Tailwind build — run `npm run build` after adding
   one, or utilities used only there silently render nothing.
 
