@@ -98,6 +98,15 @@ class PublicOnboardingStartController extends Controller
             ]);
         }
 
+        // Big brands / public-sector sites — legal hostnames nobody signing up
+        // here owns. Checked BEFORE the rate-limit hit, like the giants above,
+        // so an honest mistake doesn't burn an attempt.
+        if (\App\Support\MajorBrands::isProtected($domain)) {
+            return back()->withInput()->withErrors([
+                'domain' => __('That website belongs to a well-known brand. Enter the site you own and can publish articles to — if this really is your organisation, contact support and we will enable it.'),
+            ]);
+        }
+
         // Count the attempt only once we're past validation.
         RateLimiter::hit($keys[0], 3600);
         RateLimiter::hit($keys[1], 86400);

@@ -284,6 +284,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — Big brands can no longer be signed up as "your website".** `du.ae`
+  (UAE telecom) had reached an active plan with 36 topics and 4 finished articles on a
+  free account with no publish target. New `App\Support\MajorBrands` + `config/brands.php`
+  gate `WebsiteAttachService` / `PublicOnboardingStartController` / `App\Rules\WebsiteDomain`
+  (`blocked = 'major_brand'`): curated brand list, public-sector suffixes, live
+  `Setting` block/allow lists (allow wins — the escape hatch for a brand's real
+  employee), and a zero-API-cost `domain_metrics` authority net (DA ≥ 80 **and**
+  ≥ 50k referring domains). Kept **separate from `GiantDomains`** on purpose — that
+  list feeds competitor discovery, where a telecom is a valid rival for another
+  telecom. `MajorBrandGateTest` pins the over-blocking side against real customer
+  domains. Docs: [crawler/known-issues.md](./crawler/known-issues.md).
 - **2026-08-16 — Crawls can no longer leave their own domain, and junk can no longer
   be a "website".** Four fixes: (1) every `website_pages` writer
   (`PageCrawlProcessor::rebuildEdges`, `CrawlFrontierBuilder`, `CrawlSitemapDeltaJob`)

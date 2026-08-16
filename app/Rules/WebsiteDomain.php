@@ -42,6 +42,12 @@ class WebsiteDomain implements ValidationRule
 
         if ($this->rejectGiants && GiantDomains::isGiant($normalized)) {
             $fail(__('That looks like a major platform, not your own website. Enter the site you own and can publish articles to.'))->translate();
+
+            return;
+        }
+
+        if ($this->rejectGiants && \App\Support\MajorBrands::isProtected($normalized)) {
+            $fail(__('That website belongs to a well-known brand. Enter the site you own and can publish articles to — if this really is your organisation, contact support and we will enable it.'))->translate();
         }
     }
 }

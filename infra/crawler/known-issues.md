@@ -553,6 +553,38 @@ Four related defects, all fixed the same day:
    while its jobs were queued produced permanent `failed_jobs` rows no retry
    could clear. **Fix:** `find()` + quiet return.
 
+### 2026-08-16 — big brands could be signed up as "your website"
+`du.ae` (a UAE telecom) reached an **active plan with 36 topics and 4 finished
+articles** — "How to Pay Your du Bill Online" — on a free account with **no
+publish integration** and a homepage that had **timed out during crawl** (1 page,
+cURL 28). Neither existing gate could catch it: `DomainName::isValid('du.ae')` is
+correctly *true* (a 2+2 char hostname is legal, cf. `bp.com`), and
+`GiantDomains` must not learn it because that list feeds **competitor
+discovery**, where a telecom is a legitimate rival for another telecom.
+
+**Fix:** `App\Support\MajorBrands` — a second, independent list:
+1. curated brands in `config/brands.php` (GCC + global telecom, airlines, banks,
+   energy, auto, FMCG, pharma, logistics, hospitality, consulting);
+2. public-sector suffixes (`.gov`, `.gov.ae`, `.mil`, …) — `.edu` deliberately
+   excluded, a small college is a plausible customer;
+3. `Setting` keys `signup.blocked_brand_domains` / `signup.allowed_brand_domains`
+   — live-editable, no deploy; the allow-list wins over every other rule and is
+   the escape hatch when a real employee of a listed brand signs up;
+4. an authority recall net reading **only cached `domain_metrics`** (never a paid
+   fetch): `moz_da >= 80` **AND** `dfs_referring_domains >= 50k`. Both required,
+   both at global-brand scale, so a cold or merely-healthy domain never trips it.
+
+Gated at `WebsiteAttachService` (`blocked = 'major_brand'`),
+`PublicOnboardingStartController` and `App\Rules\WebsiteDomain`.
+`tests/Feature/MajorBrandGateTest.php` asserts the **over-blocking** side with
+real prod customer domains — if a list edit ever blocks `mycurtain.ae`,
+`tmcgeneralclinic.com` or `nestara.in`, that test fails.
+
+> ⚠️ Still open: a crawl that returned **nothing** still produced a confident
+> 36-topic plan 25 seconds later. Plan generation does not require any crawled
+> content — independent of the ownership question, and it would bite any client
+> on a slow or WAF'd site.
+
 ## Transitional cruft
 
 - The four crawl tables still carry a **nullable, FK-dropped, unused `website_id`** column

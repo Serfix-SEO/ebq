@@ -95,6 +95,12 @@ class WebsitesList extends Component
             return;
         }
 
+        if ($result['blocked'] === 'major_brand') {
+            $this->addError('domain', __('That website belongs to a well-known brand. Enter the site you own and can publish articles to — if this really is your organisation, contact support and we will enable it.'));
+
+            return;
+        }
+
         if ($result['created']) {
             // Same landing as onboarding (ConnectGoogle::finishOnboarding):
             // the NEW site is pinned as current; drop the user on the overview

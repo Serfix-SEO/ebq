@@ -39,7 +39,7 @@ class WebsiteAttachService
      * @param  array{ga_property_id?: string, ga_google_account_id?: string|int|null,
      *               gsc_site_url?: string, gsc_google_account_id?: string|int|null}  $sourceAttrs
      * @return array{website: ?Website, created: bool, blocked: ?string}
-     *         blocked: null | 'invalid_domain' | 'giant_domain' | 'plan_limit'
+     *         blocked: null | 'invalid_domain' | 'giant_domain' | 'major_brand' | 'plan_limit'
      */
     public function attach(User $user, string $rawDomain, array $sourceAttrs = []): array
     {
@@ -66,6 +66,14 @@ class WebsiteAttachService
         // competitor pipeline uses.
         if (\App\Support\GiantDomains::isGiant($normalized)) {
             return ['website' => null, 'created' => false, 'blocked' => 'giant_domain'];
+        }
+
+        // Big brands and public-sector sites: legal hostnames the visitor
+        // cannot own or publish to. `du.ae` produced 36 topics and 4 finished
+        // articles about a UAE telecom's billing before anyone noticed
+        // (2026-08-16). Separate list from the giants above — see MajorBrands.
+        if (\App\Support\MajorBrands::isProtected($normalized)) {
+            return ['website' => null, 'created' => false, 'blocked' => 'major_brand'];
         }
 
         $existing = Website::query()
