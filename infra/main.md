@@ -284,6 +284,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — Mega-platform domains can no longer be added as "your website".**
+  `WebsiteAttachService::attach()` (the single chokepoint every add-path uses) and the
+  public onboarding controller both refuse `GiantDomains::isGiant()` domains
+  (google/youtube/amazon/…) with a clear inline error, before any rate-limit hit or
+  provisional site. Trigger: a client added youtube.com — 490k pages crawled into the
+  shared store, orphaned after the website was deleted. Tests in
+  `RegisterFunnelAttachTest` + `ContentPublicOnboardingTest`.
+
 - **2026-08-16 — Outage: memory livelock on box A (no swap).** The box sat at 83–86% RAM
   / ~145% overcommit with zero swap; a ~1.3GB allocation burst (08:10–08:21 UTC) sent the
   kernel into a reclaim livelock — load 73, 18 tasks blocked, no OOM kill — and the whole

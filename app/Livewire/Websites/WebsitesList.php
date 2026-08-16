@@ -89,6 +89,12 @@ class WebsitesList extends Component
             return;
         }
 
+        if ($result['blocked'] === 'giant_domain') {
+            $this->addError('domain', __('That looks like a major platform, not your own website. Enter the site you own and can publish articles to.'));
+
+            return;
+        }
+
         if ($result['created']) {
             // Same landing as onboarding (ConnectGoogle::finishOnboarding):
             // the NEW site is pinned as current; drop the user on the overview

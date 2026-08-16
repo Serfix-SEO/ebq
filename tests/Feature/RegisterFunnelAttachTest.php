@@ -162,4 +162,23 @@ class RegisterFunnelAttachTest extends TestCase
         $this->assertTrue($existing->is($result['website']));
         $this->assertEquals(1, Website::count());
     }
+
+    /**
+     * Mega-platforms are nobody's "own website" (a client adding youtube.com
+     * left 490k orphaned crawl pages, 2026-08-16). Every add-path funnels
+     * through the attach service, so blocking here blocks them all.
+     */
+    public function test_attach_service_refuses_giant_platform_domains(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        $user = User::factory()->create();
+
+        foreach (['youtube.com', 'google.com', 'www.facebook.com', 'music.amazon.com'] as $domain) {
+            $result = app(\App\Services\WebsiteAttachService::class)->attach($user, $domain);
+            $this->assertSame('giant_domain', $result['blocked'], $domain.' must be refused');
+            $this->assertNull($result['website']);
+        }
+
+        $this->assertSame(0, Website::where('user_id', $user->id)->count());
+    }
 }

@@ -39,13 +39,22 @@ class WebsiteAttachService
      * @param  array{ga_property_id?: string, ga_google_account_id?: string|int|null,
      *               gsc_site_url?: string, gsc_google_account_id?: string|int|null}  $sourceAttrs
      * @return array{website: ?Website, created: bool, blocked: ?string}
-     *         blocked: null | 'invalid_domain' | 'plan_limit'
+     *         blocked: null | 'invalid_domain' | 'giant_domain' | 'plan_limit'
      */
     public function attach(User $user, string $rawDomain, array $sourceAttrs = []): array
     {
         $normalized = WebsiteReportSnapshot::normalizeDomain($rawDomain);
         if ($normalized === '') {
             return ['website' => null, 'created' => false, 'blocked' => 'invalid_domain'];
+        }
+
+        // Mega-platforms (google.com, youtube.com, amazon…) are nobody's "own
+        // website": accepting one triggers a six-figure-page crawl of a site
+        // the user can't publish to (a client adding youtube.com left 490k
+        // orphaned pages in the DB, 2026-08-16). Same shared list the
+        // competitor pipeline uses.
+        if (\App\Support\GiantDomains::isGiant($normalized)) {
+            return ['website' => null, 'created' => false, 'blocked' => 'giant_domain'];
         }
 
         $existing = Website::query()

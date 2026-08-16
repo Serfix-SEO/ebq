@@ -77,6 +77,17 @@ class PublicOnboardingStartController extends Controller
             return back()->withInput()->withErrors(['domain' => __('Enter a valid website domain.')]);
         }
 
+        // Mega-platforms are nobody's "own website" — accepting youtube.com or
+        // google.com here starts a crawl of a site the visitor can't publish
+        // to and pollutes the shared crawl store (490k-page youtube incident,
+        // 2026-08-16). Checked BEFORE the rate-limit hit so honest mistakes
+        // don't burn an attempt.
+        if (\App\Support\GiantDomains::isGiant($domain)) {
+            return back()->withInput()->withErrors([
+                'domain' => __('That looks like a major platform, not your own website. Enter the site you own and can publish articles to.'),
+            ]);
+        }
+
         // Count the attempt only once we're past validation.
         RateLimiter::hit($keys[0], 3600);
         RateLimiter::hit($keys[1], 86400);

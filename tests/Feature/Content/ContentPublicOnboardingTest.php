@@ -599,4 +599,19 @@ class ContentPublicOnboardingTest extends TestCase
             fn ($job) => in_array('freshrival.com', $job->domains, true)
         );
     }
+
+    public function test_giant_platform_domains_are_rejected_with_a_clear_error(): void
+    {
+        $response = $this->from(route('content.landing'))->post(route('content.onboarding.begin'), [
+            'domain' => 'youtube.com',
+        ]);
+
+        $response->assertRedirect(route('content.landing'))
+            ->assertSessionHasErrors('domain');
+        $this->assertStringContainsString(
+            'major platform',
+            session('errors')->first('domain'),
+        );
+        $this->assertSame(0, \App\Models\ContentOnboardingSession::count(), 'no provisional site may be created');
+    }
 }
