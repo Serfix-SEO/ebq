@@ -17,27 +17,34 @@ namespace App\Support\Crawler;
 final class LinkStatus
 {
     /**
-     * We were blocked/limited/redirected-to-auth, NOT told the page is gone.
-     * Includes 999 (LinkedIn's non-standard bot block) and 418 (teapot, used
-     * by several WAFs as a scraper trap).
+     * The ONLY statuses that mean "this resource is not there":
+     *   400 — the URL itself is malformed, so the link as written is bad
+     *   404 — not found
+     *   410 — gone, deliberately
+     *
+     * An ALLOW-list, not a block-list, and deliberately so: every other 4xx is
+     * either about US (405/411/413/414/415/416/417/422/426 = request shape or
+     * method — `pochta.ru` answers 417 to any HEAD/GET we send yet serves fine
+     * in a browser) or about PERMISSION (401/402/403/407/451). Neither proves
+     * the page is missing, and a block-list silently mis-classifies every new
+     * or non-standard status a CDN invents next.
      */
-    public const NOT_DEAD = [401, 402, 403, 405, 406, 407, 408, 409, 412, 418, 421, 423, 425, 428, 429, 431, 451, 999];
+    public const DEAD = [400, 404, 410];
+
+    /**
+     * Common "we were blocked/limited, not told it's gone" statuses. Kept for
+     * documentation + labelling; `isDead()` does not consult it (the allow-list
+     * above is the authority).
+     */
+    public const NOT_DEAD = [401, 402, 403, 405, 406, 407, 408, 409, 412, 417, 418, 421, 423, 425, 428, 429, 431, 451, 999];
 
     /** True only for a status that genuinely means the target is not there. */
     public static function isDead(?int $status): bool
     {
-        if ($status === null || $status < 400) {
-            return false;
-        }
-
-        // 5xx is the SERVER failing, not the URL being wrong — a site having a
-        // bad five minutes must not turn every inbound link into a client's
-        // "broken link" to fix.
-        if ($status >= 500) {
-            return false;
-        }
-
-        return ! in_array($status, self::NOT_DEAD, true);
+        // 5xx never counts either: the SERVER is failing, not the URL — a site
+        // having a bad five minutes must not turn every inbound link into a
+        // client's "broken link" to fix.
+        return $status !== null && in_array($status, self::DEAD, true);
     }
 
     /** Human-readable reason a non-dead error status was ignored (logging). */
@@ -52,6 +59,7 @@ final class LinkStatus
             408 => 'request_timeout',
             409 => 'conflict',
             412, 428 => 'precondition',
+            417 => 'expectation_failed',
             421 => 'misdirected',
             423 => 'locked',
             425 => 'too_early',

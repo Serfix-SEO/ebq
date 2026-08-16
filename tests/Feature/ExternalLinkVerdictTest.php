@@ -91,6 +91,9 @@ class ExternalLinkVerdictTest extends TestCase
             'WAF block' => [403],
             'not acceptable' => [406],
             'teapot / scraper trap' => [418],
+            'expectation failed (HEAD artifact)' => [417],
+            'unsupported media type' => [415],
+            'unknown future CDN status' => [430],
             'rate limited' => [429],
             'legal block' => [451],
             'server error' => [503],
@@ -122,6 +125,11 @@ class ExternalLinkVerdictTest extends TestCase
             $this->assertFalse(LinkStatus::isDead($status), $status.' must not count as a dead link');
         }
         $this->assertFalse(LinkStatus::isDead(500), 'a server having a bad day is not the client’s broken link');
+        // Allow-list behaviour: anything we have not positively classified as
+        // "gone" must fail SAFE (not reported), including statuses that don't
+        // exist yet. pochta.ru answering 417 was the case that proved this.
+        $this->assertFalse(LinkStatus::isDead(417));
+        $this->assertFalse(LinkStatus::isDead(430), 'unknown 4xx must not be reported as broken');
         $this->assertFalse(LinkStatus::isDead(null), 'unverifiable is not dead');
         $this->assertFalse(LinkStatus::isDead(200));
     }

@@ -70,10 +70,13 @@ errors, not just for 403/405/429/501. See known-issues § "Live-but-slow externa
   GET 200**, and that one pattern was 136 of the 173 "404" findings open on prod — all live
   pages reported to clients as broken links. Tumblr share endpoints (HEAD 403 / GET 200) were
   another 12.
-- **Blocked ≠ dead.** `LinkStatus::NOT_DEAD` (401, 402, 403, 405–409, 412, 418, 421, 423, 425,
-  428, 429, 431, 451, 999) and every **5xx** are never `broken_external`: an auth wall, a WAF
-  teapot, a rate limit or a server having a bad hour is not something the client fixes by
-  editing their link. `SiteIssueDetector` logs the skip with `LinkStatus::blockedLabel()`.
+- **Dead is an ALLOW-list: `LinkStatus::DEAD = [400, 404, 410]`.** Everything else — every
+  other 4xx and all 5xx — is never `broken_external`. Other 4xx are either about US (405,
+  411, 413–417, 422, 426 = request shape/method; `pochta.ru` answers **417** to every HEAD
+  and GET we send yet serves fine in a browser) or about PERMISSION (401, 402, 403, 407,
+  451); neither proves the page is missing. A block-list was tried first and mis-classified
+  417 on the very first pass — an allow-list fails SAFE for whatever status a CDN invents
+  next. `SiteIssueDetector` logs each skip with `LinkStatus::blockedLabel()`.
 - **`dns_resolution_failed` is inconclusive, not deterministic.** It used to set
   `guard_blocked = true` (= confirmed broken); live Korean sites (`emart.ssg.com`, `charms.kr`)
   our resolver couldn't answer for were flagged dead. Only URL-SHAPE guard rejections
