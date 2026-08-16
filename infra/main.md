@@ -284,6 +284,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — Site Health header chips now match the queue.** `CrawlReportService::
+  summary()` used to count findings by their OWN severity column ("0 crit · 2 high")
+  while the Priority Action Queue below escalates severity per CATEGORY — the same
+  screen showed a red critical card under a "0 critical" header (nestara.in). The
+  chips now roll up from `actionGroups()` (same source, same cache version), so
+  header == sum of the queue's cards, always. Pinned by
+  `ContentSiteHealthTest::test_summary_severity_chips_match_the_action_queue_rollup`.
+
 - **2026-08-16 — Site Health moved into Content Autopilot.** New menu item + page
   `/content/site-health` (route `content.site-health`) rendering the same crawl-banner +
   `SiteHealthStats` + `PriorityActionQueue` trio the SEO platform's overview health tab

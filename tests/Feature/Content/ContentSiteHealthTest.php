@@ -55,4 +55,26 @@ class ContentSiteHealthTest extends TestCase
         $payload = app(\App\Services\Crawler\CrawlReportService::class)->emailReportPayload($website);
         $this->assertSame(route('content.site-health'), $payload['dashboard_url']);
     }
+
+    /**
+     * The header chips and the Priority Action Queue must tell ONE story:
+     * both roll severity up per category (actionGroups), so the chip counts
+     * always equal the sum of the queue's critical/high card counts.
+     */
+    public function test_summary_severity_chips_match_the_action_queue_rollup(): void
+    {
+        [$user, $website] = $this->contentUser();
+
+        $svc = app(\App\Services\Crawler\CrawlReportService::class);
+        $summary = $svc->summary($website->id);
+        $groups = $svc->actionGroups($website->id);
+
+        $critical = collect($groups)->where('severity', 'critical')->sum('count');
+        $high = collect($groups)->where('severity', 'high')->sum('count');
+        $total = collect($groups)->sum('count');
+
+        $this->assertSame($critical, $summary['findings']['critical']);
+        $this->assertSame($high, $summary['findings']['high']);
+        $this->assertSame($total, $summary['findings']['total']);
+    }
 }

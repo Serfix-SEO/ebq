@@ -360,8 +360,25 @@ class CrawlReportService
             : null;
         $display = $completed ?? $latest;
 
-        $bySeverity = $this->findingsBase($websiteId)
-            ->select('severity', DB::raw('COUNT(*) as c'))->groupBy('severity')->pluck('c', 'severity');
+        // Severity chips roll up the SAME category-level severities the
+        // Priority Action Queue shows below this card. They used to count the
+        // findings' own severity column, which produced "0 crit · 2 high" above
+        // a queue displaying a red critical card and three high cards — same
+        // data, two severity definitions on one screen (nestara.in,
+        // 2026-08-16). actionGroups() escalates a category to critical/high by
+        // its meta + contents; summing its counts keeps header == queue.
+        $groups = $this->actionGroups($websiteId);
+        $critical = 0;
+        $high = 0;
+        $total = 0;
+        foreach ($groups as $g) {
+            $total += (int) $g['count'];
+            if (($g['severity'] ?? '') === 'critical') {
+                $critical += (int) $g['count'];
+            } elseif (($g['severity'] ?? '') === 'high') {
+                $high += (int) $g['count'];
+            }
+        }
 
         $pagesTotal = $this->windowPages($websiteId)->whereNotNull('last_crawled_at')->whereNull('removed_at')->count();
         $indexable = $this->windowPages($websiteId)->indexable()->whereNotNull('last_crawled_at')->count();
@@ -378,11 +395,9 @@ class CrawlReportService
             'pages_indexable' => $indexable,
             'orphan_count' => $orphans,
             'findings' => [
-                'critical' => (int) ($bySeverity['critical'] ?? 0),
-                'high' => (int) ($bySeverity['high'] ?? 0),
-                'medium' => (int) ($bySeverity['medium'] ?? 0),
-                'low' => (int) ($bySeverity['low'] ?? 0),
-                'total' => (int) $bySeverity->sum(),
+                'critical' => $critical,
+                'high' => $high,
+                'total' => $total,
             ],
         ];
     }
