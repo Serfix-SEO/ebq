@@ -284,6 +284,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — `ebq:deploy-verify`: prove the workers run the deployed code.** A probe
+  job (`App\Jobs\Ops\DeployVerifyJob`) is dispatched to all 7 queues; each worker answers
+  from inside its own process with hostname, resolved Redis/DB host and a
+  `CodeFingerprint` of its `app/` + `config/` tree, checked against the dispatcher's.
+  Catches the two failure modes a file-level `grep` cannot: a worker that never
+  restarted (`STALE CODE`) and a queue nothing drains (`NO WORKER`) — respectively the
+  2026-06-16 orphan incident and the 2026-08-14→16 two-day cached-config outage. Now a
+  required step in [deployment-and-queues.md](./deployment-and-queues.md) step 5.
 - **2026-08-16 — Big brands can no longer be signed up as "your website".** `du.ae`
   (UAE telecom) had reached an active plan with 36 topics and 4 finished articles on a
   free account with no publish target. New `App\Support\MajorBrands` + `config/brands.php`

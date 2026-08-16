@@ -104,10 +104,29 @@ web box never crawls.
    > manage/rebuild them. (This happened 2026-06-16; recovered by recreating both from
    > the running image's `docker history`.) Also exclude `ebq-wordpress-plugin/` (its own
    > 581M repo) or every deploy copies it across.
-   Verify the code actually landed:
-   `grep -c crawl_site_id /var/www/ebq/app/Jobs/CrawlWebsitePagesJob.php` (> 0), and
-   confirm at runtime by dispatching a crawl and checking the new `crawl_runs` row is
-   `crawl_site_id`-keyed (old code = `website_id`-keyed).
+5. **Verify the fleet — run this after every worker-code deploy:**
+   ```bash
+   php artisan ebq:deploy-verify
+   ```
+   It dispatches a no-op probe to all 7 queues; each worker answers from **inside
+   its own process** with its hostname, resolved Redis/DB host, and a fingerprint
+   of its `app/` + `config/` tree, compared against the dispatcher's. Expected
+   output — every row `current`, box A queues on `host.ebq.io`/redis 127.0.0.1 and
+   box B queues on `ubuntu-4gb-fsn1-3`/redis 10.0.0.2:
+
+   | queue | worker | verdict |
+   |---|---|---|
+   | interactive, default, content | host.ebq.io (local) | current |
+   | sync, crawl, crawl-finalize, link-crawl | ubuntu-4gb-fsn1-3 (worker) | current |
+
+   - `STALE CODE` → that worker never restarted; restart it and re-run.
+   - `NO WORKER` → nothing drains that queue at all; jobs are piling up silently.
+
+   This exists because "the files are on the box" and "the workers run them" are
+   **different claims**, and the gap between them has bitten twice: the 2026-06-16
+   stale-worker orphan incident and the 2026-08-14→16 cached-config outage (two
+   days, 250+ queued jobs, 10 client sites uncrawled). A file `grep` on box B
+   cannot detect either — only a probe executed by the worker can.
 
 `opcache.enable_cli = 0`, so `artisan` / `tinker` / queue workers compile fresh —
 but a long-running `queue:work` process still holds loaded **classes** in memory, so
