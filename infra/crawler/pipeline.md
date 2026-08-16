@@ -84,6 +84,35 @@ their GSC pages + every `<loc>` in their sitemaps, plus always the canonical
 homepage (`https://{normalized_domain}`) so a domain-only site still gets crawled.
 `source_gsc` becomes an aggregate flag. New rows are due immediately.
 
+### ⚠️ Scope containment — a crawl must never leave its own domain
+
+Three places create `website_pages` rows, and **all three** filter through
+`DomainName::urlBelongsToSite($url, $crawlSite->normalized_domain)` (site itself
+or a subdomain):
+
+| Where | File |
+|---|---|
+| discovered links | `PageCrawlProcessor::rebuildEdges()` (`app/Services/Crawler/PageCrawlProcessor.php:366`) |
+| GSC + sitemap seed | `CrawlFrontierBuilder::build()` (`app/Services/Crawler/CrawlFrontierBuilder.php:88`) |
+| daily sitemap delta | `CrawlSitemapDeltaJob` (`app/Jobs/CrawlSitemapDeltaJob.php:95`) |
+
+**Why (2026-08-16 incident).** `PageCrawlProcessor` anchors relative links to the
+**post-redirect** URL — correct, and load-bearing for apex→www sites. But
+`HtmlAuditor::links()` (`app/Support/Audit/HtmlAuditor.php:234`) calls a link
+"internal" when it matches the host of the **document it parsed**. Combine the
+two and one off-domain redirect hands the crawler a foreign site:
+`serfix.io/auth/google/sso` 302s to `accounts.google.com`, so every link on
+Google's page counted as internal, got a page row under serfix.io's crawl site,
+and went back into the frontier. Result: **194 of serfix.io's 234 pages were
+policies.google.com**, surfacing to the client as 164 unfixable "broken internal
+links"; facebook.com's crawl held **15,508** off-domain pages of 22,603.
+
+`HtmlAuditor`'s per-document rule is *right for a standalone page audit* — do not
+change it there. The crawl-side boundary is the filter above.
+
+A batch whose crawl site has been GC'd mid-run also writes nothing
+(`CrawlPageBatchJob`) — see [known-issues.md](./known-issues.md).
+
 ## Scheduling
 
 `ebq:crawl-websites` (cron) iterates **crawl_sites** (not websites):

@@ -80,7 +80,7 @@ class ConnectGoogle extends Component
     public function addWebsite(): void
     {
         $this->validate([
-            'domain' => ['required', 'string', 'max:255'],
+            'domain' => ['required', 'string', 'max:255', new \App\Rules\WebsiteDomain],
         ], [], ['domain' => __('website address')]);
 
         $website = $this->persistWebsite([

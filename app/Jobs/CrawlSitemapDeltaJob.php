@@ -90,6 +90,13 @@ class CrawlSitemapDeltaJob implements ShouldBeUnique, ShouldQueue
                 'lastmod' => $this->parseLastmod($entry['lastmod'] ?? null),
             ];
         }
+        // Same scope gate as CrawlFrontierBuilder: a sitemap may list any host,
+        // and every new row here becomes a crawl target.
+        $candidates = array_filter(
+            $candidates,
+            fn ($c) => \App\Support\DomainName::urlBelongsToSite((string) $c['url'], (string) $crawlSite->normalized_domain),
+        );
+
         if ($candidates === []) {
             return;
         }

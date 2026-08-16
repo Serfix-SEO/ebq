@@ -56,7 +56,7 @@ class WebsitesList extends Component
     public function addWebsite(): void
     {
         $this->validate([
-            'domain' => ['required', 'string', 'max:255'],
+            'domain' => ['required', 'string', 'max:255', new \App\Rules\WebsiteDomain],
             'gaSelection' => ['nullable', 'string', 'max:512'],
             'gscSelection' => ['nullable', 'string', 'max:512'],
         ]);

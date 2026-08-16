@@ -78,6 +78,15 @@ class CrawlFrontierBuilder
             $fromSitemap++;
         }
 
+        // Scope gate: a sitemap (or a GSC property covering several hosts) can
+        // list URLs on any domain, and every row inserted here is crawled. Keep
+        // the frontier inside the site it belongs to — same boundary
+        // PageCrawlProcessor::rebuildEdges() enforces for discovered links.
+        $candidates = array_filter(
+            $candidates,
+            fn ($c) => \App\Support\DomainName::urlBelongsToSite((string) $c['url'], (string) $crawlSite->normalized_domain),
+        );
+
         if ($candidates === []) {
             return ['discovered' => 0, 'from_gsc' => 0, 'from_sitemap' => 0];
         }

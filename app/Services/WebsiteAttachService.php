@@ -43,8 +43,19 @@ class WebsiteAttachService
      */
     public function attach(User $user, string $rawDomain, array $sourceAttrs = []): array
     {
+        // Checked on the RAW input: normalization strips the local part, so
+        // "me@gmail.com" would otherwise quietly attach gmail.com — a website
+        // the user does not own and never asked for.
+        if (\App\Support\DomainName::looksLikeEmail($rawDomain)) {
+            return ['website' => null, 'created' => false, 'blocked' => 'invalid_domain'];
+        }
+
         $normalized = WebsiteReportSnapshot::normalizeDomain($rawDomain);
-        if ($normalized === '') {
+        // Shape gate, not just emptiness: normalizeDomain returns whatever it
+        // was handed, so "" was the ONLY thing ever rejected here and an email
+        // address became a website + a 190-page crawl (prod, 2026-08-11).
+        // Backstop for every caller — the forms also validate up front.
+        if (! \App\Support\DomainName::isValid($normalized)) {
             return ['website' => null, 'created' => false, 'blocked' => 'invalid_domain'];
         }
 

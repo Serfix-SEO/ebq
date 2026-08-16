@@ -284,6 +284,21 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — Crawls can no longer leave their own domain, and junk can no longer
+  be a "website".** Four fixes: (1) every `website_pages` writer
+  (`PageCrawlProcessor::rebuildEdges`, `CrawlFrontierBuilder`, `CrawlSitemapDeltaJob`)
+  now filters through `DomainName::urlBelongsToSite()` — one off-domain 302
+  (`serfix.io/auth/google/sso` → `accounts.google.com`) had been enough to pull a
+  foreign site into a crawl, leaving 194/234 serfix.io pages on `policies.google.com`
+  and 15,508/22,603 facebook.com pages off-domain; (2) new `App\Support\DomainName` +
+  `App\Rules\WebsiteDomain` gate every "your website" field, and `normalizeDomain()`
+  now strips userinfo/port — an email address used to become a website and a
+  190-page crawl; (3) `CrawlPageBatchJob` aborts when its crawl site was GC'd
+  mid-run, plus `ebq:prune-orphan-crawl-data` for the 1,353 rows the race already
+  left; (4) the four `Sync*`/`GenerateAiInsights` jobs tolerate a deleted website
+  instead of filling `failed_jobs`. Docs:
+  [crawler/pipeline.md](./crawler/pipeline.md#-scope-containment--a-crawl-must-never-leave-its-own-domain),
+  [crawler/known-issues.md](./crawler/known-issues.md).
 - **2026-08-16 — External-link checker stopped inventing 404s.** A HEAD-only 404 was
   trusted without a GET retry, so `support.google.com` links (HEAD 404 / GET 200) became
   136 of the 173 open "404" findings; another 48 were auth walls / rate limits / WAF

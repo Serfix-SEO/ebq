@@ -63,7 +63,7 @@ class GuestRankCheckController extends Controller
         // Reduce the domain input ("https://www.example.com/path", "example.com")
         // to a bare host. A non-host (no dot) is almost always a typo.
         $domain = $this->normalizeDomain($validated['domain']);
-        if ($domain === '' || ! str_contains($domain, '.')) {
+        if (! \App\Support\DomainName::isValid($domain)) {
             return response()->json([
                 'message' => 'Enter a valid domain, like example.com.',
                 'errors' => ['domain' => ['Enter a valid domain, like example.com.']],

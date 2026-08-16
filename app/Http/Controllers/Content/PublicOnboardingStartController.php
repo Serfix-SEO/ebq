@@ -73,7 +73,17 @@ class PublicOnboardingStartController extends Controller
             return back()->withInput()->withErrors(['domain' => __('Enter a public website address (https://…).')]);
         }
         $domain = WebsiteReportSnapshot::normalizeDomain($raw);
-        if ($domain === '') {
+        // Shape gate. The SSRF guard above only asks "is this host public?" and
+        // parse_url reads `https://me@gmail.com` as host gmail.com, so an email
+        // sailed through both checks — that is how the lead website
+        // `santoshvarma.water@gmail.com` and its 190-page crawl were created
+        // (2026-08-11, found 2026-08-16).
+        if (\App\Support\DomainName::looksLikeEmail((string) $request->input('domain'))) {
+            return back()->withInput()->withErrors([
+                'domain' => __('That looks like an email address. Enter your website address instead, like example.com.'),
+            ]);
+        }
+        if (! \App\Support\DomainName::isValid($domain)) {
             return back()->withInput()->withErrors(['domain' => __('Enter a valid website domain.')]);
         }
 

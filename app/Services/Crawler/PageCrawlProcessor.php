@@ -12,6 +12,7 @@ use App\Support\Crawler\PageAnalyzer;
 use App\Support\Crawler\RenderGate;
 use App\Support\Crawler\SimHash;
 use App\Support\Crawler\TermExtractor;
+use App\Support\DomainName;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -213,7 +214,7 @@ class PageCrawlProcessor
 
         // Rebuild edges when content meaningfully changed (links may differ).
         if ($significantlyChanged) {
-            $this->rebuildEdges($page, $analysis['internal_links']);
+            $this->rebuildEdges($page, $analysis['internal_links'], $website);
         }
 
         // Tier-1 link-graph harvest: deposit this page's external outlinks
@@ -363,16 +364,33 @@ class PageCrawlProcessor
     /**
      * @param  array<int,array{href:string,anchor?:string}>  $internalLinks
      */
-    private function rebuildEdges(WebsitePage $page, array $internalLinks): void
+    private function rebuildEdges(WebsitePage $page, array $internalLinks, ?CrawlSite $site = null): void
     {
         $now = now();
         $crawlSiteId = $page->crawl_site_id;
+
+        // THE containment boundary. `$internalLinks` comes from HtmlAuditor,
+        // which calls a link "internal" when it shares a host with the DOCUMENT
+        // it parsed — correct for a standalone page audit, unsafe here: an
+        // off-domain redirect makes the parsed document foreign, and every link
+        // on it then looks internal and gets a page row under this crawl site.
+        // That is how policies.google.com became 190 pages of serfix.io's crawl
+        // and facebook.com pulled in 15.5k off-domain pages (both 2026-08-16).
+        // Every stub this method creates is fed straight back to the frontier,
+        // so this is the one place the check has to hold.
+        $siteDomain = ($site ?? CrawlSite::find($crawlSiteId))?->normalized_domain ?? '';
+        if ($siteDomain === '') {
+            return; // unknown scope → create nothing rather than crawl the web
+        }
 
         // Map of target url_hash => url (deduped, capped).
         $targets = [];
         foreach ($internalLinks as $link) {
             $href = (string) ($link['href'] ?? '');
             if ($href === '' || ! preg_match('#^https?://#i', $href)) {
+                continue;
+            }
+            if (! DomainName::urlBelongsToSite($href, $siteDomain)) {
                 continue;
             }
             $href = FrontierUrl::collapse($href);

@@ -520,6 +520,39 @@ all the owner's sites — each site's actual cap is `min(hard cap, pool remainin
 owner's other sites' usage)`, floored at 1 (never blocked outright). See
 `Website::crawlPageCap()` and `infra/billing/plans-and-gating.md`.
 
+### 2026-08-16 — crawls escaped their own domain; junk domains were crawlable
+Four related defects, all fixed the same day:
+
+1. **Off-domain crawl leak.** `PageCrawlProcessor` anchors links to the
+   post-redirect URL and `HtmlAuditor::links()` judges "internal" against the
+   parsed document's host, so a single off-domain 302 handed the crawler a
+   foreign site. serfix.io: 194/234 pages were `policies.google.com` (the client
+   saw 164 unfixable "broken internal links"); facebook.com: 15,508/22,603.
+   **Fix:** every `website_pages` writer now filters through
+   `DomainName::urlBelongsToSite()` — see [pipeline.md](./pipeline.md#-scope-containment--a-crawl-must-never-leave-its-own-domain).
+2. **Anything was a domain.** `CrawlSite::normalizeDomain()` strips scheme/path/
+   www and returns whatever is left; `""` was the only value ever rejected. A
+   funnel visitor's email became a website + a 190-page crawl
+   (`santoshvarma.water@gmail.com`, 2026-08-11). **Fix:** normalizeDomain also
+   strips userinfo + port, and `App\Support\DomainName::isValid()` (plus the
+   `App\Rules\WebsiteDomain` rule) gates `WebsiteAttachService`, `WebsitesList`,
+   `ConnectGoogle`, `PublicOnboardingStartController` and the guest rank check.
+   The email case is caught on the RAW input — otherwise `me@gmail.com` quietly
+   attaches `gmail.com`.
+3. **Orphan rows after a mid-crawl GC.** The last subscriber leaving purges the
+   shared crawl (`Website::deleted` → `ShardCleanup`), but queued batches kept
+   writing: 1,353 stranded `website_pages` rows. **Fix:** `CrawlPageBatchJob`
+   aborts when its crawl site can't be resolved, plus
+   `php artisan ebq:prune-orphan-crawl-data [--force]` to sweep.
+   ⚠️ Prod carries **no FK** on `website_pages.crawl_site_id` (sharding dropped
+   it — cross-tier FKs are app-enforced), so there the id dangles; sqlite in
+   tests still has the migration's `nullOnDelete` and blanks it instead. Code
+   that cleans up must handle both shapes.
+4. **Deleted website = failed jobs.** `Sync{Sitemaps,AnalyticsData,SearchConsoleData}`
+   and `GenerateAiInsights` used `Website::findOrFail`, so deleting a website
+   while its jobs were queued produced permanent `failed_jobs` rows no retry
+   could clear. **Fix:** `find()` + quiet return.
+
 ## Transitional cruft
 
 - The four crawl tables still carry a **nullable, FK-dropped, unused `website_id`** column

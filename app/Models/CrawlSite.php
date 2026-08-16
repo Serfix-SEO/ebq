@@ -60,7 +60,14 @@ class CrawlSite extends Model
     {
         $d = strtolower(trim($domain));
         $d = preg_replace('#^https?://#', '', $d) ?? $d; // drop scheme
-        $d = preg_replace('#/.*$#', '', $d) ?? $d;        // drop path/trailing slash
+        $d = preg_replace('#[/?\#].*$#', '', $d) ?? $d;   // drop path/query/fragment
+        // Drop userinfo ("user:pass@host"). Without this an EMAIL normalized to
+        // itself — `santoshvarma.water@gmail.com` became a website + a 190-page
+        // crawl on prod (2026-08-16) because every later check only asked "is
+        // the result non-empty?". parse_url() would have read the host, but the
+        // input here is often scheme-less, where parse_url guesses wrong.
+        $d = preg_replace('#^[^@]*@#', '', $d) ?? $d;
+        $d = preg_replace('#:\d+$#', '', $d) ?? $d;       // drop port
         $d = preg_replace('/^www\./', '', $d) ?? $d;      // drop leading www.
         $d = rtrim($d, '.');                              // drop trailing dot(s)
 

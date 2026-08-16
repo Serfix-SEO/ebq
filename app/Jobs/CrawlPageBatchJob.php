@@ -50,6 +50,21 @@ class CrawlPageBatchJob implements ShouldQueue
         // Resolved once and shared across the batch so the per-domain crawl-protection
         // flag (Cloudflare/blocked) is read/written in memory, not re-queried per page.
         $crawlSite = ($csid = $pages->first()?->crawl_site_id) ? CrawlSite::find($csid) : null;
+
+        // The crawl site can be GC'd mid-crawl: the last subscriber deletes their
+        // website, Website::deleted purges the shared crawl, and batches already
+        // queued keep running — inserting fresh page rows for a crawl site that
+        // no longer exists. That left 1,353 orphan website_pages rows on prod
+        // (found 2026-08-16). No site, no crawl.
+        //
+        // Checked on $pages, not on $csid: prod carries NO foreign key on
+        // website_pages.crawl_site_id (the sharding work dropped it — cross-tier
+        // FKs are app-enforced), so there the id dangles; sqlite in tests still
+        // has the migration's nullOnDelete and blanks it instead. Both shapes
+        // land here as "cannot resolve a site", which is the condition we want.
+        if ($pages->isNotEmpty() && $crawlSite === null) {
+            return;
+        }
         foreach ($pages as $i => $page) {
             try {
                 $outcome = $processor->process($page, $crawlSite);
