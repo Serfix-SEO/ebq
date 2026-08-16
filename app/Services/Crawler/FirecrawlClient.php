@@ -28,6 +28,55 @@ class FirecrawlClient
             && trim((string) config('services.firecrawl.url')) !== '';
     }
 
+    /**
+     * The REAL HTTP status a browser sees for this URL — the render server
+     * fetches through a residential exit with a full browser, so a host that
+     * feeds our datacenter IP a 403/404 answers honestly here.
+     *
+     * Used as the final adjudicator in the external-link check (LinkChecker):
+     * only links that still look dead after HEAD → GET → proxy-GET get this
+     * far, so the cost stays bounded. Null = disabled / guard-blocked /
+     * couldn't decide, which callers must treat as INCONCLUSIVE.
+     */
+    public function status(string $url): ?int
+    {
+        if (! $this->enabled()) {
+            return null;
+        }
+        if (! ($this->guard->check($url)['ok'] ?? false)) {
+            // A guard failure here is a URL-shape problem, except DNS: the
+            // caller handles that case and asks us precisely because its own
+            // resolver failed, so re-checking DNS would defeat the purpose.
+            if (($this->guard->check($url)['reason'] ?? '') !== 'dns_resolution_failed') {
+                return null;
+            }
+        }
+
+        $base = rtrim((string) config('services.firecrawl.url'), '/');
+        $key = (string) config('services.firecrawl.key');
+        $timeout = max(10, (int) config('services.firecrawl.timeout_s', 45));
+
+        try {
+            $req = Http::timeout($timeout + 10)->asJson();
+            if ($key !== '') {
+                $req = $req->withToken($key);
+            }
+            $json = $req->post($base.'/v1/scrape', [
+                'url' => $url,
+                'formats' => ['html'],
+                'timeout' => $timeout * 1000,
+            ])->json();
+
+            $upstream = $json['data']['metadata']['statusCode'] ?? null;
+
+            return is_numeric($upstream) ? (int) $upstream : null;
+        } catch (\Throwable $e) {
+            Log::info('firecrawl.status_error', ['url' => $url, 'error' => mb_substr($e->getMessage(), 0, 200)]);
+
+            return null;
+        }
+    }
+
     /** Rendered HTML, or null if disabled / guard-blocked / render failed. */
     public function html(string $url): ?string
     {

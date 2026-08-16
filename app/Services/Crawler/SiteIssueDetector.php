@@ -542,11 +542,14 @@ class SiteIssueDetector
             // Known social/antibot hosts always block bots — skip regardless of status.
             // Their share/profile URLs are never dead links, any response is untrustworthy.
             $isUntrustedAntibotBlock = $this->isKnownAntibotHost($href);
-            // 403 from any external host almost always means WAF/bot-blocking, not a dead link.
-            $isAccessBlocked = $status === 403;
+            // "We were not allowed to see it" (auth wall, WAF, rate limit, legal
+            // block) is not "the page is gone", and the client cannot fix it by
+            // editing their link. One shared definition — see LinkStatus.
+            $isAccessBlocked = $status !== null && $status >= 400 && ! \App\Support\Crawler\LinkStatus::isDead($status);
             if ($isUntrustedAntibotBlock || $isAccessBlocked) {
                 Log::info('crawler.broken_external.antibot_skip', [
                     'website_id' => $website->id, 'run_id' => $run->id, 'href' => $href, 'status' => $status,
+                    'reason' => $isUntrustedAntibotBlock ? 'antibot_host' : \App\Support\Crawler\LinkStatus::blockedLabel($status),
                 ]);
             }
             // A null status is INCONCLUSIVE (timeout / connection reset / TLS / DNS) —
@@ -556,7 +559,7 @@ class SiteIssueDetector
             // working links (bestproservicesdubai.com → live mohre.gov.ae/wam.ae pages).
             // Only a CONFIRMED HTTP error (>=400) or a DETERMINISTIC guard rejection
             // (malformed/unsafe URL, e.g. http://info@host) counts as broken.
-            $isConfirmedDead = ($status !== null && $status >= 400) || ! empty($p['guard_blocked']);
+            $isConfirmedDead = \App\Support\Crawler\LinkStatus::isDead($status) || ! empty($p['guard_blocked']);
             if ($status === null && empty($p['guard_blocked'])) {
                 Log::info('crawler.broken_external.unverifiable_skip', [
                     'website_id' => $website->id, 'run_id' => $run->id, 'href' => $href, 'error' => $p['error'],

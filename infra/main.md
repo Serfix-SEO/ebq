@@ -284,6 +284,18 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — External-link checker stopped inventing 404s.** A HEAD-only 404 was
+  trusted without a GET retry, so `support.google.com` links (HEAD 404 / GET 200) became
+  136 of the 173 open "404" findings; another 48 were auth walls / rate limits / WAF
+  teapots, and 10 were live sites our DNS couldn't resolve — ~90% of all
+  `broken_external` findings were false. Now: every 4xx re-verifies with GET, one shared
+  `App\Support\Crawler\LinkStatus` decides dead vs merely blocked (5xx and 401/403/418/429/451…
+  never count), DNS failures are inconclusive instead of deterministic, and anything still
+  looking dead is adjudicated by the Firecrawl render server (`FirecrawlClient::status()`,
+  ≤25/run). `php artisan ebq:recheck-broken-links` retro-clears stored false positives.
+  Docs: [crawler/findings-and-scoring.md](./crawler/findings-and-scoring.md);
+  tests: `ExternalLinkVerdictTest`.
+
 - **2026-08-16 — Site Health header chips now match the queue.** `CrawlReportService::
   summary()` used to count findings by their OWN severity column ("0 crit · 2 high")
   while the Priority Action Queue below escalates severity per CATEGORY — the same

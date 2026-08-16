@@ -64,6 +64,30 @@ not flagged — slow-but-alive government/enterprise hosts were being reported d
 8s HEAD timeouts. `LinkChecker` also now runs its GET+proxy fallback (15s) for transport
 errors, not just for 403/405/429/501. See known-issues § "Live-but-slow external links".
 
+**What counts as DEAD is one shared rule** (2026-08-16, `App\Support\Crawler\LinkStatus`):
+- Every **4xx now re-verifies with GET** before any verdict (`LinkChecker::FALLBACK_STATUSES`
+  covers 400–451 + 501, not just 403/405/429/501). `support.google.com` answers **HEAD 404 /
+  GET 200**, and that one pattern was 136 of the 173 "404" findings open on prod — all live
+  pages reported to clients as broken links. Tumblr share endpoints (HEAD 403 / GET 200) were
+  another 12.
+- **Blocked ≠ dead.** `LinkStatus::NOT_DEAD` (401, 402, 403, 405–409, 412, 418, 421, 423, 425,
+  428, 429, 431, 451, 999) and every **5xx** are never `broken_external`: an auth wall, a WAF
+  teapot, a rate limit or a server having a bad hour is not something the client fixes by
+  editing their link. `SiteIssueDetector` logs the skip with `LinkStatus::blockedLabel()`.
+- **`dns_resolution_failed` is inconclusive, not deterministic.** It used to set
+  `guard_blocked = true` (= confirmed broken); live Korean sites (`emart.ssg.com`, `charms.kr`)
+  our resolver couldn't answer for were flagged dead. Only URL-SHAPE guard rejections
+  (malformed, unsupported scheme, literal/private IP) stay deterministic.
+- **The render server is the final adjudicator.** A link still looking dead after
+  HEAD → GET → proxy-GET is re-checked through Firecrawl (`FirecrawlClient::status()`, real
+  browser + residential exit, returns `data.metadata.statusCode`). Capped at
+  `LinkChecker::RENDER_ADJUDICATIONS = 25` per run so the shared render box can't be flooded;
+  a null answer changes nothing (stays inconclusive).
+- Retro-fix for already-stored findings: **`php artisan ebq:recheck-broken-links`**
+  (`--dry-run` first) re-verifies open `broken_external` rows with these rules, resolves the
+  false ones and bumps `ReportCache` so Site Health updates. Idempotent, resolve-only.
+Tests: `tests/Feature/ExternalLinkVerdictTest.php`.
+
 **Duplicate-title/meta/content skip if same `canonical_url`** (2026-07-03): pages that all
 canonicalize to one URL are intentional dedup (pagination, filters, print views), not a bug —
 `detectDuplicateField`/`detectDuplicateContent` skip the group when `canonical_url` is

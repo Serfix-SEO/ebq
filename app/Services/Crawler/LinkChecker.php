@@ -3,6 +3,7 @@
 namespace App\Services\Crawler;
 
 use App\Support\Audit\SafeHttpGuard;
+use App\Support\Crawler\LinkStatus;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -24,12 +25,28 @@ class LinkChecker
 
     private const CONCURRENCY = 10;
 
-    /** Statuses that can be a block/rate-limit false positive rather than a real dead link. */
-    private const FALLBACK_STATUSES = [403, 405, 429, 501];
+    /**
+     * A HEAD result we refuse to trust on its own. EVERY 4xx is here, 404
+     * included: `support.google.com/ads/answer/1634057` answers HEAD with 404
+     * and GET with 200, and that single pattern produced 136 of the 173 "404"
+     * findings on prod (2026-08-16) — every one of them a live page. Also 501
+     * ("method not implemented" = the host simply doesn't do HEAD).
+     */
+    private const FALLBACK_STATUSES = [
+        400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410,
+        411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423,
+        424, 425, 426, 428, 429, 431, 451, 501,
+    ];
+
+    /** Max links per run we escalate to the render server (bounded cost). */
+    private const RENDER_ADJUDICATIONS = 25;
+
+    private int $renderCalls = 0;
 
     public function __construct(
         private readonly SafeHttpGuard $guard,
         private readonly ProxyPool $proxies,
+        private readonly FirecrawlClient $firecrawl,
     ) {}
 
     /**
@@ -62,11 +79,27 @@ class LinkChecker
         foreach ($unique as $link) {
             $check = $this->guard->check($link['href']);
             if (! $check['ok']) {
-                // Mailto/tel/relative would have been filtered upstream; a guard
-                // failure here means a genuinely unfetchable/unsafe target. This is a
-                // DETERMINISTIC verdict (malformed/unsafe URL), not a network guess —
-                // mark it so the caller can distinguish it from an inconclusive timeout.
-                $problems[] = $this->row($link, null, $check['reason'] ?? 'blocked', false, null, 0, true);
+                $reason = (string) ($check['reason'] ?? 'blocked');
+                // `dns_resolution_failed` is NOT a verdict about the link: our
+                // resolver can fail on geo-restricted or slow authoritative DNS
+                // for a site that is perfectly alive (emart.ssg.com, charms.kr —
+                // both reachable through the render server, 2026-08-16). Ask the
+                // render server before giving up; if that can't decide either,
+                // fall through as INCONCLUSIVE (guard_blocked stays false).
+                if ($reason === 'dns_resolution_failed') {
+                    $rendered = $this->renderStatus($link['href']);
+                    if ($rendered !== null && ! LinkStatus::isDead($rendered)) {
+                        continue; // alive → not a problem at all
+                    }
+                    $problems[] = $this->row($link, $rendered, $reason, false, null, 0, false);
+
+                    continue;
+                }
+
+                // Everything else here is a DETERMINISTIC shape problem
+                // (malformed URL, unsupported scheme, literal/private IP) — no
+                // network guessing involved, so it is a reliable verdict.
+                $problems[] = $this->row($link, null, $reason, false, null, 0, true);
 
                 continue;
             }
@@ -138,6 +171,19 @@ class LinkChecker
                     }
                 }
 
+                // Last resort: still looks dead after HEAD → GET → proxy GET.
+                // Datacenter IPs get blocked or fed error pages by plenty of
+                // live hosts, so before calling a link broken we ask the render
+                // server (headless browser + residential exit) for the real
+                // status. Bounded per run; a null answer changes nothing.
+                if ($status !== null && LinkStatus::isDead($status)) {
+                    $rendered = $this->renderStatus($link['href']);
+                    if ($rendered !== null) {
+                        $status = $rendered;
+                        $error = null;
+                    }
+                }
+
                 if ($status === null || $status >= 400 || $redirected) {
                     $problems[] = $this->row($link, $status, $error, $redirected, $finalUrl, $chain, false);
                 }
@@ -145,6 +191,21 @@ class LinkChecker
         }
 
         return $problems;
+    }
+
+    /**
+     * Real status from the self-hosted render server (headless browser through
+     * a residential exit) — the only check that sees what a human browser sees.
+     * Null when disabled, out of budget, or unable to decide.
+     */
+    private function renderStatus(string $url): ?int
+    {
+        if (! $this->firecrawl->enabled() || $this->renderCalls >= self::RENDER_ADJUDICATIONS) {
+            return null;
+        }
+        $this->renderCalls++;
+
+        return $this->firecrawl->status($url);
     }
 
     private function getFallback(string $url): ?int

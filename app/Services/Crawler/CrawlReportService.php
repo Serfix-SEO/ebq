@@ -368,16 +368,21 @@ class CrawlReportService
         // 2026-08-16). actionGroups() escalates a category to critical/high by
         // its meta + contents; summing its counts keeps header == queue.
         $groups = $this->actionGroups($websiteId);
-        $critical = 0;
-        $high = 0;
+        $bySev = ['critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0];
         $total = 0;
         foreach ($groups as $g) {
-            $total += (int) $g['count'];
-            if (($g['severity'] ?? '') === 'critical') {
-                $critical += (int) $g['count'];
-            } elseif (($g['severity'] ?? '') === 'high') {
-                $high += (int) $g['count'];
-            }
+            $count = (int) $g['count'];
+            $total += $count;
+            // Rollup severities are critical|high|growth. `growth` = an
+            // opportunity, not a defect → reported as 'medium' so the long-lived
+            // plugin API contract (critical/high/medium/low/total, consumed by
+            // the WordPress plugin's site-audit summary) keeps all four keys.
+            $bucket = match ($g['severity'] ?? '') {
+                'critical' => 'critical',
+                'high' => 'high',
+                default => 'medium',
+            };
+            $bySev[$bucket] += $count;
         }
 
         $pagesTotal = $this->windowPages($websiteId)->whereNotNull('last_crawled_at')->whereNull('removed_at')->count();
@@ -395,8 +400,10 @@ class CrawlReportService
             'pages_indexable' => $indexable,
             'orphan_count' => $orphans,
             'findings' => [
-                'critical' => $critical,
-                'high' => $high,
+                'critical' => $bySev['critical'],
+                'high' => $bySev['high'],
+                'medium' => $bySev['medium'],
+                'low' => $bySev['low'],
                 'total' => $total,
             ],
         ];
