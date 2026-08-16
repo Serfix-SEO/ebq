@@ -284,6 +284,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — Site Health moved into Content Autopilot.** New menu item + page
+  `/content/site-health` (route `content.site-health`) rendering the same crawl-banner +
+  `SiteHealthStats` + `PriorityActionQueue` trio the SEO platform's overview health tab
+  used — pure reuse of the existing site-profile crawl, no second crawler. The
+  crawl-complete email (`CrawlReportMail` via `SendCrawlReportEmailsJob`) now links the
+  new page, and the OLD links **301**: `/dashboard` and `/overview?tab=health` →
+  `/content/site-health` for non-admin users while the SEO UI is off
+  (`EnsureDashboardAccess`). `issues.*` drill-downs removed from the kill-switch list —
+  they are the module's detail pages. Tests: `ContentSiteHealthTest` +
+  `SeoPlatformUiToggleTest`.
+
 - **2026-08-16 — Mega-platform domains can no longer be added as "your website".**
   `WebsiteAttachService::attach()` (the single chokepoint every add-path uses) and the
   public onboarding controller both refuse `GiantDomains::isGiant()` domains

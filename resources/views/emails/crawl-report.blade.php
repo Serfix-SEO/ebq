@@ -4,7 +4,7 @@
     $health = $report['health_score'] ?? null;
     $catColor = ['critical' => '#dc2626', 'high' => '#ea580c', 'growth' => '#0ea5e9'];
     $traffic = $report['traffic'] ?? null;
-    $dashboardUrl = $report['dashboard_url'] ?? url('/dashboard');
+    $dashboardUrl = $report['dashboard_url'] ?? route('content.site-health');
 @endphp
 <!doctype html>
 <html lang="en">

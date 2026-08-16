@@ -46,8 +46,11 @@ class EnsureDashboardAccess
      * ABSENT from both lists: client report links are deliverables people
      * open from emails, and they keep working in every state.
      */
+    // 'issues.' left OFF this list on purpose (2026-08-16): the /issues/{key}
+    // drill-downs are the Site Health module's detail pages, and Site Health
+    // now ships inside Content Autopilot.
     private const SEO_ONLY_PREFIXES = [
-        'competitor-discovery.', 'website-overview', 'issues.', 'page-audits.',
+        'competitor-discovery.', 'website-overview', 'page-audits.',
         'site-audit.', 'overview', 'onboarding',
     ];
 
@@ -68,6 +71,14 @@ class EnsureDashboardAccess
         if (! config('features.seo_platform_ui')
             && ! $user->is_admin
             && ($this->matches($route, self::TEASER_PREFIXES) || $this->matches($route, self::SEO_ONLY_PREFIXES))) {
+            // Site Health moved into Content Autopilot (2026-08-16). The
+            // crawl-report emails clients already received link /dashboard, and
+            // the old health tab lived at /overview?tab=health — both 301 to
+            // the new page (permanent: the module moved, not the kill-switch).
+            if ($route === 'dashboard' || ($route === 'website-overview' && $request->query('tab') === 'health')) {
+                return redirect()->route('content.site-health', status: 301);
+            }
+
             // EnsureContentAccess cascades non-entitled users on to
             // content.get-started — but a user with NO websites must go there
             // DIRECTLY. content.index bounces them through EnsureFeatureAccess

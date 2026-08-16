@@ -99,9 +99,19 @@ class SeoPlatformUiToggleTest extends TestCase
         $website = Website::factory()->for($user)->create();
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
 
-        foreach (['dashboard', 'backlinks.index', 'keywords.index', 'onboarding'] as $routeName) {
+        foreach (['backlinks.index', 'keywords.index', 'onboarding'] as $routeName) {
             $this->get(route($routeName))->assertRedirect(route('content.index'));
         }
+
+        // /dashboard is the link every crawl-report email carried — it 301s to
+        // Site Health's new home in Content Autopilot (module moved for good).
+        $this->get(route('dashboard'))
+            ->assertStatus(301)
+            ->assertRedirect(route('content.site-health'));
+        $this->get(route('website-overview', ['tab' => 'health']))
+            ->assertStatus(301)
+            ->assertRedirect(route('content.site-health'));
+        $this->get(route('website-overview'))->assertRedirect(route('content.index'));
     }
 
     /**
@@ -209,7 +219,9 @@ class SeoPlatformUiToggleTest extends TestCase
             'impersonator_id' => User::factory()->create(['is_admin' => true])->id,
         ]);
 
-        $this->get(route('dashboard'))->assertRedirect(route('content.index'));
+        $this->get(route('dashboard'))
+            ->assertStatus(301)
+            ->assertRedirect(route('content.site-health'));
     }
 
     /** The winback strip promotes SEO plans — it goes with the product. */

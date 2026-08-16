@@ -388,6 +388,9 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
         Route::view('/content/integrations', 'content.integrations')->middleware(['feature:content', 'content.access'])->name('content.integrations');
         Route::view('/content/social', 'content.social')->middleware(['feature:content', 'content.access'])->name('content.social');
         Route::view('/content/tracker', 'content.tracker')->middleware(['feature:content', 'content.access'])->name('content.tracker');
+        // Site Health, pulled out of the hidden SEO platform (2026-08-16): the
+        // crawl-driven health score + issue queue for the current website.
+        Route::view('/content/site-health', 'content.site-health')->middleware(['feature:content', 'content.access'])->name('content.site-health');
         Route::get('/content/tracker/{keyword}', fn (string $keyword) => view('content.keyword-history', ['keywordId' => $keyword]))
             ->middleware(['feature:content', 'content.access'])
             ->name('content.keyword-history');

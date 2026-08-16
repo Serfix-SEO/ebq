@@ -48,7 +48,9 @@ class CrawlReportService
             'last_crawled_at' => optional($summary['last_crawled_at'])->toIso8601String(),
             'breakdown' => $this->reportBreakdown($website->id, 5),
             'traffic' => $this->emailTraffic($website),
-            'dashboard_url' => url('/dashboard'),
+            // Site Health lives in Content Autopilot since 2026-08-16 —
+            // /dashboard (the old link target) now 301s there for clients.
+            'dashboard_url' => route('content.site-health'),
         ];
     }
 

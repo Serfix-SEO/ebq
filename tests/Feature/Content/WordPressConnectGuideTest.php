@@ -115,7 +115,7 @@ class WordPressConnectGuideTest extends TestCase
             '01-application-passwords.png' => '<svg viewBox="0 0 420 190"',
             '02-password-revealed.png' => '<svg viewBox="0 0 420 96"',
         ] as $file => $fallback) {
-            if (is_file(public_path('guide/wordpress/'.$file))) {
+            if (is_file(public_path('images/wp-guide/'.$file))) {
                 $this->assertStringContainsString($file, $html, "the {$file} screenshot renders");
             } else {
                 $this->assertStringContainsString($fallback, $html, "the drawn fallback for {$file} renders");
