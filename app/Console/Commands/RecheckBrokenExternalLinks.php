@@ -27,12 +27,45 @@ class RecheckBrokenExternalLinks extends Command
 {
     protected $signature = 'ebq:recheck-broken-links
         {--dry-run : Report what would change without writing}
-        {--limit=1000 : Max findings to re-check in one pass}';
+        {--limit=1000 : Max findings to re-check in one pass}
+        {--flush-resolved-since= : Skip re-checking; just flush caches for crawl sites whose broken_external findings were resolved on/after this date (Y-m-d)}';
 
     protected $description = 'Re-verify open broken-external-link findings and resolve false positives';
 
+    /**
+     * Repair path for findings already resolved by an earlier run whose cache
+     * bump was a no-op (the first version keyed off the always-null
+     * `website_id`). Pure cache invalidation — touches no rows.
+     */
+    private function flushOnly(string $since): int
+    {
+        $crawlSiteIds = CrawlFinding::query()
+            ->where('type', 'broken_external')
+            ->where('status', 'resolved')
+            ->whereDate('resolved_at', '>=', $since)
+            ->distinct()
+            ->pluck('crawl_site_id');
+
+        $websiteIds = \App\Models\Website::query()
+            ->whereIn('crawl_site_id', $crawlSiteIds)
+            ->pluck('id');
+
+        foreach ($websiteIds as $websiteId) {
+            \App\Services\ReportCache::flushWebsite((string) $websiteId);
+        }
+
+        $this->info('Flushed '.$websiteIds->count().' website(s) across '
+            .$crawlSiteIds->count().' crawl site(s) with findings resolved since '.$since.'.');
+
+        return self::SUCCESS;
+    }
+
     public function handle(LinkChecker $checker): int
     {
+        if (($since = (string) $this->option('flush-resolved-since')) !== '') {
+            return $this->flushOnly($since);
+        }
+
         $dry = (bool) $this->option('dry-run');
         $findings = CrawlFinding::query()
             ->where('type', 'broken_external')
@@ -98,11 +131,20 @@ class RecheckBrokenExternalLinks extends Command
             'updated_at' => now(),
         ]);
 
-        // Health cards + the action queue are cached per website data-version;
-        // without a bump the client keeps seeing the resolved issues all day.
-        foreach ($resolve->pluck('website_id')->filter()->unique() as $websiteId) {
+        // Health cards + the action queue are cached per WEBSITE data-version,
+        // but findings belong to the shared CRAWL SITE and their `website_id`
+        // column is null on every row (68,962 of them, checked 2026-08-16) —
+        // pluck('website_id') returned an empty list and the first run of this
+        // command flushed nothing at all, leaving clients looking at resolved
+        // issues for up to 24h. Resolve the subscribers the same way
+        // AnalyzeSiteJob::flushSubscribers() does.
+        $websiteIds = \App\Models\Website::query()
+            ->whereIn('crawl_site_id', $resolve->pluck('crawl_site_id')->filter()->unique())
+            ->pluck('id');
+        foreach ($websiteIds as $websiteId) {
             \App\Services\ReportCache::flushWebsite((string) $websiteId);
         }
+        $this->line('Flushed report caches for '.$websiteIds->count().' subscribed website(s).');
 
         $this->info('Resolved '.$resolve->count().' false-positive findings.');
 
