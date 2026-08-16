@@ -89,6 +89,12 @@ errors, not just for 403/405/429/501. See known-issues § "Live-but-slow externa
 - Retro-fix for already-stored findings: **`php artisan ebq:recheck-broken-links`**
   (`--dry-run` first) re-verifies open `broken_external` rows with these rules, resolves the
   false ones and bumps `ReportCache` so Site Health updates. Idempotent, resolve-only.
+  ⚠️ **`crawl_findings.website_id` is NULL on every row** (68,962 checked, 2026-08-16) —
+  findings belong to the shared `crawl_site`. Anything invalidating caches from a finding
+  must resolve subscribers via `Website::where('crawl_site_id', …)` (as
+  `AnalyzeSiteJob::flushSubscribers()` does); the command's first version plucked
+  `website_id` and silently flushed nothing. `--flush-resolved-since=Y-m-d` repairs runs that
+  hit that. Pinned by `tests/Feature/RecheckBrokenLinksCacheTest.php`.
 Tests: `tests/Feature/ExternalLinkVerdictTest.php`.
 
 **Duplicate-title/meta/content skip if same `canonical_url`** (2026-07-03): pages that all
