@@ -91,6 +91,13 @@ web box never crawls.
    # if `up -d` doesn't recreate (config unchanged), force the code reload:
    #   docker restart $(docker ps -q --filter name=ebq)
    ```
+   > ⛔ **NEVER rsync `bootstrap/cache/` to the worker box** (the exclude above is
+   > load-bearing, not tidiness): on 2026-08-14→16 a shortened rsync shipped box A's
+   > `config:cache` output — `REDIS_HOST=127.0.0.1` baked in — onto box B. The cached
+   > file silently overrides `.env`, so every crawl/sync worker died on Redis
+   > "Connection refused" and 10 new client sites sat uncrawled for two days while
+   > queue depth built to 250+ jobs. The `rm -f bootstrap/cache/*.php` step above is
+   > the recovery if it ever happens again.
    > ⛔ **NEVER add `--delete` to this rsync.** `docker-compose.worker.yml` and
    > `docker/worker/Dockerfile` live **only on the worker box** (not in the repo), so
    > `--delete` wipes them — the containers keep running but you lose the ability to
