@@ -284,6 +284,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — Outage: memory livelock on box A (no swap).** The box sat at 83–86% RAM
+  / ~145% overcommit with zero swap; a ~1.3GB allocation burst (08:10–08:21 UTC) sent the
+  kernel into a reclaim livelock — load 73, 18 tasks blocked, no OOM kill — and the whole
+  stack (Apache/FPM/SSH/MariaDB) froze until a hard reboot at 08:28. MariaDB crash
+  recovery completed cleanly. Mitigation now in place: 3G `/swapfile` (fstab) +
+  `vm.swappiness=10` (`/etc/sysctl.d/99-ebq.conf`). If pressure recurs: trim FPM
+  children, add systemd-oomd, or upsize RAM.
+
 - **2026-08-15 — Public /guide rebuilt as the Content-AI client guide.** Full rewrite of
   `resources/views/guide.blade.php`: hero, sticky TOC, sections for onboarding, calendar,
   review/editor, all 8 publishing destinations (+ webhook tester), research, tracker,
