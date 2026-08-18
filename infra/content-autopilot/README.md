@@ -1452,9 +1452,28 @@ financial loss.
      local business name to put there. **No prompt may request text of any kind
      now**, hero included;
   2. the "never include logos or real brand marks" rule was addressed to the LLM
-     that WRITES prompts, never to the model that DRAWS. `IdeogramClient` has
-     always accepted `negative_prompt`; nothing passed one. **Both** generation
-     call sites now do.
+     that WRITES prompts, never to the model that DRAWS.
+
+  ⚠️ **The negative-prompt fix DID NOT WORK — corrected 2026-08-18.** A client hit
+  it again ("NOVA CLINIC" on a reception wall, on an image generated *after* that
+  fix). Measured directly against the v4 endpoint:
+  - v4 **rewrites every prompt** into a ~3,900-char scene description before
+    drawing, so our text is never what the model sees;
+  - `negative_prompt` does not survive the rewrite, and `magic_prompt=OFF` is
+    ignored;
+  - spelling the ban out IN the prompt makes it **worse** — an explicit "no
+    signage, no logos" clause left 5 signage/wordmark terms in the expansion vs
+    **0** for a scene that simply had no such surface.
+
+  **The control is the SCENE.** The art director must never request a subject
+  containing a surface a name could sit on (reception desks, lobbies, storefronts,
+  facades, entrances, vehicles, uniforms, packaging, screens, notice boards, name
+  plates) and must frame close-ups of hands/tools/materials/textures, tight
+  action, outdoor scenery or abstract treatments instead. It is explicitly told
+  NOT to write "no text" into a prompt. `negative_prompt` is kept as cheap
+  defence-in-depth for providers that honour it — **nothing may depend on it** —
+  and is now persisted on the image row (it was NULL everywhere, which made the
+  investigation guesswork).
 
   Two negative sets, on purpose: `NEGATIVE_PROMPT` (pipeline — blanket no text /
   signage / business names) and `MANUAL_NEGATIVE_PROMPT` (the editor's
