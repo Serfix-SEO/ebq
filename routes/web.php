@@ -534,6 +534,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Companion to the ebq:failed-jobs-alert mailed digest (2026-07-06 incident).
     Route::get('/ops', [OpsController::class, 'index'])->name('ops.index');
     Route::get('/content-feedback', [ContentFeedbackController::class, 'index'])->name('content-feedback.index');
+    // Dismiss a verdict from the admin home (does not delete it).
+    Route::post('/content-feedback/{feedback}/seen', [ContentFeedbackController::class, 'markSeen'])->name('content-feedback.seen');
     Route::post('/ops/retry', [OpsController::class, 'retry'])->name('ops.retry');
     Route::post('/ops/forget', [OpsController::class, 'forget'])->name('ops.forget');
     Route::post('/ops/crawl/{crawlSite}', [OpsController::class, 'startCrawl'])->name('ops.start-crawl');

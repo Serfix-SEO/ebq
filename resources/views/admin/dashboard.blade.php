@@ -152,6 +152,95 @@
             @endforeach
         </div>
 
+        {{-- ── Waiting on us ─────────────────────────────────────
+             Above the feeds on purpose: these are the two queues where a slow
+             response costs a customer, unlike the signup/subscription feeds
+             which are just information. --}}
+        <div class="grid gap-3 lg:grid-cols-2">
+            {{-- Unreplied support tickets. "open" IS the unreplied state — the
+                 whose-turn tracker flips to "answered" the moment we reply. --}}
+            <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                    <p class="text-sm font-semibold text-slate-900 dark:text-white">
+                        Awaiting our reply
+                        @if ($openTicketTotal > 0)
+                            <span class="ms-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">{{ $openTicketTotal }}</span>
+                        @endif
+                    </p>
+                    <a href="{{ route('admin.support.index', ['status' => 'open']) }}" class="text-xs font-semibold text-orange-600 hover:underline">All tickets &rarr;</a>
+                </div>
+                <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                    @forelse ($openTickets as $t)
+                        <li class="px-4 py-2.5 text-sm">
+                            <a href="{{ route('admin.support.show', $t) }}" class="flex items-start justify-between gap-3 group">
+                                <div class="min-w-0">
+                                    <p class="truncate font-medium text-slate-900 group-hover:text-orange-600 dark:text-white">{{ $t->subject }}</p>
+                                    <p class="truncate text-xs text-slate-500 dark:text-slate-400">
+                                        {{ $t->user?->name ?: $t->user?->email ?: '—' }}@if ($t->website) · {{ $t->website->domain }}@endif
+                                    </p>
+                                </div>
+                                <span class="flex-none whitespace-nowrap text-xs text-slate-400" title="{{ $t->last_reply_at }}">
+                                    {{ $t->last_reply_at?->diffForHumans(null, true) }} waiting
+                                </span>
+                            </a>
+                        </li>
+                    @empty
+                        <li class="px-4 py-6 text-center text-sm text-slate-400">Nothing waiting — every ticket has been answered.</li>
+                    @endforelse
+                </ul>
+            </div>
+
+            {{-- Client article verdicts nobody has looked at. "Mark as seen"
+                 only clears it from here; the full list keeps every row. --}}
+            <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                    <p class="text-sm font-semibold text-slate-900 dark:text-white">
+                        New article feedback
+                        @if ($feedbackTotal > 0)
+                            <span class="ms-1.5 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ $feedbackTotal }}</span>
+                        @endif
+                    </p>
+                    <a href="{{ route('admin.content-feedback.index') }}" class="text-xs font-semibold text-orange-600 hover:underline">All feedback &rarr;</a>
+                </div>
+                <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                    @forelse ($feedback as $f)
+                        @php
+                            $tone = match ($f->rating) {
+                                \App\Models\ContentArticleFeedback::RATING_WRONG => 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300',
+                                \App\Models\ContentArticleFeedback::RATING_REWRITES => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+                                default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+                            };
+                        @endphp
+                        <li class="px-4 py-2.5 text-sm">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="flex items-center gap-2">
+                                        <span class="flex-none rounded-full px-2 py-0.5 text-[11px] font-bold {{ $tone }}">{{ \App\Models\ContentArticleFeedback::label($f->rating) }}</span>
+                                        <span class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $f->website?->domain ?? '—' }}</span>
+                                    </p>
+                                    <p class="mt-1 truncate font-medium text-slate-900 dark:text-white">{{ $f->topic?->title ?? '(article removed)' }}</p>
+                                    @if (trim((string) $f->comment) !== '')
+                                        <p class="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">“{{ $f->comment }}”</p>
+                                    @endif
+                                    <p class="mt-0.5 text-xs text-slate-400">{{ $f->user?->email ?? '—' }} · {{ $f->created_at?->diffForHumans() }}</p>
+                                </div>
+                                <form method="POST" action="{{ route('admin.content-feedback.seen', $f) }}" class="flex-none">
+                                    @csrf
+                                    <input type="hidden" name="back" value="{{ route('admin.dashboard') }}">
+                                    <button type="submit"
+                                            class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:border-orange-400 hover:text-orange-600 dark:border-slate-700 dark:text-slate-300">
+                                        Mark seen
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
+                    @empty
+                        <li class="px-4 py-6 text-center text-sm text-slate-400">No new feedback — all caught up.</li>
+                    @endforelse
+                </ul>
+            </div>
+        </div>
+
         {{-- ── Feeds ─────────────────────────────────────────────── --}}
         <div class="grid gap-3 lg:grid-cols-3">
             <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ContentArticleFeedback;
 use App\Models\ContentTopic;
+use App\Models\SupportTicket;
 use App\Models\Lead;
 use App\Models\User;
 use App\Models\Website;
@@ -128,7 +130,33 @@ class DashboardController extends Controller
                 'subscriptions.created_at as subscribed_at',
             ]);
 
+        // ── Waiting on us ───────────────────────────────────────────────
+        // `open` is the whose-turn tracker's "customer is waiting on us" state
+        // (a client reply re-opens a closed ticket), so this IS the unreplied
+        // queue — not merely "not closed".
+        $openTickets = SupportTicket::query()
+            ->where('status', SupportTicket::STATUS_OPEN)
+            ->with(['user:id,name,email', 'website:id,domain'])
+            ->withCount('messages')
+            ->orderBy('last_reply_at')      // oldest wait first — that is the SLA risk
+            ->limit(10)
+            ->get();
+
+        // Client article verdicts nobody has looked at yet. Unhappy first: a
+        // "fundamentally wrong" sitting unread is worse than an unread "loved it".
+        $feedback = ContentArticleFeedback::query()
+            ->unseen()
+            ->with(['user:id,name,email', 'website:id,domain', 'topic:id,title'])
+            ->orderByRaw("CASE rating WHEN 'wrong' THEN 0 WHEN 'rewrites' THEN 1 ELSE 2 END")
+            ->latest()
+            ->limit(10)
+            ->get();
+
         return view('admin.dashboard', [
+            'openTickets' => $openTickets,
+            'openTicketTotal' => SupportTicket::query()->where('status', SupportTicket::STATUS_OPEN)->count(),
+            'feedback' => $feedback,
+            'feedbackTotal' => ContentArticleFeedback::query()->unseen()->count(),
             'daily' => $daily,
             'segments' => $segments,
             'series' => $series,

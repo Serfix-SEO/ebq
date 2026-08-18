@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ContentArticleFeedback;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
@@ -37,5 +39,23 @@ class ContentFeedbackController extends Controller
             'total' => (int) $counts->sum(),
             'rating' => $rating,
         ]);
+    }
+
+    /**
+     * Dismiss one verdict from the admin home. Deliberately NOT a delete: the
+     * feedback list stays complete for trend-reading, this only takes the row
+     * off the "needs a look" queue, and records who cleared it.
+     */
+    public function markSeen(Request $request, ContentArticleFeedback $feedback): RedirectResponse
+    {
+        if ($feedback->seen_at === null) {
+            $feedback->forceFill([
+                'seen_at' => now(),
+                'seen_by' => (string) Auth::user()?->email,
+            ])->save();
+        }
+
+        return redirect()->to($request->input('back', route('admin.dashboard')))
+            ->with('status', 'feedback-seen');
     }
 }

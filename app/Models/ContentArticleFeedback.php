@@ -21,6 +21,17 @@ class ContentArticleFeedback extends Model
 
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return ['seen_at' => 'datetime'];
+    }
+
+    /** Feedback the team has not dismissed yet — what the admin home shows. */
+    public function scopeUnseen($query)
+    {
+        return $query->whereNull('seen_at');
+    }
+
     public const RATING_LOVE = 'love';
 
     public const RATING_REWRITES = 'rewrites';
