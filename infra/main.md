@@ -284,6 +284,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — Article export (Copy HTML / Copy Markdown / Download).** A client on
+  **Hostinger Horizon** asked how to auto-post; builders like it expose no content API,
+  so no publish driver can ever work there. New `content.article.export` route +
+  `ArticleExporter` + `MarkdownAdapter` (third adapter over `HtmlBlockParser`) let any
+  client move an article by hand without losing structure. Landmine recorded:
+  `content_articles.markdown` is **stale after any edit** (`ArticleReview::save()` copies
+  it verbatim), so the exporter re-renders from `html`. Docs:
+  [content-autopilot/README.md](./content-autopilot/README.md) § Publishing.
 - **2026-08-16 — `ebq:deploy-verify`: prove the workers run the deployed code.** A probe
   job (`App\Jobs\Ops\DeployVerifyJob`) is dispatched to all 7 queues; each worker answers
   from inside its own process with hostname, resolved Redis/DB host and a

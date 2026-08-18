@@ -400,6 +400,8 @@
                             @endif
                         @endif
                     @endif
+
+                    @include('livewire.content.partials.article-export', ['topic' => $topic])
                 </div>
             </div>
 

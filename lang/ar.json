@@ -4804,5 +4804,9 @@
     "Every choice here can be changed later in Content Settings — nothing is locked in.": "كل خيار هنا يمكن تغييره لاحقًا من إعدادات المحتوى — لا شيء نهائي.",
     "That looks like a major platform, not your own website. Enter the site you own and can publish articles to.": "يبدو أن هذا موقع منصة كبرى، وليس موقعك الخاص. أدخل الموقع الذي تملكه وتستطيع نشر المقالات عليه.",
     "What our crawler found on your website — technical problems that hold your articles back, ranked by how much they matter.": "ما وجده زاحفنا في موقعك — مشكلات تقنية تعيق مقالاتك، مرتبة حسب أهميتها.",
-    "That website belongs to a well-known brand. Enter the site you own and can publish articles to — if this really is your organisation, contact support and we will enable it.": "هذا الموقع يخصّ علامة تجارية معروفة. أدخل الموقع الذي تملكه وتستطيع نشر المقالات عليه — وإذا كانت هذه بالفعل مؤسستك، تواصل مع الدعم وسنقوم بتفعيله."
+    "That website belongs to a well-known brand. Enter the site you own and can publish articles to — if this really is your organisation, contact support and we will enable it.": "هذا الموقع يخصّ علامة تجارية معروفة. أدخل الموقع الذي تملكه وتستطيع نشر المقالات عليه — وإذا كانت هذه بالفعل مؤسستك، تواصل مع الدعم وسنقوم بتفعيله.",
+    "Take it elsewhere": "انقلها إلى مكان آخر",
+    "Copy Markdown": "نسخ Markdown",
+    "Download .md": "تنزيل ملف ‎.md",
+    "For websites we cannot post to automatically — paste this into your site editor.": "للمواقع التي لا يمكننا النشر عليها تلقائيًا — الصق هذا في محرّر موقعك."
 }

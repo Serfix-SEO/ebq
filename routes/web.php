@@ -397,6 +397,12 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
         Route::get('/content/topics/{topic}', fn (string $topic) => view('content.review', ['topicId' => $topic]))
             ->middleware(['feature:content', 'content.access'])
             ->name('content.review');
+        // Take the article elsewhere by hand — for site builders with no
+        // content API (Hostinger Horizon and friends) there is nothing a
+        // publish driver can call, so copy/download is the only route out.
+        Route::get('/content/topics/{topic}/export/{format}', \App\Http\Controllers\Content\ArticleExportController::class)
+            ->middleware(['feature:content', 'content.access'])
+            ->name('content.article.export');
     }
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
 

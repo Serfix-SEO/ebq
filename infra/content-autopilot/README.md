@@ -931,6 +931,37 @@ now driven by `mode`, not plan status — see the Calendar/Settings split above.
 
 ## Publishing (Phase 3, 2026-07-18)
 
+### Manual export — the escape hatch for platforms with no API (2026-08-16)
+
+Some sites simply cannot be published into: **site builders with no content
+API** (a client on **Hostinger Horizon** raised this) and hand-built sites.
+There is nothing for a driver to call, so no amount of driver work helps. Until
+now those clients had no way to get an article out except selecting the rendered
+preview in the browser, which loses headings, links and image references.
+
+`GET /content/topics/{topic}/export/{html|md}` (`content.article.export` →
+`ArticleExportController`) serves the current article body:
+
+- **html** — body plus an `<h1>`, deliberately **no** `<html>/<head>` wrapper: a
+  full document pasted into a CMS editor comes out escaped.
+- **md** — `HtmlBlockParser` → new **`MarkdownAdapter`** (third adapter after
+  Ricos and Portable Text).
+- `?download=1` switches `Content-Disposition` from `inline` to `attachment`.
+- Scoped exactly like `ArticleReview::topic()` (topic reachable only through an
+  accessible website), and always the `is_current` version.
+
+⚠️ **Never export `content_articles.markdown`.** `ArticleReview::save()` copies
+that column verbatim from the previous version, so it holds **pre-edit** text
+the moment a client edits anything. Nothing else reads it today — keep it that
+way, or fix the column. The exporter re-renders from `html`, which is the source
+of truth.
+
+UI: `resources/views/livewire/content/partials/article-export.blade.php` — Copy
+HTML / Copy Markdown (fetch the route, then `navigator.clipboard`; falls back to
+opening the download when the clipboard is blocked on insecure origins) plus
+download links. Tests: `tests/Feature/ArticleExportTest.php`,
+`tests/Unit/MarkdownAdapterTest.php`.
+
 `app/Services/Content/Publishing/`:
 - **`PublishDriver`** interface (`verify`/`publish`/`update`) + `PublishResult`
   DTO (`ok`, `externalId`, `externalUrl`, `error`, `transient`) +
