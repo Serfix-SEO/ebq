@@ -1431,6 +1431,37 @@ financial loss.
   `.env` on **both boxes** restores enforcement with no code change.
   `tests/Feature/SpendCapDisabledTest.php` pins both halves. Nothing else
   limits paid API spend now: watch `/admin/ops` (and the provider dashboards).
+- ⚠️ **Brand guardrails on every image** (`App\Support\ContentImageGuardrails`,
+  2026-08-16). A client's hero image carried a **competitor's** signage — "Al Noor
+  Medical Center" on a TMC General Clinic article. Two causes, both fixed:
+  1. the art-director system prompt used to allow the hero image to carry "the
+     article title as a bold text overlay". A model drawing letters into a
+     real-world scene also fills in the **signage**, and invents a plausible
+     local business name to put there. **No prompt may request text of any kind
+     now**, hero included;
+  2. the "never include logos or real brand marks" rule was addressed to the LLM
+     that WRITES prompts, never to the model that DRAWS. `IdeogramClient` has
+     always accepted `negative_prompt`; nothing passed one. **Both** generation
+     call sites now do.
+
+  Two negative sets, on purpose: `NEGATIVE_PROMPT` (pipeline — blanket no text /
+  signage / business names) and `MANUAL_NEGATIVE_PROMPT` (the editor's
+  regenerate-with-my-own-prompt path — competitors and logos only, because the
+  client may deliberately want their own name rendered; the TMC client typed
+  *"change the name of the clinic to TMC General clinic"* trying to fix this by
+  hand). The plan's own `competitor_overrides['added']` domains are appended as
+  named negatives in both. Tests: `tests/Feature/Content/ImageBrandGuardrailsTest.php`.
+- ⚠️ **The writer is told which business it writes for** (2026-08-16). Until then
+  `business_description` reached the topic planner, competitor guard, keyword
+  insights and the image prompts — but **never the writer**. Articles named the
+  client only when the model guessed it off the CTA link; the same TMC client
+  reported their clinic and pharmacy names missing from a 3,700-word piece
+  (measured: 4 visible mentions, 0 for the pharmacy, 10 of the 14 raw hits were
+  link URLs). The rule ships through `templateInstructions()` →
+  `AiWriterService` `custom_prompt`, which is the writer's only instruction
+  channel — `scorerContext()` feeds the SCORER, so adding it there changes
+  nothing. Bounded to 2-4 natural mentions; covers multi-name businesses.
+  Tests: `tests/Feature/Content/WriterKnowsTheBusinessTest.php`.
 - **Ideogram** (`app/Services/Content/IdeogramClient.php`): v3 generate,
   `Api-Key` header, TURBO $0.03/img default; **returned URLs EXPIRE — always
   download in-job**. `IDEOGRAM_API_KEY` in `.env` (phpunit blanks it — billable-

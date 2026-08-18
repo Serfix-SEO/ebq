@@ -821,6 +821,19 @@ class ContentArticleProducer
         if ($plan->toggle('faq')) {
             $rules[] = 'End with an FAQ section (H2) answering 3-5 real questions searchers ask.';
         }
+        // Name the business we are writing for. The writer used to get no
+        // identity at all, so a client's own name appeared only when the model
+        // guessed it from the CTA link — a clinic reported both its clinic and
+        // pharmacy names missing from a 3,700-word article (2026-08-16).
+        // Bounded to a few mentions: this is their blog, not an advert.
+        if (($business = trim((string) $plan->business_description)) !== '') {
+            $rules[] = 'THIS ARTICLE IS PUBLISHED BY THIS BUSINESS: '.mb_substr($business, 0, 600)
+                .' — refer to it by the exact name it uses above, naturally, 2-4 times across the article '
+                .'(a natural place is the opening, one mid-article example, and the closing/CTA). '
+                .'If it operates under more than one name (e.g. a clinic and its pharmacy), use each where relevant. '
+                .'Never invent a different business name, never rename it, and never present another company as the author. '
+                .'Do not turn the article into an advert — it stays genuinely useful, in first-person-plural voice.';
+        }
         if ($plan->toggle('cta_enabled') && $plan->cta_url) {
             $rules[] = 'Include one natural call-to-action linking to '.$plan->cta_url.' where it genuinely helps the reader'
                 .$this->ctaFraming($plan).'.';

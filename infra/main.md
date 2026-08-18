@@ -284,6 +284,19 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — A competitor's name appeared in a client's hero image; the writer never
+  knew the client's name.** Two independent defects from one TMC General Clinic report.
+  (1) The art director could ask for the article title as a "bold text overlay", and a
+  model drawing letters into a clinic scene invented the signage **"Al Noor Medical
+  Center"** — a real competitor. No prompt may request text now, and
+  `App\Support\ContentImageGuardrails` sends a `negative_prompt` on **every** generation
+  (the constraint previously only ever reached the prompt-WRITING LLM, never the model
+  that draws). Pipeline and client-directed paths get different negative sets so a
+  client asking for their own name is not fought. (2) `business_description` reached the
+  planner, competitor guard and image prompts but **never the writer**, so naming the
+  client was luck — now delivered via `templateInstructions()`, the writer's actual
+  instruction channel. Docs:
+  [content-autopilot/README.md](./content-autopilot/README.md) § Publishing/images.
 - **2026-08-16 — Article export (Copy HTML / Copy Markdown / Download).** A client on
   **Hostinger Horizon** asked how to auto-post; builders like it expose no content API,
   so no publish driver can ever work there. New `content.article.export` route +

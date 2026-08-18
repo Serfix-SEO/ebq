@@ -105,6 +105,15 @@ class GenerateContentImagesJob implements ShouldQueue
             ? \App\Support\ContentImageStyles::ideogramStyle($plan->image_style)
             : ContentAutopilotConfig::styleType();
 
+        // Blanket "no text / no signage / no brand names", plus this client's
+        // own named competitors as extra negatives. Read straight off the plan
+        // (no insights call) — this runs per article and must stay cheap.
+        // Parenthesised on purpose: `(array) $a['added'] ?? []` casts BEFORE
+        // the coalesce, so the guard never fires on a plan with no overrides.
+        $negativePrompt = \App\Support\ContentImageGuardrails::forCompetitors(
+            (array) (((array) ($plan?->competitor_overrides ?? []))['added'] ?? [])
+        );
+
         // Tell the review page that images are actively being generated so its
         // progress overlay stays up until every image is done. Image rows are
         // created only on success, so there is no in-progress row to detect —
@@ -161,6 +170,11 @@ class GenerateContentImagesJob implements ShouldQueue
                 'rendering_speed' => $speed,
                 'style_type' => $style,
                 'num_images' => 1,
+                // The constraint has to travel with the DRAW request. Telling
+                // the prompt-writing LLM "no brand marks" never reached the
+                // image model, which happily rendered a competitor's signage
+                // onto a client's hero image (see ContentImageGuardrails).
+                'negative_prompt' => $negativePrompt,
             ]);
             if (! ($result['ok'] ?? false) || empty($result['images'][0]['url'])) {
                 continue;
@@ -280,8 +294,16 @@ class GenerateContentImagesJob implements ShouldQueue
                 .'Return ONLY JSON. For each prompt, describe a single, specific, editorial-quality image that '
                 .'visually represents the actual content — concrete scene, subject, mood, lighting, composition, and style. '
                 .'Adapt to the business/topic (photoreal for real-world businesses, illustration/graphic for digital/gaming/abstract topics). '
-                .'The FEATURED (hero) prompt may include the article title as a bold, correctly-spelled text overlay if it suits the theme. '
-                .'Inline prompts must NOT contain text overlays. Never include logos, watermarks, real brand marks, celebrities, or anything offensive. '
+                // No prompt may ask for text of any kind. A model drawing
+                // letters into a real-world scene also fills in the signage,
+                // and it invents a plausible LOCAL business name to put there
+                // — which is how a competitor's clinic name ended up on a
+                // client's hero image (2026-08-16). Purely visual scenes have
+                // nothing to hallucinate a brand onto.
+                .'NEVER ask for text, words, letters, titles, captions, signage, name plates or number plates in any image, '
+                .'including the featured one — describe a purely visual scene. '
+                .'Never include logos, watermarks, real brand marks, celebrities, or anything offensive. '
+                .'Never name any business, clinic, shop or brand in a prompt — not the client\'s and not anyone else\'s. '
                 .'Keep each prompt 1-3 sentences.'
                 .($stylePrompt !== '' ? ' Preferred visual style: '.$stylePrompt.'.' : '');
 

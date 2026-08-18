@@ -65,11 +65,21 @@ class GenerateInlineImageJob implements ShouldQueue
         $speed = ContentAutopilotConfig::renderingSpeed();
         $style = ContentAutopilotConfig::styleType();
 
+        // Client-directed prompt: block competitors and logos, but NOT text —
+        // they may be asking for their own name on purpose (which is exactly
+        // what the TMC client tried when a competitor's name appeared).
+        $plan = $image->article?->topic?->plan;
+        $negativePrompt = \App\Support\ContentImageGuardrails::forCompetitors(
+            (array) (((array) ($plan?->competitor_overrides ?? []))['added'] ?? []),
+            \App\Support\ContentImageGuardrails::MANUAL_NEGATIVE_PROMPT,
+        );
+
         $result = $ideogram->generate($this->prompt, [
             'aspect_ratio' => '16x9',
             'rendering_speed' => $speed,
             'style_type' => $style,
             'num_images' => 1,
+            'negative_prompt' => $negativePrompt,
         ]);
         if (! ($result['ok'] ?? false) || empty($result['images'][0]['url'])) {
             $image->forceFill(['status' => ContentImage::STATUS_FAILED])->save();
