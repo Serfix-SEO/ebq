@@ -284,6 +284,15 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-18 — Admin can open a support ticket with any client.** `/admin/support/new`
+  (+ a **Message** button on the client detail page that pre-selects them). Threads could
+  only ever start with the customer, so team-initiated contact happened over plain email,
+  outside the thread the client can see and reply to. Opens as `answered` (we spoke last,
+  so it stays out of the "awaiting reply" queue), attaches a website only when the client
+  has exactly one, excludes funnel lead placeholders from the picker, and the client email
+  says "a message from the team" rather than "we replied". Docs:
+  [accounts/support-tickets.md](./accounts/support-tickets.md).
+
 - **2026-08-16 — The image spend cap silently stopped images for every client.** The
   $10 Ideogram cap tripped at 2026-08-17 00:14 and `GenerateContentImagesJob` returns
   early when the meter is exhausted, creating no rows — so **91 articles across 12

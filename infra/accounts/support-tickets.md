@@ -40,13 +40,30 @@ A client reply ALWAYS flips to `open` — including re-opening a closed ticket
 - Admin reply → message `is_admin=true` + status `answered` +
   `SupportTicketReplied` mail to the customer (**shown verbatim in-app and in
   email — write it for the customer**).
+- **Admin can OPEN a ticket with any client** (2026-08-18): `/admin/support/new`
+  → `create()` / `store()`, "New ticket" button on the index and a **Message**
+  button on `/admin/clients/{id}` (pre-selects that client via `?user=`).
+  Before this a thread could only begin with the customer, so anything we
+  initiated happened over plain email — outside the thread they can see, reply
+  to and find again.
+  - Opens as **`answered`**, not `open`: we spoke last, so it must not land in
+    the "customer is waiting on us" work queue.
+  - `website_id` is attached **only when the client has exactly one site** —
+    guessing for a multi-site client puts the wrong context on the thread.
+  - Client picker excludes `%@leads.serfix.internal` (funnel lead placeholders
+    have no real address). Plain `<select>`, fine at current scale; revisit if
+    the client list grows past a few hundred.
+  - Same sanitize-then-measure-visible-text rule as `reply()`, so
+    `<p><br></p>` is rejected rather than sending an empty message.
 
 ## Mail
 
 - `App\Mail\SupportTicketActivity` → all `is_admin` users on client
   create/reply (English, inline-HTML heredoc style like BugReportSubmitted).
 - `App\Mail\SupportTicketReplied` → customer on admin reply (localized
-  envelope, links to `/support/{id}`).
+  envelope, links to `/support/{id}`). Carries an **`isNew`** flag: when WE
+  opened the thread the subject/intro become "A message from the Serfix team"
+  instead of "We've replied to your ticket", which would be a lie.
 - All sends synchronous + try/catch — mail failure never breaks the action.
 
 ## Bug-report bridge
@@ -67,5 +84,8 @@ A client reply ALWAYS flips to `open` — including re-opening a closed ticket
 ## Gotchas
 
 - New routes → **`php artisan route:cache` on deploy** (prod route-cache
-  landmine) — phpunit reads the same cache.
+  landmine) — phpunit reads the same cache. This bit again while adding
+  `/support/new`: the tests 404'd until `route:clear`.
+- ⚠️ `/admin/support/new` MUST stay registered **before** `/admin/support/{ticket}`
+  or the literal is captured as a ticket id. A test pins it.
 - Tests: `tests/Feature/Support/` (client, admin, bridge).

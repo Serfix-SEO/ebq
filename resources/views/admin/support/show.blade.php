@@ -42,6 +42,9 @@
             </div>
         </div>
 
+        @if (session('status') === 'support-opened')
+            <div class="rounded-2xl border border-success/25 bg-white p-4 text-sm font-semibold text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100">Ticket opened — the client was emailed and can reply from their Support page.</div>
+        @endif
         @if (session('status') === 'support-replied')
             <div class="rounded-2xl border border-success/25 bg-white p-4 text-sm font-semibold text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100">Reply sent — the customer was notified by email.</div>
         @endif

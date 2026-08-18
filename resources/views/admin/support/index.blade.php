@@ -1,6 +1,7 @@
 <x-layouts.app>
     <div class="mx-auto w-full max-w-6xl space-y-6">
-        <div>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
             <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                 Support tickets
                 @if (($counts['open'] ?? 0) > 0)
@@ -8,6 +9,12 @@
                 @endif
             </h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open = the customer is waiting on us. Replying flips a ticket to Answered and emails them.</p>
+            </div>
+            <a href="{{ route('admin.support.create') }}"
+                class="inline-flex flex-none items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                New ticket
+            </a>
         </div>
 
         <div class="flex flex-wrap gap-2">

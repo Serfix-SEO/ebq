@@ -570,6 +570,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/leads', [LeadController::class, 'index'])->name('leads.index');
     Route::get('/support', [\App\Http\Controllers\Admin\SupportTicketController::class, 'index'])->name('support.index');
+    // Start a conversation WITH a client (proactive outreach, follow-ups).
+    // Registered before /support/{ticket} or the literal would be captured as
+    // a ticket id.
+    Route::get('/support/new', [\App\Http\Controllers\Admin\SupportTicketController::class, 'create'])->name('support.create');
+    Route::post('/support', [\App\Http\Controllers\Admin\SupportTicketController::class, 'store'])->name('support.store');
     Route::get('/support/{ticket}', [\App\Http\Controllers\Admin\SupportTicketController::class, 'show'])->name('support.show');
     Route::post('/support/{ticket}/reply', [\App\Http\Controllers\Admin\SupportTicketController::class, 'reply'])->name('support.reply');
     Route::post('/support/{ticket}/status', [\App\Http\Controllers\Admin\SupportTicketController::class, 'setStatus'])->name('support.status');
