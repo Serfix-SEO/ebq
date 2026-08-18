@@ -1392,6 +1392,14 @@ financial loss.
   completeJson exposes no usage) and `IdeogramSpendMeter` (`ideogram:spend:`,
   `IDEOGRAM_MONTHLY_CAP_USD`). Exhausted LLM cap ⇒ dispatcher stops claiming
   (dates shift silently); exhausted image cap ⇒ articles publish without images.
+  ⚠️ **All three money caps are set to `0` (= disabled) on prod since
+  2026-08-16** (owner's call: a $10 image cap stopped mid-month and articles
+  started publishing without images). The breakers are **dormant, not deleted**
+  — the meters keep counting real billed dollars and `/admin/ops` still shows
+  the running totals with a "no cap" label, so setting a positive number in
+  `.env` on **both boxes** restores enforcement with no code change.
+  `tests/Feature/SpendCapDisabledTest.php` pins both halves. Nothing else
+  limits paid API spend now: watch `/admin/ops` (and the provider dashboards).
 - **Ideogram** (`app/Services/Content/IdeogramClient.php`): v3 generate,
   `Api-Key` header, TURBO $0.03/img default; **returned URLs EXPIRE — always
   download in-job**. `IDEOGRAM_API_KEY` in `.env` (phpunit blanks it — billable-
