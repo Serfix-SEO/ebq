@@ -1431,6 +1431,18 @@ financial loss.
   `.env` on **both boxes** restores enforcement with no code change.
   `tests/Feature/SpendCapDisabledTest.php` pins both halves. Nothing else
   limits paid API spend now: watch `/admin/ops` (and the provider dashboards).
+  `MOZ_MONTHLY_ROW_CAP=0` too (2026-08-16) — that one guards a free-tier ROW
+  quota rather than a bill, so with it off an over-run surfaces as Moz refusing
+  the call instead of us silently skipping DA/PA enrichment.
+
+  ⚠️ **What a blown cap actually looks like** (the reason they are off):
+  `GenerateContentImagesJob` returns early when the meter is exhausted and only
+  creates image rows on success, so the cap produced **articles with silently
+  zero images and nothing to retry from** — 91 articles across 12 clients from
+  2026-08-17 00:14 onward, one of whom (fit-xp.com) signed up mid-blackout and
+  never saw images work at all. Recovery:
+  `php artisan ebq:backfill-article-images` (dry run by default; refuses to run
+  while the meter is exhausted, since every job would no-op and report success).
 - ⚠️ **Brand guardrails on every image** (`App\Support\ContentImageGuardrails`,
   2026-08-16). A client's hero image carried a **competitor's** signage — "Al Noor
   Medical Center" on a TMC General Clinic article. Two causes, both fixed:

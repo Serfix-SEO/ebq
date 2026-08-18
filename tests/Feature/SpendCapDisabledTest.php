@@ -28,6 +28,9 @@ class SpendCapDisabledTest extends TestCase
             'dataforseo' => [DataForSeoSpendMeter::class, 'services.dataforseo.monthly_cap_usd'],
             'content llm' => [ContentLlmSpendMeter::class, 'services.content_autopilot.llm_monthly_cap_usd'],
             'ideogram images' => [IdeogramSpendMeter::class, 'services.ideogram.monthly_cap_usd'],
+            // Moz is a free-tier ROW quota, not money — but it is the same
+            // breaker class and is also off on prod (owner's call 2026-08-16).
+            'moz rows' => [\App\Services\Content\MozSpendMeter::class, 'services.moz.monthly_row_cap'],
         ];
     }
 

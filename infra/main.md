@@ -284,6 +284,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-16 — The image spend cap silently stopped images for every client.** The
+  $10 Ideogram cap tripped at 2026-08-17 00:14 and `GenerateContentImagesJob` returns
+  early when the meter is exhausted, creating no rows — so **91 articles across 12
+  clients** were written with zero images and nothing to retry from. It surfaced only
+  because fit-xp.com signed up mid-blackout and reported "this site never generates
+  images". All spend caps are now `0` on both boxes (incl. `MOZ_MONTHLY_ROW_CAP`, a
+  free-tier row quota rather than a bill), and `ebq:backfill-article-images` re-runs
+  generation for articles that have none — dry run by default, refuses to run while a
+  meter is exhausted, skips clients who turned images off themselves. 57 images
+  backfilled across the 12 affected clients. See [[spend-caps-disabled]] and
+  [content-autopilot/README.md](./content-autopilot/README.md).
 - **2026-08-16 — A competitor's name appeared in a client's hero image; the writer never
   knew the client's name.** Two independent defects from one TMC General Clinic report.
   (1) The art director could ask for the article title as a "bold text overlay", and a
