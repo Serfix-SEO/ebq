@@ -33,7 +33,13 @@ class GuideContentTest extends TestCase
             ->assertSee('id="faq"', false)
             // The troubleshooting promises clients rely on.
             ->assertSee('Featured image in article')
-            ->assertSee('Common problems, solved');
+            ->assertSee('Common problems, solved')
+            // Site builders with no content API can never auto-publish; the
+            // guide must say so and offer both routes out (2026-08-16, raised
+            // by a client on Hostinger Horizon).
+            ->assertSee('My website isn’t one of these', false)
+            ->assertSee('Hostinger Horizon', false)
+            ->assertSee('Take it elsewhere', false);
     }
 
     public function test_guide_screenshots_exist_on_disk(): void
