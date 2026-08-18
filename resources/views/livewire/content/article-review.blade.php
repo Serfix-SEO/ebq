@@ -24,6 +24,13 @@
         @endif
     </div>
 
+    {{-- Right under the header: this was missed at the bottom of the sidebar.
+         Only once there is a finished article to take — nothing to copy while
+         it is still being written. --}}
+    @if ($topic && $article && ! $generating)
+        @include('livewire.content.partials.article-export', ['topic' => $topic])
+    @endif
+
     @if (session('review-status'))
         <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 6000)"
             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
@@ -400,8 +407,6 @@
                             @endif
                         @endif
                     @endif
-
-                    @include('livewire.content.partials.article-export', ['topic' => $topic])
                 </div>
             </div>
 

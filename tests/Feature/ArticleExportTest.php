@@ -161,4 +161,27 @@ class ArticleExportTest extends TestCase
 
         $this->assertSame('how-to-clean-a-rug.html', $out['filename']);
     }
+
+    public function test_the_export_bar_sits_above_the_article_not_buried_below_it(): void
+    {
+        // Owner feedback 2026-08-16: at the bottom of the sidebar it was missed.
+        // Compare positions in the RENDERED markup with <script> and the
+        // Livewire snapshot stripped — both embed the article JSON and would
+        // make a naive strpos comparison lie (it did, while building this).
+        $user = User::factory()->create();
+        $topic = $this->article($user);
+
+        $html = $this->actingAs($user)->get(route('content.review', ['topic' => $topic->id]))->getContent();
+        $clean = (string) preg_replace('#<script.*?</script>#s', '', $html);
+        $clean = (string) preg_replace('#wire:snapshot="[^"]*"#s', '', $clean);
+
+        $header = strpos($clean, 'truncate text-xl font-bold');
+        $export = strpos($clean, 'Take it elsewhere');
+        $body = strpos($clean, 'Blot, do not rub');   // the article content itself
+
+        $this->assertNotFalse($export, 'the export bar must render on the review page');
+        $this->assertNotFalse($body, 'the article body must render');
+        $this->assertLessThan($export, $header, 'export sits under the page header');
+        $this->assertLessThan($body, $export, 'export sits ABOVE the article body');
+    }
 }
