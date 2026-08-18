@@ -78,6 +78,32 @@ HTML input → `HtmlSanitizer::clean()`, plain input → `nl2br(e())`, then
 - Tests: `tests/Unit/AutolinkTest.php` (double-linking + dangerous schemes are
   the cases that matter).
 
+### The reply editor (`components/support/html-editor.blade.php`)
+
+A `contenteditable` div synced into a hidden `<textarea>` on every input; the
+toolbar drives `document.execCommand`. Two things about it have bitten us:
+
+- **The link button used to lose links silently.** The old handler was
+  `if (url && /^https?:\/\//i.test(url)) this.cmd('createLink', url)`, which
+  failed three ways with no feedback: a scheme-less paste (`wa.me/971…`) never
+  matched, `prompt()` blurs the editor so the selection `createLink` needs is
+  already gone, and with nothing selected `createLink` is a no-op. Ticket
+  `01m0b359042x3pt20z4wb4zrbw` went to the client with "Contact me on WhatsApp"
+  as dead text — the anchor was never in storage, so no amount of render-side
+  Autolink could have saved it. `link()` now captures the Range **before**
+  prompting, prepends `https://` when there is no scheme, builds the `<a>` by
+  hand (`extractContents` + `insertNode`), inserts the URL as its own text when
+  nothing is selected, and alerts on a rejected scheme.
+- ⚠️ **The whole component is one `x-data="{ … }"` attribute, so a single
+  double quote anywhere inside it — including in a comment — ends the attribute
+  early.** Alpine then throws `Unexpected token '}'` and *every* toolbar button
+  goes dead with nothing in the UI to show it. Two comments cost an afternoon
+  here. `tests/Feature/Support/SupportEditorComponentTest.php` asserts the
+  attribute closes its own braces, which is what truncation breaks.
+- Verified in headless Chrome (puppeteer-core from `/opt/ebq-intelegence`)
+  across all four cases: scheme-less URL, full https URL, empty selection,
+  `javascript:` rejected.
+
 ## Mail
 
 - `App\Mail\SupportTicketActivity` → all `is_admin` users on client

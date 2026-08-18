@@ -284,6 +284,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-18 — The reply editor's link button dropped links silently.** A client
+  reply shipped with "Contact me on WhatsApp" as dead text (ticket
+  `01m0b359042x3pt20z4wb4zrbw`): the anchor was never written to storage, so the
+  render-side Autolink added the day before had nothing to work with. `link()` in
+  `resources/views/components/support/html-editor.blade.php` now captures the
+  selection before `prompt()` (which blurs it), adds `https://` to scheme-less
+  pastes, and builds the anchor itself instead of `execCommand('createLink')`.
+  Landmine recorded: the component is one `x-data="{…}"` attribute, so a lone
+  double quote — even in a comment — truncates it and kills every toolbar button
+  with an Alpine syntax error; `tests/Feature/Support/SupportEditorComponentTest.php`
+  guards it. Docs: [accounts/support-tickets.md](./accounts/support-tickets.md).
 - **2026-08-18 — Admin can open a client's article.** New read-only
   `/admin/content/articles/{topic}` (client + site, score, images **with their
   prompts**, feedback, body). The client's article route is scoped to accessible

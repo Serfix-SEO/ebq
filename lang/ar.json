@@ -4557,7 +4557,6 @@
     "Subject": "الموضوع",
     "Message": "الرسالة",
     "Closed": "مغلقة",
-    "Link URL (https://…)": "رابط URL ‏(https://…)",
     "Write a reply first.": "اكتب رداً أولاً.",
     "Republish": "إعادة نشر",
     "Republish to your site": "إعادة النشر إلى موقعك",
@@ -4819,5 +4818,6 @@
     "If I paste articles myself, what still works?": "إذا لصقت المقالات بنفسي، فما الذي يظل يعمل؟",
     "Everything except the final step. We still research topics, write and illustrate the articles, score them and keep your calendar. Two things become manual: the article won’t be marked as published here (so use it as your to-do list), and rank tracking won’t start on its own — open the article and use the tracking panel, or add the keyword in the Tracker, and positions are followed from then on.": "كل شيء عدا الخطوة الأخيرة. نواصل بحث المواضيع وكتابة المقالات وتزويدها بالصور وتقييمها وإدارة تقويمك. أمران يصبحان يدويين: لن يُوسم المقال بأنه منشور هنا (استخدم ذلك كقائمة مهامك)، ولن يبدأ تتبّع الترتيب تلقائيًا — افتح المقال واستخدم لوحة التتبّع، أو أضف الكلمة المفتاحية في المتتبّع، وستُتابَع المراكز من تلك اللحظة.",
     "Squarespace, Framer, a custom-built site — same answer?": "Squarespace أو Framer أو موقع مُخصّص — هل الإجابة نفسها؟",
-    "Yes. The question is always whether your site offers a way for outside tools to add posts. If it does, tell us what you use and we’ll look at supporting it. If it doesn’t, the blog-subdomain route above is the reliable way to keep publishing automatic.": "نعم. السؤال دائمًا هو ما إذا كان موقعك يوفّر وسيلة للأدوات الخارجية لإضافة المقالات. إن كان يوفّرها، أخبرنا بما تستخدمه وسندرس دعمه. وإن لم يكن، فمسار المدوّنة على نطاق فرعي أعلاه هو الطريقة الموثوقة لإبقاء النشر تلقائيًا."
+    "Yes. The question is always whether your site offers a way for outside tools to add posts. If it does, tell us what you use and we’ll look at supporting it. If it doesn’t, the blog-subdomain route above is the reliable way to keep publishing automatic.": "نعم. السؤال دائمًا هو ما إذا كان موقعك يوفّر وسيلة للأدوات الخارجية لإضافة المقالات. إن كان يوفّرها، أخبرنا بما تستخدمه وسندرس دعمه. وإن لم يكن، فمسار المدوّنة على نطاق فرعي أعلاه هو الطريقة الموثوقة لإبقاء النشر تلقائيًا.",
+    "Links must start with http:// or https://": "يجب أن تبدأ الروابط بـ http:// أو https://"
 }

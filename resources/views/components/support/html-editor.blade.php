@@ -12,9 +12,48 @@
             field.dispatchEvent(new Event('input', { bubbles: true }));
         },
         cmd(c, v = null) { this.$refs.editor.focus(); document.execCommand(c, false, v); this.sync(); },
+        /*
+         * Insert a link. The old one-liner failed SILENTLY three ways and a
+         * real reply went out with ‘Contact me on WhatsApp’ as dead text
+         * (ticket 01m0b359042x3pt20z4wb4zrbw, 2026-08-18):
+         *   1. a scheme-less URL (wa.me/971…) failed /^https?:/ and it just
+         *      returned — no link, no warning;
+         *   2. prompt() blurs the editor, so by the time it returns the
+         *      selection execCommand('createLink') needs is gone;
+         *   3. with nothing selected, createLink is a no-op.
+         * So: capture the range BEFORE prompting, add the scheme, build the
+         * anchor by hand, and say something when it still cannot be done.
+         */
         link() {
-            const url = prompt('{{ __('Link URL (https://…)') }}');
-            if (url && /^https?:\/\//i.test(url)) this.cmd('createLink', url);
+            const ed = this.$refs.editor;
+            ed.focus();
+            const sel = window.getSelection();
+            const range = (sel && sel.rangeCount && ed.contains(sel.getRangeAt(0).commonAncestorContainer))
+                ? sel.getRangeAt(0).cloneRange()
+                : null;
+
+            let url = (prompt('{{ __('Link URL') }}') || '').trim();
+            if (url === '') return;
+            // Scheme-less pastes (wa.me/971…, www.serfix.io) are the common case.
+            if (! /^[a-z][a-z0-9+.-]*:/i.test(url)) url = 'https://' + url;
+            if (! /^https?:\/\//i.test(url)) {
+                alert('{{ __('Links must start with http:// or https://') }}');
+                return;
+            }
+
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            if (range && ! range.collapsed) {
+                a.appendChild(range.extractContents());   // wrap the selection
+                range.insertNode(a);
+            } else {
+                // Nothing selected: insert the address itself as the link text
+                // rather than doing nothing at all.
+                a.textContent = url;
+                if (range) range.insertNode(a); else ed.appendChild(a);
+            }
+            sel?.removeAllRanges();
+            this.sync();
         },
         clear() { this.$refs.editor.innerHTML = ''; this.sync(); }
     }"
