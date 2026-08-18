@@ -167,10 +167,9 @@ class DashboardQueuesTest extends TestCase
 
         // Ticket → its thread.
         $this->assertStringContainsString(route('admin.support.show', $ticket), $html);
-        // Feedback → the CLIENT's admin page. The article itself lives behind
-        // the client's own route, which accessibleWebsitesQuery denies to
-        // admins — linking there would 404.
-        $this->assertStringContainsString(route('admin.clients.show', $f->user_id), $html);
+        // Feedback → THE article, in the admin's own read-only view (the
+        // client's route is scoped to accessible websites and 404s for admins).
+        $this->assertStringContainsString(route('admin.content.article', $f->topic_id), $html);
     }
 
     public function test_the_mark_seen_form_is_not_nested_inside_the_row_link(): void
@@ -182,5 +181,67 @@ class DashboardQueuesTest extends TestCase
         $html = $this->actingAs($this->admin())->get(route('admin.dashboard'))->getContent();
 
         $this->assertDoesNotMatchRegularExpression('#<a\b[^>]*>(?:(?!</a>).)*<form#s', $html);
+    }
+
+    public function test_feedback_links_straight_to_the_article_in_the_admin_view(): void
+    {
+        $f = $this->feedback(ContentArticleFeedback::RATING_WRONG, 'Competitor in the image');
+
+        $this->actingAs($this->admin())->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertSee(route('admin.content.article', $f->topic_id), false);
+    }
+
+    public function test_the_admin_article_view_shows_the_article_and_its_feedback(): void
+    {
+        $f = $this->feedback(ContentArticleFeedback::RATING_WRONG, 'Competitor in the image');
+        \App\Models\ContentArticle::query()->create([
+            'topic_id' => $f->topic_id, 'version' => 1, 'is_current' => true,
+            'h1' => 'Health packages explained',
+            'html' => '<h2>What is included</h2><p>Consultations and tests.</p>',
+            'seo_score' => 88, 'word_count' => 1500,
+        ]);
+
+        $this->actingAs($this->admin())->get(route('admin.content.article', $f->topic_id))
+            ->assertOk()
+            ->assertSee('Health packages explained')
+            ->assertSee('What is included', false)
+            ->assertSee('Competitor in the image')   // the complaint that led here
+            ->assertSee('88/100');
+    }
+
+    public function test_the_admin_article_view_strips_what_the_client_side_blocklist_misses(): void
+    {
+        // Clients edit article HTML in TipTap and ArticleReview::sanitize() is
+        // a blocklist — an unclosed <iframe> and an unquoted handler slip past
+        // it. This page renders inside an ADMIN session, so it re-sanitizes.
+        $f = $this->feedback(ContentArticleFeedback::RATING_LOVE);
+        \App\Models\ContentArticle::query()->create([
+            'topic_id' => $f->topic_id, 'version' => 1, 'is_current' => true,
+            'h1' => 'Edited by the client',
+            'html' => '<h2>Fine</h2><iframe src="https://evil.test"><p onclick=alert(1)>x</p><script>alert(1)</script>',
+        ]);
+
+        $html = $this->actingAs($this->admin())->get(route('admin.content.article', $f->topic_id))->getContent();
+        // ONLY the rendered article body: the surrounding page legitimately
+        // contains scripts and Alpine handlers, and a loose substring match
+        // picks those up (it did on the first run).
+        preg_match('#<div class="admin-article[^"]*">(.*?)</div>#s', $html, $m);
+        $body = $m[1] ?? '';
+
+        $this->assertNotSame('', $body, 'the article body must render');
+        $this->assertStringNotContainsString('<iframe', $body);
+        $this->assertStringNotContainsString('onclick', $body);
+        $this->assertStringNotContainsString('alert(1)', $body);
+        $this->assertStringContainsString('<h2>Fine</h2>', $body);
+    }
+
+    public function test_a_non_admin_cannot_open_the_admin_article_view(): void
+    {
+        $f = $this->feedback(ContentArticleFeedback::RATING_LOVE);
+
+        $this->actingAs(User::factory()->create(['is_admin' => false]))
+            ->get(route('admin.content.article', $f->topic_id))
+            ->assertForbidden();
     }
 }

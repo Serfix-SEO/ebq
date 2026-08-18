@@ -533,6 +533,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Ops dashboard: failed jobs + never-crawled stuck sites + queue depths.
     // Companion to the ebq:failed-jobs-alert mailed digest (2026-07-06 incident).
     Route::get('/ops', [OpsController::class, 'index'])->name('ops.index');
+    // Read-only admin view of one client article — the client's own route is
+    // scoped to accessible websites, which admins do not have.
+    Route::get('/content/articles/{topic}', [\App\Http\Controllers\Admin\ContentArticleController::class, 'show'])->name('content.article');
     Route::get('/content-feedback', [ContentFeedbackController::class, 'index'])->name('content-feedback.index');
     // Dismiss a verdict from the admin home (does not delete it).
     Route::post('/content-feedback/{feedback}/seen', [ContentFeedbackController::class, 'markSeen'])->name('content-feedback.seen');

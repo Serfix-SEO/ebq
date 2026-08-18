@@ -284,6 +284,16 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-18 — Admin can open a client's article.** New read-only
+  `/admin/content/articles/{topic}` (client + site, score, images **with their
+  prompts**, feedback, body). The client's article route is scoped to accessible
+  websites and admins are NOT special-cased, so the dashboard's feedback rows —
+  and `/admin/content-feedback`, which had the same bug — used to 404. The body is
+  re-sanitized with the new `HtmlSanitizer::article()` allow-list, because clients
+  edit article HTML and `ArticleReview::sanitize()` is a blocklist that an unclosed
+  `<iframe>` or unquoted `onclick` slips past — fine for the client's own eyes, not
+  for an admin session. Docs: [admin/README.md](./admin/README.md).
+
 - **2026-08-18 — Admin can open a support ticket with any client.** `/admin/support/new`
   (+ a **Message** button on the client detail page that pre-selects them). Threads could
   only ever start with the customer, so team-initiated contact happened over plain email,

@@ -17,6 +17,35 @@ class HtmlSanitizer
 {
     private const ALLOWED = ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'ul', 'ol', 'li', 'a', 'blockquote'];
 
+    /**
+     * Wider set for rendering a generated ARTICLE (headings, images, tables).
+     * Still an allow-list: the client can edit article HTML in the TipTap
+     * editor, and `ArticleReview::sanitize()` is only a blocklist (regex over
+     * script/style/iframe + on* attributes), which leaks — an unclosed
+     * `<iframe src=…>` or an unquoted `onclick=…` walks straight through it.
+     * Fine for showing a client their own content; NOT fine for rendering that
+     * content inside an admin session, so the admin view goes through here.
+     */
+    private const ALLOWED_ARTICLE = [
+        'p', 'br', 'b', 'strong', 'i', 'em', 'u', 'ul', 'ol', 'li', 'a', 'blockquote',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'figure', 'figcaption', 'img',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr', 'code', 'pre', 'sup', 'sub',
+    ];
+
+    /** @var list<string> swapped in for the duration of an article clean */
+    private static array $allowed = self::ALLOWED;
+
+    /** Article-grade clean: headings, images and tables survive; scripts do not. */
+    public static function article(string $html): string
+    {
+        self::$allowed = self::ALLOWED_ARTICLE;
+        try {
+            return self::clean($html);
+        } finally {
+            self::$allowed = self::ALLOWED;   // never leak the wider set
+        }
+    }
+
     public static function clean(string $html): string
     {
         $html = trim($html);
@@ -71,15 +100,28 @@ class HtmlSanitizer
             return $inner === '' ? '' : "<p>$inner</p>";
         }
 
-        if (! in_array($tag, self::ALLOWED, true)) {
+        if (! in_array($tag, self::$allowed, true)) {
             // Unknown element (span/script/style…): keep only its text
             // content — already escaped by the recursion above. Script/style
             // bodies are dropped entirely.
             return in_array($tag, ['script', 'style'], true) ? '' : $inner;
         }
 
-        if ($tag === 'br') {
-            return '<br>';
+        if ($tag === 'br' || $tag === 'hr') {
+            return '<'.$tag.'>';
+        }
+
+        if ($tag === 'img') {
+            // Only our own generated/stored images, never a remote or data:
+            // URL pulled in by an edit.
+            $src = trim($node->getAttribute('src'));
+            if (preg_match('#^https?://#i', $src) !== 1) {
+                return '';
+            }
+
+            return '<img src="'.htmlspecialchars($src, ENT_QUOTES | ENT_HTML5, 'UTF-8').'"'
+                .' alt="'.htmlspecialchars(trim($node->getAttribute('alt')), ENT_QUOTES | ENT_HTML5, 'UTF-8').'"'
+                .' loading="lazy">';
         }
 
         if ($tag === 'a') {

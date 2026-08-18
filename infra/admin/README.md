@@ -142,3 +142,26 @@ a `crawl_report_sends` row (`status=failed` if the queue call throws).
 - `app/Services/ClientActivityLogger.php`
 - `app/Models/{ClientActivity,Lead,Proxy,CrawlReportSend,KeywordApiServer,Setting}.php`
 - Routes: `routes/web.php:264` (admin group), `:350` (impersonation stop)
+
+## Admin article view (2026-08-18)
+
+`GET /admin/content/articles/{topic}` → `Admin\ContentArticleController` —
+read-only view of ONE client article: the client + site, status, SEO score,
+word count, every image **with the prompt that made it**, the client's feedback,
+and the article body.
+
+- **Why it exists:** the client's own article route is scoped by
+  `User::accessibleWebsitesQuery()` (owner/shared websites) and **admins are not
+  special-cased**, so following feedback to "the article" used to 404 for the
+  team; impersonation was the only way in. `/admin/content-feedback` linked to
+  `content.review` and had the same bug — fixed to point here.
+- **Read-only on purpose:** editing belongs to the client, or to an explicit
+  impersonation session, not to a side door in the admin panel.
+- ⚠️ **The body is re-sanitized with `HtmlSanitizer::article()`**, an allow-list
+  (headings/images/tables added to the support set). Clients edit article HTML in
+  TipTap and `ArticleReview::sanitize()` is only a **blocklist** — an unclosed
+  `<iframe src=…>` or an unquoted `onclick=…` walks straight past its regexes.
+  That is tolerable when showing a client their own content; it is not, when the
+  same HTML renders inside an admin session. A test pins both leaks.
+- Images show `prompt` and `negative_prompt`, which is the fastest way to answer
+  "why is a competitor's name in this picture".

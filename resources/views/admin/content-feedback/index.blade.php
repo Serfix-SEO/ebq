@@ -61,7 +61,10 @@
                                 <td class="whitespace-nowrap px-4 py-3 text-xs">{{ $row->website?->domain }}</td>
                                 <td class="max-w-xs px-4 py-3">
                                     @if ($row->topic)
-                                        <a href="{{ route('content.review', $row->topic->id) }}" class="text-orange-600 hover:underline dark:text-orange-400">{{ \Illuminate\Support\Str::limit($row->topic->title, 70) }}</a>
+                                        {{-- admin.content.article, NOT content.review: the
+                                             client route is scoped to accessible websites and
+                                             404s for an admin (found 2026-08-18). --}}
+                                        <a href="{{ route('admin.content.article', $row->topic->id) }}" class="text-orange-600 hover:underline dark:text-orange-400">{{ \Illuminate\Support\Str::limit($row->topic->title, 70) }}</a>
                                     @else
                                         <span class="text-slate-400">—</span>
                                     @endif

@@ -219,13 +219,12 @@
                                 \App\Models\ContentArticleFeedback::RATING_REWRITES => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
                                 default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
                             };
-                            // The article itself lives behind the CLIENT's own
-                            // route, which admins cannot open (accessibleWebsitesQuery
-                            // is owner/shared only). The client's admin page is the
-                            // reachable "relevant item" — and the place to
-                            // impersonate from if the article must be seen.
-                            $target = $f->user
-                                ? route('admin.clients.show', $f->user)
+                            // Straight to THE article in the admin's own
+                            // read-only view. The client's route is scoped to
+                            // accessible websites and admins are not
+                            // special-cased there, hence a dedicated view.
+                            $target = $f->topic_id
+                                ? route('admin.content.article', $f->topic_id)
                                 : route('admin.content-feedback.index');
                         @endphp
                         <li>
