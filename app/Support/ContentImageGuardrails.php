@@ -17,9 +17,22 @@ namespace App\Support;
  *     LLM that WRITES prompts, never to the model that DRAWS. `IdeogramClient`
  *     has always accepted a `negative_prompt`; nothing passed one.
  *
- * So the constraint now travels with the image request itself. Text in an image
- * is the root of the whole class: a business name we did not choose is, by
- * definition, someone else's.
+ * ⚠️ **Measured against Ideogram v4 on 2026-08-18: `negative_prompt` DOES NOT
+ * WORK.** The v4 endpoint rewrites every prompt into a ~3,900-character scene
+ * description before drawing; the negatives below do not survive that, and
+ * `magic_prompt=OFF` is ignored too. A clean, text-free prompt still produced
+ * "NOVA CLINIC" on a reception wall for a real client. Worse, spelling the ban
+ * out IN the prompt backfires — an explicit "no signage, no logos" clause left
+ * 5 signage/wordmark terms in the expansion, versus 0 for a scene that simply
+ * had no such surface.
+ *
+ * **The control that actually works is the SCENE**: never request a subject
+ * containing a surface a name could sit on (reception desks, lobbies,
+ * storefronts, facades, screens, uniforms, packaging). That rule lives in the
+ * art-director system prompt in {@see \App\Jobs\GenerateContentImagesJob}.
+ *
+ * These negatives are kept as cheap defence-in-depth — harmless, and they do
+ * bite on providers that honour the field — but nothing may DEPEND on them.
  */
 final class ContentImageGuardrails
 {

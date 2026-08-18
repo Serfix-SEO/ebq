@@ -197,6 +197,10 @@ class GenerateContentImagesJob implements ShouldQueue
                 'role' => $spec['role'],
                 'section_anchor' => $spec['anchor'],
                 'prompt' => $spec['prompt'],
+                // Stored so a bad image can be traced to what we actually sent
+                // — it was NULL on every row, which made the Nova Clinic
+                // investigation guesswork.
+                'negative_prompt' => $negativePrompt,
                 'params' => ['rendering_speed' => $speed, 'style_type' => $style, 'aspect_ratio' => $spec['aspect'],
                     'seed' => $result['images'][0]['seed'] ?? null, 'resolution' => $result['images'][0]['resolution'] ?? null],
                 'disk_path' => $path,
@@ -294,14 +298,27 @@ class GenerateContentImagesJob implements ShouldQueue
                 .'Return ONLY JSON. For each prompt, describe a single, specific, editorial-quality image that '
                 .'visually represents the actual content — concrete scene, subject, mood, lighting, composition, and style. '
                 .'Adapt to the business/topic (photoreal for real-world businesses, illustration/graphic for digital/gaming/abstract topics). '
-                // No prompt may ask for text of any kind. A model drawing
-                // letters into a real-world scene also fills in the signage,
-                // and it invents a plausible LOCAL business name to put there
-                // — which is how a competitor's clinic name ended up on a
-                // client's hero image (2026-08-16). Purely visual scenes have
-                // nothing to hallucinate a brand onto.
-                .'NEVER ask for text, words, letters, titles, captions, signage, name plates or number plates in any image, '
-                .'including the featured one — describe a purely visual scene. '
+                // THE control is the SCENE, not a prohibition. Measured against
+                // Ideogram v4 (2026-08-18): the API rewrites every prompt into a
+                // ~3,900-char scene description before drawing, `negative_prompt`
+                // does not stop it, and `magic_prompt=OFF` is ignored. Worse, an
+                // explicit "no signage" clause made it WORSE (5 signage/wordmark
+                // terms in the expansion vs 0 for a scene with no such surface) —
+                // naming the thing is how the expander starts thinking about it.
+                // So: never request a scene that CONTAINS a surface a name could
+                // sit on. That is what put a competitor's clinic name on two
+                // client hero images.
+                .'SCENE RULE — this is the most important instruction: never describe a scene containing any surface '
+                .'that would carry a name, sign or logo. FORBIDDEN subjects: reception desks and reception areas, '
+                .'lobbies, waiting rooms shown wide, shopfronts, storefronts, building exteriors and facades, '
+                .'entrances, shop windows, vehicles, uniforms with badges, packaging, screens or monitors showing '
+                .'an interface, notice boards, name plates, banners. '
+                .'INSTEAD frame images that physically cannot carry a name: close-ups of hands at work, tools, '
+                .'materials, ingredients or products in isolation, textures and details, a person mid-action framed '
+                .'tight, outdoor scenery and nature, or an abstract/graphic treatment. '
+                .'Do NOT write "no text" or "no signage" in the prompt — mentioning it makes the model add it. '
+                .'Simply describe a scene with nothing to write on. '
+                .'Never ask for text, words, letters, titles or captions. '
                 .'Never include logos, watermarks, real brand marks, celebrities, or anything offensive. '
                 .'Never name any business, clinic, shop or brand in a prompt — not the client\'s and not anyone else\'s. '
                 .'Keep each prompt 1-3 sentences.'
@@ -355,7 +372,11 @@ class GenerateContentImagesJob implements ShouldQueue
     private function prompt(string $subject, string $stylePrompt): string
     {
         $subject = trim(preg_replace('/\s+/', ' ', $subject));
-        $base = "Editorial blog illustration for an article about \"{$subject}\". Clean, modern, high quality, no text or watermarks.";
+        // Close-up/detail framing on purpose: a scene with no signable surface
+        // is the only thing that reliably keeps invented brand names out (the
+        // old wording literally said "no text", which invites it).
+        $base = "Editorial close-up photograph evoking \"{$subject}\" — hands, tools, materials or textures in tight framing, "
+            ."soft natural light, shallow depth of field, clean and modern.";
 
         return $stylePrompt !== '' ? $base.' Style: '.$stylePrompt : $base;
     }
