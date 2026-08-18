@@ -88,6 +88,28 @@ class MajorBrandGateTest extends TestCase
         $this->assertFalse(MajorBrands::isProtected($domain), $domain.' must stay allowed');
     }
 
+    /**
+     * `isGiant()` matches exact-or-subdomain, so a platform's SHORTENER is not
+     * covered by its main domain — youtu.be sailed past a list that already
+     * held youtube.com (2026-08-18).
+     */
+    public function test_platform_shorteners_are_blocked_like_their_platforms(): void
+    {
+        foreach (['youtu.be', 'fb.me', 'fb.com', 'm.me', 't.co', 'instagr.am',
+            'wa.me', 't.me', 'lnkd.in', 'pin.it', 'redd.it', 'g.co', 'goo.gl', 'amzn.to'] as $short) {
+            $this->assertTrue(GiantDomains::isGiant($short), $short.' must be blocked like its platform');
+        }
+    }
+
+    public function test_short_domains_belonging_to_real_clients_are_untouched(): void
+    {
+        // Two-letter ccTLD domains are ordinary businesses — the shortener
+        // entries must not turn into a blanket "short domain" rule.
+        foreach (['tny.ae', 'digs.ae', 'sanira.id', 'fit-xp.com', 'nestara.in'] as $client) {
+            $this->assertFalse(GiantDomains::isGiant($client), $client.' must stay allowed');
+        }
+    }
+
     public function test_competitor_discovery_is_untouched_by_the_brand_list(): void
     {
         // The whole reason this is a second list: a telecom IS a valid

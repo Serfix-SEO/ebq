@@ -64,6 +64,22 @@ final class GiantDomains
         'theguardian.com', 'reuters.com', 'bloomberg.com',
         'businessinsider.com', 'washingtonpost.com', 'huffpost.com',
         'usatoday.com', 'dailymail.co.uk',
+
+        // Short-link aliases of platforms ALREADY listed above. `isGiant()`
+        // matches exact-or-subdomain, so `youtu.be` is NOT covered by
+        // `youtube.com` — every alias needs its own entry or the same platform
+        // walks in through its shortener.
+        'youtu.be',                         // youtube.com
+        'fb.com', 'fb.me', 'm.me',          // facebook.com / messenger
+        't.co',                             // x.com / twitter.com
+        'instagr.am',                       // instagram.com
+        'wa.me',                            // whatsapp.com
+        't.me',                             // telegram.org
+        'lnkd.in',                          // linkedin.com
+        'pin.it',                           // pinterest.com
+        'redd.it',                          // reddit.com
+        'g.co', 'goo.gl',                   // google.com
+        'amzn.to',                          // amazon.com
     ];
 
     public static function isGiant(string $domain): bool
