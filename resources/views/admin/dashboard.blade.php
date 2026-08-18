@@ -154,34 +154,43 @@
 
         {{-- ── Waiting on us ─────────────────────────────────────
              Above the feeds on purpose: these are the two queues where a slow
-             response costs a customer, unlike the signup/subscription feeds
-             which are just information. --}}
+             response costs a customer.
+
+             Mobile-first layout: every row STACKS. The desktop pattern of
+             "text left, meta hard right" squeezes a long ticket subject into a
+             few characters on a 390px screen, so the meta drops to its own line
+             and only widens back out at sm:. --}}
         <div class="grid gap-3 lg:grid-cols-2">
             {{-- Unreplied support tickets. "open" IS the unreplied state — the
                  whose-turn tracker flips to "answered" the moment we reply. --}}
-            <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-                    <p class="text-sm font-semibold text-slate-900 dark:text-white">
+                    <p class="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white">
                         Awaiting our reply
                         @if ($openTicketTotal > 0)
                             <span class="ms-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">{{ $openTicketTotal }}</span>
                         @endif
                     </p>
-                    <a href="{{ route('admin.support.index', ['status' => 'open']) }}" class="text-xs font-semibold text-orange-600 hover:underline">All tickets &rarr;</a>
+                    <a href="{{ route('admin.support.index', ['status' => 'open']) }}" class="flex-none text-xs font-semibold text-orange-600 hover:underline">All &rarr;</a>
                 </div>
                 <ul class="divide-y divide-slate-100 dark:divide-slate-800">
                     @forelse ($openTickets as $t)
-                        <li class="px-4 py-2.5 text-sm">
-                            <a href="{{ route('admin.support.show', $t) }}" class="flex items-start justify-between gap-3 group">
-                                <div class="min-w-0">
-                                    <p class="truncate font-medium text-slate-900 group-hover:text-orange-600 dark:text-white">{{ $t->subject }}</p>
-                                    <p class="truncate text-xs text-slate-500 dark:text-slate-400">
-                                        {{ $t->user?->name ?: $t->user?->email ?: '—' }}@if ($t->website) · {{ $t->website->domain }}@endif
-                                    </p>
+                        <li>
+                            {{-- Whole row is the tap target: on a phone a small
+                                 title-only link is easy to miss. --}}
+                            <a href="{{ route('admin.support.show', $t) }}"
+                               class="group block px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800">
+                                <p class="text-sm font-medium text-slate-900 group-hover:text-orange-600 dark:text-white">{{ $t->subject }}</p>
+                                <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                                    <span class="truncate">{{ $t->user?->name ?: $t->user?->email ?: '—' }}</span>
+                                    @if ($t->website)
+                                        <span class="text-slate-300 dark:text-slate-600">·</span>
+                                        <span class="truncate">{{ $t->website->domain }}</span>
+                                    @endif
+                                    <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                                        {{ $t->last_reply_at?->diffForHumans(null, true) }} waiting
+                                    </span>
                                 </div>
-                                <span class="flex-none whitespace-nowrap text-xs text-slate-400" title="{{ $t->last_reply_at }}">
-                                    {{ $t->last_reply_at?->diffForHumans(null, true) }} waiting
-                                </span>
                             </a>
                         </li>
                     @empty
@@ -192,15 +201,15 @@
 
             {{-- Client article verdicts nobody has looked at. "Mark as seen"
                  only clears it from here; the full list keeps every row. --}}
-            <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-                    <p class="text-sm font-semibold text-slate-900 dark:text-white">
+                    <p class="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white">
                         New article feedback
                         @if ($feedbackTotal > 0)
                             <span class="ms-1.5 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ $feedbackTotal }}</span>
                         @endif
                     </p>
-                    <a href="{{ route('admin.content-feedback.index') }}" class="text-xs font-semibold text-orange-600 hover:underline">All feedback &rarr;</a>
+                    <a href="{{ route('admin.content-feedback.index') }}" class="flex-none text-xs font-semibold text-orange-600 hover:underline">All &rarr;</a>
                 </div>
                 <ul class="divide-y divide-slate-100 dark:divide-slate-800">
                     @forelse ($feedback as $f)
@@ -210,25 +219,38 @@
                                 \App\Models\ContentArticleFeedback::RATING_REWRITES => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
                                 default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
                             };
+                            // The article itself lives behind the CLIENT's own
+                            // route, which admins cannot open (accessibleWebsitesQuery
+                            // is owner/shared only). The client's admin page is the
+                            // reachable "relevant item" — and the place to
+                            // impersonate from if the article must be seen.
+                            $target = $f->user
+                                ? route('admin.clients.show', $f->user)
+                                : route('admin.content-feedback.index');
                         @endphp
-                        <li class="px-4 py-2.5 text-sm">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <p class="flex items-center gap-2">
-                                        <span class="flex-none rounded-full px-2 py-0.5 text-[11px] font-bold {{ $tone }}">{{ \App\Models\ContentArticleFeedback::label($f->rating) }}</span>
-                                        <span class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $f->website?->domain ?? '—' }}</span>
-                                    </p>
-                                    <p class="mt-1 truncate font-medium text-slate-900 dark:text-white">{{ $f->topic?->title ?? '(article removed)' }}</p>
-                                    @if (trim((string) $f->comment) !== '')
-                                        <p class="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">“{{ $f->comment }}”</p>
-                                    @endif
-                                    <p class="mt-0.5 text-xs text-slate-400">{{ $f->user?->email ?? '—' }} · {{ $f->created_at?->diffForHumans() }}</p>
+                        <li>
+                            {{-- The link and the form are SIBLINGS: a <form>
+                                 nested inside an <a> is invalid and the button
+                                 would stop submitting. --}}
+                            <a href="{{ $target }}" class="group block px-4 pt-3 transition hover:bg-slate-50 dark:hover:bg-slate-800">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="flex-none rounded-full px-2 py-0.5 text-[11px] font-bold {{ $tone }}">{{ \App\Models\ContentArticleFeedback::label($f->rating) }}</span>
+                                    <span class="min-w-0 truncate text-xs text-slate-500 dark:text-slate-400">{{ $f->website?->domain ?? '—' }}</span>
                                 </div>
-                                <form method="POST" action="{{ route('admin.content-feedback.seen', $f) }}" class="flex-none">
+                                <p class="mt-1.5 text-sm font-medium text-slate-900 group-hover:text-orange-600 dark:text-white">{{ $f->topic?->title ?? '(article removed)' }}</p>
+                                @if (trim((string) $f->comment) !== '')
+                                    <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">“{{ $f->comment }}”</p>
+                                @endif
+                                <p class="mt-1 truncate text-xs text-slate-400">{{ $f->user?->email ?? '—' }} · {{ $f->created_at?->diffForHumans() }}</p>
+                            </a>
+                            <div class="px-4 pb-3 pt-2">
+                                <form method="POST" action="{{ route('admin.content-feedback.seen', $f) }}">
                                     @csrf
                                     <input type="hidden" name="back" value="{{ route('admin.dashboard') }}">
+                                    {{-- Full-width on a phone so it is a real
+                                         thumb target, shrink-to-fit from sm:. --}}
                                     <button type="submit"
-                                            class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:border-orange-400 hover:text-orange-600 dark:border-slate-700 dark:text-slate-300">
+                                            class="w-full rounded-lg border border-slate-300 px-3 py-3 text-xs font-semibold text-slate-600 transition hover:border-orange-400 hover:text-orange-600 sm:w-auto dark:border-slate-700 dark:text-slate-300">
                                         Mark seen
                                     </button>
                                 </form>

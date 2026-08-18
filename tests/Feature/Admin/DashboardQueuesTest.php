@@ -157,4 +157,30 @@ class DashboardQueuesTest extends TestCase
             ->assertSee('every ticket has been answered')
             ->assertSee('all caught up');
     }
+
+    public function test_each_row_links_to_something_an_admin_can_actually_open(): void
+    {
+        $ticket = $this->ticket(SupportTicket::STATUS_OPEN, 'Client is waiting');
+        $f = $this->feedback(ContentArticleFeedback::RATING_WRONG, 'Competitor in the image');
+
+        $html = $this->actingAs($this->admin())->get(route('admin.dashboard'))->getContent();
+
+        // Ticket → its thread.
+        $this->assertStringContainsString(route('admin.support.show', $ticket), $html);
+        // Feedback → the CLIENT's admin page. The article itself lives behind
+        // the client's own route, which accessibleWebsitesQuery denies to
+        // admins — linking there would 404.
+        $this->assertStringContainsString(route('admin.clients.show', $f->user_id), $html);
+    }
+
+    public function test_the_mark_seen_form_is_not_nested_inside_the_row_link(): void
+    {
+        // A <form> inside an <a> is invalid HTML and the button stops
+        // submitting — the row link and the form must stay siblings.
+        $this->feedback(ContentArticleFeedback::RATING_LOVE);
+
+        $html = $this->actingAs($this->admin())->get(route('admin.dashboard'))->getContent();
+
+        $this->assertDoesNotMatchRegularExpression('#<a\b[^>]*>(?:(?!</a>).)*<form#s', $html);
+    }
 }
