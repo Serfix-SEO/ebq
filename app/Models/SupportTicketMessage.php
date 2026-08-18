@@ -25,11 +25,16 @@ class SupportTicketMessage extends Model
     public function bodyHtml(): string
     {
         $body = (string) $this->body;
-        if (preg_match('/<[a-z][^>]*>/i', $body) === 1) {
-            return \App\Support\HtmlSanitizer::clean($body);
-        }
 
-        return nl2br(e($body));
+        // Autolink AFTER escaping/sanitizing, never before: it works on
+        // known-safe HTML and only touches text outside existing anchors.
+        // People paste URLs instead of using the editor's link button, and
+        // those used to render as dead text the client had to copy by hand.
+        $safe = preg_match('/<[a-z][^>]*>/i', $body) === 1
+            ? \App\Support\HtmlSanitizer::clean($body)
+            : nl2br(e($body));
+
+        return \App\Support\Autolink::apply($safe);
     }
 
     public function ticket(): BelongsTo

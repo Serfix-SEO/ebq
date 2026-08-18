@@ -56,6 +56,28 @@ A client reply ALWAYS flips to `open` — including re-opening a closed ticket
   - Same sanitize-then-measure-visible-text rule as `reply()`, so
     `<p><br></p>` is rejected rather than sending an empty message.
 
+### Rendering
+
+`SupportTicketMessage::bodyHtml()` is the single render path (client thread,
+admin thread and the notification emails all call it):
+HTML input → `HtmlSanitizer::clean()`, plain input → `nl2br(e())`, then
+**`App\Support\Autolink::apply()`** on the result.
+
+- Autolink runs on already-safe HTML, **never on raw input** — it only wraps
+  text that sits outside existing `<a>` elements, so it can't nest anchors or
+  re-open what the sanitizer closed.
+- Why it exists: nobody uses the editor's link button. People paste a URL, and
+  those rendered as dead text the client had to select and copy by hand
+  (reported 2026-08-18).
+- Handles bare `www.` (gets `https://`), keeps query strings, and leaves
+  trailing sentence punctuation / unmatched `)` out of the href. Non-http(s)
+  schemes stay plain text, same rule the sanitizer applies to `<a href>`.
+- Link *styling* was never the problem — both thread blades already carry
+  `.ticket-body a { color:#C44E0E; text-decoration: underline }`, which is
+  needed because Tailwind's preflight strips link colour and underline.
+- Tests: `tests/Unit/AutolinkTest.php` (double-linking + dangerous schemes are
+  the cases that matter).
+
 ## Mail
 
 - `App\Mail\SupportTicketActivity` → all `is_admin` users on client
