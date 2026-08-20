@@ -556,6 +556,17 @@ old behaviour left that test red from 07-27 until 2026-08-15.
 Tests: `ContentGuardEvolutionTest` (7); `CompetitorMentionGuardTest` (26 —
 +2 for the common-word alias filter).
 
+### reviseCurrentArticle (context refresh, 2026-08-20)
+
+`ContentArticleProducer::reviseCurrentArticle($topic, $maxPasses = 2)` — re-runs the
+revise tail (fresh scorerContext → rescore current html → revise loop → brand gate →
+back to READY, published topics keep PUBLISHED) for articles whose generation context
+improved after writing. Built for the cocomii internal-links case: articles written
+while the crawl was blocked had empty site_urls, so the internal-link checks silently
+skipped; after the Firecrawl crawl populated the URL list the same machinery adds
+validated links. Stages: `context_rescore` / `context_revise_N`. May need >1
+invocation — a pass can hit target score while the link check still fails.
+
 ### Brand-safety hard guarantee (2026-08-20, cocomii incident)
 
 No article carrying a blocked term the lint can match ships READY or reaches a
