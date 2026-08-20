@@ -541,6 +541,76 @@ class ContentArticleProducer
     }
 
     /**
+     * Re-run the revise tail of the pipeline on a topic's CURRENT article —
+     * for articles whose generation context has since improved (cocomii
+     * 2026-08-20: the site's crawl was blocked at write time, so site_urls
+     * was empty, the internal-link checks silently skipped, and articles
+     * shipped without internal links; after the Firecrawl crawl populated
+     * 500+ real URLs the same revise machinery can add them).
+     *
+     * Steps: fresh score of the current content against a NEW context →
+     * revise while below target / style-dirty (≤ $maxPasses) → brand-safety
+     * scrub + hard gate → topic back to READY (published topics keep their
+     * status). Returns the final current article, or null when the topic has
+     * no article.
+     */
+    public function reviseCurrentArticle(ContentTopic $topic, int $maxPasses = 2): ?ContentArticle
+    {
+        $plan = $topic->plan;
+        $website = $topic->website;
+        $article = $topic->articles()->where('is_current', true)->first();
+        if ($plan === null || $website === null || $article === null) {
+            return null;
+        }
+        $priorStatus = $topic->status;
+
+        $context = $this->scorerContext($topic, $plan, $website);
+        $article = $this->storeScoredVersion($topic, $context, [
+            'h1' => (string) $article->h1,
+            'meta_title' => (string) $article->meta_title,
+            'meta_description' => (string) $article->meta_description,
+            'slug' => (string) $article->slug,
+            'html' => (string) $article->html,
+            'outline' => $article->outline,
+            'generation_meta' => ['stage' => 'context_rescore'],
+        ]);
+
+        $target = ContentAutopilotConfig::targetScore();
+        for ($i = 1; $i <= $maxPasses && ($article->seo_score < $target || $this->hasStyleIssue($article)); $i++) {
+            $topic->enterStage(ContentTopic::STATUS_REVISING);
+            try {
+                $revised = $this->revise($article, $topic, $plan);
+            } catch (QuotaExceededException) {
+                break;
+            }
+            if ($revised === null) {
+                break;
+            }
+            $this->meter->add(ContentLlmSpendMeter::EST_REVISE_USD);
+            $article = $this->storeScoredVersion($topic, $context, $revised + [
+                'generation_meta' => ['stage' => 'context_revise_'.$i],
+            ]);
+        }
+
+        if ($this->hasBlockedMention($article)) {
+            $article = $this->scrubLoop($article, $topic, $plan, $context, editSlug: false);
+        }
+        if ($this->hasBlockedMention($article)) {
+            $topic->fail('brand_safety: could not remove blocked terms — '.$this->blockedMentionSummary($article));
+
+            return $article;
+        }
+
+        // Restore where the topic was — a published topic stays published; an
+        // in-review one goes back to READY for the client.
+        $topic->forceFill(['status' => $priorStatus === ContentTopic::STATUS_PUBLISHED
+            ? ContentTopic::STATUS_PUBLISHED
+            : ContentTopic::STATUS_READY])->save();
+
+        return $article;
+    }
+
+    /**
      * Retro-active cleanup for an ALREADY-produced article (review page
      * "remove blocked mentions" action + CleanBlockedTermsJob): re-lint the
      * current version and scrub it if dirty. Returns true when the current

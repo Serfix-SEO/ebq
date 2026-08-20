@@ -244,4 +244,21 @@ class BrandSafetyGateTest extends TestCase
         Queue::assertNotPushed(\App\Jobs\ProduceContentArticleJob::class,
             fn ($job) => $job->topicId === $topic->id);
     }
+
+    // ── reviseCurrentArticle (context refresh) ──────────────────────────
+
+    public function test_revise_current_article_rescores_and_returns_to_ready(): void
+    {
+        [, , $topic] = $this->guardedTopic();
+        $topic->forceFill(['status' => ContentTopic::STATUS_READY])->save();
+        $this->currentArticle($topic, '<p>A clean guide about choosing a case.</p>');
+
+        $article = app(\App\Services\Content\ContentArticleProducer::class)->reviseCurrentArticle($topic);
+
+        $this->assertNotNull($article);
+        $this->assertTrue((bool) $article->is_current);
+        $this->assertSame('context_rescore', $article->generation_meta['stage'] ?? null,
+            'no LLM available in tests → the rescore version is the final one');
+        $this->assertSame(ContentTopic::STATUS_READY, $topic->fresh()->status);
+    }
 }
