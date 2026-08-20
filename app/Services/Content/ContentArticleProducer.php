@@ -265,6 +265,23 @@ class ContentArticleProducer
             }
         }
 
+        // ── Brand-safety scrub + hard gate ──────────────────────────────
+        // If a blocked competitor mention survived the revise loop, run up to
+        // two focused scrub passes whose ONLY job is removing those terms.
+        // Brand-clean outranks SEO score (owner 2026-08-20): a scrubbed
+        // version is kept even when it scores lower. If the mention still
+        // cannot be removed, the topic FAILS — an article carrying a term the
+        // client explicitly blocked must never ship READY.
+        if ($this->hasBlockedMention($article)) {
+            $article = $this->scrubLoop($article, $topic, $plan, $context);
+        }
+        if ($this->hasBlockedMention($article)) {
+            $topic->fail('brand_safety: could not remove blocked terms — '
+                .$this->blockedMentionSummary($article));
+
+            return $article;
+        }
+
         // ── Verdict ─────────────────────────────────────────────────────
         if ($article->seo_score < ContentAutopilotConfig::publishFloor()) {
             $topic->fail('below_publish_floor: score '.$article->seo_score);
@@ -474,6 +491,174 @@ class ContentArticleProducer
         return ! empty((array) ($article->style_issues ?? []));
     }
 
+    /** The stored lint found a blocked competitor term or link. */
+    private function hasBlockedMention(ContentArticle $article): bool
+    {
+        return in_array('competitor_mentions',
+            array_column((array) ($article->style_issues ?? []), 'code'), true);
+    }
+
+    /** "Remove every mention of …" → the terms, for last_error/UI. */
+    private function blockedMentionSummary(ContentArticle $article): string
+    {
+        foreach ((array) ($article->style_issues ?? []) as $issue) {
+            if (($issue['code'] ?? '') === 'competitor_mentions') {
+                return mb_substr((string) ($issue['message'] ?? ''), 0, 300);
+            }
+        }
+
+        return 'blocked term present';
+    }
+
+    /**
+     * Up to two dedicated scrub passes. Each result is stored + re-linted via
+     * storeScoredVersion (so is_current always tracks what we keep); the loop
+     * stops at the first clean version.
+     */
+    private function scrubLoop(ContentArticle $article, ContentTopic $topic, ContentPlan $plan, array $context, bool $editSlug = true): ContentArticle
+    {
+        for ($pass = 1; $pass <= 2 && $this->hasBlockedMention($article); $pass++) {
+            $topic->enterStage(ContentTopic::STATUS_REVISING);
+            try {
+                $scrubbed = $this->scrubBlockedTerms($article, $topic, $plan, $editSlug);
+            } catch (QuotaExceededException) {
+                return $article;
+            }
+            if ($scrubbed === null) {
+                return $article;
+            }
+            $this->meter->add(ContentLlmSpendMeter::EST_REVISE_USD);
+            $article = $this->storeScoredVersion($topic, $context, $scrubbed + [
+                'generation_meta' => [
+                    'provider' => ContentAutopilotConfig::modelFor('revise')['provider'],
+                    'model' => ContentAutopilotConfig::modelFor('revise')['model'],
+                    'stage' => 'brand_scrub_'.$pass,
+                ],
+            ]);
+        }
+
+        return $article;
+    }
+
+    /**
+     * Retro-active cleanup for an ALREADY-produced article (review page
+     * "remove blocked mentions" action + CleanBlockedTermsJob): re-lint the
+     * current version and scrub it if dirty. Returns true when the current
+     * version ends clean. Never touches the topic status — the caller decides
+     * what a clean/dirty outcome means for its flow.
+     */
+    public function cleanCurrentArticle(ContentTopic $topic): bool
+    {
+        $plan = $topic->plan;
+        $website = $topic->website;
+        $article = $topic->articles()->where('is_current', true)->first();
+        if ($plan === null || $website === null || $article === null) {
+            return false;
+        }
+
+        $context = $this->scorerContext($topic, $plan, $website);
+        // Re-lint through a fresh store so stale style_issues (written before
+        // a term was added) can't produce a false "already clean".
+        $article = $this->storeScoredVersion($topic, $context, [
+            'h1' => (string) $article->h1,
+            'meta_title' => (string) $article->meta_title,
+            'meta_description' => (string) $article->meta_description,
+            'slug' => (string) $article->slug,
+            'html' => (string) $article->html,
+            'outline' => $article->outline,
+            'generation_meta' => ['stage' => 'brand_relint'],
+        ]);
+        if (! $this->hasBlockedMention($article)) {
+            return true;
+        }
+        // editSlug false: the article may already be live — rewriting the slug
+        // would move its URL out from under the published post.
+        $article = $this->scrubLoop($article, $topic, $plan, $context, editSlug: false);
+
+        return ! $this->hasBlockedMention($article);
+    }
+
+    /**
+     * One focused LLM pass whose only job is removing the blocked competitor
+     * terms/links the lint found. Everything else must survive verbatim.
+     */
+    private function scrubBlockedTerms(ContentArticle $article, ContentTopic $topic, ContentPlan $plan, bool $editSlug = true): ?array
+    {
+        $reviseModel = ContentAutopilotConfig::modelFor('revise');
+        $llm = LlmClientFactory::make($reviseModel['provider']);
+        if (! $llm->isAvailable()) {
+            return null;
+        }
+
+        $guard = app(CompetitorMentionGuard::class);
+        $terms = $guard->termsForTopic($plan, $topic);
+        if ($terms === []) {
+            return null;
+        }
+
+        $system = 'You are an editor with exactly ONE job: remove every occurrence of the banned words below from the article. '
+            .'Do NOT restructure, do not add or remove sections, do not change headings that lack a banned word, keep the same length and tone. '
+            .'For each occurrence: if it names a rival product or company, replace it with a generic description ("a protective case brand"); '
+            .'if it is used as an ordinary descriptive word, rephrase the sentence with a synonym or reword it so the word is not needed. '
+            .'The banned words must not appear ANYWHERE afterwards: body text, headings, image alt text, link text or link URLs, meta title, meta description. '
+            .'This includes plural and possessive forms of the banned words. '
+            .'Respond with valid JSON only: {"html": "<full edited article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}.';
+
+        $user = 'BANNED WORDS (remove every occurrence, all forms): "'.implode('", "', $terms)."\"\n"
+            .'LANGUAGE: '.($plan->language ?: 'en')."\n\n"
+            ."CURRENT META TITLE: {$article->meta_title}\n"
+            ."CURRENT META DESCRIPTION: {$article->meta_description}\n"
+            ."CURRENT H1: {$article->h1}\n\n"
+            ."ARTICLE HTML:\n{$article->html}";
+
+        $options = [
+            'temperature' => 0.2,
+            'max_tokens' => 16000,
+            'timeout' => 240,
+            '__user_id' => $topic->website?->user_id,
+            '__source' => 'content_autopilot.brand_scrub',
+            '__unmetered' => true,
+        ];
+        if (! empty($reviseModel['model'])) {
+            $options['model'] = $reviseModel['model'];
+        }
+
+        $result = $llm->completeJson([
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $user],
+        ], $options);
+
+        if (! is_array($result) || trim((string) ($result['html'] ?? '')) === '') {
+            return null;
+        }
+
+        // The slug is deterministic to fix — strip the banned tokens instead
+        // of hoping the LLM notices it (pre-publish only; a live article's
+        // slug is its URL and must not move).
+        $slug = (string) $article->slug;
+        if ($editSlug) {
+            foreach ($terms as $t) {
+                $token = Str::slug($t);
+                if ($token !== '') {
+                    $slug = preg_replace('/\b'.preg_quote($token, '/').'\b/', '', $slug) ?? $slug;
+                }
+            }
+            $slug = trim((string) preg_replace('/-{2,}/', '-', $slug), '-');
+            if ($slug === '') {
+                $slug = (string) $article->slug;
+            }
+        }
+
+        return [
+            'h1' => trim((string) ($result['h1'] ?? $article->h1)) ?: (string) $article->h1,
+            'meta_title' => mb_substr(trim((string) ($result['meta_title'] ?? $article->meta_title)), 0, 300),
+            'meta_description' => mb_substr(trim((string) ($result['meta_description'] ?? $article->meta_description)), 0, 500),
+            'slug' => $slug,
+            'html' => $this->humanizer->clean((string) $result['html']),
+            'outline' => $article->outline,
+        ];
+    }
+
     /**
      * The subset of style tells that are integrity/credibility problems (as
      * opposed to rhythm nits) — worth a dedicated cleanup pass because the SEO
@@ -663,6 +848,14 @@ class ContentArticleProducer
             $html,
             $guardPlan !== null ? $guard->termsForTopic($guardPlan, $topic) : [],
             $guardPlan !== null && $guard->enabled($guardPlan) ? $guard->blockedDomains($guardPlan) : [],
+            // Blocked brands hide outside the body too — meta fields and the
+            // slug ship with the article, so the competitor check reads them.
+            implode(' ', [
+                (string) ($attributes['meta_title'] ?? ''),
+                (string) ($attributes['meta_description'] ?? ''),
+                (string) ($attributes['h1'] ?? ''),
+                str_replace('-', ' ', (string) ($attributes['slug'] ?? '')),
+            ]),
         );
         $context['style_issues'] = $styleIssues;
 
@@ -697,10 +890,20 @@ class ContentArticleProducer
             return null;
         }
 
+        // Style issues FIRST — competitor mentions above all. They used to be
+        // invisible here (only seo_issues fed the prompt), so the loop spun
+        // through every revision while never telling the model what was wrong
+        // (cocomii 2026-08-20: "squared" survived 13 versions).
+        $styleMessages = array_map(
+            static fn ($i) => (string) ($i['message'] ?? ''),
+            (array) ($article->style_issues ?? [])
+        );
+        usort($styleMessages, static fn ($a, $b) => (int) str_contains($b, 'competitor') <=> (int) str_contains($a, 'competitor'));
         $issues = array_merge(
+            $styleMessages,
             array_map(static fn ($i) => (string) ($i['message'] ?? ''), (array) $article->seo_issues),
         );
-        $issueList = implode("\n- ", array_filter($issues));
+        $issueList = implode("\n- ", array_unique(array_filter($issues)));
 
         $currentWords = str_word_count(trim(strip_tags((string) $article->html)));
         $system = 'You are an expert SEO editor. Fix ONLY the listed problems in the article. '

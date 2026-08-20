@@ -472,19 +472,35 @@ class CompetitorMentionGuard
             (array) ($topic->secondary_keywords ?? [])
         )));
 
+        // MANUAL terms are never exempt: the client explicitly typed them, so
+        // "the topic keyword contains it" is not a reason to stand down — that
+        // was exactly the cocomii 2026-08-20 leak ("square iphone case" topics
+        // silently disabled the hand-blocked "square"/"squared"). The topic
+        // exemption exists for AUTO-classified brands only ("otterbox
+        // alternatives" articles must be allowed to say otterbox), and it
+        // matches on word boundaries — substring matching let "square" inside
+        // "squared" kill the wrong term.
+        $manual = array_map(
+            static fn ($t) => mb_strtolower(trim((string) $t)),
+            (array) ((($plan->competitor_guard ?? [])['manual']) ?? [])
+        );
+        $inText = static fn (string $needle, string $haystack): bool => (bool) preg_match(
+            '/\b'.preg_quote($needle, '/').'\b/u', $haystack
+        );
+
         $terms = array_values(array_filter(
             $this->terms($plan),
-            static fn (string $term) => ! str_contains($keywords, $term)
+            static fn (string $term) => in_array($term, $manual, true) || ! $inText($term, $keywords)
         ));
 
         // stocked_only (resellers): brands the shop itself carries are the
         // point of the content — anything named in the sell-offerings is
-        // never blocked, only competing retailers are.
+        // never blocked, only competing retailers are. Manual adds still win.
         if ($this->mode($plan) === \App\Support\ContentSiteTypeProfiles::GUARD_STOCKED_ONLY) {
             $stocked = mb_strtolower(implode(' ', (array) (($plan->offerings ?? [])['sell'] ?? [])));
             $terms = array_values(array_filter(
                 $terms,
-                static fn (string $term) => ! str_contains($stocked, $term)
+                static fn (string $term) => in_array($term, $manual, true) || ! $inText($term, $stocked)
             ));
         }
 
@@ -540,6 +556,42 @@ class CompetitorMentionGuard
         // PUBLISHED articles the guard never saw. Cheap deterministic lint,
         // flags only — never edits published content.
         \App\Jobs\Content\ScanPublishedForBlockedTermsJob::dispatch($plan->id);
+    }
+
+    /**
+     * Honest expectation-setting for a manual term the client just added:
+     * a single everyday word ("square", "peak", "clean") is enforced — manual
+     * terms always are — but the writer will keep reaching for it in normal
+     * prose, so articles about that very subject may end up needing attention
+     * instead of shipping. Returns the warning to flash, or null when the term
+     * looks like a distinctive brand name. Cocomii 2026-08-20: "squared" on a
+     * square-phone-case shop.
+     */
+    public function termWarning(ContentPlan $plan, string $term): ?string
+    {
+        $t = mb_strtolower(trim($term));
+        if ($t === '' || str_contains($t, ' ')) {
+            return null; // multi-word terms are almost always real brand names
+        }
+
+        $everyday = in_array($t, self::COMMON_WORD_TERMS, true)
+            || in_array(rtrim($t, 'd'), self::COMMON_WORD_TERMS, true)
+            || in_array(rtrim($t, 's'), self::COMMON_WORD_TERMS, true);
+
+        // The strongest signal that the word will fight the writer: it already
+        // appears inside the plan's own offerings or topic keywords.
+        $own = mb_strtolower(implode(' ', array_merge(
+            (array) (($plan->offerings ?? [])['sell'] ?? []),
+            $plan->topics()->limit(200)->pluck('target_keyword')->all(),
+        )));
+        $inOwnContent = (bool) preg_match('/\b'.preg_quote($t, '/').'\b/u', $own)
+            || (bool) preg_match('/\b'.preg_quote(rtrim($t, 'd'), '/').'\b/u', $own);
+
+        if (! $everyday && ! $inOwnContent) {
+            return null;
+        }
+
+        return __('“:term” is a common word, so it also matches ordinary sentences — not just the brand. Articles will be held back until every use is removed, which can block topics that naturally need the word. If you only want to avoid the brand, block its full name or domain instead.', ['term' => $term]);
     }
 
     /** semrush.com → "semrush" — public for the reference→block chip action. */

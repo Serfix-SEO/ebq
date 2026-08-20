@@ -57,6 +57,10 @@ class ShopifyDriver implements ProvidesTargets, PublishDriver
         $shopUrl = rtrim((string) $response->json('data.shop.primaryDomain.url', ''), '/');
         $config = (array) ($integration->config ?? []);
         $config['shop_url'] = $shopUrl;
+        // Stores with a required article author reject a null author on
+        // articleCreate (cocomii 2026-08-20) — remember the shop name so
+        // publish always has one to send.
+        $config['shop_name'] = (string) $response->json('data.shop.name', '');
         $config['available_blogs'] = $blogs;
         // A previously chosen blog that no longer exists must be re-chosen.
         if (! in_array($config['blog_id'] ?? null, array_column($blogs, 'id'), true)) {
@@ -129,8 +133,18 @@ class ShopifyDriver implements ProvidesTargets, PublishDriver
 
         $isPublished = ($config['post_status'] ?? 'publish') !== 'draft';
 
+        // Shopify rejects a null author on stores where the article author is
+        // required ("provided invalid value for author (Expected value to not
+        // be null)" — cocomii 2026-08-20). Shop name from verify(); fall back
+        // to the store's domain for integrations connected before it existed.
+        $authorName = trim((string) ($config['shop_name'] ?? ''));
+        if ($authorName === '') {
+            $authorName = (string) parse_url((string) ($config['shop_url'] ?? ''), PHP_URL_HOST) ?: 'Editorial Team';
+        }
+
         $input = [
             'title' => (string) ($article->meta_title ?: $article->h1),
+            'author' => ['name' => $authorName],
             'body' => (string) $article->html,
             'handle' => (string) $article->slug,
             'summary' => (string) ($article->meta_description ?? ''),

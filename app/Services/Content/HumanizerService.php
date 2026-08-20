@@ -113,11 +113,17 @@ class HumanizerService
      * revise loop hard-gates on exactly like the dash ban — the article cannot
      * ship READY while one remains.
      *
+     * $extraText: prose that ships with the article but lives OUTSIDE the body
+     * html — meta title/description, OG/Twitter fields, slug (hyphens as
+     * spaces). Only the competitor check reads it; style checks stay body-only.
+     * Image alt attributes are extracted from the html automatically because
+     * strip_tags() in toText() drops them.
+     *
      * @param  list<string>  $blockedTerms
      * @param  list<string>  $blockedDomains
      * @return list<array{code:string, message:string, count?:int}>
      */
-    public function lint(string $html, array $blockedTerms = [], array $blockedDomains = []): array
+    public function lint(string $html, array $blockedTerms = [], array $blockedDomains = [], string $extraText = ''): array
     {
         $issues = [];
         $text = $this->toText($html);
@@ -127,9 +133,14 @@ class HumanizerService
         //    case-insensitive like the banned phrases below; links are checked
         //    against the HTML because hrefs do not survive toText().
         if ($blockedTerms !== [] || $blockedDomains !== []) {
+            $alts = [];
+            preg_match_all('/\balt\s*=\s*["\']([^"\']*)["\']/iu', $html, $altMatches);
+            $alts = $altMatches[1] ?? [];
+            $brandScope = $lower.' '.mb_strtolower($extraText.' '.implode(' ', $alts));
+
             $hits = [];
             foreach ($blockedTerms as $term) {
-                $n = preg_match_all('/\b'.preg_quote(mb_strtolower($term), '/').'\b/u', $lower);
+                $n = preg_match_all('/\b'.preg_quote(mb_strtolower($term), '/').'\b/u', $brandScope);
                 if ($n > 0) {
                     $hits[$term] = $n;
                 }

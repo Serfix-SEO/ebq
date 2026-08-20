@@ -284,6 +284,18 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-20 — Blocked competitor terms now hard-guaranteed end-to-end.** Cocomii's
+  hand-blocked "squared" kept shipping: the revise prompt never saw style issues
+  (competitor lint lived only in `style_issues`), READY gated on score alone, and a
+  Shopify publish failure (null author) marked the topic FAILED → the dispatcher
+  regenerated it from scratch 13 versions deep, wiping client edits each time. Now:
+  reviser sees style issues first, a dedicated scrub pass runs, READY and publish both
+  hard-gate on the competitor lint (publish self-heals once via CleanBlockedTermsJob),
+  delivery failures return topics to READY (never FAILED), the dispatcher refuses to
+  regenerate `brand_safety` failures, manual guard terms are never topic-exempted, the
+  lint covers meta/slug/alt, and Shopify always sends an author. See
+  `infra/content-autopilot/README.md` § Brand-safety hard guarantee.
+
 - **2026-08-18 — The reply editor's link button dropped links silently.** A client
   reply shipped with "Contact me on WhatsApp" as dead text (ticket
   `01m0b359042x3pt20z4wb4zrbw`): the anchor was never written to storage, so the

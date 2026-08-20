@@ -57,7 +57,12 @@ class PublishContentArticleJob implements ShouldQueue
 
     public int $timeout = 300;
 
-    public function __construct(public string $topicId)
+    /**
+     * $afterScrub: set only by CleanBlockedTermsJob when it re-dispatches
+     * publish after a scrub — if the brand gate STILL trips then, we fail the
+     * topic instead of scrubbing again (breaks the publish↔scrub loop).
+     */
+    public function __construct(public string $topicId, public bool $afterScrub = false)
     {
         $this->onQueue(Queues::CONTENT);
         $this->onConnection('redis-long');
@@ -81,6 +86,25 @@ class PublishContentArticleJob implements ShouldQueue
         $article = $topic->currentArticle()->first() ?? $topic->articles()->where('is_current', true)->first();
         if ($article === null) {
             $topic->fail('No current article version to publish.');
+
+            return;
+        }
+
+        // Brand-safety gate (belt to the producer's braces): NEVER send an
+        // article that still carries a blocked competitor term — re-lint right
+        // here because terms may have been added after the article was scored,
+        // and client edits bypass the producer entirely. First trip routes
+        // through the scrub job (which re-dispatches publish with $afterScrub);
+        // a second trip means the scrub couldn't win — fail loudly, never send.
+        if (($blocked = $this->blockedMentionMessage($topic, $article)) !== null) {
+            if ($this->afterScrub) {
+                $topic->fail('brand_safety: publish blocked — '.$blocked);
+
+                return;
+            }
+            $topic->enterStage(ContentTopic::STATUS_PUBLISHING); // keep the dispatcher from re-claiming it mid-scrub
+            \App\Jobs\Content\CleanBlockedTermsJob::dispatch($topic->id);
+            Log::info('content_autopilot.publish_brand_gate', ['topic_id' => $topic->id, 'blocked' => $blocked]);
 
             return;
         }
@@ -191,14 +215,65 @@ class PublishContentArticleJob implements ShouldQueue
             return;
         }
 
-        $topic->fail('Publishing failed on every connected platform.');
+        // Delivery failed but the ARTICLE is fine — go back to READY with the
+        // error surfaced, never to FAILED. FAILED means "needs a new article",
+        // and the dispatcher regenerates FAILED topics from scratch: cocomii
+        // 2026-08-20 got 13 versions (client edits wiped each time) because a
+        // Shopify author error kept round-tripping publish-fail → re-produce.
+        $topic->forceFill([
+            'status' => ContentTopic::STATUS_READY,
+            'last_error' => 'Publishing failed on every connected platform.',
+        ])->save();
     }
 
     public function failed(\Throwable $e): void
     {
+        // Same principle as the total-failure path above: a publish crash
+        // never invalidates the article, so the topic returns to READY (not
+        // FAILED) — otherwise the dispatcher would regenerate it.
         ContentTopic::query()->whereKey($this->topicId)
             ->whereIn('status', [ContentTopic::STATUS_PUBLISHING, ContentTopic::STATUS_SCHEDULED])
-            ->first()?->fail('Publishing error: '.$e->getMessage());
+            ->first()?->forceFill([
+                'status' => ContentTopic::STATUS_READY,
+                'last_error' => mb_substr('Publishing error: '.$e->getMessage(), 0, 2000),
+            ])->save();
+    }
+
+    /**
+     * Fresh competitor-mention lint of what is about to be sent (body + meta
+     * fields + slug). Returns the lint message when dirty, null when clean or
+     * the guard is off for this topic.
+     */
+    private function blockedMentionMessage(ContentTopic $topic, $article): ?string
+    {
+        $plan = $topic->plan;
+        if ($plan === null) {
+            return null;
+        }
+        $guard = app(\App\Services\Content\CompetitorMentionGuard::class);
+        $terms = $guard->termsForTopic($plan, $topic);
+        $domains = $guard->enabled($plan) ? $guard->blockedDomains($plan) : [];
+        if ($terms === [] && $domains === []) {
+            return null;
+        }
+        $issues = app(\App\Services\Content\HumanizerService::class)->lint(
+            (string) $article->html,
+            $terms,
+            $domains,
+            implode(' ', [
+                (string) $article->meta_title,
+                (string) $article->meta_description,
+                (string) $article->h1,
+                str_replace('-', ' ', (string) $article->slug),
+            ]),
+        );
+        foreach ($issues as $issue) {
+            if (($issue['code'] ?? '') === 'competitor_mentions') {
+                return mb_substr((string) ($issue['message'] ?? 'blocked term present'), 0, 300);
+            }
+        }
+
+        return null;
     }
 
     /**

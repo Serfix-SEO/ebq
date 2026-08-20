@@ -459,7 +459,25 @@ class ArticleReview extends Component
             $meter->add(ContentLlmSpendMeter::EST_EDIT_USD);
         }
 
-        return trim($result->value);
+        // Brand gate: the generic rewrite tools know nothing about this plan's
+        // blocked competitors, so a "rewrite" can helpfully name one. Reject a
+        // replacement that INTRODUCES a blocked term the selection didn't have.
+        $replacement = trim($result->value);
+        $guard = app(CompetitorMentionGuard::class);
+        $plan = $topic?->plan;
+        if ($plan !== null) {
+            foreach ($guard->termsForTopic($plan, $topic) as $term) {
+                $pattern = '/\b'.preg_quote(mb_strtolower($term), '/').'\b/u';
+                if (preg_match($pattern, mb_strtolower($replacement))
+                    && ! preg_match($pattern, mb_strtolower($text))) {
+                    $this->dispatch('ai-edit-failed', message: __('The AI edit mentioned a blocked brand (“:term”), so it was not applied. Try again.', ['term' => $term]));
+
+                    return null;
+                }
+            }
+        }
+
+        return $replacement;
     }
 
     // ── In-editor images ────────────────────────────────────────────────
@@ -597,6 +615,27 @@ class ArticleReview extends Component
         session()->flash('review-status', __('Publishing now — it can take a moment to appear on your site.'));
     }
 
+    /**
+     * "Remove blocked mentions" — the article (usually already published, or
+     * held by the brand gate) carries a blocked competitor term. Queue the
+     * scrub job: it rewrites just those mentions and re-sends the clean
+     * version to the connected platforms as an update.
+     */
+    public function cleanBlockedMentions(): void
+    {
+        $topic = $this->topic();
+        if ($topic === null || in_array($topic->status, ContentTopic::IN_FLIGHT, true)) {
+            return;
+        }
+        $flagged = ! empty((($topic->meta ?? [])['brand_safety'] ?? null))
+            || str_starts_with((string) $topic->last_error, 'brand_safety');
+        if (! $flagged) {
+            return;
+        }
+        \App\Jobs\Content\CleanBlockedTermsJob::dispatch($topic->id);
+        session()->flash('review-status', __('Removing the blocked mentions — the cleaned article will be sent to your site in a few minutes.'));
+    }
+
     /** Re-run generation after a failure (from the in-flight progress card). */
     public function retryGeneration(): void
     {
@@ -650,10 +689,20 @@ class ArticleReview extends Component
         $guard = app(CompetitorMentionGuard::class);
         $guardPlan = $topic->plan;
         $styleIssues = app(HumanizerService::class)->lint(
-            html_entity_decode(strip_tags($html)),
+            // RAW html: the competitor lint reads hrefs and alt attributes too.
+            $html,
             $guardPlan !== null ? $guard->termsForTopic($guardPlan, $topic) : [],
-            // strip_tags removes hrefs, so link-lint the RAW html separately is
-            // pointless here; mentions are the editable risk in the editor.
+            $guardPlan !== null && $guard->enabled($guardPlan) ? $guard->blockedDomains($guardPlan) : [],
+            // The editable SEO fields ship with the article — a blocked brand
+            // in the meta description or slug is just as published.
+            implode(' ', [
+                trim($this->editMetaTitle),
+                trim($this->editMetaDescription),
+                trim($this->editH1),
+                trim($this->editOgTitle), trim($this->editOgDescription),
+                trim($this->editTwitterTitle), trim($this->editTwitterDescription),
+                str_replace('-', ' ', trim($this->editSlug) !== '' ? trim($this->editSlug) : (string) $article->slug),
+            ]),
         );
         $context['style_issues'] = $styleIssues;
 

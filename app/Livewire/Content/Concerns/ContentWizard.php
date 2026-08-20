@@ -547,6 +547,9 @@ trait ContentWizard
             return;
         }
         app(CompetitorMentionGuard::class)->addTerm($plan, $term);
+        if (($warning = app(CompetitorMentionGuard::class)->termWarning($plan, $term)) !== null) {
+            session()->flash('guard-warning', $warning);
+        }
     }
 
     public function removeBlockedTerm(string $term): void

@@ -112,7 +112,10 @@ class ShopifyDriverTest extends PublishDriverTestCase
                 && $input['handle'] === 'a-publishable-article'
                 && str_contains($input['body'], '<strong>bold</strong>')
                 && $input['isPublished'] === true
-                && $input['tags'] === ['alpha keyword', 'beta keyword'];
+                && $input['tags'] === ['alpha keyword', 'beta keyword']
+                // Stores with a required article author reject a null author
+                // outright (cocomii 2026-08-20) — every push must carry one.
+                && ! empty($input['author']['name']);
         });
     }
 

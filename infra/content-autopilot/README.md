@@ -556,6 +556,62 @@ old behaviour left that test red from 07-27 until 2026-08-15.
 Tests: `ContentGuardEvolutionTest` (7); `CompetitorMentionGuardTest` (26 —
 +2 for the common-word alias filter).
 
+### Brand-safety hard guarantee (2026-08-20, cocomii incident)
+
+No article carrying a blocked term the lint can match ships READY or reaches a
+publish call. Five layers (`BrandSafetyGateTest`, 8 tests):
+
+1. **Reviser is told** — `ContentArticleProducer::revise()` prepends
+   `style_issues` messages (competitor first) to PROBLEMS TO FIX. Before this
+   they were invisible (only `seo_issues` fed the prompt; the scorer's
+   `style_clean` bridge tolerates ≤2 style issues), so the loop burned all
+   revisions blind — cocomii's "squared" survived 13 versions.
+2. **Dedicated scrub** — `scrubLoop()` (≤2 passes of `scrubBlockedTerms()`,
+   stage `brand_scrub_N`): one-job LLM edit removing the listed terms;
+   brand-clean outranks SEO score. The slug is scrubbed deterministically —
+   but only pre-publish (`$editSlug`); a live article's slug is its URL.
+3. **Producer hard gate** — still dirty after scrub → `topic->fail('brand_safety: …')`.
+   Never READY with a `competitor_mentions` lint hit.
+4. **Publish-time gate** — `PublishContentArticleJob` re-lints the current
+   version (terms may postdate scoring; client edits bypass the producer).
+   First trip: topic → PUBLISHING + `CleanBlockedTermsJob` (scrub → re-publish
+   with `$afterScrub`). Second trip (`$afterScrub`): fail `brand_safety:` —
+   breaks the publish↔scrub loop.
+5. **Editor** — `ArticleReview::aiEdit()` rejects a replacement that
+   INTRODUCES a blocked term the selection didn't contain.
+
+Scope widened: `HumanizerService::lint()` takes `$extraText` (meta
+title/description, h1, OG/Twitter, slug-as-words) and lints `alt=`
+attributes extracted from the html — used by `storeScoredVersion`, the
+publish gate, `scoreCurrent` (live editor checks), and the retroactive scan.
+
+`termsForTopic()` scoping rules: MANUAL terms are never exempted (topic
+keyword containing the term used to silently disable the client's own block
+— "square iphone case" vs manual "square"/"squared"); the topic/stocked
+exemptions apply to AUTO terms only and match on word boundaries (substring
+matching let "square" in "squared" kill the wrong term).
+
+**Delivery failure ≠ regenerate**: `PublishContentArticleJob` total failure
+returns the topic to READY with `last_error` set (was `fail()` → FAILED →
+dispatcher `catchUpImminent` regenerated from scratch, wiping client edits —
+the second half of the cocomii incident). The dispatcher also skips FAILED
+topics whose `last_error` starts with `brand_safety` — a stubborn everyday
+word must not regenerate (and re-bill) every tick; it sits in "needs
+attention" until a human decides.
+
+Recovery UX: the review page renders an amber card when
+`topic.meta.brand_safety` is stamped or `last_error` starts with
+`brand_safety` — "Remove blocked mentions" → `CleanBlockedTermsJob`
+(scrub + re-publish as an update over the same external ids).
+`addBlockedTerm` (both wizard hosts) flashes `guard-warning` via
+`CompetitorMentionGuard::termWarning()` when the term is an everyday word or
+already appears in the plan's own offerings/topic keywords.
+
+Shopify: `articleCreate/articleUpdate` now always send `author.name`
+(stores with a required article author reject null — the cocomii publish
+failure). `verify()` stores `config['shop_name']`; publish falls back to the
+shop_url host for integrations connected before that existed.
+
 ## Type-aware writing (Phase F, 2026-07-23)
 
 Instruction-text only — the chunked write protocol, scorer, and revise loop

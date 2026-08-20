@@ -298,7 +298,13 @@ class ContentPublishingTest extends TestCase
         $this->assertSame('500', ContentPublication::query()->where('article_id', $newArticle->id)->value('external_id'));
     }
 
-    public function test_hard_failure_on_every_platform_fails_the_topic(): void
+    /**
+     * A delivery failure never invalidates the ARTICLE: the topic returns to
+     * READY with the error surfaced, not FAILED — FAILED tells the dispatcher
+     * to regenerate, which wiped client edits over and over while a Shopify
+     * config error kept publishing from succeeding (cocomii 2026-08-20).
+     */
+    public function test_hard_failure_on_every_platform_returns_the_topic_to_ready(): void
     {
         Http::fake([
             'client-blog.com/*' => Http::response(['message' => 'nope'], 403),
@@ -312,7 +318,9 @@ class ContentPublishingTest extends TestCase
             app(\App\Support\Audit\SafeHttpGuard::class),
         );
 
-        $this->assertSame(ContentTopic::STATUS_FAILED, $topic->fresh()->status);
+        $topic->refresh();
+        $this->assertSame(ContentTopic::STATUS_READY, $topic->status);
+        $this->assertSame('Publishing failed on every connected platform.', $topic->last_error);
         $this->assertSame(
             ContentPublication::STATUS_FAILED,
             ContentPublication::query()->first()->status

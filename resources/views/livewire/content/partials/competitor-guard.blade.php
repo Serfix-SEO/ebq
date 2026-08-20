@@ -83,6 +83,9 @@
                     </button>
                 </div>
                 @error('newBlockedTerm') <p class="mt-1.5 text-xs text-error">{{ $message }}</p> @enderror
+                @if (session('guard-warning'))
+                    <p class="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">{{ session('guard-warning') }}</p>
+                @endif
 
                 {{-- Allowed references (Phase E): the classifier's other half —
                      directories/platforms/citation sources articles may still

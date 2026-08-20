@@ -71,7 +71,13 @@ class ScanPublishedForBlockedTermsJob implements ShouldQueue, ShouldBeUnique
 
                     $hits = [];
                     if ($terms !== [] || $blockedDomains !== []) {
-                        foreach ($humanizer->lint((string) $article->html, $terms, $blockedDomains) as $issue) {
+                        $extra = implode(' ', [
+                            (string) $article->meta_title,
+                            (string) $article->meta_description,
+                            (string) $article->h1,
+                            str_replace('-', ' ', (string) $article->slug),
+                        ]);
+                        foreach ($humanizer->lint((string) $article->html, $terms, $blockedDomains, $extra) as $issue) {
                             if (($issue['code'] ?? '') === 'competitor_mentions') {
                                 $hits[] = $issue;
                             }

@@ -377,6 +377,23 @@
                     </div>
                 @endif
 
+                @php $brandSafety = (array) (($topic->meta ?? [])['brand_safety'] ?? []); @endphp
+                @if ($brandSafety !== [] || str_starts_with((string) $topic->last_error, 'brand_safety'))
+                    <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+                        <div class="flex items-start gap-2">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                            <div class="min-w-0 text-xs leading-5">
+                                <p class="font-bold text-amber-800 dark:text-amber-200">{{ __('This article contains a brand you blocked') }}</p>
+                                <p class="mt-0.5 text-slate-600 dark:text-slate-300">{{ __('It won\'t publish (or stay published) with the blocked words in it. We can rewrite just those mentions and send the clean version to your site.') }}</p>
+                                <button wire:click="cleanBlockedMentions" wire:loading.attr="disabled"
+                                        class="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:brightness-110 disabled:opacity-60">
+                                    {{ __('Remove blocked mentions') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 <div class="space-y-2">
                     @if (! $editing)
                         {{-- startEditing loads the whole editor bundle — without

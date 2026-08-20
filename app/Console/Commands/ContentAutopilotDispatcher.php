@@ -221,6 +221,13 @@ class ContentAutopilotDispatcher extends Command
 
         $imminent = ContentTopic::query()
             ->whereIn('status', [ContentTopic::STATUS_APPROVED, ContentTopic::STATUS_FAILED])
+            // brand_safety failures are NOT "regenerate me": the pipeline
+            // already proved it can't write this topic without the blocked
+            // term (or refused to publish a dirty article). Regenerating just
+            // re-fails and re-bills every tick — a human has to decide
+            // (unblock the word / edit / skip). Cocomii 2026-08-20.
+            ->where(fn ($q) => $q->whereNull('last_error')
+                ->orWhere('last_error', 'not like', 'brand_safety%'))
             ->whereNotNull('scheduled_for')
             ->where('scheduled_for', '<=', $cutoff)
             ->whereNotIn('id', $this->claimedTopicIds ?: ['-'])
