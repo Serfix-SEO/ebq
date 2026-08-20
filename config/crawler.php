@@ -59,6 +59,10 @@ return [
     // the render path entirely.
     'firecrawl_daily_page_budget' => (int) env('CRAWLER_FIRECRAWL_DAILY_PAGE_BUDGET', 500),
 
+    // Fleet-wide cap on concurrent Firecrawl renders (one cx33 render box —
+    // more parallel browsers just queue inside Firecrawl and blow timeouts).
+    'firecrawl_max_concurrency' => (int) env('CRAWLER_FIRECRAWL_MAX_CONCURRENCY', 4),
+
     // Per-job PHP memory ceiling (ini_set), applied at the top of the heavy crawl
     // jobs. Horizon workers inherit PHP's CLI default (128M); the pre-Horizon raw
     // workers ran `php -d memory_limit=2048M`, which the Horizon migration dropped —

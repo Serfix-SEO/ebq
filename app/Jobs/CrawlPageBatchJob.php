@@ -19,7 +19,12 @@ class CrawlPageBatchJob implements ShouldQueue
 {
     use Batchable, Queueable;
 
-    public int $timeout = 300;
+    // 900, not 300: rendered fetches (Firecrawl, ~4-5s/page — worse when the
+    // render box is busy) put a 25-page batch way past the old direct-fetch
+    // budget; the 300s kill left batches RESERVED for the full 22-min
+    // retry_after (cocomii 2026-08-20 stall). MUST stay under
+    // REDIS_QUEUE_RETRY_AFTER (1320) or reserved jobs double-run.
+    public int $timeout = 900;
     public int $tries = 2;
 
     /**

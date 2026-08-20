@@ -387,8 +387,19 @@ class PageCrawlProcessor
         if (! $fc->enabled() || ! $budget->allow($crawlSiteId)) {
             return null;
         }
-        $budget->consume($crawlSiteId); // count attempts, not successes — failures cost proxy traffic too
-        $html = $fc->html($url);
+        // Concurrency slot: without it, every crawl worker piles onto the one
+        // render box at once, latency balloons, and batches die on the job
+        // timeout. No slot → skip the render this time; the page falls to the
+        // normal path (or a later pass retries it).
+        if (! $budget->acquireSlot()) {
+            return null;
+        }
+        try {
+            $budget->consume($crawlSiteId); // count attempts, not successes — failures cost proxy traffic too
+            $html = $fc->html($url);
+        } finally {
+            $budget->releaseSlot();
+        }
         if ($html === null || trim($html) === '') {
             return null;
         }

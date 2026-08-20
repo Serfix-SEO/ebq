@@ -48,4 +48,44 @@ class FirecrawlBudget
     {
         return 'crawler:fc-budget:'.$crawlSiteId.':'.now()->format('Y-m-d');
     }
+
+    // ── render concurrency semaphore ────────────────────────────────────
+    // Firecrawl is ONE cx33 running real browsers: sixteen crawl workers all
+    // rendering at once jam its queue, scrape latency balloons past the HTTP
+    // client's ceiling, and whole batches die on the job timeout (2026-08-20
+    // stall). Cap concurrent renders fleet-wide; a worker that can't get a
+    // slot skips the render (normal fetch path) instead of queueing blind.
+
+    private const SLOT_KEY = 'crawler:fc-slots';
+
+    public function maxConcurrency(): int
+    {
+        return max(1, (int) config('crawler.firecrawl_max_concurrency', 4));
+    }
+
+    /** Try to take a render slot. Caller MUST releaseSlot() when done. */
+    public function acquireSlot(): bool
+    {
+        $r = \Illuminate\Support\Facades\Redis::connection();
+        $count = (int) $r->incr(self::SLOT_KEY);
+        // TTL refresh on every acquire: if a worker is killed mid-render the
+        // counter leaks, and the expiry (generously above one render's worst
+        // case) heals it instead of starving the fleet forever.
+        $r->expire(self::SLOT_KEY, 300);
+        if ($count > $this->maxConcurrency()) {
+            $r->decr(self::SLOT_KEY);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public function releaseSlot(): void
+    {
+        $r = \Illuminate\Support\Facades\Redis::connection();
+        if ((int) $r->decr(self::SLOT_KEY) < 0) {
+            $r->del(self::SLOT_KEY); // never go negative (expired mid-flight)
+        }
+    }
 }
