@@ -596,16 +596,35 @@ class ContentArticleProducer
             return null;
         }
 
+        // The exact sentences the lint flagged — a bare "remove the word"
+        // instruction gets ignored when the word reads as a natural product
+        // adjective (deepseek echoed cocomii's article back byte-for-byte);
+        // naming the sentences that MUST change converts it into a concrete
+        // editing task the model can't skip.
+        $plainText = html_entity_decode(strip_tags((string) $article->html));
+        $offending = [];
+        foreach ($terms as $t) {
+            preg_match_all('/[^.!?]*\b'.preg_quote($t, '/').'\b[^.!?]*[.!?]?/iu', $plainText, $m);
+            foreach ($m[0] as $sentence) {
+                $offending[trim($sentence)] = true;
+            }
+        }
+        $offending = array_slice(array_keys($offending), 0, 15);
+
         $system = 'You are an editor with exactly ONE job: remove every occurrence of the banned words below from the article. '
+            .'This is a hard compliance requirement, not a style preference — returning the article unchanged is a FAILURE. '
             .'Do NOT restructure, do not add or remove sections, do not change headings that lack a banned word, keep the same length and tone. '
             .'For each occurrence: if it names a rival product or company, replace it with a generic description ("a protective case brand"); '
-            .'if it is used as an ordinary descriptive word, rephrase the sentence with a synonym or reword it so the word is not needed. '
+            .'if it is used as an ordinary descriptive word, replace it with a natural synonym (e.g. for shape words: angular, boxy, flat-edged, right-angled, sharp-cornered) or reword the sentence so the word is not needed. '
             .'The banned words must not appear ANYWHERE afterwards: body text, headings, image alt text, link text or link URLs, meta title, meta description. '
             .'This includes plural and possessive forms of the banned words. '
             .'Respond with valid JSON only: {"html": "<full edited article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}.';
 
         $user = 'BANNED WORDS (remove every occurrence, all forms): "'.implode('", "', $terms)."\"\n"
             .'LANGUAGE: '.($plan->language ?: 'en')."\n\n"
+            .($offending === [] ? ''
+                : "EVERY ONE of these sentences currently contains a banned word and MUST come back rewritten without it:\n- "
+                    .implode("\n- ", $offending)."\n\n")
             ."CURRENT META TITLE: {$article->meta_title}\n"
             ."CURRENT META DESCRIPTION: {$article->meta_description}\n"
             ."CURRENT H1: {$article->h1}\n\n"
