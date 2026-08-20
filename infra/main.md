@@ -284,6 +284,13 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-20 — Blocked sites now crawl through Firecrawl.** Non-Cloudflare bot walls
+  (Shopify/hCaptcha — cocomii.com) never matched RenderGate, so the render fallback was dead
+  and runs aborted "(captcha)". Any detector-classified block now falls back to Firecrawl,
+  `crawl_protection` sites go Firecrawl-first (no doomed direct fetches), a per-site daily
+  render budget bounds the residential-proxy spend, and the flag stays sticky while a site
+  crawls via render. See `infra/reference/firecrawl-server.md` § Crawl routing v2.
+
 - **2026-08-20 — Blocked competitor terms now hard-guaranteed end-to-end.** Cocomii's
   hand-blocked "squared" kept shipping: the revise prompt never saw style issues
   (competitor lint lived only in `style_issues`), READY gated on score alone, and a

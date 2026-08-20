@@ -283,6 +283,20 @@ class PageCrawlProcessor
         // 1/4 if some boxes are already blocked here ("cautious"). See infra/crawler/autoscaling.md.
         $this->rateLimiter->throttle($domain);
 
+        // Known-blocked site (crawl_protection set by a previous run's rollup):
+        // go straight to the render server — direct/proxy attempts are doomed
+        // and just burn politeness budget + teach the WAF our IPs. Bounded by
+        // the per-site daily Firecrawl budget; falls through to the normal
+        // path when the render fails or the budget is spent. cocomii
+        // 2026-08-20: Shopify captcha aborted every run while a working
+        // Firecrawl fallback sat gated behind Cloudflare-only detection.
+        if ($website?->crawl_protection !== null) {
+            $rendered = $this->renderViaFirecrawl($page->url, $website->id);
+            if ($rendered !== null) {
+                return $rendered;
+            }
+        }
+
         // Use a proxy FIRST whenever the pool has one — never expose the server's OWN IP if
         // we can avoid it (a blocked server IP makes the whole box useless; pool IPs are
         // disposable/rotatable). Fetch DIRECT (own IP) only as a fallback when no proxy is
@@ -339,19 +353,19 @@ class PageCrawlProcessor
             $this->pool->markFailure($proxy);
         }
 
-        // Still blocked after the retry. If it's a bot CHALLENGE our IP/proxies
-        // can't pass (Cloudflare "Just a moment" et al.), try the headless render
-        // server (Firecrawl) as a last resort — it runs a real browser through a
-        // residential IP. No-op unless Firecrawl is configured. Success returns a
-        // synthesized 200 with the rendered HTML so the rest of the pipeline
-        // (title/terms/links) processes it normally.
-        if (RenderGate::isChallenge((int) $res['status'], $res['headers'] ?? [], (string) $res['body'])) {
-            $fc = app(FirecrawlClient::class);
-            if ($fc->enabled()) {
-                $html = $fc->html($page->url);
-                if ($html !== null && trim($html) !== '') {
-                    return array_merge($res, ['ok' => true, 'status' => 200, 'blocked' => false, 'body' => $html, 'rendered' => true]);
-                }
+        // Still blocked after the retry — try the headless render server
+        // (Firecrawl, real browser + residential IP) as a last resort. Any
+        // detector-classified block qualifies, not just Cloudflare challenge
+        // markers: Shopify/hCaptcha walls classify as `captcha` without ever
+        // matching RenderGate, which left the fallback dead for those sites
+        // (cocomii 2026-08-20). LOGIN_REQUIRED is excluded — a real login
+        // wall doesn't yield to a browser either. Budget-bounded per site.
+        $renderWorthy = $blocked !== BlockDetector::LOGIN_REQUIRED
+            || RenderGate::isChallenge((int) $res['status'], $res['headers'] ?? [], (string) $res['body']);
+        if ($renderWorthy && $website !== null) {
+            $rendered = $this->renderViaFirecrawl($page->url, $website->id);
+            if ($rendered !== null) {
+                return $rendered;
             }
         }
 
@@ -359,6 +373,34 @@ class PageCrawlProcessor
         // blocking us (and owns the crawl_protection flag), so a single blocked
         // page never trips the banner.
         return $res;
+    }
+
+    /**
+     * Budget-checked render fetch. Returns a synthesized 200 with the rendered
+     * HTML (marked `rendered`) so the rest of the pipeline (title/terms/links)
+     * processes it normally, or null when Firecrawl is off/over budget/failed.
+     */
+    private function renderViaFirecrawl(string $url, string $crawlSiteId): ?array
+    {
+        $fc = app(FirecrawlClient::class);
+        $budget = app(\App\Support\Crawler\FirecrawlBudget::class);
+        if (! $fc->enabled() || ! $budget->allow($crawlSiteId)) {
+            return null;
+        }
+        $budget->consume($crawlSiteId); // count attempts, not successes — failures cost proxy traffic too
+        $html = $fc->html($url);
+        if ($html === null || trim($html) === '') {
+            return null;
+        }
+        $budget->markRendered($crawlSiteId);
+
+        return [
+            'ok' => true, 'blocked' => false, 'status' => 200, 'not_modified' => false,
+            'body' => $html, 'etag' => null, 'last_modified' => null, 'content_type' => 'text/html',
+            'headers' => [], 'redirected' => false, 'redirect_target' => null,
+            'redirect_chain' => 0, 'ttfb_ms' => 0, 'error' => null,
+            'proxy_used' => null, 'rendered' => true,
+        ];
     }
 
     /**

@@ -54,6 +54,11 @@ return [
     // Per-page fetch timeout (seconds).
     'timeout' => (int) env('CRAWLER_TIMEOUT', 20),
 
+    // Max Firecrawl-rendered fetches per crawl site per day (headless browser
+    // through the metered residential proxy — see FirecrawlBudget). 0 disables
+    // the render path entirely.
+    'firecrawl_daily_page_budget' => (int) env('CRAWLER_FIRECRAWL_DAILY_PAGE_BUDGET', 500),
+
     // Per-job PHP memory ceiling (ini_set), applied at the top of the heavy crawl
     // jobs. Horizon workers inherit PHP's CLI default (128M); the pre-Horizon raw
     // workers ran `php -d memory_limit=2048M`, which the Horizon migration dropped —

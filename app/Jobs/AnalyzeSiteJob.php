@@ -146,7 +146,13 @@ class AnalyzeSiteJob implements ShouldQueue
             return;
         }
 
-        if ($crawlSite->crawl_protection !== null) {
+        // Keep crawl_protection STICKY when this site fetched pages through the
+        // render server: the run only succeeded BECAUSE of the Firecrawl-first
+        // routing that the flag itself enables. Clearing it would send the next
+        // run direct-first again (blocked per page, then re-rendered — a wasted
+        // blocked fetch per page) and oscillate the flag every run.
+        if ($crawlSite->crawl_protection !== null
+            && ! app(\App\Support\Crawler\FirecrawlBudget::class)->renderedRecently($crawlSite->id)) {
             $crawlSite->forceFill(['crawl_protection' => null, 'crawl_protection_at' => null])->save();
         }
         // Fetching done → finalizing (banner shows "computing your results").

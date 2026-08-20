@@ -86,13 +86,39 @@ with `Authorization: Bearer <TEST_API_KEY>`. All requests egress through the res
   a real description, audience, and services (SEO/PPC/social/web/content) — the three previously-blank
   fields. Tests: `tests/Feature/Content/FirecrawlRenderFallbackTest.php`.
 
+## Crawl routing v2 (2026-08-20, cocomii incident)
+
+Shopify/hCaptcha walls classify as `captcha` in `BlockDetector` but never matched
+`RenderGate`'s Cloudflare-only markers, so the crawl fallback was dead for them —
+cocomii.com aborted every run ("Crawler blocked by site (captcha)") while Firecrawl
+could render it fine (verified: full homepage in ~5s). Now, in
+`PageCrawlProcessor`:
+
+- **Blocked fallback widened** — ANY `BlockDetector::classify()` verdict except
+  `LOGIN_REQUIRED` tries Firecrawl after the proxy retry (RenderGate remains as
+  an extra OR-signal).
+- **Protected sites go Firecrawl-FIRST** — when `crawl_sites.crawl_protection`
+  is set, `fetchWithPolicy` skips the doomed direct/proxy attempts entirely
+  (the follow-up below, built).
+- **Budget** — `App\Support\Crawler\FirecrawlBudget`: per-site rolling-daily cap
+  on rendered fetches (`crawler.firecrawl_daily_page_budget`, default 500, env
+  `CRAWLER_FIRECRAWL_DAILY_PAGE_BUDGET`, 0 = off). Counts attempts (failures
+  cost proxy traffic too); over budget → normal path, honest blocked results.
+- **Sticky protection** — `AnalyzeSiteJob` keeps `crawl_protection` when the run
+  fetched via render (`FirecrawlBudget::renderedRecently`), because the success
+  came FROM the flag's routing; clearing it would oscillate every run and burn a
+  blocked direct fetch per page. Conditional-GET (etag/304) doesn't apply to
+  rendered fetches — protected sites re-render every page each run, which the
+  budget caps.
+
+Tests: `tests/Feature/CrawlerFirecrawlRoutingTest.php` (5).
+
 ## Follow-ups (not built)
 
 - Fleet ephemeral crawl workers run the old snapshot without `FIRECRAWL_*` env, so the crawl-path
   fallback is a no-op there (fires on box A/B + pinned box only). Add to `.env.worker` / rebuild the
-  snapshot if fleet crawls need it.
-- Consider caching a per-`crawl_sites` "needs render" flag + setting `crawl_protection='cloudflare'`
-  so challenged sites skip the wasted direct/proxy attempts and go straight to render.
+  snapshot if fleet crawls need it. (With crawl_protection routing this matters more — a fleet box
+  crawling a protected site silently skips the render path.)
 
 ## Caveats
 
