@@ -32,9 +32,14 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureDashboardAccess
 {
     /** Route-name prefixes that are dashboard reports/crawl surfaces. */
+    // 'link-structure.' left OFF this list on purpose (2026-08-20, same
+    // rationale as 'issues.' below): it is the Site Health module's Fix
+    // destination — every "Fix" button on the site-health page deep-links a
+    // page into the Link Explorer — and Site Health ships inside Content
+    // Autopilot. Listing it here sent those clicks to the content calendar.
     private const TEASER_PREFIXES = [
         'dashboard', 'statistics', 'site-explorer', 'backlinks', 'competitors',
-        'pagespeed.', 'pages.', 'custom-audit.', 'link-structure.', 'keywords.',
+        'pagespeed.', 'pages.', 'custom-audit.', 'keywords.',
         'keyword-', 'rank-tracking.', 'rank-tracker', 'sitemaps.', 'reports.',
         'audit', 'redirects.',
     ];

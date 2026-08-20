@@ -115,6 +115,23 @@ class SeoPlatformUiToggleTest extends TestCase
     }
 
     /**
+     * Link Explorer is Site Health's Fix destination (every "Fix" button on
+     * the site-health page deep-links a page into it), and Site Health ships
+     * inside Content Autopilot — so it must stay reachable with the SEO UI
+     * off. It used to be kill-switched, which sent every Fix click to the
+     * content calendar (2026-08-20).
+     */
+    public function test_link_explorer_stays_reachable_when_off(): void
+    {
+        $this->off();
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        $this->get(route('link-structure.index'))->assertOk();
+    }
+
+    /**
      * A user with NO websites must land somewhere TERMINAL. content.index
      * bounces them through EnsureFeatureAccess → websites.index →
      * EnsureOnboarded → /onboarding → back into the kill-switch: too many
