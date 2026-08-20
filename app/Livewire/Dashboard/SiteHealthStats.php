@@ -83,11 +83,18 @@ class SiteHealthStats extends Component
         $hasPartialData = $summary && (int) ($summary['pages_total'] ?? 0) > 0;
         $hide = $partial && ! $hasPartialData;
 
+        // The allowlist banner is only for sites we genuinely CANNOT crawl —
+        // crawl_protection alone no longer means that: the flag stays sticky
+        // while the render path (Firecrawl) crawls the site successfully, so a
+        // fully-crawled site would nag the client forever (cocomii 2026-08-20).
+        // "Genuinely blocked" = the crawl site's own status says so.
+        $crawlSite = $website?->crawlSite;
+
         return view('livewire.dashboard.site-health-stats', [
             'summary' => $summary,
             'hide' => $hide,
             'partial' => $partial && $hasPartialData,
-            'protection' => $website?->crawlSite?->crawl_protection,
+            'protection' => $crawlSite?->status === 'blocked' ? $crawlSite->crawl_protection : null,
             'egressIp' => config('crawler.egress_ip'),
             'crawlerUa' => \App\Services\Crawler\CrawlFetcher::UA,
         ]);
