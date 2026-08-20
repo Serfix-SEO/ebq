@@ -97,15 +97,21 @@ class FirecrawlClient
                 if ($key !== '') {
                     $req = $req->withToken($key);
                 }
+                // rawHtml, NOT html: Firecrawl's "html" format is a cleaned
+                // rendering that strips the entire <head> — every crawled page
+                // came back title-less/meta-less/canonical-less (cocomii
+                // 2026-08-20: 500+ pages titled "icon-X" from an SVG sprite,
+                // mass false duplicate-title findings, empty descriptions).
+                // rawHtml is the unmodified rendered document.
                 $resp = $req->post($base.'/v1/scrape', [
                     'url' => $url,
-                    'formats' => ['html'],
+                    'formats' => ['rawHtml'],
                     'timeout' => $timeout * 1000,
                 ]);
 
                 $json = $resp->json();
                 $upstream = (int) ($json['data']['metadata']['statusCode'] ?? $resp->status());
-                $html = (string) ($json['data']['html'] ?? '');
+                $html = (string) ($json['data']['rawHtml'] ?? $json['data']['html'] ?? '');
 
                 if (($json['success'] ?? false) === true && $upstream < 500 && trim($html) !== '') {
                     return $html;
