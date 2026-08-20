@@ -186,8 +186,11 @@ class LinkCrawlBatchJob implements ShouldQueue
         }
 
         $rateLimiter->recordBlock($domain);
-        if ($proxy !== null) {
-            $pool->markFailure($proxy);
+        // Delivered-but-blocked = the SITE refused us, not the proxy — count it
+        // as proxy success (mis-charging walls to proxy health wiped the paid
+        // pool on 2026-08-20). Only transport failures dent the counters.
+        if ($proxy !== null && ($res['ok'] ?? false)) {
+            $pool->markSuccess($proxy);
         }
 
         if ($useProxies && $proxy === null && $pool->available()) {
@@ -202,7 +205,7 @@ class LinkCrawlBatchJob implements ShouldQueue
 
                     return [$res2, null];
                 }
-                $pool->markFailure($retryProxy);
+                ($res2['ok'] ?? false) ? $pool->markSuccess($retryProxy) : $pool->markFailure($retryProxy);
             }
         }
 

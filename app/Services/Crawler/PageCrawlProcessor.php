@@ -329,8 +329,14 @@ class PageCrawlProcessor
 
         // A block here means this DOMAIN is banning THIS server — record it fleet-wide so
         // the others go cautious (and, once every box is blocked, switch to proxies). Per
-        // domain, never global.
+        // domain, never global. The PROXY did its job (it delivered the wall) — a
+        // delivered-but-blocked response is the site's verdict on us, not on the proxy,
+        // so it counts as proxy SUCCESS. Charging walls to proxy health is what deleted
+        // all four paid proxies on 2026-08-20 (cocomii's captcha × 5-strike rule).
         $this->rateLimiter->recordBlock($domain);
+        if ($proxy !== null && $res['ok']) {
+            $this->pool->markSuccess($proxy);
+        }
 
         // (Legacy) direct-then-proxy retry — only relevant if proxies are forced on but we
         // somehow went direct; with the all-blocked logic above the first attempt already
@@ -347,10 +353,10 @@ class PageCrawlProcessor
 
                     return $res2;
                 }
-                $this->pool->markFailure($retryProxy);
+                // Delivered-but-blocked = proxy worked; only a transport
+                // failure counts against the proxy's health.
+                $res2['ok'] ? $this->pool->markSuccess($retryProxy) : $this->pool->markFailure($retryProxy);
             }
-        } elseif ($proxy !== null) {
-            $this->pool->markFailure($proxy);
         }
 
         // Still blocked after the retry — try the headless render server

@@ -96,10 +96,11 @@ class ProxyManager extends Component
     }
 
     /**
-     * @param  bool  $deleteOnFail  Used by the "Retest all" sweep on the admin screen —
-     *                               a deliberate bulk re-check, so a failure there deletes
-     *                               the row immediately instead of just decaying fail_count.
-     *                               The single-row "Test" button never deletes.
+     * @param  bool  $deleteOnFail  Historical name — since 2026-08-20 NO automatic
+     *                               path deletes a proxy (paid credentials; a
+     *                               transient hiccup must never destroy them).
+     *                               "Retest all" now just refreshes health counters;
+     *                               removing a proxy is the explicit delete button only.
      */
     public function test(string $id, bool $deleteOnFail = false): void
     {
@@ -119,9 +120,6 @@ class ProxyManager extends Component
 
         if ($ok) {
             $p->update(['last_ok_at' => now(), 'last_used_at' => now(), 'fail_count' => 0]);
-        } elseif ($deleteOnFail) {
-            $p->delete();
-            unset($this->testResults[$id]);
         } else {
             $p->increment('fail_count');
         }

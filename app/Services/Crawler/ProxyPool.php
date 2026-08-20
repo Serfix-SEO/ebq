@@ -94,28 +94,26 @@ class ProxyPool
 
     /**
      * Records a failure from REAL production use (audit link-check, crawler
-     * fetch/link-check) — not a synthetic health-check ping. After
-     * `max_failures` such failures the proxy is deleted outright, not just
-     * deactivated: a service genuinely tried to use it and it didn't work,
-     * repeatedly, so it's not worth keeping the row around.
+     * fetch/link-check) — not a synthetic health-check ping.
+     *
+     * TELEMETRY ONLY — never deletes, never deactivates (owner 2026-08-20).
+     * The pool is PAID residential proxies: the old 5-strike auto-delete wiped
+     * all four of them in minutes when a blocked SITE (cocomii's captcha wall)
+     * was mis-charged against proxy health — every wall response through a
+     * proxy counted as a proxy failure. Paid credentials must survive both
+     * transient provider hiccups and hostile sites; fail_count is a health
+     * signal on the admin screen, nothing more.
      */
     public function markFailure(?string $url): void
     {
         if ($url === null) {
             return;
         }
-        $max = (int) config('crawler.proxy.max_failures', 5);
         $proxy = Proxy::where('url_hash', Proxy::hashUrl($url))->first();
         if (! $proxy) {
             return; // file-sourced proxy — not health-tracked here
         }
         $proxy->fail_count++;
-        if ($max > 0 && $proxy->fail_count >= $max) {
-            $proxy->delete();
-            Cache::forget(self::CACHE_KEY); // drop it from the live pool now
-
-            return;
-        }
         $proxy->last_used_at = now();
         $proxy->save();
     }
