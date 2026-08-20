@@ -115,10 +115,10 @@ Tests: `tests/Feature/CrawlerFirecrawlRoutingTest.php` (5).
 
 ## Follow-ups (not built)
 
-- Fleet ephemeral crawl workers run the old snapshot without `FIRECRAWL_*` env, so the crawl-path
-  fallback is a no-op there (fires on box A/B + pinned box only). Add to `.env.worker` / rebuild the
-  snapshot if fleet crawls need it. (With crawl_protection routing this matters more — a fleet box
-  crawling a protected site silently skips the render path.)
+- ~~Fleet ephemeral workers lack `FIRECRAWL_*`~~ FIXED 2026-08-20: the vars are now in
+  `/var/www/ebq/.env.worker` (the template WorkerFleetService pushes to every ephemeral box), and the
+  then-live ephemeral (10.0.0.5) was patched + recreated in place. Symptom while broken: an ephemeral
+  claiming the crawl queue direct-fetched a protected site and stacked blocked page rows (cocomii).
 
 ## Caveats
 
