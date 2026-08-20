@@ -32,7 +32,16 @@ class HtmlAuditor
 
     public function metadata(): array
     {
-        $title = trim((string) $this->xpath->evaluate('string(//title)'));
+        // The head <title> specifically — NOT the document's first <title>:
+        // inline SVG icon sprites carry their own <title> children ("icon-X",
+        // "shopify-bag-outline"), and on rendered Shopify DOMs one of those can
+        // come first. `string(//title)` stamped 503 cocomii pages with
+        // "icon-X" and mass-produced false duplicate_title findings
+        // (2026-08-20). Fallback: first title OUTSIDE any svg.
+        $title = trim((string) $this->xpath->evaluate('string(/html/head/title)'));
+        if ($title === '') {
+            $title = trim((string) $this->xpath->evaluate('string(//title[not(ancestor::svg)])'));
+        }
         $description = trim((string) $this->xpath->evaluate(
             'string(//meta[translate(@name, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="description"]/@content)'
         ));
