@@ -281,16 +281,58 @@ class ContentEntitlements
         return $done + $reserved;
     }
 
-    /** Total generations for a user across all websites since trial start. */
-    public function trialUsage(User $user, ?string $excludeTopicId = null): int
+    /**
+     * In-flight reservations for a website (topics generating right now, no
+     * article yet) — the live half of usage counting; the durable half is the
+     * ledger. Mirrors the reservation logic inside usageForWebsite().
+     */
+    private function reservedForWebsite(string $websiteId, ?string $excludeTopicId = null): int
     {
-        $since = $user->content_trial_started_at ?? now()->startOfCentury();
+        return ContentTopic::query()
+            ->where('website_id', $websiteId)
+            ->whereDoesntHave('articles')
+            ->when($excludeTopicId, fn ($q) => $q->where('id', '!=', $excludeTopicId))
+            ->where(function ($q) {
+                $q->whereIn('status', ContentTopic::IN_FLIGHT)
+                    ->orWhere(fn ($q2) => $q2
+                        ->where('status', ContentTopic::STATUS_APPROVED)
+                        ->whereNotNull('stage_started_at')
+                        ->where('stage_started_at', '>=', now()->subMinutes(60)));
+            })
+            ->count();
+    }
+
+    private function reservedForUser(User $user, ?string $excludeTopicId = null): int
+    {
         $total = 0;
         foreach ($user->websites()->pluck('id') as $wid) {
-            $total += $this->usageForWebsite($wid, $since, $excludeTopicId);
+            $total += $this->reservedForWebsite($wid, $excludeTopicId);
         }
 
         return $total;
+    }
+
+    /**
+     * Durable generation count for a user since $since — from the ledger
+     * (content_generations), which has no FK to websites and therefore
+     * SURVIVES website deletion. The old implementation counted rows that
+     * cascade-deleted with the website, so delete-site + re-add reset both
+     * the trial and monthly caps (loophole found 2026-08-21).
+     */
+    public function ledgerCount(User $user, Carbon $since): int
+    {
+        return \App\Models\ContentGeneration::query()
+            ->where('user_id', $user->id)
+            ->where('created_at', '>=', $since)
+            ->count();
+    }
+
+    /** Total generations for a user since trial start: ledger + in-flight. */
+    public function trialUsage(User $user, ?string $excludeTopicId = null): int
+    {
+        $since = $user->content_trial_started_at ?? now()->startOfCentury();
+
+        return $this->ledgerCount($user, $since) + $this->reservedForUser($user, $excludeTopicId);
     }
 
     /**
@@ -326,6 +368,18 @@ class ContentEntitlements
         // Monthly per-website cap.
         $monthly = $this->usageForWebsite($website->id, now()->startOfMonth(), $topic->id);
         if ($monthly >= ContentAutopilotConfig::monthlyArticlesPerWebsite()) {
+            return 'monthly_limit';
+        }
+
+        // USER-level monthly cap: allowed sites × per-website cap, counted from
+        // the durable ledger — the per-website check alone resets when a site
+        // is deleted and re-added (its rows cascade away with the website), so
+        // a $1 subscriber could farm 30 articles per site-cycle indefinitely
+        // (2026-08-21). The ledger survives deletion; reservations are live.
+        $userMonthly = $this->ledgerCount($user, now()->startOfMonth())
+            + $this->reservedForUser($user, $topic->id);
+        $userCap = ContentAutopilotConfig::monthlyArticlesPerWebsite() * max(1, $this->sitesAllowed($user));
+        if ($userMonthly >= $userCap) {
             return 'monthly_limit';
         }
 

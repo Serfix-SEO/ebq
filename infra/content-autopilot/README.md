@@ -589,6 +589,19 @@ skipped; after the Firecrawl crawl populated the URL list the same machinery add
 validated links. Stages: `context_rescore` / `context_revise_N`. May need >1
 invocation — a pass can hit target score while the link check still fails.
 
+### Generation ledger — caps survive website deletion (2026-08-21)
+
+`content_generations` (ContentGeneration model): one immutable row per v1 article,
+written in `ContentArticle::storeVersion`, deliberately **no FKs** — the old counters
+lived on rows that `cascadeOnDelete` with the website, so delete-site + re-add reset
+both the 3-article trial cap and the 30/month cap ($1-first-month farming loophole).
+`ContentEntitlements`: `trialUsage` = ledger-since-trial-start + live in-flight
+reservations; `blockReason` adds a USER-level monthly cap = per-website cap ×
+`sitesAllowed(user)` counted from the ledger (per-website cap unchanged on top).
+Migration backfills the ledger from existing v1 articles so nobody's current usage
+reset at introduction. Tests: `ContentGenerationLedgerTest` (4 — incl. both
+delete-and-re-add loophole regressions).
+
 ### Site directives — admin steering prompt (2026-08-21)
 
 `content_plans.admin_content_prompt` (admin-set, per website, `/admin/clients/{user}`

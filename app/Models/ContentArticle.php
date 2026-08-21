@@ -59,6 +59,24 @@ class ContentArticle extends Model
             'is_current' => true,
         ]);
 
+        // v1 = one consumed generation → durable ledger row (survives website
+        // deletion; ContentEntitlements counts trial/monthly caps from it).
+        // Best-effort: a ledger hiccup must never lose a produced article.
+        if ($latest === 0) {
+            try {
+                ContentGeneration::create([
+                    'user_id' => (string) $topic->website?->user_id,
+                    'website_id' => (string) $topic->website_id,
+                    'topic_id' => (string) $topic->id,
+                    'created_at' => now(),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('content_generation_ledger_write_failed', [
+                    'topic_id' => $topic->id, 'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         // Images follow the crown: every consumer (publish drivers' featured
         // image, WP sideload, review page) reads images off the CURRENT
         // version, so leaving the rows on the old one silently strips the
