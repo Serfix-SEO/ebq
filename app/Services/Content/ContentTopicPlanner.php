@@ -657,4 +657,40 @@ class ContentTopicPlanner
 
         return count(array_intersect($ta, $tb)) / min(count($ta), count($tb));
     }
+
+    /**
+     * A topic was removed from the calendar (wizard ✗ / calendar Skip) — its
+     * publish date must not become a silent hole. Each later still-movable
+     * topic shifts onto the previous one's date, so the next planned article
+     * takes the vacated slot and the cadence (the exact set of dates) is
+     * preserved; only the tail date frees up, which the thin-calendar planner
+     * refills. In-flight / ready / scheduled / published topics never move —
+     * their content was produced for their date. Brigid 2026-08-21: the
+     * client ✗-ed four wizard suggestions and their first article silently
+     * slid from "today" to the 25th.
+     */
+    public function fillVacatedDate(ContentPlan $plan, ?\Carbon\CarbonInterface $vacated): void
+    {
+        if ($vacated === null) {
+            return;
+        }
+        // Never pull articles into the past; an already-past hole is moot.
+        $target = $vacated->toDateString();
+        if ($target < now()->toDateString()) {
+            $target = now()->toDateString();
+        }
+
+        $movable = $plan->topics()
+            ->whereIn('status', [ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED, ContentTopic::STATUS_FAILED])
+            ->whereNotNull('scheduled_for')
+            ->whereDate('scheduled_for', '>', $target)
+            ->orderBy('scheduled_for')
+            ->get();
+
+        foreach ($movable as $topic) {
+            $next = $topic->scheduled_for?->toDateString();
+            $topic->update(['scheduled_for' => $target]);
+            $target = $next;
+        }
+    }
 }

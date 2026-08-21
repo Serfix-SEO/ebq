@@ -556,6 +556,18 @@ old behaviour left that test red from 07-27 until 2026-08-15.
 Tests: `ContentGuardEvolutionTest` (7); `CompetitorMentionGuardTest` (26 —
 +2 for the common-word alias filter).
 
+### Schedule reflow on topic removal (2026-08-21)
+
+`ContentTopicPlanner::fillVacatedDate($plan, $vacatedDate)` — called by BOTH
+`dropTopic` implementations (ContentCalendar + ContentWizard trait — dual-component
+invariant) and by the calendar `skip()`: when a client removes a topic, each later
+still-movable topic (suggested/approved/failed only) shifts onto the previous one's
+date, so the next planned article takes the vacated slot, the cadence's date set is
+preserved, and only the tail date frees up (thin-calendar planner refills). Never
+re-dates into the past; ready/in-flight/published topics never move. Brigid
+2026-08-21: client ✗-ed the first four wizard suggestions and the first article
+silently slid from "today" to the 25th. Tests: `ContentScheduleReflowTest` (4).
+
 ### reviseCurrentArticle (context refresh, 2026-08-20)
 
 `ContentArticleProducer::reviseCurrentArticle($topic, $maxPasses = 2)` — re-runs the

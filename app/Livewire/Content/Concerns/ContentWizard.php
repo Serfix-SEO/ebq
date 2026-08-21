@@ -650,9 +650,17 @@ trait ContentWizard
 
     public function dropTopic(string $topicId): void
     {
-        $this->plan()?->topics()->whereKey($topicId)
+        $plan = $this->plan();
+        $topic = $plan?->topics()->whereKey($topicId)
             ->whereIn('status', [ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED, ContentTopic::STATUS_FAILED])
-            ->update(['status' => ContentTopic::STATUS_SKIPPED]);
+            ->first();
+        if ($topic === null) {
+            return;
+        }
+        $topic->update(['status' => ContentTopic::STATUS_SKIPPED]);
+        // The removed topic's date must not become a hole — the next planned
+        // article takes its place (brigid 2026-08-21).
+        app(\App\Services\Content\ContentTopicPlanner::class)->fillVacatedDate($plan, $topic->scheduled_for);
     }
 
     protected function guessBrand(?Website $website): string
