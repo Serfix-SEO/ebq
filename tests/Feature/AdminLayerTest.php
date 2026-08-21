@@ -50,9 +50,12 @@ class AdminLayerTest extends TestCase
         $admin = User::factory()->create(['is_admin' => true]);
         $client = User::factory()->create();
 
+        // Impersonation lands where the CLIENT would land after login (a
+        // website-less user → the websites page), not on a hard-coded
+        // 'dashboard' that 301s to Site Health when the SEO UI is off.
         $this->actingAs($admin)
             ->post(route('admin.clients.impersonate', $client))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route($client->firstAccessibleRoute(null)));
 
         $this->assertAuthenticatedAs($client);
         $this->assertDatabaseHas('client_activities', [

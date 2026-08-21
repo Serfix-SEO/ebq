@@ -193,7 +193,7 @@ class BillingController extends Controller
     {
         $user = $request->user();
         if (! $user) {
-            return redirect()->route('dashboard');
+            return redirect()->route('login');
         }
 
         // Webhook-race fallback: Stripe redirects the customer back to

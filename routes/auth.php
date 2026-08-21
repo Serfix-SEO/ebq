@@ -41,7 +41,12 @@ Route::middleware('auth')->group(function () {
     Route::get('verify-email/{id}/{hash}', function (EmailVerificationRequest $request): RedirectResponse {
         $request->fulfill();
 
-        return redirect()->route('dashboard');
+        // Same landing logic as login — 'dashboard' 301s to Site Health when
+        // the SEO UI is off, so content clients verified their email straight
+        // into the wrong page (2026-08-21).
+        return redirect()->route(
+            $request->user()->firstAccessibleRoute(session('current_website_id'))
+        );
     })->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 
     Route::post('email/verification-notification', function (Request $request): RedirectResponse {

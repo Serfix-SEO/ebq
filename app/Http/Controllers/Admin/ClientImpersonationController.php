@@ -31,14 +31,25 @@ class ClientImpersonationController extends Controller
 
         $logger->log('admin.impersonation_started', userId: $user->id, actorUserId: $admin->id);
 
-        return redirect()->route('dashboard');
+        // Land where the CLIENT lands — 'dashboard' 301s to Site Health when
+        // the SEO UI is off, which is not what they see after login. Pick
+        // their first website like the login controller does (the regenerated
+        // session has no current_website_id yet).
+        $websiteId = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->value('id');
+        if ($websiteId !== null) {
+            session(['current_website_id' => (string) $websiteId]);
+        }
+
+        return redirect()->route($user->firstAccessibleRoute($websiteId !== null ? (string) $websiteId : null));
     }
 
     public function stop(Request $request, ClientActivityLogger $logger): RedirectResponse
     {
         $impersonatorId = session('impersonator_id');
         if (($impersonatorId === null || $impersonatorId === '')) {
-            return redirect()->route('dashboard');
+            $user = Auth::user();
+
+            return redirect()->route($user ? $user->firstAccessibleRoute(session('current_website_id')) : 'login');
         }
 
         $impersonatedId = Auth::id();
