@@ -190,6 +190,44 @@ class ContentKeywordEnrichmentTest extends TestCase
         $this->assertSame(['still pending'], $this->calls[0], 'the fresh keyword must not be re-bought');
     }
 
+    /**
+     * A fresh GKP measurement (our own free Keyword Finder node) satisfies
+     * enrichment too — 98% of what DFS bought in Aug 2026 already had one
+     * (~$13/mo of duplicate spend). An EXPIRED gkp row does NOT satisfy it,
+     * so DFS self-heals coverage if the node stops producing.
+     */
+    public function test_fresh_gkp_metrics_are_not_bought_from_dfs(): void
+    {
+        $plan = $this->coveredPlan();
+        $this->keywordRow($plan, 'gkp covered');
+        $this->keywordRow($plan, 'gkp expired');
+        $this->keywordRow($plan, 'never measured');
+        KeywordMetric::create([
+            'keyword' => 'gkp covered',
+            'keyword_hash' => KeywordMetric::hashKeyword('gkp covered'),
+            'country' => 'us', 'data_source' => 'gkp',
+            'search_volume' => 1000, 'fetched_at' => now(), 'expires_at' => now()->addDays(20),
+        ]);
+        KeywordMetric::create([
+            'keyword' => 'gkp expired',
+            'keyword_hash' => KeywordMetric::hashKeyword('gkp expired'),
+            'country' => 'us', 'data_source' => 'gkp',
+            'search_volume' => 500, 'fetched_at' => now()->subDays(40), 'expires_at' => now()->subDays(10),
+        ]);
+        $this->bindStubClient([
+            'gkp expired' => $this->metricRow('gkp expired', 30, 'commercial', 500),
+            'never measured' => $this->metricRow('never measured', 20, 'informational', 300),
+        ]);
+
+        (new EnrichPlanKeywordMetricsJob($plan->id))->handle();
+
+        $this->assertCount(1, $this->calls);
+        $bought = $this->calls[0];
+        sort($bought);
+        $this->assertSame(['gkp expired', 'never measured'], $bought,
+            'GKP-covered keyword skipped; expired-GKP and unmeasured keywords still bought');
+    }
+
     public function test_heartbeat_trigger_respects_monthly_guard(): void
     {
         Queue::fake();

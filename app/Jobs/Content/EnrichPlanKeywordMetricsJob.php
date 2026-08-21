@@ -16,7 +16,8 @@ use Illuminate\Support\Str;
 /**
  * Paid bulk enrichment of a covered plan's keyword library via DataForSEO:
  * real keyword difficulty + search intent + precise Google Ads volume for
- * every library keyword that doesn't yet have a fresh dfs_labs metric row.
+ * every library keyword that doesn't yet have a fresh metric row from
+ * EITHER dfs_labs or our own free GKP node (gkp) — see the delta query.
  * Three flat-fee requests per 1,000-keyword chunk (~$0.07/chunk).
  *
  * Money rails, in order:
@@ -25,7 +26,7 @@ use Illuminate\Support\Str;
  *  - kill switch: services.content_autopilot.keyword_enrichment;
  *  - DataForSeoSpendMeter checked before EVERY chunk (real billed tasks[0]
  *    cost is added after each chunk);
- *  - delta-only: keywords with a fresh dfs_labs metric are never re-bought
+ *  - delta-only: keywords with a fresh dfs_labs OR gkp metric are never bought
  *    (30-day keyword_metrics freshness), which also dedupes across clients
  *    because metrics are a shared asset;
  *  - MAX_CHUNKS bounds any single run.
@@ -73,11 +74,19 @@ class EnrichPlanKeywordMetricsJob implements ShouldQueue
         $country = strtolower((string) ($plan->country ?: 'global'));
         [$location, $language] = DataForSeoBacklinkClient::labsGeo($country);
 
-        // Delta: library keywords with no FRESH dfs_labs metric row. Fresh rows
-        // were paid for already (by any client) and must never be re-bought.
+        // Delta: library keywords with no FRESH metric row. Fresh dfs_labs rows
+        // were paid for already (by any client) and must never be re-bought —
+        // and since 2026-08-21 a fresh `gkp` row (our own free Keyword Finder
+        // node) ALSO satisfies enrichment: measured on live data, 98% of what
+        // DFS enrichment bought in August already had a GKP measurement, and
+        // 99.94% of those keywords carry difficulty/intent via the competitor
+        // harvest anyway (~$13/mo re-buying data we already had). Keywords GKP
+        // has NOT covered still go to DFS, so precise volume + KD + intent are
+        // bought exactly where nothing else provides them — self-healing if
+        // the GKP node ever stops producing.
         $fresh = KeywordMetric::query()
             ->where('country', $country)
-            ->where('data_source', 'dfs_labs')
+            ->whereIn('data_source', ['dfs_labs', 'gkp'])
             ->where('expires_at', '>', now())
             ->whereIn('keyword_hash', fn ($q) => $q->select('keyword_hash')
                 ->from('content_plan_keywords')->where('plan_id', $plan->id))
