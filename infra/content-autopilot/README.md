@@ -589,6 +589,17 @@ skipped; after the Firecrawl crawl populated the URL list the same machinery add
 validated links. Stages: `context_rescore` / `context_revise_N`. May need >1
 invocation — a pass can hit target score while the link check still fails.
 
+### Keyword-enrichment de-dup vs the GKP node (2026-08-21)
+
+`EnrichPlanKeywordMetricsJob`'s delta check accepts a LIVE `gkp` metric row (own
+Keyword Finder node) as already-covered, not just `dfs_labs` — measured live, 98% of
+August's DFS enrichment re-bought keywords GKP had measured (~$13/mo), and 99.94% of
+those carry KD/intent via the competitor harvest regardless (quality exposure ≈ 19
+keywords/mo). Expired gkp rows do NOT satisfy the check, so DFS automatically resumes
+covering keywords if the node stops producing. Real billed price ≈ $0.394/1000 kw
+(the docblock's ~$0.07 figure is per REQUEST, three per chunk plus per-keyword fees).
+Test: `ContentKeywordEnrichmentTest::test_fresh_gkp_metrics_are_not_bought_from_dfs`.
+
 ### Generation ledger — caps survive website deletion (2026-08-21)
 
 `content_generations` (ContentGeneration model): one immutable row per v1 article,
