@@ -175,6 +175,18 @@ class ContentAutopilotConfig
         return max(0, (int) self::setting('content.limits.trial_days', 5));
     }
 
+    /**
+     * How long a paid DFS enrichment of a keyword stays "bought" before the
+     * monthly heartbeat may re-buy it (owner decision 2026-08-22: 365 days).
+     * The metric row's own 30-day expires_at governs READ freshness elsewhere;
+     * this horizon governs SPEND only — without it the whole library re-bought
+     * monthly once the GKP rows' TTLs lapsed in lockstep (~$17/mo and growing).
+     */
+    public static function enrichmentRebuyDays(): int
+    {
+        return max(30, (int) self::setting('content.enrichment.rebuy_days', 365));
+    }
+
     public static function trialArticles(): int
     {
         return max(0, (int) self::setting('content.limits.trial_articles', 3));

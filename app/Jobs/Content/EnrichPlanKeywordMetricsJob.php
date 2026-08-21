@@ -84,10 +84,23 @@ class EnrichPlanKeywordMetricsJob implements ShouldQueue
         // has NOT covered still go to DFS, so precise volume + KD + intent are
         // bought exactly where nothing else provides them — self-healing if
         // the GKP node ever stops producing.
+        // Coverage semantics differ by source (owner decision 2026-08-22):
+        //  - dfs_labs: a keyword we PAID for stays bought for the re-buy
+        //    horizon (365d default), regardless of the row's 30-day
+        //    expires_at — that TTL governs read-freshness, not spend. Without
+        //    this, the whole library re-bought monthly once the free GKP
+        //    rows' TTLs lapsed in lockstep (~$17/mo, growing with clients).
+        //  - gkp: LIVE rows only. Old GKP data must not permanently block a
+        //    keyword's one paid enrichment — when both lapse, DFS buys it
+        //    once and the horizon takes over.
         $fresh = KeywordMetric::query()
             ->where('country', $country)
-            ->whereIn('data_source', ['dfs_labs', 'gkp'])
-            ->where('expires_at', '>', now())
+            ->where(function ($q) {
+                $q->where(fn ($d) => $d->where('data_source', 'dfs_labs')
+                    ->where('fetched_at', '>=', now()->subDays(\App\Support\ContentAutopilotConfig::enrichmentRebuyDays())))
+                    ->orWhere(fn ($g) => $g->where('data_source', 'gkp')
+                        ->where('expires_at', '>', now()));
+            })
             ->whereIn('keyword_hash', fn ($q) => $q->select('keyword_hash')
                 ->from('content_plan_keywords')->where('plan_id', $plan->id))
             ->pluck('keyword_hash')

@@ -228,6 +228,40 @@ class ContentKeywordEnrichmentTest extends TestCase
             'GKP-covered keyword skipped; expired-GKP and unmeasured keywords still bought');
     }
 
+    /**
+     * A PAID dfs enrichment stays bought for the re-buy horizon (365d default)
+     * even after its 30-day read-freshness expires — without this the whole
+     * library was re-bought monthly once the free GKP rows lapsed in lockstep
+     * (~$17/mo and growing, found 2026-08-22). Past the horizon it re-buys.
+     */
+    public function test_paid_enrichment_is_not_rebought_within_the_horizon(): void
+    {
+        $plan = $this->coveredPlan();
+        $this->keywordRow($plan, 'bought recently');
+        $this->keywordRow($plan, 'bought long ago');
+        KeywordMetric::create([
+            'keyword' => 'bought recently',
+            'keyword_hash' => KeywordMetric::hashKeyword('bought recently'),
+            'country' => 'us', 'data_source' => 'dfs_labs',
+            'keyword_difficulty' => 40,
+            'fetched_at' => now()->subDays(100), 'expires_at' => now()->subDays(70), // read-stale, spend-covered
+        ]);
+        KeywordMetric::create([
+            'keyword' => 'bought long ago',
+            'keyword_hash' => KeywordMetric::hashKeyword('bought long ago'),
+            'country' => 'us', 'data_source' => 'dfs_labs',
+            'keyword_difficulty' => 40,
+            'fetched_at' => now()->subDays(400), 'expires_at' => now()->subDays(370), // past the horizon
+        ]);
+        $this->bindStubClient(['bought long ago' => $this->metricRow('bought long ago', 25, 'commercial', 900)]);
+
+        (new EnrichPlanKeywordMetricsJob($plan->id))->handle();
+
+        $this->assertCount(1, $this->calls);
+        $this->assertSame(['bought long ago'], $this->calls[0],
+            'within-horizon keyword skipped despite expired read-TTL; past-horizon keyword re-bought');
+    }
+
     public function test_heartbeat_trigger_respects_monthly_guard(): void
     {
         Queue::fake();

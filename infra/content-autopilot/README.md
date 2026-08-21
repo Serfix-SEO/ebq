@@ -600,6 +600,16 @@ covering keywords if the node stops producing. Real billed price ≈ $0.394/1000
 (the docblock's ~$0.07 figure is per REQUEST, three per chunk plus per-keyword fees).
 Test: `ContentKeywordEnrichmentTest::test_fresh_gkp_metrics_are_not_bought_from_dfs`.
 
+**Re-buy horizon (2026-08-22, owner: 365 days)**: a PAID dfs_labs row counts as
+covered for `ContentAutopilotConfig::enrichmentRebuyDays()` (Setting
+`content.enrichment.rebuy_days`, default 365) measured on `fetched_at`, regardless of
+its 30-day read-TTL `expires_at` — spend and read-freshness are separate clocks.
+Without this the GKP rows' TTLs lapsed in lockstep ~30 days after each onboarding
+wave and the monthly heartbeat re-bought the entire library (~$17/mo measured,
+growing with clients; 43,295 keywords were due to double-lapse within 30 days).
+GKP coverage stays LIVE-only so a never-enriched keyword still gets its one paid
+buy when both lapse. Test: `test_paid_enrichment_is_not_rebought_within_the_horizon`.
+
 ### Generation ledger — caps survive website deletion (2026-08-21)
 
 `content_generations` (ContentGeneration model): one immutable row per v1 article,
