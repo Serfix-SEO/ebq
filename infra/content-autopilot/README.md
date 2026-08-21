@@ -589,6 +589,20 @@ skipped; after the Firecrawl crawl populated the URL list the same machinery add
 validated links. Stages: `context_rescore` / `context_revise_N`. May need >1
 invocation — a pass can hit target score while the link check still fails.
 
+### DeepSeek off-peak dispatch (2026-08-22)
+
+DeepSeek bills 2× during ITS peak hours — defined in UTC on their pricing page:
+01:00–04:00 + 06:00–10:00 UTC (`ContentAutopilotConfig::isDeepSeekOffPeak()`, always
+evaluated in UTC regardless of app/plan timezone). During peak, the dispatcher's
+`claimDueTopics` narrows its write-ahead from 48h to CATCH_UP_HOURS (24h): topics due
+soon still generate immediately (no publish slot or review window ever waits), while
+the bulk cohort waits ≤4h (the longest peak block) for half-price generation. Since
+articles generate EARLIER in the day, `review_hours` elapse before the publish slot —
+auto-publish timing improves, never degrades. "Write now" bypasses the dispatcher and
+is never gated. Kill switch: Setting `content.dispatch.offpeak_only` (default true).
+Saves ~$25–35/mo at full-calendar volume. Tests: `ContentOffPeakDispatchTest` (4 —
+incl. the sqlite string-vs-DATE boundary trap in fixtures; prod column is MySQL DATE).
+
 ### Keyword-enrichment de-dup vs the GKP node (2026-08-21)
 
 `EnrichPlanKeywordMetricsJob`'s delta check accepts a LIVE `gkp` metric row (own

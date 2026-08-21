@@ -9,6 +9,7 @@ use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Services\Content\ContentEntitlements;
+use App\Support\ContentAutopilotConfig;
 use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentLlmSpendMeter;
 use Illuminate\Console\Command;
@@ -172,10 +173,23 @@ class ContentAutopilotDispatcher extends Command
             ->whereIn('status', ContentTopic::IN_FLIGHT)
             ->pluck('website_id')->unique()->all();
 
+        // DeepSeek off-peak steering (owner 2026-08-22): peak hours (01–04 +
+        // 06–10 UTC, per their pricing page) bill 2×. During peak, only claim
+        // topics genuinely due soon (CATCH_UP_HOURS) — the bulk 24-48h
+        // write-ahead cohort waits at most one peak block (≤4h) for half-price
+        // generation. Off-peak claims the full write-ahead window as before.
+        // Generating EARLIER also means review_hours elapse before the publish
+        // slot, so auto-publish timing only improves. "Write now" bypasses the
+        // dispatcher entirely and is never delayed.
+        $aheadHours = (ContentAutopilotConfig::offPeakDispatchEnabled()
+            && ! ContentAutopilotConfig::isDeepSeekOffPeak())
+            ? self::CATCH_UP_HOURS
+            : self::WRITE_AHEAD_HOURS;
+
         $due = ContentTopic::query()
             ->where('status', ContentTopic::STATUS_APPROVED)
             ->whereNotNull('scheduled_for')
-            ->where('scheduled_for', '<=', now()->addHours(self::WRITE_AHEAD_HOURS)->toDateString())
+            ->where('scheduled_for', '<=', now()->addHours($aheadHours)->toDateString())
             ->whereNotIn('website_id', $busyWebsites)
             ->whereHas('plan', fn ($q) => $q->where('status', ContentPlan::STATUS_ACTIVE))
             ->orderBy('scheduled_for')

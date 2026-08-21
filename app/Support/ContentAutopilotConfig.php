@@ -176,6 +176,31 @@ class ContentAutopilotConfig
     }
 
     /**
+     * DeepSeek bills 2× during its peak hours — which are defined in UTC on
+     * their pricing page (https://api-docs.deepseek.com/quick_start/pricing/):
+     * 01:00–04:00 and 06:00–10:00 UTC. Everything else is off-peak (half
+     * price). Evaluated in UTC EXPLICITLY — never the app/plan timezone.
+     */
+    public static function isDeepSeekOffPeak(?\Carbon\CarbonInterface $at = null): bool
+    {
+        $hour = ($at?->copy() ?? now())->utc()->hour;
+
+        $peak = ($hour >= 1 && $hour < 4) || ($hour >= 6 && $hour < 10);
+
+        return ! $peak;
+    }
+
+    /**
+     * Off-peak-only bulk generation (owner 2026-08-22): the dispatcher's
+     * write-ahead claims wait for DeepSeek off-peak; topics due soon and
+     * manual "Write now" are exempt. Kill switch for ops.
+     */
+    public static function offPeakDispatchEnabled(): bool
+    {
+        return (bool) self::setting('content.dispatch.offpeak_only', true);
+    }
+
+    /**
      * How long a paid DFS enrichment of a keyword stays "bought" before the
      * monthly heartbeat may re-buy it (owner decision 2026-08-22: 365 days).
      * The metric row's own 30-day expires_at governs READ freshness elsewhere;
