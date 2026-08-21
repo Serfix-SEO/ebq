@@ -76,13 +76,14 @@ class RefineTopicSecondaryKeywordsJob implements ShouldQueue
         $offer = implode(', ', array_slice((array) (($plan->offerings ?? [])['sell'] ?? []), 0, 12));
         $desc = mb_substr((string) $plan->business_description, 0, 500);
         $keep = self::KEEP;
+        $directives = $plan?->promptAddendumBlock() ?? '';
 
         try {
             $result = $llm->completeJson([
                 ['role' => 'system', 'content' => 'You select supporting SEO keywords for an article. Respond with valid JSON only.'],
                 ['role' => 'user', 'content' => <<<PROMPT
                 Business offerings: {$offer}
-                About: {$desc}
+                About: {$desc}{$directives}
 
                 An article will target this focus keyword: "{$focus}"
 

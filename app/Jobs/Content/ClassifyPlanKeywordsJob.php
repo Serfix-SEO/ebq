@@ -211,6 +211,7 @@ class ClassifyPlanKeywordsJob implements ShouldQueue
         $llm = LlmClientFactory::make($model['provider']);
         $offer = implode(', ', array_slice((array) (($plan->offerings ?? [])['sell'] ?? []), 0, 12));
         $desc = mb_substr((string) $plan->business_description, 0, 500);
+        $directives = $plan->promptAddendumBlock();
 
         if (! $llm->isAvailable()) {
             // Fail closed: keep only the top-40 by volume rather than tag thousands
@@ -232,7 +233,7 @@ class ClassifyPlanKeywordsJob implements ShouldQueue
                     ['role' => 'system', 'content' => 'You filter SEO keyword lists for topical relevance. Respond with valid JSON only.'],
                     ['role' => 'user', 'content' => <<<PROMPT
                     Business offerings: {$offer}
-                    About: {$desc}
+                    About: {$desc}{$directives}
 
                     From the keywords below, return ONLY those genuinely relevant to THIS
                     business — the ones its articles should target. DROP anything off-topic:

@@ -346,7 +346,7 @@ class ContentTopicPlanner
         // candidate that drifted onto an explicit exclusion had no second net.
         $exclude = implode(', ', array_slice((array) (($plan->offerings ?? [])['dont_sell'] ?? []), 0, 10));
 
-        $keep = $this->llmRelevant($keywords, $offer, $desc, $exclude);
+        $keep = $this->llmRelevant($keywords, $offer, $desc, $exclude, $plan->promptAddendumBlock());
         if ($keep === null) {
             return $candidates; // LLM unavailable → fail open
         }
@@ -365,7 +365,7 @@ class ContentTopicPlanner
      * @param  list<string>  $keywords
      * @return list<string>|null lowercased on-topic keywords; null on LLM unavailable/error
      */
-    private function llmRelevant(array $keywords, string $offer, string $desc, string $exclude = ''): ?array
+    private function llmRelevant(array $keywords, string $offer, string $desc, string $exclude = '', string $directives = ''): ?array
     {
         try {
             if (! $this->llm->isAvailable()) {
@@ -383,7 +383,7 @@ class ContentTopicPlanner
                 ['role' => 'user', 'content' => <<<PROMPT
                 Business offerings: {$offer}
                 About: {$desc}
-                {$excludeBlock}
+                {$excludeBlock}{$directives}
                 From the topic keywords below, return ONLY those genuinely relevant to
                 THIS business — topics its articles should actually cover. DROP anything
                 off-topic: unrelated tools, industries, or languages, even when they
@@ -463,6 +463,7 @@ class ContentTopicPlanner
         }
 
         $system = 'You are an SEO content strategist. Respond with valid JSON only.';
+        $directivesBlock = $plan->promptAddendumBlock();
         $user = <<<PROMPT
         Plan {$count} blog article topics for the website {$domain}.
 
@@ -470,7 +471,7 @@ class ContentTopicPlanner
         {$plan->business_description}
         They offer: {$sell}
         They do NOT offer (never write about these as if they do): {$dontSell}
-        {$marketBlock}{$typeBlock}
+        {$marketBlock}{$typeBlock}{$directivesBlock}
 
         REAL SEARCH QUERIES the site already appears for (impressions = demand, position 8-30 = a dedicated article can win the ranking):
         {$gscBlock}

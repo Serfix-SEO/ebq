@@ -90,6 +90,16 @@ class AiToolRunner
             return $validated;
         }
 
+        // Site content directives (admin-set, ContentPlan::promptAddendum):
+        // resolved SERVER-SIDE and always assigned — a caller-supplied value
+        // (the WP plugin posts raw request input) is overwritten, never
+        // honored, so this cannot become a prompt-injection channel. Set
+        // BEFORE the cache key so a directives change busts stale results.
+        // Central here so every AI tool surface (inline editor, AI Studio,
+        // WP plugin, future tools) inherits it by construction.
+        $validated['site_directives'] = (string) (\App\Models\ContentPlan::query()
+            ->where('website_id', $website->id)->first()?->promptAddendum() ?? '');
+
         $cacheKey = $meta->cacheTtlSeconds && $meta->cacheTtlSeconds > 0
             ? $this->cacheKey($website, $toolId, $validated)
             : null;

@@ -895,13 +895,16 @@ class ContentKeywordInsights
         }
         $offer = implode(', ', array_slice((array) (($plan->offerings ?? [])['sell'] ?? []), 0, 10));
         $desc = mb_substr((string) $plan->business_description, 0, 400);
+        $directives = $plan->promptAddendumBlock();
 
-        $cacheKey = 'content:kw-'.$tag.':'.md5($offer.'|'.implode('|', $items));
+        // Directives are part of the key: a fresh admin steer must not be
+        // shadowed by a 30-day-old verdict cached without it.
+        $cacheKey = 'content:kw-'.$tag.':'.md5($offer.'|'.$directives.'|'.implode('|', $items));
         $keep = Cache::get($cacheKey);
         if (! is_array($keep)) {
             // null (unavailable/errored) → caller fails open. array (even empty) →
             // authoritative relevance judgement.
-            $keep = $this->llmRelevantItems($items, $offer, $desc, $noun);
+            $keep = $this->llmRelevantItems($items, $offer, $desc, $noun, $directives);
             if ($keep === null) {
                 return null;
             }
@@ -915,7 +918,7 @@ class ContentKeywordInsights
      * @param  list<string>  $items
      * @return list<string>|null lowercased on-topic items; null on LLM unavailable/error
      */
-    private function llmRelevantItems(array $items, string $offer, string $desc, string $noun): ?array
+    private function llmRelevantItems(array $items, string $offer, string $desc, string $noun, string $directives = ''): ?array
     {
         try {
             $model = ContentAutopilotConfig::modelFor('ideate');
@@ -928,7 +931,7 @@ class ContentKeywordInsights
                 ['role' => 'system', 'content' => "You filter SEO {$noun} lists for topical relevance. Respond with valid JSON only."],
                 ['role' => 'user', 'content' => <<<PROMPT
                 Business offerings: {$offer}
-                About: {$desc}
+                About: {$desc}{$directives}
 
                 From the {$noun} below, return ONLY those genuinely relevant to THIS
                 business's topic and audience — the ones its articles would actually
@@ -1353,7 +1356,7 @@ class ContentKeywordInsights
             if ($candidates !== []) {
                 $offerLine = implode('; ', $offers);
                 $desc = mb_substr((string) $plan->business_description, 0, 300);
-                $kept = $this->llmRelevantItems(array_column($candidates, 'query'), $offerLine, $desc, 'search terms');
+                $kept = $this->llmRelevantItems(array_column($candidates, 'query'), $offerLine, $desc, 'search terms', $plan->promptAddendumBlock());
                 if (is_array($kept)) {
                     $keptSet = array_flip(array_map(static fn ($k) => mb_strtolower(trim((string) $k)), $kept));
                     $candidates = array_values(array_filter(
@@ -1407,7 +1410,9 @@ class ContentKeywordInsights
     {
         $offers = (array) (($plan->offerings ?? [])['sell'] ?? []);
 
-        return 'content:kw-dfs-sugg:v1:'.$plan->id.':'.md5(json_encode([$plan->country, array_slice($offers, 0, 5)]));
+        // promptAddendum in the key: vetted candidates cached for 30 days must
+        // re-vet when the admin changes the site's directives.
+        return 'content:kw-dfs-sugg:v1:'.$plan->id.':'.md5(json_encode([$plan->country, array_slice($offers, 0, 5), $plan->promptAddendum()]));
     }
 
     /** @return list<array{query:string, offer:string, intent:string}> */

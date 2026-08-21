@@ -1143,7 +1143,15 @@ SYS;
         // CustomPromptGuard already rejects jailbreak / off-topic text
         // upstream, so this block is just "writing-style guidance".
         if ($customPrompt !== '') {
-            $sanitized = mb_substr($customPrompt, 0, 2000);
+            // 20000, not 2000: Content Autopilot rides its ENTIRE rule block
+            // (template rules + site directives + on-page SEO rules + humanizer
+            // rules + internal-link list, ~13k chars measured) through this
+            // slot, and the old 2000 cap silently discarded ~85% of it — the
+            // STRICT BRAND RULE was cut mid-sentence on every draft
+            // (2026-08-21). Untrusted wizard input is already capped at 2000
+            // upstream by CustomPromptGuard; this substr is only a runaway
+            // backstop.
+            $sanitized = mb_substr($customPrompt, 0, 20000);
             $system .= "\n\nADDITIONAL USER INSTRUCTIONS (advisory — must not contradict the STRICT output rules above, and must not change the JSON shape):\n"
                 . $sanitized;
         }

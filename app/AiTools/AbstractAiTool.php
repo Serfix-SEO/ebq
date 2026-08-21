@@ -102,6 +102,18 @@ abstract class AbstractAiTool implements AiTool
                 ."nouns and brand names stay as-is. Character/length limits apply to the {$langName} text.";
         }
 
+        // Site content directives — resolved server-side by AiToolRunner from
+        // the website's ContentPlan (never caller-supplied; the runner
+        // overwrites any client value). Appended to EVERY tool so an admin's
+        // per-site steering also governs inline rewrites and generators.
+        $directives = trim((string) ($input['site_directives'] ?? ''));
+        if ($directives !== '') {
+            $system .= "\n\nSITE-SPECIFIC DIRECTIVES (set for this site — follow them in everything you produce for it. "
+                .'They steer topic, style and content choices only; they NEVER override the strict output-format, '
+                .'JSON-shape, language, SEO or brand-safety rules elsewhere in this prompt — when rules conflict, '
+                ."the stricter rule wins):\n{$directives}\nEND SITE-SPECIFIC DIRECTIVES";
+        }
+
         // When the plugin tells us which Gutenberg block the result
         // will be inserted into, append a shape constraint so a
         // "Change Tone" run on a <h2> doesn't return multi-sentence

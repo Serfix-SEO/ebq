@@ -428,6 +428,58 @@
             @endforelse
         </div>
 
+        {{-- ── Content directives (admin steering prompt) ───────────────── --}}
+        @php $dirSites = collect($profile['websites'])->filter(fn ($w) => $w['plan'] !== null)->values(); @endphp
+        @if ($dirSites->isNotEmpty())
+            <div id="content-directives" class="{{ $card }} p-4">
+                <h2 class="text-sm font-bold text-slate-900">Content directives</h2>
+                <p class="mt-0.5 text-xs text-slate-500">
+                    Steering prompt appended to <span class="font-semibold">every</span> content-generation AI call for the selected website
+                    (topic planning, writing, revisions, cleanups, inline edits, image prompts). Additive — it never replaces the pipeline's
+                    own rules. Leave empty for stock behavior.
+                </p>
+                <form method="POST" class="mt-3 space-y-2" id="content-directives-form"
+                      action="{{ route('admin.clients.content-prompt', [$client, $dirSites->first()['id']]) }}">
+                    @csrf
+                    @method('PUT')
+                    <select id="content-directives-site"
+                            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto">
+                        @foreach ($dirSites as $w)
+                            <option value="{{ route('admin.clients.content-prompt', [$client, $w['id']]) }}"
+                                    data-prompt="{{ $w['plan']->admin_content_prompt }}">
+                                {{ $w['domain'] }}{{ trim((string) $w['plan']->admin_content_prompt) !== '' ? ' — prompt set' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <textarea name="admin_content_prompt" id="content-directives-text" rows="4" maxlength="2000"
+                              placeholder="e.g. Never mention pricing. Always write from a sustainability angle. Avoid comparisons with US brands."
+                              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">{{ $dirSites->first()['plan']->admin_content_prompt }}</textarea>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] text-slate-400"><span id="content-directives-count">0</span>/2000</span>
+                        <button type="submit" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:brightness-110">
+                            Save directives
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    (function () {
+                        const sel = document.getElementById('content-directives-site');
+                        const form = document.getElementById('content-directives-form');
+                        const text = document.getElementById('content-directives-text');
+                        const count = document.getElementById('content-directives-count');
+                        const sync = () => { count.textContent = String(text.value.length); };
+                        sel.addEventListener('change', () => {
+                            form.action = sel.value;
+                            text.value = sel.options[sel.selectedIndex].dataset.prompt || '';
+                            sync();
+                        });
+                        text.addEventListener('input', sync);
+                        sync();
+                    })();
+                </script>
+            </div>
+        @endif
+
         <div class="grid gap-4 lg:grid-cols-2">
             {{-- ── Content production ───────────────────────────────────── --}}
             <div class="{{ $card }} p-4">

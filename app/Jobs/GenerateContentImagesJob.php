@@ -322,7 +322,8 @@ class GenerateContentImagesJob implements ShouldQueue
                 .'Never include logos, watermarks, real brand marks, celebrities, or anything offensive. '
                 .'Never name any business, clinic, shop or brand in a prompt — not the client\'s and not anyone else\'s. '
                 .'Keep each prompt 1-3 sentences.'
-                .($stylePrompt !== '' ? ' Preferred visual style: '.$stylePrompt.'.' : '');
+                .($stylePrompt !== '' ? ' Preferred visual style: '.$stylePrompt.'.' : '')
+                .$plan->promptAddendumBlock();
 
             $user = json_encode([
                 'article_title' => (string) $article->h1,

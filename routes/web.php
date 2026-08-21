@@ -503,6 +503,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/clients/bulk', [AdminClientController::class, 'bulk'])->name('clients.bulk');
     Route::get('/clients/{user}', [AdminClientController::class, 'show'])->name('clients.show');
     Route::put('/clients/{user}', [AdminClientController::class, 'update'])->name('clients.update');
+    Route::put('/clients/{user}/websites/{website}/content-prompt', [AdminClientController::class, 'updateContentPrompt'])->name('clients.content-prompt');
     Route::post('/clients/{user}/crawl', [AdminClientController::class, 'crawl'])->name('clients.crawl');
     Route::post('/clients/{user}/impersonate', [ClientImpersonationController::class, 'start'])->name('clients.impersonate');
 

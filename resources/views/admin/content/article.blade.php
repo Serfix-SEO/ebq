@@ -35,6 +35,23 @@
             </div>
         </div>
 
+        {{-- Site content directives — the admin steering prompt in force for this
+             website (set on the client page). Reviewing a bad article without
+             knowing the active steering wastes the review. --}}
+        @php $sitePrompt = trim((string) ($topic->plan?->admin_content_prompt ?? '')); @endphp
+        @if ($sitePrompt !== '')
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">Site content directives (active)</p>
+                    @if ($topic->website?->user)
+                        <a href="{{ route('admin.clients.show', $topic->website->user) }}#content-directives"
+                           class="text-xs font-medium text-orange-600 hover:underline">Edit →</a>
+                    @endif
+                </div>
+                <p class="mt-1 whitespace-pre-line text-xs leading-5 text-slate-700 dark:text-slate-300">{{ $sitePrompt }}</p>
+            </div>
+        @endif
+
         {{-- What the client said. Shown ABOVE the article: this page is usually
              reached from a complaint, so the complaint is the context. --}}
         @if ($feedback->isNotEmpty())

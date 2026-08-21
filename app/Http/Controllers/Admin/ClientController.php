@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ClientActivity;
 use App\Models\ContentIntegration;
+use App\Models\ContentPlan;
+use App\Models\Website;
 use App\Models\CrawlSite;
 use App\Models\Plan;
 use App\Models\User;
@@ -274,6 +276,43 @@ class ClientController extends Controller
         return redirect()
             ->route('admin.clients.index', $request->query())
             ->with('status', $msg);
+    }
+
+    /**
+     * Admin-set per-website content directives (appended to every content
+     * LLM prompt via ContentPlan::promptAddendumBlock). Additive steering —
+     * empty/cleared value removes the prompt and restores stock behavior.
+     */
+    public function updateContentPrompt(Request $request, User $user, Website $website, ClientActivityLogger $logger): RedirectResponse
+    {
+        abort_unless($website->user_id === $user->id, 404);
+        $plan = ContentPlan::query()->where('website_id', $website->id)->first();
+        abort_if($plan === null, 404);
+
+        $data = $request->validate([
+            'admin_content_prompt' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $old = (string) $plan->admin_content_prompt;
+        $new = trim((string) ($data['admin_content_prompt'] ?? ''));
+        $plan->update(['admin_content_prompt' => $new !== '' ? $new : null]);
+
+        $logger->log(
+            'admin.content_prompt_updated',
+            userId: $user->id,
+            websiteId: $website->id,
+            meta: [
+                'old_length' => mb_strlen($old),
+                'new_length' => mb_strlen($new),
+                'preview' => mb_substr($new, 0, 120),
+            ],
+        );
+
+        return redirect()
+            ->to(route('admin.clients.show', $user).'#content-directives')
+            ->with('status', $new !== ''
+                ? 'Content directives saved for '.$website->domain.'.'
+                : 'Content directives cleared for '.$website->domain.'.');
     }
 
     public function update(Request $request, User $user, ClientActivityLogger $logger): RedirectResponse

@@ -688,7 +688,8 @@ class ContentArticleProducer
             .'if it is used as an ordinary descriptive word, replace it with a natural synonym (e.g. for shape words: angular, boxy, flat-edged, right-angled, sharp-cornered) or reword the sentence so the word is not needed. '
             .'The banned words must not appear ANYWHERE afterwards: body text, headings, image alt text, link text or link URLs, meta title, meta description. '
             .'This includes plural and possessive forms of the banned words. '
-            .'Respond with valid JSON only: {"html": "<full edited article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}.';
+            .'Respond with valid JSON only: {"html": "<full edited article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}.'
+            .$plan->promptAddendumBlock();
 
         $user = 'BANNED WORDS (remove every occurrence, all forms): "'.implode('", "', $terms)."\"\n"
             .'LANGUAGE: '.($plan->language ?: 'en')."\n\n"
@@ -790,7 +791,8 @@ class ContentArticleProducer
             .'Hard rules: DELETE every invented claim outright — no "players reported", no "the community found", no dated events ("in mid-2025..."), no fabricated studies/percentages, no "works on all regions/versions", no "most reliable" unless it is plainly true. When you delete an unsupported claim, do NOT replace it with another guess; either state only what is certain or drop the point. '
             .'Compress teaching loops so each idea is explained ONCE. Remove dramatic sign-offs. Keep contractions and natural rhythm. DO NOT reduce how often the focus keyphrase appears — the article needs it at the current SEO density, so preserve those mentions. '
             .'Respond with valid JSON only: {"html": "<full edited article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}. '
-            ."\n".$this->humanizer->promptRules();
+            ."\n".$this->humanizer->promptRules()
+            .$plan->promptAddendumBlock();
 
         $user = "FOCUS KEYWORD (keep its existing density, do not remove mentions): {$topic->target_keyword}\n"
             .'LANGUAGE: '.($plan->language ?: 'en')."\n\n"
@@ -1018,7 +1020,8 @@ class ContentArticleProducer
             .'Do not make the writing more formal, more corporate, or more "complete" than it was. Do not add hype, dramatic contrasts ("it doesn\'t just X, it Y"), or invented personal experience. Keep sentence-length variety and any deliberate fragments. '
             .'Respond with valid JSON only: '
             .'{"html": "<full corrected article HTML>", "meta_title": "...", "meta_description": "...", "h1": "..."}. '
-            ."\n".$this->humanizer->promptRules();
+            ."\n".$this->humanizer->promptRules()
+            .$plan->promptAddendumBlock();
 
         // Real, existing pages the model may link to — without this list the
         // reviser cannot satisfy the internal-link checks (it would invent
@@ -1150,8 +1153,11 @@ class ContentArticleProducer
         }
         $rules[] = "Today's date is ".now()->toFormattedDateString().'. Any year you mention must be '
             .now()->year.' unless you are referring to a genuinely historical fact.';
-        if (trim((string) $plan->custom_instructions) !== '') {
-            $rules[] = trim((string) $plan->custom_instructions);
+        // Site directives (admin_content_prompt + custom_instructions) — the
+        // bounded block, so the draft prompt carries the same clearly-marked
+        // directives every other content flow appends.
+        if (($directives = $plan->promptAddendumBlock()) !== '') {
+            $rules[] = trim($directives);
         }
         // Competitor-mention guard (prevention layer; the lint is the cure).
         $guardTerms = app(CompetitorMentionGuard::class)->termsForTopic($plan, $topic);

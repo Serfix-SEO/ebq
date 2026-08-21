@@ -589,6 +589,39 @@ skipped; after the Firecrawl crawl populated the URL list the same machinery add
 validated links. Stages: `context_rescore` / `context_revise_N`. May need >1
 invocation — a pass can hit target score while the link check still fails.
 
+### Site directives — admin steering prompt (2026-08-21)
+
+`content_plans.admin_content_prompt` (admin-set, per website, `/admin/clients/{user}`
+"Content directives" card with a website selector; audit type
+`admin.content_prompt_updated`) + the previously write-dead `custom_instructions`
+merge in `ContentPlan::promptAddendum()` (admin part first, combined cap 2000) and
+render as a bounded block via `promptAddendumBlock()` ("SITE-SPECIFIC DIRECTIVES …
+END SITE-SPECIFIC DIRECTIVES"). ADDITIVE ONLY: empty → `''` → prompts byte-identical
+to stock (owner invariant, test-pinned).
+
+**HARD RULE: any new content-pipeline LLM call MUST append
+`$plan->promptAddendumBlock()` AND add a capture test to
+`SiteDirectivesCoverageTest`.** Covered today: draft (templateInstructions),
+revise, deAiCleanup, scrubBlockedTerms, GenerateContentImagesJob::llmPrompts,
+ContentTopicPlanner::ideate + llmRelevant, ClassifyPlanKeywordsJob::bulkRelevant,
+RefineTopicSecondaryKeywordsJob, ContentKeywordInsights::llmRelevantItems (both
+call sites; the addendum is part of BOTH 30-day cache keys — `relevanceKeep` and
+`dfsSuggestionKey` — so a directives change re-vets immediately), and every AI tool
+via AiToolRunner (server-side `site_directives` injected into validated input BEFORE
+the cache key; caller-supplied values are overwritten — prompt-injection-proof; the
+block is appended in `AbstractAiTool::execute()`).
+
+**Excluded on purpose** (pure classification/extraction where directives would bias
+verdicts): `CompetitorMentionGuard::classify`, `DiscoverContentCompetitorsJob`,
+`SiteProfileExtractor`, `ContentKeywordInsights::llmScrapKeywords`.
+
+**Truncation bug fixed with this feature**: `AiWriterService::buildPrompt` capped the
+`custom_prompt` slot at 2,000 chars while the autopilot rides its ENTIRE rule block
+(~13k chars measured) through it — ~85% of the writer's rules (STRICT BRAND RULE cut
+mid-sentence, on-page SEO + humanizer rules) were silently discarded on every draft.
+Cap now 20,000 (untrusted wizard input is still capped at 2000 upstream by
+CustomPromptGuard).
+
 ### Brand-safety hard guarantee (2026-08-20, cocomii incident)
 
 No article carrying a blocked term the lint can match ships READY or reaches a
