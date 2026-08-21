@@ -556,6 +556,16 @@ old behaviour left that test red from 07-27 until 2026-08-15.
 Tests: `ContentGuardEvolutionTest` (7); `CompetitorMentionGuardTest` (26 —
 +2 for the common-word alias filter).
 
+### Images follow the is_current crown (2026-08-21)
+
+`ContentArticle::storeVersion` re-points ALL of the topic's ContentImage rows to the
+newly-created current version, and the producer's `makeCurrent` (rejected de-AI/scrub
+candidate path) hands them back. Every consumer — publish drivers' `featuredImage()`,
+WP sideload, review page — reads images off the CURRENT version, so any post-image
+version bump (client edit, revise pass, brand scrub, reviseCurrentArticle) used to
+strand the rows on the old version and the article published with no main image
+(cocomii Shopify 2026-08-21). Tests: `ContentImageCrownTest` (2).
+
 ### Schedule reflow on topic removal (2026-08-21)
 
 `ContentTopicPlanner::fillVacatedDate($plan, $vacatedDate)` — called by BOTH

@@ -912,6 +912,15 @@ class ContentArticleProducer
             ->whereKey($article->getKey())
             ->update(['is_current' => true]);
 
+        // Images follow the crown (see ContentArticle::storeVersion) — the
+        // rejected candidate took them when it was stored; hand them back.
+        \App\Models\ContentImage::query()
+            ->whereIn('article_id', ContentArticle::query()
+                ->where('topic_id', $article->topic_id)
+                ->whereKeyNot($article->getKey())
+                ->select('id'))
+            ->update(['article_id' => $article->getKey()]);
+
         $article->setAttribute('is_current', true)->syncOriginal();
     }
 
