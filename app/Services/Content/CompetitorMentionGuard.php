@@ -263,6 +263,15 @@ class CompetitorMentionGuard
 
         $auto = [];
         foreach ((array) ($guard['auto'] ?? []) as $c) {
+            // Generic-name brands (classifier flag, 2026-08-22): the name is
+            // everyday English in this niche ("stylish names" on a nickname
+            // site) — blocking the words wedges every article in the
+            // brand-safety gate. Links to the DOMAIN stay blocked via
+            // blockedDomains(); only the prose term is exempt. A client can
+            // still hand-add the term (manual always wins).
+            if (! empty($c['generic'])) {
+                continue;
+            }
             $brand = mb_strtolower(trim((string) ($c['brand'] ?? '')));
             $auto[] = $brand;
             // Aliases classified alongside the brand ("urban company" → "uc",
@@ -889,6 +898,12 @@ class CompetitorMentionGuard
                   -> "Semrush"), plus up to 4 "aliases": common abbreviations, alternate
                   spellings or flagship product names a writer might use instead
                   (e.g. "UC" for Urban Company). Empty list when none exist.
+                  Also set "generic_name": true when the brand name is ALSO an
+                  everyday word or phrase writers would naturally use in this
+                  niche's articles (e.g. "Stylish Names" for a nickname-generator
+                  site, "Square" for a payments company on a furniture blog).
+                  For generic names we block only LINKS to the domain, never the
+                  words themselves — flagging prose would forbid normal English.
 
                 Also tag EVERY domain with "entity" — what kind of business it is:
                 "brand" (sells its own products), "retailer" (shop selling many brands),
@@ -913,7 +928,7 @@ class CompetitorMentionGuard
                 Give a one-sentence reason written TO the business owner.
 
                 Return JSON:
-                {"harmful": bool, "reason": "...", "domains": [{"domain": "...", "verdict": "block|reference", "entity": "brand|retailer|marketplace|directory|media|service|other", "brand": "...", "aliases": ["..."], "why": "..."}]}
+                {"harmful": bool, "reason": "...", "domains": [{"domain": "...", "verdict": "block|reference", "entity": "brand|retailer|marketplace|directory|media|service|other", "brand": "...", "aliases": ["..."], "generic_name": bool, "why": "..."}]}
                 PROMPT],
             ], array_filter([
                 'temperature' => 0.1,
@@ -953,6 +968,9 @@ class CompetitorMentionGuard
                     'brand' => mb_strtolower($brand),
                     'domain' => $domain,
                     'reason' => mb_substr(trim((string) ($row['why'] ?? '')), 0, 200),
+                    // Generic-name brands ("Stylish Names" on a nickname site)
+                    // block by DOMAIN/link only — their words are normal prose.
+                    'generic' => (bool) ($row['generic_name'] ?? false),
                     'aliases' => array_slice(array_values(array_filter(array_map(
                         static fn ($a) => mb_strtolower(trim((string) $a)),
                         is_array($row['aliases'] ?? null) ? $row['aliases'] : []

@@ -243,6 +243,39 @@ class CompetitorMentionGuardTest extends TestCase
 
     // ── assessment ──────────────────────────────────────────────────────
 
+    /**
+     * A blocked competitor whose NAME is everyday English in the niche
+     * ("Stylish Names" on a nickname-generator site) must not become a prose
+     * term — it wedged articles in the brand-safety hard gate after burning
+     * the whole revise+scrub budget (pubgnamegenerator 2026-08-22). The
+     * classifier flags it generic_name; links to the domain stay blocked.
+     */
+    public function test_generic_name_brands_block_by_domain_only(): void
+    {
+        [, , $plan] = $this->planWithGuard();
+        $plan->update(['competitor_overrides' => ['added' => ['stylishnames.com', 'nickfinder.com']]]);
+
+        app(CompetitorMentionGuard::class)->assess($plan->fresh(), $this->fakeLlm([
+            'harmful' => true,
+            'reason' => 'Rival generators exist.',
+            'domains' => [
+                ['domain' => 'stylishnames.com', 'verdict' => 'block', 'brand' => 'Stylish Names',
+                    'generic_name' => true, 'aliases' => ['stylish name'], 'why' => 'rival but generic phrase'],
+                ['domain' => 'nickfinder.com', 'verdict' => 'block', 'brand' => 'NickFinder',
+                    'generic_name' => false, 'why' => 'distinctive rival'],
+            ],
+        ]));
+
+        $plan->refresh();
+        $guard = app(CompetitorMentionGuard::class);
+        $this->assertSame(['nickfinder'], $guard->terms($plan),
+            'generic-name brand (and its aliases) must not be a prose term');
+        $domains = $guard->blockedDomains($plan);
+        sort($domains);
+        $this->assertSame(['nickfinder.com', 'stylishnames.com'], $domains,
+            'the generic-name rival is still link-blocked');
+    }
+
     public function test_assess_classifies_blocks_vs_references_and_auto_enables(): void
     {
         [, , $plan] = $this->planWithGuard();

@@ -589,6 +589,19 @@ skipped; after the Firecrawl crawl populated the URL list the same machinery add
 validated links. Stages: `context_rescore` / `context_revise_N`. May need >1
 invocation — a pass can hit target score while the link check still fails.
 
+### Generic-name auto brands block by domain only (2026-08-22)
+
+The classifier now flags `generic_name` per blocked competitor (stored as
+`auto[i].generic`): a rival whose NAME is everyday English in the niche ("Stylish
+Names" on a nickname site) contributes NO prose term in `terms()` — its words are
+normal writing and blocking them wedged articles in the brand-safety hard gate
+after burning the full revise+scrub budget (pubgnamegenerator 2026-08-22, the
+multi-word cousin of the COMMON_WORD_TERMS single-word filter). Links to the
+domain stay blocked via `blockedDomains()`; a client hand-adding the term still
+wins (manual is never filtered). Pre-flag assessments treat missing `generic` as
+false and heal on their next re-assessment. Test:
+`CompetitorMentionGuardTest::test_generic_name_brands_block_by_domain_only`.
+
 ### DeepSeek off-peak dispatch (2026-08-22)
 
 DeepSeek bills 2× during ITS peak hours — defined in UTC on their pricing page:
