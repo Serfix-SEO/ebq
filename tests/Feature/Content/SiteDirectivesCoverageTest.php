@@ -339,4 +339,62 @@ class SiteDirectivesCoverageTest extends TestCase
                 'admin_content_prompt' => str_repeat('a', 2001),
             ])->assertSessionHasErrors('admin_content_prompt');
     }
+
+    /**
+     * "Clear future topics & re-plan": deletes only UNWRITTEN planner output
+     * (suggested/approved without an article), leaves everything written or
+     * historical, and re-dispatches the planner so fresh directives shape the
+     * whole calendar immediately.
+     */
+    public function test_admin_clear_future_topics_deletes_unwritten_only_and_replans(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        [$website, $plan, $readyTopic] = $this->directedPlan();
+        $owner = User::find($website->user_id);
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->articleFor($readyTopic); // ready + written
+
+        $mk = fn (string $status, string $kw) => ContentTopic::create([
+            'plan_id' => $plan->id, 'website_id' => $website->id,
+            'title' => 'T '.$kw, 'target_keyword' => $kw, 'status' => $status,
+        ]);
+        $suggested = $mk(ContentTopic::STATUS_SUGGESTED, 'kw suggested');
+        $approved = $mk(ContentTopic::STATUS_APPROVED, 'kw approved');
+        $writing = $mk(ContentTopic::STATUS_WRITING, 'kw writing');
+        $published = $mk(ContentTopic::STATUS_PUBLISHED, 'kw published');
+        // Approved but carrying an article (edge: reset after a write) — the
+        // whereDoesntHave('articles') guard must keep it.
+        $approvedWritten = $mk(ContentTopic::STATUS_APPROVED, 'kw approved written');
+        $this->articleFor($approvedWritten);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.clients.content-topics.clear', [$owner, $website]))
+            ->assertRedirect();
+
+        $this->assertNull(ContentTopic::find($suggested->id));
+        $this->assertNull(ContentTopic::find($approved->id));
+        foreach ([$readyTopic, $writing, $published, $approvedWritten] as $survivor) {
+            $this->assertNotNull(ContentTopic::find($survivor->id), $survivor->target_keyword.' must survive');
+        }
+
+        \Illuminate\Support\Facades\Queue::assertPushed(
+            \App\Jobs\PlanContentTopicsJob::class,
+            fn ($job) => $job->planId === $plan->id
+        );
+        $this->assertDatabaseHas('client_activities', [
+            'type' => 'admin.content_topics_cleared', 'website_id' => $website->id,
+        ]);
+
+        // Cross-client website → 404, nothing dispatched for it.
+        $stranger = User::factory()->create();
+        $this->actingAs($admin)
+            ->delete(route('admin.clients.content-topics.clear', [$stranger, $website]))
+            ->assertNotFound();
+
+        // Website without a plan → 404.
+        $bare = Website::factory()->for($owner)->create();
+        $this->actingAs($admin)
+            ->delete(route('admin.clients.content-topics.clear', [$owner, $bare]))
+            ->assertNotFound();
+    }
 }

@@ -284,6 +284,12 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-22 — Admin "Clear future topics & re-plan" + directives-card select fix.**
+  New directives only shaped next month's top-up; the card now clears a website's
+  UNWRITTEN planner output (suggested/approved without an article — DELETE not skip,
+  so confirmed keywords re-materialize) and re-runs `PlanContentTopicsJob`. Select
+  chevron overlapped text (`px-3` vs @tailwindcss/forms padding) — fixed.
+  `infra/content-autopilot/README.md` § Site directives.
 - **2026-08-20 — Blocked sites now crawl through Firecrawl.** Non-Cloudflare bot walls
   (Shopify/hCaptcha — cocomii.com) never matched RenderGate, so the render fallback was dead
   and runs aborted "(captcha)". Any detector-classified block now falls back to Firecrawl,

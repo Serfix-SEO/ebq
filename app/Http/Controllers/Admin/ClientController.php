@@ -315,6 +315,44 @@ class ClientController extends Controller
                 : 'Content directives cleared for '.$website->domain.'.');
     }
 
+    /**
+     * "Clear future topics & re-plan" (content-directives card): delete the
+     * website's UNWRITTEN planner output (suggested/approved, never anything
+     * with an article) and re-run the planner immediately, so fresh admin
+     * directives shape the whole calendar instead of only next month's top-up.
+     *
+     * DELETE, not skip: confirmed-keyword idempotency is "a topic row with
+     * that keyword exists" (any status) — skipping would permanently bury the
+     * client's own confirmed picks, deleting lets them re-materialize 1:1 on
+     * the very next plan run.
+     */
+    public function clearFutureTopics(User $user, Website $website, ClientActivityLogger $logger): RedirectResponse
+    {
+        abort_unless($website->user_id === $user->id, 404);
+        $plan = ContentPlan::query()->where('website_id', $website->id)->first();
+        abort_if($plan === null, 404);
+
+        $scope = $plan->topics()
+            ->whereIn('status', [\App\Models\ContentTopic::STATUS_SUGGESTED, \App\Models\ContentTopic::STATUS_APPROVED])
+            ->whereDoesntHave('articles');
+        $cleared = (clone $scope)->count();
+        $scope->delete();
+
+        $logger->log(
+            'admin.content_topics_cleared',
+            userId: $user->id,
+            websiteId: $website->id,
+            meta: ['cleared' => $cleared],
+        );
+
+        \App\Jobs\PlanContentTopicsJob::dispatch($plan->id);
+
+        return redirect()
+            ->to(route('admin.clients.show', $user).'#content-directives')
+            ->with('status', 'Cleared '.$cleared.' planned topic'.($cleared === 1 ? '' : 's').' for '.$website->domain
+                .' — the planner is rebuilding the calendar with the current directives.');
+    }
+
     public function update(Request $request, User $user, ClientActivityLogger $logger): RedirectResponse
     {
         $data = $request->validate([

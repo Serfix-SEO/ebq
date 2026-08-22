@@ -504,6 +504,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/clients/{user}', [AdminClientController::class, 'show'])->name('clients.show');
     Route::put('/clients/{user}', [AdminClientController::class, 'update'])->name('clients.update');
     Route::put('/clients/{user}/websites/{website}/content-prompt', [AdminClientController::class, 'updateContentPrompt'])->name('clients.content-prompt');
+    Route::delete('/clients/{user}/websites/{website}/content-topics', [AdminClientController::class, 'clearFutureTopics'])->name('clients.content-topics.clear');
     Route::post('/clients/{user}/crawl', [AdminClientController::class, 'crawl'])->name('clients.crawl');
     Route::post('/clients/{user}/impersonate', [ClientImpersonationController::class, 'start'])->name('clients.impersonate');
 

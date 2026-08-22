@@ -442,10 +442,13 @@
                       action="{{ route('admin.clients.content-prompt', [$client, $dirSites->first()['id']]) }}">
                     @csrf
                     @method('PUT')
+                    {{-- No px-* here: @tailwindcss/forms reserves the right padding
+                         for its chevron — px-3 made the arrow overlap the domain. --}}
                     <select id="content-directives-site"
-                            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto">
+                            class="w-full rounded-lg border-slate-300 text-sm focus:border-orange-500 focus:ring-orange-500 sm:w-auto">
                         @foreach ($dirSites as $w)
                             <option value="{{ route('admin.clients.content-prompt', [$client, $w['id']]) }}"
+                                    data-clear-action="{{ route('admin.clients.content-topics.clear', [$client, $w['id']]) }}"
                                     data-prompt="{{ $w['plan']->admin_content_prompt }}">
                                 {{ $w['domain'] }}{{ trim((string) $w['plan']->admin_content_prompt) !== '' ? ' — prompt set' : '' }}
                             </option>
@@ -461,15 +464,35 @@
                         </button>
                     </div>
                 </form>
+                {{-- Clear-and-replan: deletes UNWRITTEN planner output only (suggested/
+                     approved, nothing with an article) and re-runs the planner so new
+                     directives shape the whole calendar immediately. --}}
+                <form method="POST" class="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3"
+                      id="content-directives-clear-form"
+                      action="{{ route('admin.clients.content-topics.clear', [$client, $dirSites->first()['id']]) }}"
+                      onsubmit="return confirm('Delete all unwritten planned topics for this website and re-plan under the current directives?')">
+                    @csrf
+                    @method('DELETE')
+                    <p class="text-[11px] leading-4 text-slate-400">
+                        Removes unwritten planned topics only — written, scheduled and published articles are never
+                        touched. The client's own confirmed keywords are re-added automatically.
+                    </p>
+                    <button type="submit"
+                            class="shrink-0 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50">
+                        Clear future topics &amp; re-plan
+                    </button>
+                </form>
                 <script>
                     (function () {
                         const sel = document.getElementById('content-directives-site');
                         const form = document.getElementById('content-directives-form');
+                        const clearForm = document.getElementById('content-directives-clear-form');
                         const text = document.getElementById('content-directives-text');
                         const count = document.getElementById('content-directives-count');
                         const sync = () => { count.textContent = String(text.value.length); };
                         sel.addEventListener('change', () => {
                             form.action = sel.value;
+                            clearForm.action = sel.options[sel.selectedIndex].dataset.clearAction || clearForm.action;
                             text.value = sel.options[sel.selectedIndex].dataset.prompt || '';
                             sync();
                         });

@@ -680,6 +680,25 @@ block is appended in `AbstractAiTool::execute()`).
 verdicts): `CompetitorMentionGuard::classify`, `DiscoverContentCompetitorsJob`,
 `SiteProfileExtractor`, `ContentKeywordInsights::llmScrapKeywords`.
 
+**Clear future topics & re-plan (2026-08-22)**: the calendar is full of topics ideated
+under the OLD steering, and the planner only tops up as topics publish — so a new
+directive would take ~a month to shape the calendar. The directives card has a
+"Clear future topics & re-plan" button per selected website
+(`DELETE admin/clients/{user}/websites/{website}/content-topics` →
+`Admin\ClientController::clearFutureTopics`, audit `admin.content_topics_cleared`):
+deletes ONLY unwritten planner output — status `suggested`/`approved` AND
+`whereDoesntHave('articles')` (nothing written/in-flight/ready/published/failed is
+touched) — then dispatches `PlanContentTopicsJob`, which refills the pool to cap
+under the current directives. **DELETE, not skip**: confirmed-keyword idempotency in
+`ContentTopicPlanner::materializeConfirmedTopics` is "a topic row with that keyword
+exists in ANY status", so skipping would permanently bury the client's own confirmed
+picks; deleting lets them re-materialize 1:1 on the next plan run. Test:
+`SiteDirectivesCoverageTest::test_admin_clear_future_topics_deletes_unwritten_only_and_replans`.
+
+**Card UI gotcha**: never put `px-*` on that card's `<select>` — `@tailwindcss/forms`
+reserves the select's right padding for its chevron background; `px-3` made the arrow
+overlap the domain text (fixed 2026-08-22, lifecycle-page select pattern).
+
 **Truncation bug fixed with this feature**: `AiWriterService::buildPrompt` capped the
 `custom_prompt` slot at 2,000 chars while the autopilot rides its ENTIRE rule block
 (~13k chars measured) through it — ~85% of the writer's rules (STRICT BRAND RULE cut
