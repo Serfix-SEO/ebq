@@ -315,6 +315,73 @@ class ReferralProgramTest extends TestCase
         $this->actingAs($user)->get(route('referrals.index'))->assertOk();
     }
 
+    // ── Custom referral IDs ─────────────────────────────────────────────
+
+    public function test_custom_code_is_saved_and_attributes_signups(): void
+    {
+        $referrer = $this->referrer();
+        $program = app(ReferralProgram::class);
+
+        $this->assertNull($program->setCustomCode($referrer, 'Malis-Agency'));
+        $this->assertSame('malis-agency', $referrer->fresh()->referral_code); // stored lowercase
+
+        // Hyphenated custom codes survive middleware capture + attribution.
+        $response = $this->get('/?ref=malis-agency');
+        $this->assertNotNull(collect($response->headers->getCookies())
+            ->first(fn ($c) => $c->getName() === CaptureReferralCode::COOKIE));
+
+        $this->withCookie(CaptureReferralCode::COOKIE, 'malis-agency')
+            ->post(route('register'), [
+                'name' => 'F', 'email' => 'custom@example.com',
+                'password' => 'secret-password-1', 'password_confirmation' => 'secret-password-1',
+            ]);
+        $this->assertDatabaseHas('referrals', [
+            'referrer_user_id' => $referrer->id,
+            'code_used' => 'malis-agency',
+            'status' => Referral::STATUS_PENDING,
+        ]);
+    }
+
+    public function test_custom_code_rejects_taken_and_invalid_values(): void
+    {
+        $referrer = $this->referrer(); // holds abcd1234
+        $other = User::factory()->create();
+        $program = app(ReferralProgram::class);
+
+        // Another user's code is refused; the holder keeps it.
+        $this->assertSame('taken', $program->setCustomCode($other, 'abcd1234'));
+        $this->assertSame('taken', $program->setCustomCode($other, 'ABCD1234')); // case-insensitive
+        $this->assertNull($other->fresh()->referral_code);
+        $this->assertSame('abcd1234', $referrer->fresh()->referral_code);
+
+        // Shape violations.
+        foreach (['ab', '-abcdef', 'abcdef-', 'has space', 'ünïcode1', str_repeat('a', 17)] as $bad) {
+            $this->assertSame('invalid_format', $program->setCustomCode($other, $bad), $bad);
+        }
+
+        // Saving your own current code is a no-op success.
+        $this->assertNull($program->setCustomCode($referrer, 'abcd1234'));
+    }
+
+    public function test_livewire_component_updates_code_and_url(): void
+    {
+        $user = User::factory()->create();
+        $taken = User::factory()->create();
+        $taken->forceFill(['referral_code' => 'claimed1'])->save();
+
+        \Livewire\Livewire::actingAs($user)->test(\App\Livewire\Referrals\ReferralHub::class)
+            ->set('editCode', 'claimed1')
+            ->call('updateCode')
+            ->assertHasErrors('editCode')
+            ->set('editCode', 'my-brand')
+            ->call('updateCode')
+            ->assertHasNoErrors()
+            ->assertSet('code', 'my-brand')
+            ->assertSet('url', fn ($url) => str_ends_with($url, '/?ref=my-brand'));
+
+        $this->assertSame('my-brand', $user->fresh()->referral_code);
+    }
+
     public function test_referral_page_masks_referred_emails(): void
     {
         $referrer = User::factory()->create();

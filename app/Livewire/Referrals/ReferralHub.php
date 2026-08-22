@@ -19,10 +19,42 @@ class ReferralHub extends Component
 
     public string $url = '';
 
+    /** Editable copy of the code (custom / vanity codes). */
+    public string $editCode = '';
+
     public function mount(): void
     {
         $this->code = app(ReferralProgram::class)->codeFor(Auth::user());
+        $this->editCode = $this->code;
+        $this->refreshUrl();
+    }
+
+    private function refreshUrl(): void
+    {
         $this->url = rtrim((string) config('app.public_url', config('app.url')), '/').'/?ref='.$this->code;
+    }
+
+    /** Save a custom code — honored only when no other user already holds it. */
+    public function updateCode(): void
+    {
+        $error = app(ReferralProgram::class)->setCustomCode(Auth::user(), $this->editCode);
+
+        if ($error === 'invalid_format') {
+            $this->addError('editCode', __('Use 4–16 characters: lowercase letters, numbers and hyphens (no leading/trailing hyphen).'));
+
+            return;
+        }
+        if ($error === 'taken') {
+            $this->addError('editCode', __('That referral ID is already taken — try another one.'));
+
+            return;
+        }
+
+        $this->resetErrorBag('editCode');
+        $this->code = Auth::user()->fresh()->referral_code;
+        $this->editCode = $this->code;
+        $this->refreshUrl();
+        session()->flash('referral-code-saved', __('Your referral link has been updated. Links you shared before still show the old ID, so share the new one.'));
     }
 
     /** j***@gmail.com — enough for the referrer to recognize, never the full address. */

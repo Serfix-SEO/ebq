@@ -21,6 +21,27 @@
             </button>
         </div>
 
+        {{-- Custom referral ID --}}
+        <div class="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <p class="text-xs font-bold text-slate-900 dark:text-slate-100">{{ __('Customize your referral ID') }}</p>
+            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ __('Pick something memorable — it’s yours as long as nobody else has claimed it.') }}</p>
+            <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+                <div class="flex min-w-0 flex-1 items-center overflow-hidden rounded-xl border border-slate-300 bg-white focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 dark:border-slate-700 dark:bg-slate-800">
+                    <span class="shrink-0 select-none bg-slate-50 px-3 py-2 font-mono text-sm text-slate-400 dark:bg-slate-900/60">{{ rtrim(parse_url($this->url, PHP_URL_HOST) ?: 'serfix.io', '/') }}/?ref=</span>
+                    <input type="text" wire:model="editCode" wire:keydown.enter="updateCode" maxlength="16"
+                        class="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 font-mono text-sm text-slate-700 focus:outline-none focus:ring-0 dark:text-slate-200" />
+                </div>
+                <button type="button" wire:click="updateCode"
+                    class="shrink-0 rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                    {{ __('Save ID') }}
+                </button>
+            </div>
+            @error('editCode') <p class="mt-1.5 text-xs text-error">{{ $message }}</p> @enderror
+            @if (session('referral-code-saved'))
+                <p class="mt-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">{{ session('referral-code-saved') }}</p>
+            @endif
+        </div>
+
         {{-- How it works --}}
         <div class="mt-5 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 dark:border-slate-800">
             @foreach ([

@@ -24,7 +24,9 @@ class CaptureReferralCode
     {
         $code = strtolower(trim((string) $request->query('ref', '')));
 
-        if ($code !== '' && preg_match('/^[a-z0-9]{4,16}$/', $code) === 1) {
+        // Same shape ReferralProgram::isValidCode accepts (custom codes may
+        // carry inner hyphens).
+        if ($code !== '' && preg_match('/^[a-z0-9][a-z0-9-]{2,14}[a-z0-9]$/', $code) === 1) {
             Cookie::queue(cookie(self::COOKIE, $code, self::TTL_MINUTES));
         }
 

@@ -59,6 +59,42 @@ class ReferralProgram
         throw new \RuntimeException('referral code generation failed');
     }
 
+    /** Shared shape for generated AND custom codes (middleware mirrors it). */
+    public static function isValidCode(string $code): bool
+    {
+        return preg_match('/^[a-z0-9][a-z0-9-]{2,14}[a-z0-9]$/', $code) === 1;
+    }
+
+    /**
+     * Custom (vanity) code: honored only when no other user holds it — the
+     * unique index is the race-proof arbiter. Changing the code kills links
+     * shared under the old one (it resolves to nobody afterwards).
+     *
+     * @return string|null null on success, else a machine reason
+     *                     ('invalid_format'|'taken')
+     */
+    public function setCustomCode(User $user, string $code): ?string
+    {
+        $code = Str::lower(trim($code));
+        if (! self::isValidCode($code)) {
+            return 'invalid_format';
+        }
+        if ($code === $user->referral_code) {
+            return null; // no-op
+        }
+        if (User::query()->where('referral_code', $code)->where('id', '!=', $user->id)->exists()) {
+            return 'taken';
+        }
+
+        try {
+            $user->forceFill(['referral_code' => $code])->save();
+        } catch (\Illuminate\Database\QueryException) {
+            return 'taken'; // lost the race to the unique index
+        }
+
+        return null;
+    }
+
     public function resolveCodeToUser(string $code): ?User
     {
         $code = Str::lower(trim($code));

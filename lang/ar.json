@@ -4856,5 +4856,11 @@
     "Someone you referred just made their first payment — thank you for spreading the word!": "أحد الأشخاص الذين أحلتهم سدّد للتو أول دفعة له — شكرًا لنشر الكلمة!",
     "We've added a :amount credit to your account — 50% off your subscription. It will be applied automatically to your next invoice.": "أضفنا رصيدًا بقيمة :amount إلى حسابك — خصم 50% على اشتراكك. سيُطبّق تلقائيًا على فاتورتك التالية.",
     "View your referrals": "عرض إحالاتك",
-    "Keep sharing your referral link — every friend who subscribes earns you another 50% off.": "واصل مشاركة رابط الإحالة — كل صديق يشترك يمنحك خصم 50% إضافيًا."
+    "Keep sharing your referral link — every friend who subscribes earns you another 50% off.": "واصل مشاركة رابط الإحالة — كل صديق يشترك يمنحك خصم 50% إضافيًا.",
+    "Customize your referral ID": "خصّص معرّف الإحالة الخاص بك",
+    "Pick something memorable — it’s yours as long as nobody else has claimed it.": "اختر شيئًا يسهل تذكّره — سيكون لك ما دام لم يحجزه أحد غيرك.",
+    "Save ID": "حفظ المعرّف",
+    "Use 4–16 characters: lowercase letters, numbers and hyphens (no leading/trailing hyphen).": "استخدم 4–16 حرفًا: أحرف إنجليزية صغيرة وأرقام وشرطات (بدون شرطة في البداية أو النهاية).",
+    "That referral ID is already taken — try another one.": "معرّف الإحالة هذا محجوز بالفعل — جرّب معرّفًا آخر.",
+    "Your referral link has been updated. Links you shared before still show the old ID, so share the new one.": "تم تحديث رابط الإحالة الخاص بك. الروابط التي شاركتها سابقًا ما زالت تحمل المعرّف القديم، لذا شارك الرابط الجديد."
 }

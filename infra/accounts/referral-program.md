@@ -61,6 +61,13 @@ still earns it — it sits on the balance until their next invoice.
 - `users.referral_code` string(16) nullable unique — lazily generated
   (`ReferralProgram::codeFor`, 8-char lowercase alnum) on first referral-page
   visit. Never mass-assignable.
+- **Custom (vanity) IDs (2026-08-22)**: the referral page lets the user edit
+  their ID (`ReferralProgram::setCustomCode`) — shape
+  `^[a-z0-9][a-z0-9-]{2,14}[a-z0-9]$` (shared with the capture middleware via
+  `isValidCode`; keep the two in sync), stored lowercase, honored only when no
+  other user holds it (pre-check + the unique index as race arbiter →
+  'taken'). Changing the ID kills previously shared links (old code resolves
+  to nobody) — the UI says so on save.
 - `referrals`: **no DB foreign keys** (content_generations precedent — reward
   history must survive account deletion; read paths null-check).
   `referred_user_id` UNIQUE = one reward per referred account, ever.
