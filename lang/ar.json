@@ -4825,5 +4825,8 @@
     "This article contains a brand you blocked": "تحتوي هذه المقالة على علامة تجارية قمت بحظرها",
     "It won't publish (or stay published) with the blocked words in it. We can rewrite just those mentions and send the clean version to your site.": "لن تُنشر (أو تبقى منشورة) وبها الكلمات المحظورة. يمكننا إعادة صياغة تلك الإشارات فقط وإرسال النسخة النظيفة إلى موقعك.",
     "Remove blocked mentions": "إزالة الإشارات المحظورة",
-    "Removing the blocked mentions — the cleaned article will be sent to your site in a few minutes.": "جارٍ إزالة الإشارات المحظورة — سيتم إرسال المقالة بعد تنظيفها إلى موقعك خلال دقائق."
+    "Removing the blocked mentions — the cleaned article will be sent to your site in a few minutes.": "جارٍ إزالة الإشارات المحظورة — سيتم إرسال المقالة بعد تنظيفها إلى موقعك خلال دقائق.",
+    "links blocked": "الروابط محظورة",
+    "“:brand” is a common phrase, so articles may use the words — but they will never link to or recommend :domain.": "«:brand» عبارة شائعة، لذا يمكن للمقالات استخدام الكلمات — لكنها لن تضع رابطًا إلى :domain ولن توصي به أبدًا.",
+    "Allow linking to :domain": "السماح بالربط إلى :domain"
 }

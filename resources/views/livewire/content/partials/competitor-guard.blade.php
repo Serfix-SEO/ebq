@@ -58,12 +58,27 @@
 
         @if ($guard['enabled'])
             <div class="mt-4">
-                @if ($guard['terms'] !== [])
+                @if ($guard['terms'] !== [] || ! empty($guard['linkOnly']))
                     <div class="flex flex-wrap gap-1.5">
                         @foreach ($guard['terms'] as $term)
                             <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 py-1 pe-1.5 ps-3 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200" wire:key="guard-term-{{ $term }}">
                                 {{ $term }}
                                 <button type="button" wire:click="removeBlockedTerm('{{ $term }}')" aria-label="{{ __('Allow mentioning :term', ['term' => $term]) }}"
+                                    class="flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700">
+                                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                            </span>
+                        @endforeach
+                        {{-- Rivals whose NAME is everyday English: their words stay
+                             allowed (blocking them would forbid normal writing) but
+                             LINKS to their site are always blocked. Shown so nothing
+                             protected is ever invisible on this card. --}}
+                        @foreach ($guard['linkOnly'] ?? [] as $lo)
+                            <span class="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 bg-transparent py-1 pe-1.5 ps-3 text-xs font-medium text-slate-500 dark:border-slate-600 dark:text-slate-400"
+                                  wire:key="guard-linkonly-{{ $lo['domain'] }}"
+                                  title="{{ __('“:brand” is a common phrase, so articles may use the words — but they will never link to or recommend :domain.', ['brand' => $lo['brand'], 'domain' => $lo['domain']]) }}">
+                                {{ $lo['domain'] }} · {{ __('links blocked') }}
+                                <button type="button" wire:click="removeBlockedTerm('{{ $lo['brand'] }}')" aria-label="{{ __('Allow linking to :domain', ['domain' => $lo['domain']]) }}"
                                     class="flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700">
                                     <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>

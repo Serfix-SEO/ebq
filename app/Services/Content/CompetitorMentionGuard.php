@@ -117,6 +117,25 @@ class CompetitorMentionGuard
             // citation sources) rendered as their own chip group, and the
             // value counter that makes the feature visible after setup.
             'mode' => $this->mode($plan),
+            // Generic-name rivals (2026-08-22): blocked at the DOMAIN/link
+            // level only — their names are everyday English. Surfaced so the
+            // card shows EVERYTHING protected; without this a client who added
+            // such a competitor saw its chip vanish and assumed it was dropped.
+            'linkOnly' => (function () use ($g): array {
+                $removed = array_map(
+                    static fn ($t) => mb_strtolower(trim((string) $t)),
+                    (array) ($g['removed'] ?? [])
+                );
+                $out = [];
+                foreach ((array) ($g['auto'] ?? []) as $c) {
+                    $brand = mb_strtolower(trim((string) ($c['brand'] ?? '')));
+                    if (! empty($c['generic']) && $brand !== '' && ! in_array($brand, $removed, true)) {
+                        $out[] = ['brand' => $brand, 'domain' => mb_strtolower(trim((string) ($c['domain'] ?? '')))];
+                    }
+                }
+
+                return $out;
+            })(),
             'references' => array_values(array_filter(array_map(
                 static fn ($d) => mb_strtolower(trim((string) $d)), (array) ($g['references'] ?? [])
             ))),

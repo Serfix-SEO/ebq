@@ -601,6 +601,10 @@ domain stay blocked via `blockedDomains()`; a client hand-adding the term still
 wins (manual is never filtered). Pre-flag assessments treat missing `generic` as
 false and heal on their next re-assessment. Test:
 `CompetitorMentionGuardTest::test_generic_name_brands_block_by_domain_only`.
+UI: `stateFor()['linkOnly']` surfaces generic-name rivals on the guard card as
+dashed "domain · links blocked" chips (shared partial → both wizard hosts), so a
+protected competitor never silently vanishes from the card; the chip's ✗ routes
+through the existing `removeBlockedTerm(brand)` which also lifts the domain block.
 
 ### DeepSeek off-peak dispatch (2026-08-22)
 

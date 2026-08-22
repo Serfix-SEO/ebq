@@ -274,6 +274,17 @@ class CompetitorMentionGuardTest extends TestCase
         sort($domains);
         $this->assertSame(['nickfinder.com', 'stylishnames.com'], $domains,
             'the generic-name rival is still link-blocked');
+
+        // The guard card must still SHOW the generic-name rival — as a
+        // link-only chip — or the client thinks their competitor was dropped.
+        $state = $guard->stateFor($plan);
+        $this->assertSame([['brand' => 'stylish names', 'domain' => 'stylishnames.com']], $state['linkOnly']);
+
+        // Removing the link-only chip removes the domain block too.
+        $guard->removeTerm($plan, 'stylish names');
+        $plan->refresh();
+        $this->assertSame(['nickfinder.com'], $guard->blockedDomains($plan));
+        $this->assertSame([], $guard->stateFor($plan)['linkOnly']);
     }
 
     public function test_assess_classifies_blocks_vs_references_and_auto_enables(): void
