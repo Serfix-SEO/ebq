@@ -167,6 +167,29 @@ class ArticleReviewRewriteTest extends TestCase
         $this->assertSame(1, Event::query()->where('kind', Event::KIND_SPEND)->count());
     }
 
+    public function test_version_history_hides_bookkeeping_rescore_versions(): void
+    {
+        [$user, $topic] = $this->fixture();
+        ContentArticle::create([
+            'topic_id' => $topic->id, 'version' => 2, 'is_current' => false,
+            'h1' => 'H', 'meta_title' => 'H', 'meta_description' => 'D', 'slug' => 'h',
+            'html' => '<p>Body.</p>', 'generation_meta' => ['stage' => 'context_rescore'],
+        ]);
+        $v3 = ContentArticle::create([
+            'topic_id' => $topic->id, 'version' => 3, 'is_current' => false,
+            'h1' => 'H', 'meta_title' => 'H', 'meta_description' => 'D', 'slug' => 'h',
+            'html' => '<p>Rewritten.</p>', 'generation_meta' => ['stage' => 'client_rewrite_1'],
+        ]);
+        $topic->articles()->where('version', 1)->update(['is_current' => false]);
+        $v3->update(['is_current' => true]);
+
+        $component = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id]);
+        $versions = $component->viewData('versions');
+
+        $this->assertSame([3, 1], array_column($versions, 'version'), 'rescore bookkeeping rows are hidden');
+        $this->assertSame('Your rewrite', $versions[0]['label']);
+    }
+
     public function test_use_version_recrowns_and_repoints_images_with_tenancy(): void
     {
         [$user, $topic] = $this->fixture();

@@ -89,6 +89,11 @@ class ClientRewriteCoverageTest extends TestCase
 
         $this->assertStringContainsString('CLIENT REWRITE REQUEST', $body);
         $this->assertStringContainsString(self::SENTINEL, $body);
+        // Regression (pubg 2026-08-23): the instruction as a system-tail
+        // footnote produced near-identical HTML. It must be a PRIMARY task in
+        // the USER message with the failure-on-no-change framing.
+        $this->assertStringContainsString('YOUR PRIMARY TASK', $body);
+        $this->assertStringContainsString('is a FAILURE', $body);
     }
 
     public function test_client_instruction_reaches_the_brand_scrub_prompt(): void

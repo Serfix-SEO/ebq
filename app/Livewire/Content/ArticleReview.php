@@ -387,8 +387,14 @@ class ArticleReview extends Component
 
         return $topic->articles()
             ->orderByDesc('version')
-            ->limit(20)
+            ->limit(25)
             ->get(['id', 'version', 'is_current', 'generation_meta', 'created_at'])
+            // context_rescore versions are bookkeeping: identical content
+            // re-scored against a fresh context. Listing them reads as
+            // duplicate "unwanted" rows to clients — hide unless current.
+            ->reject(fn (ContentArticle $a) => ($a->generation_meta['stage'] ?? '') === 'context_rescore' && ! $a->is_current)
+            ->take(20)
+            ->values()
             ->map(function (ContentArticle $a) use ($doneRewriteVersions): array {
                 $stage = (string) ($a->generation_meta['stage'] ?? '');
                 // Client-safe labels only — internal stage vocabulary never leaks.
@@ -398,7 +404,7 @@ class ArticleReview extends Component
                     (int) $a->version === 1 => __('Draft'),
                     str_contains($stage, 'revise') => __('Optimized'),
                     str_starts_with($stage, 'brand_scrub'),
-                    $stage === 'de_ai', $stage === 'context_rescore' => __('Cleanup'),
+                    $stage === 'de_ai' => __('Cleanup'),
                     str_contains($stage, 'edit') || str_contains($stage, 'manual') => __('Your edit'),
                     default => __('Update'),
                 };

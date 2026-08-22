@@ -1052,7 +1052,14 @@ class ContentArticleProducer
         $issueList = implode("\n- ", array_unique(array_filter($issues)));
 
         $currentWords = str_word_count(trim(strip_tags((string) $article->html)));
-        $system = 'You are an expert SEO editor. Fix ONLY the listed problems in the article. '
+        // With a client request, "fix ONLY the listed problems" must not win:
+        // deepseek took the conservative reading and returned near-identical
+        // HTML (pubg 2026-08-23: "+17 chars" for "add name examples"). The
+        // request has to be framed as the PRIMARY task, in the user message.
+        $system = 'You are an expert SEO editor. '
+            .($clientInstruction !== null
+                ? 'Your PRIMARY task is the CLIENT REWRITE REQUEST in the user message — apply it fully and visibly. Then also fix the listed problems. '
+                : 'Fix ONLY the listed problems in the article. ')
             .'Keep everything that is not mentioned unchanged. '
             .'Length discipline: the target is about '.$plan->article_length.' words and the article '
             .'is currently '.$currentWords.' words. If it is under target, ADD substantive paragraphs '
@@ -1080,10 +1087,14 @@ class ContentArticleProducer
 
         $user = "TARGET KEYWORD: {$topic->target_keyword}\n"
             .'LANGUAGE: '.($plan->language ?: 'en')."\n"
+            // The request comes FIRST and verbatim in the user message — the
+            // system-tail advisory block alone gets ignored ("unchanged return
+            // is a FAILURE" is the same lesson the brand scrub learned).
+            .($clientInstruction !== null
+                ? "CLIENT REWRITE REQUEST — YOUR PRIMARY TASK (apply fully; returning the article without a visible change for this request is a FAILURE):\n"
+                    .mb_substr(trim($clientInstruction), 0, 2000)."\n\n"
+                : '')
             ."PROBLEMS TO FIX:\n- {$issueList}\n\n"
-            // Without this line an empty problems list can produce a no-op
-            // response even though a client rewrite request is present.
-            .($clientInstruction !== null ? "Also apply the CLIENT REWRITE REQUEST from your instructions.\n\n" : '')
             .$linkBlock
             ."CURRENT META TITLE: {$article->meta_title}\n"
             ."CURRENT META DESCRIPTION: {$article->meta_description}\n"
