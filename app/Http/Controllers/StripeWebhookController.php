@@ -73,6 +73,34 @@ class StripeWebhookController extends CashierController
         return $this->successMethod();
     }
 
+    /**
+     * Rewrite-credit pack fulfillment safety net: if the buyer closes the tab
+     * before the success return, this webhook still credits them. Idempotent
+     * against the success path via the unique stripe_session_id column.
+     * Requires checkout.session.completed enabled on the Stripe endpoint.
+     */
+    public function handleCheckoutSessionCompleted(array $payload): Response
+    {
+        try {
+            $session = $payload['data']['object'] ?? [];
+            $meta = (array) ($session['metadata'] ?? []);
+            if (($meta['kind'] ?? '') === 'rewrite_credits'
+                && ($session['payment_status'] ?? '') === 'paid'
+                && ($session['id'] ?? '') !== '') {
+                $user = User::query()->find($meta['user_id'] ?? '')
+                    ?? User::query()->where('stripe_id', $session['customer'] ?? '')->first();
+                if ($user !== null) {
+                    app(\App\Services\Content\RewriteCredits::class)
+                        ->grantForPurchase($user, (string) $session['id'], (int) ($meta['credits'] ?? 0));
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('rewrite credits webhook skipped: '.$e->getMessage());
+        }
+
+        return $this->successMethod();
+    }
+
     public function handleCustomerSubscriptionDeleted(array $payload): Response
     {
         $response = parent::handleCustomerSubscriptionDeleted($payload);

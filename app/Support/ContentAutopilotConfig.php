@@ -212,6 +212,43 @@ class ContentAutopilotConfig
         return max(30, (int) self::setting('content.enrichment.rebuy_days', 365));
     }
 
+    /**
+     * Free article-rewrite credits per calendar month for PAID content
+     * subscribers (trial gets 0 free — they can purchase packs). No rollover:
+     * the allowance is computed per month, never stored.
+     */
+    public static function rewriteMonthlyFree(): int
+    {
+        return max(0, min(100, (int) self::setting('content.rewrite.monthly_free', 5)));
+    }
+
+    /**
+     * Purchasable rewrite-credit packs, admin-editable (settings textarea,
+     * one "credits:usd" per line). @return list<array{credits:int, usd:int}>
+     */
+    public static function rewritePacks(): array
+    {
+        $stored = self::setting('content.rewrite.packs');
+        if (is_array($stored) && $stored !== []) {
+            $packs = [];
+            foreach ($stored as $p) {
+                $credits = (int) ($p['credits'] ?? 0);
+                $usd = (int) ($p['usd'] ?? 0);
+                if ($credits > 0 && $usd > 0) {
+                    $packs[] = ['credits' => $credits, 'usd' => $usd];
+                }
+            }
+            if ($packs !== []) {
+                return $packs;
+            }
+        }
+
+        return [
+            ['credits' => 10, 'usd' => 5],
+            ['credits' => 25, 'usd' => 20],
+        ];
+    }
+
     public static function trialArticles(): int
     {
         return max(0, (int) self::setting('content.limits.trial_articles', 3));

@@ -80,6 +80,11 @@ class PlatformSettingsController extends Controller
                 'content_only_crawl_pages' => ContentAutopilotConfig::contentOnlyCrawlCap(),
                 'tracker_keywords' => ContentAutopilotConfig::trackerKeywords(),
                 'trial_tracker_keywords' => ContentAutopilotConfig::trialTrackerKeywords(),
+                'rewrite_monthly_free' => ContentAutopilotConfig::rewriteMonthlyFree(),
+                'rewrite_packs' => implode("\n", array_map(
+                    static fn ($p) => $p['credits'].':'.$p['usd'],
+                    ContentAutopilotConfig::rewritePacks()
+                )),
             ],
             'banner' => [
                 'enabled' => ((string) Setting::get('plugin.banner.enabled', '0')) === '1',
@@ -149,6 +154,9 @@ class PlatformSettingsController extends Controller
             'content_tracker_keywords' => ['required', 'integer', 'min:0', 'max:100000'],
             'content_trial_tracker_keywords' => ['required', 'integer', 'min:0', 'max:1000'],
             'content_only_crawl_pages' => ['required', 'integer', 'min:20', 'max:100000'],
+            'content_rewrite_monthly_free' => ['required', 'integer', 'min:0', 'max:100'],
+            // One "credits:usd" pack per line, e.g. "10:5".
+            'content_rewrite_packs' => ['nullable', 'string', 'max:2000', 'regex:/^\s*(\d{1,4}:\d{1,5}\s*(\r?\n\s*\d{1,4}:\d{1,5}\s*)*)?$/'],
             'banner_enabled' => ['nullable', 'boolean'],
             'banner_type' => ['required', 'string', Rule::in(['image', 'youtube'])],
             'banner_title' => ['nullable', 'string', 'max:120'],
@@ -221,6 +229,14 @@ class PlatformSettingsController extends Controller
         Setting::set('content.limits.content_only_crawl_pages', (int) $data['content_only_crawl_pages']);
         Setting::set('content.limits.tracker_keywords', (int) $data['content_tracker_keywords']);
         Setting::set('content.limits.trial_tracker_keywords', (int) $data['content_trial_tracker_keywords']);
+        Setting::set('content.rewrite.monthly_free', (int) $data['content_rewrite_monthly_free']);
+        $packs = [];
+        foreach (preg_split('/\r?\n/', (string) ($data['content_rewrite_packs'] ?? '')) ?: [] as $line) {
+            if (preg_match('/^\s*(\d{1,4}):(\d{1,5})\s*$/', $line, $m) === 1 && (int) $m[1] > 0 && (int) $m[2] > 0) {
+                $packs[] = ['credits' => (int) $m[1], 'usd' => (int) $m[2]];
+            }
+        }
+        Setting::set('content.rewrite.packs', $packs === [] ? null : $packs);
 
         Setting::set('plugin.banner.enabled', $request->boolean('banner_enabled') ? '1' : '0');
         Setting::set('plugin.banner.type', (string) $data['banner_type']);

@@ -134,6 +134,8 @@ class LlmProviderSwitchTest extends TestCase
             // provider switch under test.
             'content_tracker_keywords' => 500,
             'content_trial_tracker_keywords' => 3,
+            // Rewrite credits (PlatformSettingsController, 2026-08-23).
+            'content_rewrite_monthly_free' => 5,
         ];
     }
 

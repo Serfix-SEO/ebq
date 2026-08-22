@@ -706,6 +706,65 @@ mid-sentence, on-page SEO + humanizer rules) were silently discarded on every dr
 Cap now 20,000 (untrusted wizard input is still capped at 2000 upstream by
 CustomPromptGuard).
 
+### Client-paid rewrites — credits, custom prompt, version history (2026-08-23)
+
+The article page's feedback widget is actionable: "Needs small rewrites" AND
+"It's fundamentally wrong" turn the comment box into a rewrite instruction and
+the button into **Rewrite** (`ArticleReview::requestRewrite`). Every Rewrite
+click ALSO writes the `content_article_feedback` row (admin monitor keeps the
+signal even when validation/credits stop the rewrite — owner rule).
+
+**Pipeline threading**: `ContentArticleProducer::reviseCurrentArticle(...,
+?string $clientInstruction)` → `revise()` + `scrubLoop()→scrubBlockedTerms()`
+append `clientRewriteBlock()` (bounded, advisory, strict-rules-win, 2000 cap)
+AFTER `promptAddendumBlock()`. ONE-SHOT — nothing persisted to the plan.
+**HARD RULE**: any new LLM stage reachable from `reviseCurrentArticle` must
+thread `$clientInstruction` + add a capture test to `ClientRewriteCoverageTest`
+(`deAiCleanup` is NOT reachable — documented there). A client instruction
+FORCES one revise pass (healthy articles would otherwise no-op silently);
+stage label `client_rewrite_{i}`. Brand/publish hard gates re-lint every
+client-instructed version (nothing bypassed).
+
+**Validation** (`RewritePromptGuard`, CustomPromptGuard model): heuristics
+fail-CLOSED (needles/length/URL-only), LLM classifier fail-OPEN returning
+`{allow, reason, suggested_prompt}` — rejection shows the reason + a safe
+suggestion with a one-click "Use suggestion". Blank prompt skips the guard
+(generic quality pass).
+
+**Credits** (`RewriteCredits`, ledger `content_rewrite_credit_events`, no FKs):
+1 rewrite = 1 credit. Paid subscribers get `content.rewrite.monthly_free`
+(default 5) per calendar month, computed not stored → no rollover; trial = 0
+free but CAN purchase. Spend free-first at DISPATCH (user-row `lockForUpdate`
+mutex; job only refunds). Failed rewrites auto-refund (idempotent, mirrors the
+spend's source). `content_rewrite_requests` tracks each run (status,
+prior_status restore target, article_version, refund linkage);
+`RewriteArticleJob` (unique per topic, tries=1, timeout 900) wraps
+`reviseCurrentArticle` — success = a version beyond the bookkeeping rescore.
+
+**Packs** (Setting `content.rewrite.packs`, admin textarea `credits:usd` per
+line, defaults 10:5 + 25:20): one-time Cashier `checkoutCharge` payment
+sessions (`RewriteCreditsController`). LANDMINE: build success_url by string
+concat — `route()` params percent-encode the `{CHECKOUT_SESSION_ID}` braces.
+Fulfillment is idempotent by unique `stripe_session_id` on BOTH the verified
+success return (`StripeSessionReader` seam, replay-safe) and the
+`handleCheckoutSessionCompleted` webhook — **the prod Stripe endpoint must
+have `checkout.session.completed` enabled** (not in Cashier's default list).
+Purchase buttons: packs modal on the article page + Rewrite-credits card in
+the billing panel. Admin comps via `RewriteCredits::grantAdmin` (tinker).
+
+**Version history**: article page section lists all versions (cap 20) with
+client-safe labels ONLY (Draft/Optimized/Your rewrite/Cleanup/Your edit —
+never internal stage vocab), Preview (tenancy-checked swap) and "Use this
+version" → `ContentArticleProducer::makeVersionCurrent` (public wrapper over
+the sanctioned crown-switcher; images follow). Published topics: switching
+requires the explicit Republish click afterwards (owner decision) — slug is
+never edited by rewrites (revise returns the stored slug, scrub runs
+`editSlug: false`).
+
+Tests: `RewriteCreditsTest`, `ClientRewriteCoverageTest`,
+`RewriteArticleJobTest`, `RewritePromptGuardTest`, `ArticleReviewRewriteTest`,
+`Billing/RewriteCreditPurchaseTest` (26 total, zero network).
+
 ### Brand-safety hard guarantee (2026-08-20, cocomii incident)
 
 No article carrying a blocked term the lint can match ships READY or reaches a

@@ -287,6 +287,12 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-23 — Client-paid article rewrites + version history.** Feedback widget's
+  rewrite verdicts now trigger a credit-gated rewrite (5 free/month for subscribers,
+  purchasable packs via one-time Stripe checkout, auto-refund on failure); the client
+  instruction rides EVERY prompt of the rewrite run (forced pass on healthy articles);
+  LLM prompt validation with suggested rewordings; full version-history panel with
+  restore. `infra/content-autopilot/README.md` § Client-paid rewrites.
 - **2026-08-22 — Referral program shipped.** `?ref=CODE` → 60-day cookie → pending
   `referrals` row at the `User::created` choke point (all 3 signup paths) → NEW
   `invoice.payment_succeeded` webhook handler (first invoice.* handler in the app)

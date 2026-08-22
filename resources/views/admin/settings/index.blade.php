@@ -219,6 +219,7 @@
                         'content_only_crawl_pages' => ['Content-only crawl pages', 'content_only_crawl_pages', 20, 100000],
                         'content_tracker_keywords' => ['Tracker keywords (paid)', 'tracker_keywords', 0, 100000],
                         'content_trial_tracker_keywords' => ['Tracker keywords (trial)', 'trial_tracker_keywords', 0, 1000],
+                        'content_rewrite_monthly_free' => ['Free rewrite credits / month', 'rewrite_monthly_free', 0, 100],
                     ] as $field => $meta)
                         <div>
                             <label for="{{ $field }}" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $meta[0] }}</label>
@@ -228,6 +229,15 @@
                         </div>
                     @endforeach
                 </div>
+
+                <h3 class="mt-6 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Rewrite credit packs</h3>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    One pack per line as <code>credits:usd</code> — e.g. <code>10:5</code> = 10 credits for $5.
+                    Shown to clients in this order. Empty restores the defaults (10:5, 25:20).
+                </p>
+                <textarea id="content_rewrite_packs" name="content_rewrite_packs" rows="3"
+                    class="mt-2 w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">{{ old('content_rewrite_packs', $content_billing['rewrite_packs']) }}</textarea>
+                @error('content_rewrite_packs') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
             </section>
 
             {{-- ── Rank tracker ─────────────────────────────────────── --}}

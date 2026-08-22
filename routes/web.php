@@ -265,6 +265,11 @@ Route::middleware(['web', 'auth'])->group(function (): void {
         ->name('content.billing.cancel');
     Route::post('/content/billing/resume', [ContentBillingController::class, 'resume'])
         ->name('content.billing.resume');
+    // Rewrite-credit packs (one-time payments).
+    Route::get('/content/credits/checkout', [\App\Http\Controllers\RewriteCreditsController::class, 'checkout'])
+        ->name('content.credits.checkout');
+    Route::get('/content/credits/success', [\App\Http\Controllers\RewriteCreditsController::class, 'success'])
+        ->name('content.credits.success');
 });
 
 // OAuth-style one-click link from the WordPress plugin.

@@ -88,7 +88,7 @@
             <div class="absolute inset-0 flex items-center justify-center overflow-y-auto bg-white/60 p-4 backdrop-blur-sm dark:bg-slate-900/60">
                 <div class="my-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
                     <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
-                        {{ ($progress['failed'] ?? false) ? __('Needs attention') : __('Creating your article') }}
+                        {{ ($progress['failed'] ?? false) ? __('Needs attention') : (($progress['rewrite'] ?? false) ? __('Rewriting your article') : __('Creating your article')) }}
                     </p>
                     <h2 class="mt-0.5 text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ $topic?->title }}</h2>
 
@@ -189,15 +189,111 @@
 
                 @if (in_array($feedbackRating, [\App\Models\ContentArticleFeedback::RATING_REWRITES, \App\Models\ContentArticleFeedback::RATING_WRONG], true))
                     <div class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                        <label class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Tell us what needs to change (optional)') }}</label>
+                        <label class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Tell us what to change and we\'ll rewrite it (optional)') }}</label>
                         <textarea wire:model="feedbackComment" rows="2" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200" placeholder="{{ __('e.g. tone too formal, wrong facts in section 2, missing our USP…') }}"></textarea>
-                        <div class="mt-2 flex items-center justify-end gap-3">
+
+                        @if ($rewriteError !== '')
+                            <div class="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950">
+                                <p class="text-xs font-semibold text-amber-800 dark:text-amber-200">{{ $rewriteError }}</p>
+                                @if ($rewriteSuggestion !== '')
+                                    <p class="mt-1.5 text-xs leading-5 text-amber-700 dark:text-amber-300">{{ __('Try something like:') }} <span class="font-medium">“{{ $rewriteSuggestion }}”</span></p>
+                                    <button type="button" wire:click="applyRewriteSuggestion" class="mt-2 rounded-lg border border-amber-400 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900">{{ __('Use suggestion') }}</button>
+                                @endif
+                            </div>
+                        @endif
+
+                        <div class="mt-2 flex flex-wrap items-center justify-end gap-3">
                             @if ($feedbackSaved)<span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">{{ __('Sent — thank you') }}</span>@endif
-                            <button type="button" wire:click="saveFeedbackComment" class="rounded-lg bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-slate-700">{{ __('Send feedback') }}</button>
+                            @if ($rewriteCredits !== null)
+                                <span class="text-[11px] font-medium text-slate-400" title="{{ __(':free free this month + :bought purchased', ['free' => $rewriteCredits['free_remaining'], 'bought' => $rewriteCredits['purchased']]) }}">
+                                    {{ __('1 credit · :n left', ['n' => $rewriteCredits['total']]) }}
+                                </span>
+                            @endif
+                            @if ($activeRewrite !== null)
+                                <span class="text-xs font-semibold text-orange-600">{{ __('Rewrite in progress…') }}</span>
+                            @else
+                                <button type="button" wire:click="requestRewrite" wire:loading.attr="disabled" wire:target="requestRewrite"
+                                    class="rounded-lg bg-orange-600 px-3.5 py-1.5 text-xs font-bold text-white hover:brightness-110 disabled:opacity-60">
+                                    <span wire:loading.remove wire:target="requestRewrite">{{ __('Rewrite') }}</span>
+                                    <span wire:loading wire:target="requestRewrite">{{ __('Checking your request…') }}</span>
+                                </button>
+                            @endif
                         </div>
                     </div>
                 @elseif ($feedbackRating === \App\Models\ContentArticleFeedback::RATING_LOVE)
                     <p class="px-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">{{ __('Thanks for the love! Our team sees your feedback.') }}</p>
+                @endif
+
+                {{-- Rewrite queued but the pipeline hasn't flipped the topic to a
+                     generating status yet: poll so the overlay takes over. --}}
+                @if ($activeRewrite !== null)
+                    <div wire:poll.5s class="flex items-center gap-2.5 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-xs font-medium text-orange-700 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300">
+                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                        {{ __('Rewriting your article — this takes a few minutes. This page updates itself.') }}
+                    </div>
+                @elseif ($failedRewrite !== null)
+                    <div class="flex items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950">
+                        <p class="text-xs font-semibold text-amber-800 dark:text-amber-200">{{ __('We couldn\'t complete this rewrite — your credit was returned.') }}</p>
+                        <button type="button" wire:click="dismissRewriteNotice" aria-label="{{ __('Dismiss') }}"
+                            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900">
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                @endif
+
+                {{-- ── Version history: every saved version, restorable ── --}}
+                @if (count($versions) > 1)
+                    <div class="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" x-data="{ open: false }">
+                        <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between px-4 py-3 text-start">
+                            <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ __('Version history') }}</span>
+                            <span class="text-xs text-slate-400">{{ trans_choice(':n version|:n versions', count($versions), ['n' => count($versions)]) }}</span>
+                        </button>
+                        <div x-show="open" x-cloak class="border-t border-slate-100 dark:border-slate-800">
+                            @if ($previewingVersion !== null)
+                                <div class="flex items-center justify-between gap-3 bg-sky-50 px-4 py-2.5 dark:bg-sky-950">
+                                    <p class="text-xs font-semibold text-sky-800 dark:text-sky-200">{{ __('You\'re previewing an older version below — your live article is unchanged.') }}</p>
+                                    <button type="button" wire:click="clearVersionPreview" class="shrink-0 rounded-lg border border-sky-300 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-900">{{ __('Back to current version') }}</button>
+                                </div>
+                            @endif
+                            <div class="max-h-64 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+                                @foreach ($versions as $v)
+                                    <div class="flex items-center gap-3 px-4 py-2.5" wire:key="ver-{{ $v['id'] }}">
+                                        <span class="w-9 shrink-0 text-xs font-bold tabular-nums text-slate-400">v{{ $v['version'] }}</span>
+                                        <span class="flex-1 truncate text-xs font-medium text-slate-700 dark:text-slate-200">{{ $v['label'] }}
+                                            <span class="ms-1.5 font-normal text-slate-400">{{ $v['date'] }}</span>
+                                        </span>
+                                        @if ($v['is_current'])
+                                            <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">{{ __('Current') }}</span>
+                                        @else
+                                            <button type="button" wire:click="previewVersion('{{ $v['id'] }}')" class="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">{{ __('Preview') }}</button>
+                                            <button type="button" wire:click="useVersion('{{ $v['id'] }}')" wire:confirm="{{ __('Make this the current version of the article?') }}"
+                                                class="rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-bold text-white hover:bg-slate-800 dark:bg-slate-700">{{ __('Use this version') }}</button>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- ── Rewrite-credit packs modal ── --}}
+                @if ($showPacksModal)
+                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" wire:click.self="$set('showPacksModal', false)">
+                        <div class="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('You\'re out of rewrite credits') }}</h3>
+                            <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{{ __('Each rewrite uses 1 credit. Top up below — purchased credits never expire.') }}</p>
+                            <div class="mt-3 space-y-2">
+                                @foreach ($rewritePacks as $i => $pack)
+                                    <a href="{{ route('content.credits.checkout', ['pack' => $i, 'topic' => $topicId]) }}"
+                                       class="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 hover:border-orange-400 hover:bg-orange-50 dark:border-slate-700 dark:hover:bg-orange-950">
+                                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ trans_choice(':n rewrite credit|:n rewrite credits', $pack['credits'], ['n' => $pack['credits']]) }}</span>
+                                        <span class="text-sm font-bold text-orange-600">${{ $pack['usd'] }}</span>
+                                    </a>
+                                @endforeach
+                            </div>
+                            <button type="button" wire:click="$set('showPacksModal', false)" class="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">{{ __('Not now') }}</button>
+                        </div>
+                    </div>
                 @endif
             </div>
         @endunless

@@ -3,6 +3,12 @@
 namespace App\Livewire\Content;
 
 use App\Jobs\CheckTrackedKeywordSerpJob;
+use App\Jobs\Content\RewriteArticleJob;
+use App\Models\ContentRewriteRequest;
+use App\Services\Content\ContentArticleProducer;
+use App\Services\Content\Exceptions\InsufficientRewriteCreditsException;
+use App\Services\Content\RewriteCredits;
+use App\Services\Content\RewritePromptGuard;
 use App\Jobs\GenerateInlineImageJob;
 use App\Jobs\ProduceContentArticleJob;
 use App\Jobs\PublishContentArticleJob;
@@ -99,6 +105,16 @@ class ArticleReview extends Component
     public string $feedbackComment = '';
 
     public bool $feedbackSaved = false;
+
+    // ── Credit-gated rewrite (Rewrite button on the feedback widget) ──
+    public string $rewriteError = '';
+
+    public string $rewriteSuggestion = '';
+
+    public bool $showPacksModal = false;
+
+    /** Version-history preview: article id being previewed ('' = current). */
+    public string $previewVersionId = '';
 
     // ── Keyword Tracker CTA state ──
     public bool $isTracked = false;
@@ -241,6 +257,200 @@ class ArticleReview extends Component
             ->update(['comment' => mb_substr(trim($this->feedbackComment), 0, 2000)]);
         $this->feedbackSaved = true;
         session()->flash('review-status', __('Thanks — your feedback was sent to our team.'));
+    }
+
+    // ── Credit-gated rewrite ────────────────────────────────────────────
+
+    /** The rewrite currently queued/running for this topic, if any. */
+    private function activeRewrite(): ?ContentRewriteRequest
+    {
+        return ContentRewriteRequest::query()
+            ->where('topic_id', $this->topicId)
+            ->whereIn('status', [ContentRewriteRequest::STATUS_QUEUED, ContentRewriteRequest::STATUS_RUNNING])
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * "Rewrite" on the feedback widget: records the feedback (admin monitor
+     * always sees what clients want — owner rule), validates the instruction,
+     * spends one credit and queues the rewrite. The credit is spent HERE, in
+     * one transaction with the request row — the job only ever refunds.
+     */
+    public function requestRewrite(): void
+    {
+        $this->rewriteError = $this->rewriteSuggestion = '';
+        $topic = $this->topic();
+        $user = Auth::user();
+        if ($topic === null || $user === null || $topic->currentArticle === null) {
+            return;
+        }
+        if (! in_array($this->feedbackRating, [ContentArticleFeedback::RATING_REWRITES, ContentArticleFeedback::RATING_WRONG], true)) {
+            return;
+        }
+        if (in_array($topic->status, ContentTopic::IN_FLIGHT, true)
+            || in_array($topic->status, [ContentTopic::STATUS_PUBLISHING, ContentTopic::STATUS_SCHEDULED], true)
+            || $this->activeRewrite() !== null) {
+            session()->flash('review-status', __('This article is busy right now — try again in a few minutes.'));
+
+            return;
+        }
+
+        // 1. Feedback row FIRST — recorded even when validation or credits
+        //    stop the rewrite, so the admin monitor keeps the signal.
+        ContentArticleFeedback::updateOrCreate(
+            ['topic_id' => $topic->id, 'user_id' => $user->id],
+            [
+                'article_id' => $topic->currentArticle?->id,
+                'website_id' => $topic->website_id,
+                'rating' => $this->feedbackRating,
+                'comment' => mb_substr(trim($this->feedbackComment), 0, 2000),
+            ],
+        );
+        $this->feedbackSaved = true;
+
+        // 2. Validate a non-blank instruction (blank = generic quality pass).
+        $instruction = trim($this->feedbackComment);
+        if ($instruction !== '') {
+            $verdict = app(RewritePromptGuard::class)->check($instruction);
+            if (($verdict['ok'] ?? false) !== true) {
+                $this->rewriteError = (string) ($verdict['reason'] ?? __('This request can\'t be used for a rewrite.'));
+                $this->rewriteSuggestion = (string) ($verdict['suggestion'] ?? '');
+
+                return;
+            }
+        }
+
+        // 3. Credits.
+        $credits = app(RewriteCredits::class);
+        if ($credits->summary($user)['total'] < 1) {
+            $this->showPacksModal = true;
+
+            return;
+        }
+
+        // 4. Spend + queue.
+        try {
+            $request = DB::transaction(function () use ($topic, $user, $instruction, $credits): ContentRewriteRequest {
+                $request = ContentRewriteRequest::query()->create([
+                    'topic_id' => $topic->id,
+                    'user_id' => $user->id,
+                    'website_id' => $topic->website_id,
+                    'prompt' => $instruction !== '' ? $instruction : null,
+                    'status' => ContentRewriteRequest::STATUS_QUEUED,
+                    'prior_status' => $topic->status,
+                ]);
+                $event = $credits->spend($user, $topic, $request->id);
+                $request->update(['credit_event_id' => $event->id]);
+
+                return $request;
+            });
+        } catch (InsufficientRewriteCreditsException) {
+            $this->showPacksModal = true; // lost the race to another tab
+
+            return;
+        }
+
+        Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
+        RewriteArticleJob::dispatch($request->id, $topic->id);
+        session()->flash('review-status', __('We\'re rewriting your article — this takes a few minutes.'));
+    }
+
+    public function applyRewriteSuggestion(): void
+    {
+        if ($this->rewriteSuggestion !== '') {
+            $this->feedbackComment = $this->rewriteSuggestion;
+        }
+        $this->rewriteError = $this->rewriteSuggestion = '';
+    }
+
+    /** Dismiss the "credit returned" banner for the latest failed rewrite. */
+    public function dismissRewriteNotice(): void
+    {
+        ContentRewriteRequest::query()
+            ->where('topic_id', $this->topicId)
+            ->where('user_id', Auth::id())
+            ->where('status', ContentRewriteRequest::STATUS_FAILED)
+            ->whereNull('client_seen_at')
+            ->update(['client_seen_at' => now()]);
+    }
+
+    // ── Version history ─────────────────────────────────────────────────
+
+    /** @return list<array{id:string, version:int, date:string, label:string, is_current:bool}> */
+    private function versions(ContentTopic $topic): array
+    {
+        $doneRewriteVersions = ContentRewriteRequest::query()
+            ->where('topic_id', $topic->id)
+            ->where('status', ContentRewriteRequest::STATUS_DONE)
+            ->pluck('article_version')->filter()->map(fn ($v) => (int) $v)->all();
+
+        return $topic->articles()
+            ->orderByDesc('version')
+            ->limit(20)
+            ->get(['id', 'version', 'is_current', 'generation_meta', 'created_at'])
+            ->map(function (ContentArticle $a) use ($doneRewriteVersions): array {
+                $stage = (string) ($a->generation_meta['stage'] ?? '');
+                // Client-safe labels only — internal stage vocabulary never leaks.
+                $label = match (true) {
+                    in_array((int) $a->version, $doneRewriteVersions, true),
+                    str_starts_with($stage, 'client_rewrite') => __('Your rewrite'),
+                    (int) $a->version === 1 => __('Draft'),
+                    str_contains($stage, 'revise') => __('Optimized'),
+                    str_starts_with($stage, 'brand_scrub'),
+                    $stage === 'de_ai', $stage === 'context_rescore' => __('Cleanup'),
+                    str_contains($stage, 'edit') || str_contains($stage, 'manual') => __('Your edit'),
+                    default => __('Update'),
+                };
+
+                return [
+                    'id' => (string) $a->id,
+                    'version' => (int) $a->version,
+                    'date' => (string) $a->created_at?->translatedFormat('M j, H:i'),
+                    'label' => $label,
+                    'is_current' => (bool) $a->is_current,
+                ];
+            })->all();
+    }
+
+    public function previewVersion(string $articleId): void
+    {
+        $topic = $this->topic();
+        if ($topic === null) {
+            return;
+        }
+        // Tenancy: only this topic's versions are previewable.
+        if ($topic->articles()->whereKey($articleId)->exists()) {
+            $this->previewVersionId = $articleId;
+        }
+    }
+
+    public function clearVersionPreview(): void
+    {
+        $this->previewVersionId = '';
+    }
+
+    /** Make an older version current again ("Use this version"). */
+    public function useVersion(string $articleId): void
+    {
+        $topic = $this->topic();
+        if ($topic === null
+            || in_array($topic->status, ContentTopic::IN_FLIGHT, true)
+            || $topic->status === ContentTopic::STATUS_PUBLISHING
+            || $this->activeRewrite() !== null) {
+            return;
+        }
+        $article = $topic->articles()->whereKey($articleId)->first();
+        if ($article === null) {
+            return;
+        }
+
+        app(ContentArticleProducer::class)->makeVersionCurrent($topic, $article);
+        $this->previewVersionId = '';
+        $this->hydrateFromArticle();
+        session()->flash('review-status', $topic->status === ContentTopic::STATUS_PUBLISHED
+            ? __('Done — this version is now current. Republish to update it on your site.')
+            : __('Done — this version is now current.'));
     }
 
     private function topic(): ?ContentTopic
@@ -1029,6 +1239,11 @@ class ArticleReview extends Component
             if ($generating || $failedNoDraft) {
                 $progress = $this->generationProgress($topic, $genStart, $imagesPending);
                 $generating = $generating || $failedNoDraft;
+                // Client-requested rewrite in flight → overlay says
+                // "Rewriting your article", not "Creating".
+                if ($this->activeRewrite() !== null) {
+                    $progress['rewrite'] = true;
+                }
             }
         }
 
@@ -1062,6 +1277,26 @@ class ArticleReview extends Component
             $socialImageFallback = (string) ($img?->url() ?? '');
         }
 
+        // Version-history preview: swap the article preview to an older
+        // version (banner in the blade; tenancy enforced in previewVersion()).
+        $previewingVersion = null;
+        if ($this->previewVersionId !== '' && $topic !== null) {
+            $previewingVersion = $topic->articles()->whereKey($this->previewVersionId)->first();
+            if ($previewingVersion === null || $previewingVersion->is_current) {
+                $previewingVersion = null;
+                $this->previewVersionId = '';
+            }
+        }
+
+        $user = Auth::user();
+        $rewriteCredits = $user !== null ? app(RewriteCredits::class)->summary($user) : null;
+        $failedRewrite = $topic === null ? null : ContentRewriteRequest::query()
+            ->where('topic_id', $topic->id)
+            ->where('status', ContentRewriteRequest::STATUS_FAILED)
+            ->whereNull('client_seen_at')
+            ->latest()
+            ->first();
+
         return view('livewire.content.article-review', [
             'topic' => $topic,
             'article' => $article,
@@ -1069,7 +1304,13 @@ class ArticleReview extends Component
             'progress' => $progress,
             'featuredImage' => $featuredImage,
             'socialImageFallback' => $socialImageFallback,
-            'previewHtml' => $this->sanitize((string) ($article?->html ?? '')),
+            'rewriteCredits' => $rewriteCredits,
+            'activeRewrite' => $topic !== null ? $this->activeRewrite() : null,
+            'failedRewrite' => $failedRewrite,
+            'versions' => $topic !== null && $article !== null ? $this->versions($topic) : [],
+            'previewingVersion' => $previewingVersion,
+            'rewritePacks' => ContentAutopilotConfig::rewritePacks(),
+            'previewHtml' => $this->sanitize((string) ($previewingVersion?->html ?? $article?->html ?? '')),
             'issueLabels' => $issueLabels,
             'traffic' => $topic ? self::trafficWorth($topic) : null,
             // Bare host for the Google snippet preview breadcrumb (no scheme/www).
