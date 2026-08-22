@@ -407,6 +407,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
 
     // Support tickets — per-user (not per-website), always reachable.
+    Route::view('/referrals', 'referrals.index')->name('referrals.index');
     Route::view('/support', 'support.index')->name('support.index');
     Route::get('/support/{ticket}', fn (string $ticket) => view('support.show', ['ticketId' => $ticket]))
         ->name('support.show');

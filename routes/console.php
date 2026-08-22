@@ -38,6 +38,9 @@ Schedule::command('ebq:publish-scheduled-plugin-releases')->everyMinute();
 Schedule::command('ebq:trial-cleanup')->hourly()->withoutOverlapping();
 // GC abandoned anonymous content-onboarding runs + their provisional websites.
 Schedule::command('ebq:content-onboarding-gc')->hourly()->withoutOverlapping();
+// Referral rewards whose Stripe balance credit didn't land inline (webhook
+// blip) — retry hourly. Normal grants happen inside the invoice webhook.
+Schedule::command('ebq:grant-referral-rewards')->hourly()->withoutOverlapping();
 
 // One-shot 30%-discount promo to ACTIVE trial users (day 2+ of trial, once
 // per user ever — users.trial_discount_email_sent_at). Expired users get the

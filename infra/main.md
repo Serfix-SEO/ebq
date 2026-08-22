@@ -147,6 +147,9 @@ website selection, teams via `website_user` + `TeamPermissions` (null = full acc
 [accounts/lifecycle-emails.md](./accounts/lifecycle-emails.md) — segment-matched onboarding
 emails (daily `ebq:send-lifecycle-emails`, 4 segments + follow-ups, unsubscribe infra,
 `/admin/lifecycle` report).
+[accounts/referral-program.md](./accounts/referral-program.md) — refer-&-earn: `?ref=` cookie →
+`referrals` row at signup → invoice webhook detects first FULL content bill → 50%-of-base
+Stripe balance credit to the referrer (credit not coupon — addons never discounted).
 
 ### Admin panel ✅
 [admin/](./admin/README.md) — `is_admin` gating + per-Livewire-action re-check, impersonation,
@@ -284,6 +287,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-22 — Referral program shipped.** `?ref=CODE` → 60-day cookie → pending
+  `referrals` row at the `User::created` choke point (all 3 signup paths) → NEW
+  `invoice.payment_succeeded` webhook handler (first invoice.* handler in the app)
+  qualifies the referred account's first FULL content base invoice ($1 intro never
+  counts) → 50%-of-referrer's-base Stripe balance credit (credit not coupon so the
+  addon items are never discounted) + hourly `ebq:grant-referral-rewards` retry sweep.
+  Client page `/referrals` ("Refer & earn"). Docs:
+  [accounts/referral-program.md](./accounts/referral-program.md).
 - **2026-08-22 — Admin "Clear future topics & re-plan" + directives-card select fix.**
   New directives only shaped next month's top-up; the card now clears a website's
   UNWRITTEN planner output (suggested/approved without an article — DELETE not skip,

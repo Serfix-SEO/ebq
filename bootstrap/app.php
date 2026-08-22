@@ -55,6 +55,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // Guards itself off for admin* paths — admin stays English-only,
             // no separate admin layout exists so this is the exclusion point.
             \App\Http\Middleware\SetLocale::class,
+            // Referral attribution: `?ref=CODE` -> 60-day cookie, consumed at
+            // signup (ReferralProgram::attributeFromRequest).
+            \App\Http\Middleware\CaptureReferralCode::class,
             // WP-plugin deep-links: `?ebq_site=<domain>` switches the session
             // website (only among the user's accessible ones). Must precede
             // ResolveShardContext, which reads current_website_id.

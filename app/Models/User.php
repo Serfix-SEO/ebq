@@ -39,6 +39,9 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         static::created(function (User $user): void {
             Lead::markConvertedFor($user);
+            // Referral attribution (ebq_ref cookie -> pending Referral row).
+            // Internally guarded: console-safe, is_system-safe, never throws.
+            \App\Services\ReferralProgram::attributeFromRequest($user);
         });
 
         // Delete owned websites through the model so the per-website app-level

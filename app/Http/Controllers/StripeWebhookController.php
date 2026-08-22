@@ -53,6 +53,26 @@ class StripeWebhookController extends CashierController
         return $response;
     }
 
+    /**
+     * Referral program: a paid invoice may be the referred account's first
+     * FULL content base payment (the $1 intro month never qualifies) — if so,
+     * the referrer earns a 50%-of-base Stripe balance credit. All rules live
+     * in ReferralProgram::qualifyFromInvoicePayload; fast-exits for the vast
+     * majority of invoices that carry no pending referral.
+     */
+    public function handleInvoicePaymentSucceeded(array $payload): Response
+    {
+        try {
+            app(\App\Services\ReferralProgram::class)->qualifyFromInvoicePayload($payload);
+        } catch (\Throwable $e) {
+            // Webhooks must never 500 (house rule) — the hourly
+            // ebq:grant-referral-rewards sweep is the safety net for grants.
+            \Illuminate\Support\Facades\Log::warning('referral qualify skipped: '.$e->getMessage());
+        }
+
+        return $this->successMethod();
+    }
+
     public function handleCustomerSubscriptionDeleted(array $payload): Response
     {
         $response = parent::handleCustomerSubscriptionDeleted($payload);
