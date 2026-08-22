@@ -14,7 +14,7 @@ use App\Models\ContentTopic;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\RewriteCredits;
-use App\Services\Content\RewritePromptGuard;
+use App\Services\Content\RewritePromptEnhancer;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -29,32 +29,22 @@ class ArticleReviewRewriteTest extends TestCase
     {
         parent::setUp();
         $this->seed(PlanSeeder::class);
-        $this->allowGuard(); // default: guard approves everything
+        $this->bindEnhancer(null); // default: no enhancement -> direct dispatch
     }
 
-    private function allowGuard(): void
+    /** Enhancer that returns a fixed enhanced prompt (null = no enhancement). */
+    private function bindEnhancer(?string $enhanced): void
     {
-        $this->app->instance(RewritePromptGuard::class, new class extends RewritePromptGuard
+        $this->app->instance(RewritePromptEnhancer::class, new class($enhanced) extends RewritePromptEnhancer
         {
-            public function check(string $body): array
-            {
-                return ['ok' => true];
-            }
-        });
-    }
-
-    private function rejectGuard(string $reason, string $suggestion): void
-    {
-        $this->app->instance(RewritePromptGuard::class, new class($reason, $suggestion) extends RewritePromptGuard
-        {
-            public function __construct(private string $r, private string $s)
+            public function __construct(private ?string $e)
             {
                 parent::__construct();
             }
 
-            public function check(string $body): array
+            public function enhance(string $prompt, \App\Models\ContentTopic $topic): ?string
             {
-                return ['ok' => false, 'reason' => $this->r, 'suggestion' => $this->s];
+                return $this->e;
             }
         });
     }
@@ -117,22 +107,61 @@ class ArticleReviewRewriteTest extends TestCase
         Queue::assertPushed(RewriteArticleJob::class);
     }
 
-    public function test_guard_rejection_keeps_feedback_spends_nothing_and_suggests(): void
+    public function test_enhancement_offers_choice_without_spending_until_confirm(): void
     {
         Queue::fake();
-        $this->rejectGuard('Not usable.', 'Try asking for a friendlier tone.');
+        $this->bindEnhancer('Add a section with 100 decorated name examples.');
+        [$user, $topic] = $this->fixture();
+
+        $c = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])
+            ->set('feedbackRating', ContentArticleFeedback::RATING_REWRITES)
+            ->set('feedbackComment', 'add 100 examples')
+            ->call('requestRewrite')
+            ->assertSet('showPromptChoice', true)
+            ->assertSet('enhancedPrompt', 'Add a section with 100 decorated name examples.');
+
+        // Feedback recorded, but nothing spent or queued yet.
+        $this->assertDatabaseHas('content_article_feedback', ['topic_id' => $topic->id, 'comment' => 'add 100 examples']);
+        $this->assertSame(0, Event::query()->where('kind', Event::KIND_SPEND)->count());
+        Queue::assertNothingPushed();
+
+        $c->call('confirmRewrite', 'enhanced')->assertSet('showPromptChoice', false);
+
+        $request = ContentRewriteRequest::query()->where('topic_id', $topic->id)->first();
+        $this->assertSame('Add a section with 100 decorated name examples.', $request->prompt);
+        $this->assertSame(1, Event::query()->where('kind', Event::KIND_SPEND)->count());
+        Queue::assertPushed(RewriteArticleJob::class);
+    }
+
+    public function test_confirm_with_own_prompt_uses_the_original_text(): void
+    {
+        Queue::fake();
+        $this->bindEnhancer('Enhanced version.');
         [$user, $topic] = $this->fixture();
 
         Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])
             ->set('feedbackRating', ContentArticleFeedback::RATING_REWRITES)
-            ->set('feedbackComment', 'sneaky stuff')
+            ->set('feedbackComment', 'my own words')
             ->call('requestRewrite')
-            ->assertSet('rewriteError', 'Not usable.')
-            ->assertSet('rewriteSuggestion', 'Try asking for a friendlier tone.')
-            ->call('applyRewriteSuggestion')
-            ->assertSet('feedbackComment', 'Try asking for a friendlier tone.');
+            ->call('confirmRewrite', 'mine');
 
-        $this->assertDatabaseHas('content_article_feedback', ['topic_id' => $topic->id, 'comment' => 'sneaky stuff']);
+        $this->assertSame('my own words', ContentRewriteRequest::query()->where('topic_id', $topic->id)->value('prompt'));
+        Queue::assertPushed(RewriteArticleJob::class);
+    }
+
+    public function test_block_reason_keeps_feedback_and_spends_nothing(): void
+    {
+        Queue::fake();
+        [$user, $topic] = $this->fixture();
+
+        Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])
+            ->set('feedbackRating', ContentArticleFeedback::RATING_REWRITES)
+            ->set('feedbackComment', 'make it a 1 million word article')
+            ->call('requestRewrite')
+            ->assertSet('showPromptChoice', false);
+
+        $component = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id]);
+        $this->assertDatabaseHas('content_article_feedback', ['topic_id' => $topic->id, 'comment' => 'make it a 1 million word article']);
         $this->assertSame(0, Event::query()->where('kind', Event::KIND_SPEND)->count());
         Queue::assertNothingPushed();
     }

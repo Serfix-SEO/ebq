@@ -195,10 +195,33 @@
                         @if ($rewriteError !== '')
                             <div class="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950">
                                 <p class="text-xs font-semibold text-amber-800 dark:text-amber-200">{{ $rewriteError }}</p>
-                                @if ($rewriteSuggestion !== '')
-                                    <p class="mt-1.5 text-xs leading-5 text-amber-700 dark:text-amber-300">{{ __('Try something like:') }} <span class="font-medium">“{{ $rewriteSuggestion }}”</span></p>
-                                    <button type="button" wire:click="applyRewriteSuggestion" class="mt-2 rounded-lg border border-amber-400 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900">{{ __('Use suggestion') }}</button>
-                                @endif
+                            </div>
+                        @endif
+
+                        {{-- Enhanced-prompt choice: the client's note next to a
+                             sharpened version — they pick which one runs. --}}
+                        @if ($showPromptChoice && $enhancedPrompt !== '')
+                            <div class="mt-2 rounded-xl border border-orange-200 bg-orange-50/60 p-3 dark:border-orange-900 dark:bg-orange-950/60">
+                                <p class="text-xs font-bold text-slate-800 dark:text-slate-100">{{ __('We sharpened your request — pick the version to use:') }}</p>
+                                <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                    <div class="flex flex-col rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Your request') }}</p>
+                                        <p class="mt-1 flex-1 whitespace-pre-wrap text-xs leading-5 text-slate-700 dark:text-slate-200">{{ trim($feedbackComment) }}</p>
+                                        <button type="button" wire:click="confirmRewrite('mine')" wire:loading.attr="disabled"
+                                            class="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+                                            {{ __('Rewrite with my request') }}
+                                        </button>
+                                    </div>
+                                    <div class="flex flex-col rounded-lg border border-orange-300 bg-white p-3 dark:border-orange-800 dark:bg-slate-900">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-orange-600">{{ __('Enhanced request') }}</p>
+                                        <p class="mt-1 flex-1 whitespace-pre-wrap text-xs leading-5 text-slate-700 dark:text-slate-200">{{ $enhancedPrompt }}</p>
+                                        <button type="button" wire:click="confirmRewrite('enhanced')" wire:loading.attr="disabled"
+                                            class="mt-2 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:brightness-110">
+                                            {{ __('Rewrite with enhanced request') }}
+                                        </button>
+                                    </div>
+                                </div>
+                                <button type="button" wire:click="cancelPromptChoice" class="mt-2 text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">{{ __('Cancel') }}</button>
                             </div>
                         @endif
 
@@ -211,11 +234,11 @@
                             @endif
                             @if ($activeRewrite !== null)
                                 <span class="text-xs font-semibold text-orange-600">{{ __('Rewrite in progress…') }}</span>
-                            @else
+                            @elseif (! $showPromptChoice)
                                 <button type="button" wire:click="requestRewrite" wire:loading.attr="disabled" wire:target="requestRewrite"
                                     class="rounded-lg bg-orange-600 px-3.5 py-1.5 text-xs font-bold text-white hover:brightness-110 disabled:opacity-60">
                                     <span wire:loading.remove wire:target="requestRewrite">{{ __('Rewrite') }}</span>
-                                    <span wire:loading wire:target="requestRewrite">{{ __('Checking your request…') }}</span>
+                                    <span wire:loading wire:target="requestRewrite">{{ __('Improving your request…') }}</span>
                                 </button>
                             @endif
                         </div>

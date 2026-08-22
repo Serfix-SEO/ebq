@@ -725,11 +725,17 @@ FORCES one revise pass (healthy articles would otherwise no-op silently);
 stage label `client_rewrite_{i}`. Brand/publish hard gates re-lint every
 client-instructed version (nothing bypassed).
 
-**Validation** (`RewritePromptGuard`, CustomPromptGuard model): heuristics
-fail-CLOSED (needles/length/URL-only), LLM classifier fail-OPEN returning
-`{allow, reason, suggested_prompt}` — rejection shows the reason + a safe
-suggestion with a one-click "Use suggestion". Blank prompt skips the guard
-(generic quality pass).
+**Validation → enhancement** (`RewritePromptEnhancer`, replaced the
+allow/reject classifier 2026-08-23 — it false-rejected "add 100 name
+examples" as off-topic; owner: never judge relevance): `blockReason()` hard-
+blocks ONLY blatant injection needles + resource abuse (word-count demands
+> 10k — "make it 1 million words" is the owner's definition of manipulation;
+the pipeline also clamps: 16k output tokens/pass + a never-beyond-2x-length
+line in the rewrite block). Everything else: `enhance()` runs a cheap LLM
+call (client prompt + topic title/keyword ONLY — never the article body) and
+the UI offers a choice — "Rewrite with my request" vs "Rewrite with enhanced
+request" — credit spent at confirm. Enhancement failure/no-gain → dispatch
+directly with the original prompt. Blank prompt = generic quality pass.
 
 **Credits** (`RewriteCredits`, ledger `content_rewrite_credit_events`, no FKs):
 1 rewrite = 1 credit. Paid subscribers get `content.rewrite.monthly_free`

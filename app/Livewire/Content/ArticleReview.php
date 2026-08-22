@@ -8,7 +8,7 @@ use App\Models\ContentRewriteRequest;
 use App\Services\Content\ContentArticleProducer;
 use App\Services\Content\Exceptions\InsufficientRewriteCreditsException;
 use App\Services\Content\RewriteCredits;
-use App\Services\Content\RewritePromptGuard;
+use App\Services\Content\RewritePromptEnhancer;
 use App\Jobs\GenerateInlineImageJob;
 use App\Jobs\ProduceContentArticleJob;
 use App\Jobs\PublishContentArticleJob;
@@ -109,7 +109,10 @@ class ArticleReview extends Component
     // ── Credit-gated rewrite (Rewrite button on the feedback widget) ──
     public string $rewriteError = '';
 
-    public string $rewriteSuggestion = '';
+    /** Enhanced version of the client's prompt (their-choice flow). */
+    public string $enhancedPrompt = '';
+
+    public bool $showPromptChoice = false;
 
     public bool $showPacksModal = false;
 
@@ -271,33 +274,48 @@ class ArticleReview extends Component
             ->first();
     }
 
-    /**
-     * "Rewrite" on the feedback widget: records the feedback (admin monitor
-     * always sees what clients want — owner rule), validates the instruction,
-     * spends one credit and queues the rewrite. The credit is spent HERE, in
-     * one transaction with the request row — the job only ever refunds.
-     */
-    public function requestRewrite(): void
+    /** Common preconditions for starting a rewrite. Null when blocked. */
+    private function rewriteContext(): ?array
     {
-        $this->rewriteError = $this->rewriteSuggestion = '';
         $topic = $this->topic();
         $user = Auth::user();
         if ($topic === null || $user === null || $topic->currentArticle === null) {
-            return;
+            return null;
         }
         if (! in_array($this->feedbackRating, [ContentArticleFeedback::RATING_REWRITES, ContentArticleFeedback::RATING_WRONG], true)) {
-            return;
+            return null;
         }
         if (in_array($topic->status, ContentTopic::IN_FLIGHT, true)
             || in_array($topic->status, [ContentTopic::STATUS_PUBLISHING, ContentTopic::STATUS_SCHEDULED], true)
             || $this->activeRewrite() !== null) {
             session()->flash('review-status', __('This article is busy right now — try again in a few minutes.'));
 
-            return;
+            return null;
         }
 
-        // 1. Feedback row FIRST — recorded even when validation or credits
-        //    stop the rewrite, so the admin monitor keeps the signal.
+        return [$topic, $user];
+    }
+
+    /**
+     * "Rewrite" on the feedback widget. Records the feedback (admin monitor
+     * always sees what clients want — owner rule), then, for a non-blank
+     * note, ENHANCES it (cheap LLM: prompt + topic context only, never the
+     * article) and lets the client choose their own vs the enhanced prompt.
+     * No relevance judging — the only hard rejection is blatant injection
+     * (owner decision 2026-08-23 after a false "unrelated" rejection).
+     * Blank note = generic quality pass, dispatched immediately.
+     */
+    public function requestRewrite(): void
+    {
+        $this->rewriteError = $this->enhancedPrompt = '';
+        $this->showPromptChoice = false;
+        $ctx = $this->rewriteContext();
+        if ($ctx === null) {
+            return;
+        }
+        [$topic, $user] = $ctx;
+
+        // Feedback row FIRST — recorded even when credits stop the rewrite.
         ContentArticleFeedback::updateOrCreate(
             ['topic_id' => $topic->id, 'user_id' => $user->id],
             [
@@ -309,19 +327,68 @@ class ArticleReview extends Component
         );
         $this->feedbackSaved = true;
 
-        // 2. Validate a non-blank instruction (blank = generic quality pass).
         $instruction = trim($this->feedbackComment);
-        if ($instruction !== '') {
-            $verdict = app(RewritePromptGuard::class)->check($instruction);
-            if (($verdict['ok'] ?? false) !== true) {
-                $this->rewriteError = (string) ($verdict['reason'] ?? __('This request can\'t be used for a rewrite.'));
-                $this->rewriteSuggestion = (string) ($verdict['suggestion'] ?? '');
+        if ($instruction === '') {
+            $this->dispatchRewrite($topic, $user, null);
 
-                return;
-            }
+            return;
         }
 
-        // 3. Credits.
+        $enhancer = app(RewritePromptEnhancer::class);
+        if (($reason = $enhancer->blockReason($instruction)) !== null) {
+            $this->rewriteError = $reason;
+
+            return;
+        }
+
+        $enhanced = $enhancer->enhance($instruction, $topic);
+        if ($enhanced === null) {
+            // Nothing gained (or LLM down) — just run with the client's prompt.
+            $this->dispatchRewrite($topic, $user, $instruction);
+
+            return;
+        }
+
+        $this->enhancedPrompt = $enhanced;
+        $this->showPromptChoice = true; // credit is spent at confirm time
+    }
+
+    /** The client picked which prompt to run with ('mine' | 'enhanced'). */
+    public function confirmRewrite(string $which): void
+    {
+        $ctx = $this->rewriteContext();
+        if ($ctx === null) {
+            $this->showPromptChoice = false;
+
+            return;
+        }
+        [$topic, $user] = $ctx;
+
+        $prompt = $which === 'enhanced' && $this->enhancedPrompt !== ''
+            ? $this->enhancedPrompt
+            : trim($this->feedbackComment);
+        if ($prompt === '') {
+            $this->showPromptChoice = false;
+
+            return;
+        }
+
+        $this->showPromptChoice = false;
+        $this->dispatchRewrite($topic, $user, $prompt);
+    }
+
+    public function cancelPromptChoice(): void
+    {
+        $this->showPromptChoice = false;
+        $this->enhancedPrompt = '';
+    }
+
+    /**
+     * Spend one credit and queue the rewrite — one transaction with the
+     * request row; the job only ever refunds.
+     */
+    private function dispatchRewrite(ContentTopic $topic, $user, ?string $prompt): void
+    {
         $credits = app(RewriteCredits::class);
         if ($credits->summary($user)['total'] < 1) {
             $this->showPacksModal = true;
@@ -329,14 +396,13 @@ class ArticleReview extends Component
             return;
         }
 
-        // 4. Spend + queue.
         try {
-            $request = DB::transaction(function () use ($topic, $user, $instruction, $credits): ContentRewriteRequest {
+            $request = DB::transaction(function () use ($topic, $user, $prompt, $credits): ContentRewriteRequest {
                 $request = ContentRewriteRequest::query()->create([
                     'topic_id' => $topic->id,
                     'user_id' => $user->id,
                     'website_id' => $topic->website_id,
-                    'prompt' => $instruction !== '' ? $instruction : null,
+                    'prompt' => $prompt !== null && $prompt !== '' ? mb_substr($prompt, 0, 2000) : null,
                     'status' => ContentRewriteRequest::STATUS_QUEUED,
                     'prior_status' => $topic->status,
                 ]);
@@ -354,14 +420,6 @@ class ArticleReview extends Component
         Cache::put('content:gen-start:'.$topic->id, now()->timestamp, now()->addHour());
         RewriteArticleJob::dispatch($request->id, $topic->id);
         session()->flash('review-status', __('We\'re rewriting your article — this takes a few minutes.'));
-    }
-
-    public function applyRewriteSuggestion(): void
-    {
-        if ($this->rewriteSuggestion !== '') {
-            $this->feedbackComment = $this->rewriteSuggestion;
-        }
-        $this->rewriteError = $this->rewriteSuggestion = '';
     }
 
     /** Dismiss the "credit returned" banner for the latest failed rewrite. */

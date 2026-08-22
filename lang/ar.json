@@ -4905,5 +4905,12 @@
     "This looks like an attempt to change how the writer works rather than a request about the article.": "يبدو هذا محاولة لتغيير طريقة عمل الكاتب وليس طلبًا يخص المقالة.",
     "Please describe the change in words — links alone aren't enough.": "يرجى وصف التغيير بالكلمات — الروابط وحدها لا تكفي.",
     "This request can't be used for a rewrite.": "لا يمكن استخدام هذا الطلب لإعادة الكتابة.",
-    "Describe what you would like changed in the article — tone, facts to fix, sections to expand or remove.": "صف ما تودّ تغييره في المقالة — النبرة، الحقائق المطلوب تصحيحها، الأقسام المطلوب توسيعها أو حذفها."
+    "Describe what you would like changed in the article — tone, facts to fix, sections to expand or remove.": "صف ما تودّ تغييره في المقالة — النبرة، الحقائق المطلوب تصحيحها، الأقسام المطلوب توسيعها أو حذفها.",
+    "We sharpened your request — pick the version to use:": "لقد حسّنّا صياغة طلبك — اختر النسخة التي تريد استخدامها:",
+    "Your request": "طلبك",
+    "Enhanced request": "الطلب المحسَّن",
+    "Rewrite with my request": "إعادة الكتابة بطلبي",
+    "Rewrite with enhanced request": "إعادة الكتابة بالطلب المحسَّن",
+    "Improving your request…": "جارٍ تحسين طلبك…",
+    "Rewrites keep your article close to its planned length — huge word-count requests can't be applied. Ask for specific changes instead.": "تحافظ إعادة الكتابة على طول مقالتك المخطط له — لا يمكن تنفيذ طلبات عدد كلمات ضخمة. اطلب تغييرات محددة بدلًا من ذلك."
 }
