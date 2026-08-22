@@ -98,6 +98,11 @@ web box never crawls.
    > "Connection refused" and 10 new client sites sat uncrawled for two days while
    > queue depth built to 250+ jobs. The `rm -f bootstrap/cache/*.php` step above is
    > the recovery if it ever happens again.
+   > ⚠️ **Deleted a file under `app/` or `config/`?** Remove it on the worker box by
+   > hand (`ssh … rm <path>`) — this rsync never deletes, and `CodeFingerprint`
+   > hashes every php file, so a leftover deleted file makes `ebq:deploy-verify`
+   > report STALE CODE forever no matter how often the workers restart (2026-08-23).
+
    > ⛔ **NEVER add `--delete` to this rsync.** `docker-compose.worker.yml` and
    > `docker/worker/Dockerfile` live **only on the worker box** (not in the repo), so
    > `--delete` wipes them — the containers keep running but you lose the ability to
