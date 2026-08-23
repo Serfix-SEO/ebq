@@ -291,6 +291,9 @@ class ClientController extends Controller
 
         $data = $request->validate([
             'admin_content_prompt' => ['nullable', 'string', 'max:2000'],
+            // "Save and clear future articles" button — also wipes the
+            // website's unwritten planner output and re-plans.
+            'clear_future' => ['nullable', 'boolean'],
         ]);
 
         $old = (string) $plan->admin_content_prompt;
@@ -308,11 +311,42 @@ class ClientController extends Controller
             ],
         );
 
+        $status = $new !== ''
+            ? 'Content directives saved for '.$website->domain.'.'
+            : 'Content directives cleared for '.$website->domain.'.';
+
+        if ($request->boolean('clear_future')) {
+            $cleared = $this->clearFutureTopicsFor($plan, $user, $website, $logger);
+            $status .= ' Cleared '.$cleared.' planned topic'.($cleared === 1 ? '' : 's')
+                .' — the planner is rebuilding the calendar with the new directives.';
+        }
+
+        // ?directives_site keeps this website selected after the reload
+        // (multi-site accounts used to snap back to the first site).
         return redirect()
-            ->to(route('admin.clients.show', $user).'#content-directives')
-            ->with('status', $new !== ''
-                ? 'Content directives saved for '.$website->domain.'.'
-                : 'Content directives cleared for '.$website->domain.'.');
+            ->to(route('admin.clients.show', $user).'?directives_site='.$website->id.'#content-directives')
+            ->with('status', $status);
+    }
+
+    /** Shared by updateContentPrompt (clear_future) and clearFutureTopics. */
+    private function clearFutureTopicsFor(ContentPlan $plan, User $user, Website $website, ClientActivityLogger $logger): int
+    {
+        $scope = $plan->topics()
+            ->whereIn('status', [\App\Models\ContentTopic::STATUS_SUGGESTED, \App\Models\ContentTopic::STATUS_APPROVED])
+            ->whereDoesntHave('articles');
+        $cleared = (clone $scope)->count();
+        $scope->delete();
+
+        $logger->log(
+            'admin.content_topics_cleared',
+            userId: $user->id,
+            websiteId: $website->id,
+            meta: ['cleared' => $cleared],
+        );
+
+        \App\Jobs\PlanContentTopicsJob::dispatch($plan->id);
+
+        return $cleared;
     }
 
     /**
@@ -332,23 +366,10 @@ class ClientController extends Controller
         $plan = ContentPlan::query()->where('website_id', $website->id)->first();
         abort_if($plan === null, 404);
 
-        $scope = $plan->topics()
-            ->whereIn('status', [\App\Models\ContentTopic::STATUS_SUGGESTED, \App\Models\ContentTopic::STATUS_APPROVED])
-            ->whereDoesntHave('articles');
-        $cleared = (clone $scope)->count();
-        $scope->delete();
-
-        $logger->log(
-            'admin.content_topics_cleared',
-            userId: $user->id,
-            websiteId: $website->id,
-            meta: ['cleared' => $cleared],
-        );
-
-        \App\Jobs\PlanContentTopicsJob::dispatch($plan->id);
+        $cleared = $this->clearFutureTopicsFor($plan, $user, $website, $logger);
 
         return redirect()
-            ->to(route('admin.clients.show', $user).'#content-directives')
+            ->to(route('admin.clients.show', $user).'?directives_site='.$website->id.'#content-directives')
             ->with('status', 'Cleared '.$cleared.' planned topic'.($cleared === 1 ? '' : 's').' for '.$website->domain
                 .' — the planner is rebuilding the calendar with the current directives.');
     }

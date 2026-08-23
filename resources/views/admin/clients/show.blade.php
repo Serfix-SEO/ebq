@@ -429,7 +429,12 @@
         </div>
 
         {{-- ── Content directives (admin steering prompt) ───────────────── --}}
-        @php $dirSites = collect($profile['websites'])->filter(fn ($w) => $w['plan'] !== null)->values(); @endphp
+        @php
+            $dirSites = collect($profile['websites'])->filter(fn ($w) => $w['plan'] !== null)->values();
+            // Keep the picked website selected across the save/clear reload
+            // (?directives_site=<id> is appended by the redirect).
+            $dirSelected = $dirSites->firstWhere('id', (string) request('directives_site')) ?? $dirSites->first();
+        @endphp
         @if ($dirSites->isNotEmpty())
             <div id="content-directives" class="{{ $card }} p-4">
                 <h2 class="text-sm font-bold text-slate-900">Content directives</h2>
@@ -439,7 +444,7 @@
                     own rules. Leave empty for stock behavior.
                 </p>
                 <form method="POST" class="mt-3 space-y-2" id="content-directives-form"
-                      action="{{ route('admin.clients.content-prompt', [$client, $dirSites->first()['id']]) }}">
+                      action="{{ route('admin.clients.content-prompt', [$client, $dirSelected['id']]) }}">
                     @csrf
                     @method('PUT')
                     {{-- No px-* here: @tailwindcss/forms reserves the right padding
@@ -448,51 +453,43 @@
                             class="w-full rounded-lg border-slate-300 text-sm focus:border-orange-500 focus:ring-orange-500 sm:w-auto">
                         @foreach ($dirSites as $w)
                             <option value="{{ route('admin.clients.content-prompt', [$client, $w['id']]) }}"
-                                    data-clear-action="{{ route('admin.clients.content-topics.clear', [$client, $w['id']]) }}"
-                                    data-prompt="{{ $w['plan']->admin_content_prompt }}">
+                                    data-prompt="{{ $w['plan']->admin_content_prompt }}"
+                                    @selected($w['id'] === $dirSelected['id'])>
                                 {{ $w['domain'] }}{{ trim((string) $w['plan']->admin_content_prompt) !== '' ? ' — prompt set' : '' }}
                             </option>
                         @endforeach
                     </select>
                     <textarea name="admin_content_prompt" id="content-directives-text" rows="4" maxlength="2000"
                               placeholder="e.g. Never mention pricing. Always write from a sustainability angle. Avoid comparisons with US brands."
-                              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">{{ $dirSites->first()['plan']->admin_content_prompt }}</textarea>
-                    <div class="flex items-center justify-between">
-                        <span class="text-[11px] text-slate-400"><span id="content-directives-count">0</span>/2000</span>
-                        <button type="submit" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:brightness-110">
-                            Save directives
-                        </button>
-                    </div>
-                </form>
-                {{-- Clear-and-replan: deletes UNWRITTEN planner output only (suggested/
-                     approved, nothing with an article) and re-runs the planner so new
-                     directives shape the whole calendar immediately. --}}
-                <form method="POST" class="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3"
-                      id="content-directives-clear-form"
-                      action="{{ route('admin.clients.content-topics.clear', [$client, $dirSites->first()['id']]) }}"
-                      onsubmit="return confirm('Delete all unwritten planned topics for this website and re-plan under the current directives?')">
-                    @csrf
-                    @method('DELETE')
+                              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">{{ $dirSelected['plan']->admin_content_prompt }}</textarea>
                     <p class="text-[11px] leading-4 text-slate-400">
-                        Removes unwritten planned topics only — written, scheduled and published articles are never
-                        touched. The client's own confirmed keywords are re-added automatically.
+                        "Save and clear future articles" also deletes the website's unwritten planned topics and re-runs the
+                        planner under the new directives — written, scheduled and published articles are never touched, and the
+                        client's own confirmed keywords are re-added automatically.
                     </p>
-                    <button type="submit"
-                            class="shrink-0 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50">
-                        Clear future topics &amp; re-plan
-                    </button>
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-[11px] text-slate-400"><span id="content-directives-count">0</span>/2000</span>
+                        <div class="flex items-center gap-2">
+                            <button type="submit" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:brightness-110">
+                                Save
+                            </button>
+                            <button type="submit" name="clear_future" value="1"
+                                    onclick="return confirm('Save the directives AND delete all unwritten planned topics for this website, then re-plan?')"
+                                    class="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50">
+                                Save and clear future articles
+                            </button>
+                        </div>
+                    </div>
                 </form>
                 <script>
                     (function () {
                         const sel = document.getElementById('content-directives-site');
                         const form = document.getElementById('content-directives-form');
-                        const clearForm = document.getElementById('content-directives-clear-form');
                         const text = document.getElementById('content-directives-text');
                         const count = document.getElementById('content-directives-count');
                         const sync = () => { count.textContent = String(text.value.length); };
                         sel.addEventListener('change', () => {
                             form.action = sel.value;
-                            clearForm.action = sel.options[sel.selectedIndex].dataset.clearAction || clearForm.action;
                             text.value = sel.options[sel.selectedIndex].dataset.prompt || '';
                             sync();
                         });

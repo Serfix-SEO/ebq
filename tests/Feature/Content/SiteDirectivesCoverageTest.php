@@ -340,6 +340,44 @@ class SiteDirectivesCoverageTest extends TestCase
             ])->assertSessionHasErrors('admin_content_prompt');
     }
 
+    /** "Save and clear future articles": one submit saves AND clears AND keeps the site selected. */
+    public function test_admin_save_with_clear_future_flag_saves_clears_and_preserves_selection(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        [$website, $plan] = $this->directedPlan(adminPrompt: null);
+        $owner = User::find($website->user_id);
+        $admin = User::factory()->create(['is_admin' => true]);
+        $unwritten = ContentTopic::create([
+            'plan_id' => $plan->id, 'website_id' => $website->id,
+            'title' => 'T unwritten', 'target_keyword' => 'kw unwritten',
+            'status' => ContentTopic::STATUS_APPROVED,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->put(route('admin.clients.content-prompt', [$owner, $website]), [
+                'admin_content_prompt' => 'New direction.',
+                'clear_future' => '1',
+            ]);
+
+        $this->assertSame('New direction.', $plan->fresh()->admin_content_prompt);
+        $this->assertNull(ContentTopic::find($unwritten->id));
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\PlanContentTopicsJob::class, fn ($j) => $j->planId === $plan->id);
+        // The redirect pins the picked website so the reload keeps it selected.
+        $response->assertRedirect();
+        $this->assertStringContainsString('directives_site='.$website->id, $response->headers->get('Location'));
+
+        // Plain Save never clears.
+        $keep = ContentTopic::create([
+            'plan_id' => $plan->id, 'website_id' => $website->id,
+            'title' => 'T keep', 'target_keyword' => 'kw keep',
+            'status' => ContentTopic::STATUS_APPROVED,
+        ]);
+        $this->actingAs($admin)->put(route('admin.clients.content-prompt', [$owner, $website]), [
+            'admin_content_prompt' => 'New direction.',
+        ]);
+        $this->assertNotNull(ContentTopic::find($keep->id));
+    }
+
     /**
      * "Clear future topics & re-plan": deletes only UNWRITTEN planner output
      * (suggested/approved without an article), leaves everything written or
