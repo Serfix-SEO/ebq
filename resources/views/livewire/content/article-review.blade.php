@@ -146,6 +146,13 @@
                 <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900">
                     <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ __('Do you like this article?') }}</span>
                     <div class="flex flex-wrap items-center gap-2">
+                        @if ($rewriteCredits !== null)
+                            <span class="me-1 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                                  title="{{ __(':free free this month + :bought purchased', ['free' => $rewriteCredits['free_remaining'], 'bought' => $rewriteCredits['purchased']]) }}">
+                                <svg class="h-3.5 w-3.5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z"/></svg>
+                                {{ __('Rewrite credits:') }} <span class="font-bold text-slate-700 dark:text-slate-200">{{ $rewriteCredits['available'] }}</span>
+                            </span>
+                        @endif
                         @foreach ($fbOpts as $o)
                             <button type="button" wire:click="rateArticle('{{ $o['r'] }}')"
                                 @class([
