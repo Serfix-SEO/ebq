@@ -611,5 +611,10 @@
          trial paths lands here via a navigate redirect. Renders only on the
          request that follows a real trial start or subscription. --}}
     @include('partials.ads-conversion')
+    {{-- Refer-&-earn promo (dismiss persists in localStorage). Hidden on the
+         referral page itself — no point advertising where you already are. --}}
+    @unless (request()->routeIs('referrals.*'))
+        @include('partials.referral-promo')
+    @endunless
 </body>
 </html>

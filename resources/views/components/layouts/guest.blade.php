@@ -77,5 +77,6 @@
     </div>
     {{-- Consent Mode v2 banner (drives the gtag consent state). --}}
     @include('partials.consent-banner')
+    @include('partials.referral-promo')
 </body>
 </html>

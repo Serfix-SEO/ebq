@@ -62,6 +62,11 @@
                     <li>Plan tier, subscription status, trial-end date, last-four card digits, card brand. We do <strong>not</strong> store full payment card numbers or CVV; payment is processed by Stripe under Stripe's privacy policy.</li>
                 </ul>
 
+                <h3>1.5 Referral attribution</h3>
+                <ul>
+                    <li>If you arrive through a referral link, a first-party cookie (<code>ebq_ref</code>) stores the referral ID for 60 days so we can credit the referrer if you sign up. It contains no personal data. Referrers see only a masked form of a referred account's email address. Program rules: <a href="{{ route('referral-policy') }}">Referral Program Policy</a>.</li>
+                </ul>
+
                 <h2>2. How we use data</h2>
 
                 <h3>2.1 How we use Google user data</h3>

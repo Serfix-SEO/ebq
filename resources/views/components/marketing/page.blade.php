@@ -270,6 +270,7 @@
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('terms-conditions') }}">{{ __('Terms') }}</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('privacy-policy') }}">{{ __('Privacy') }}</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('refund-policy') }}">{{ __('Refunds') }}</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('referral-policy') }}">{{ __('Referrals') }}</a></li>
                 </ul>
             </div>
         </div>
@@ -282,5 +283,6 @@
     </footer>
     {{-- Consent Mode v2 banner (drives the gtag consent state). --}}
     @include('partials.consent-banner')
+    @include('partials.referral-promo')
 </body>
 </html>

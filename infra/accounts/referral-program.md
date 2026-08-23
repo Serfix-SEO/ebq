@@ -101,3 +101,15 @@ null-label group (survives `SEO_PLATFORM_UI=false`), `feature => null`.
   basil line shape), idempotency, credit math, sweep retry, page rendering,
   allowlist. Stripe touches are constructor-injected closures (spy creditor +
   fixed price resolver) — zero network in tests.
+
+## Policy page + promo banner (2026-08-23)
+
+- Public policy: `/referral-policy` (`legal/referral-policy.blade.php`, marketing-page
+  pattern) — qualifying rules, 50%-of-base credit terms, custom-ID rules, fair-play,
+  ebq_ref cookie disclosure. Cross-linked from the footer legal list, Terms §5 and
+  Privacy §1.5.
+- Site-wide promo: `partials/referral-promo.blade.php` — small bottom-corner banner on
+  the consent-banner pattern (vanilla JS, rendered hidden, localStorage key
+  `serfix_ref_promo`, one close hides forever). Defers to the cookie-consent banner
+  (never stacks), skipped on `/referrals` itself. Included in layouts: app, marketing
+  page, guest.

@@ -382,6 +382,32 @@ class ReferralProgramTest extends TestCase
         $this->assertSame('my-brand', $user->fresh()->referral_code);
     }
 
+    // ── Policy page + promo banner ──────────────────────────────────────
+
+    public function test_referral_policy_page_renders_and_is_cross_linked(): void
+    {
+        $this->get(route('referral-policy'))
+            ->assertOk()
+            ->assertSee('Referral Program Policy')
+            ->assertSee('50% of your own base subscription price');
+
+        // Existing policy pages link to it.
+        $this->get(route('terms-conditions'))->assertSee(route('referral-policy'));
+        $this->get(route('privacy-policy'))->assertSee(route('referral-policy'));
+    }
+
+    public function test_promo_banner_renders_hidden_everywhere_but_the_referrals_page(): void
+    {
+        $user = User::factory()->create();
+
+        // Public marketing page carries it…
+        $this->get('/')->assertSee('referral-promo');
+        // …authenticated app pages carry it…
+        $this->actingAs($user)->get(route('billing.show'))->assertSee('referral-promo');
+        // …but the referral page itself does not advertise itself.
+        $this->actingAs($user)->get(route('referrals.index'))->assertDontSee('id="referral-promo"', false);
+    }
+
     public function test_referral_page_masks_referred_emails(): void
     {
         $referrer = User::factory()->create();

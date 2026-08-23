@@ -39,6 +39,7 @@
 
                 <h2>{{ __('5. Billing and plans') }}</h2>
                 <p>{{ __('Paid plans are billed annually after any active trial period. Renewal is automatic unless canceled before the renewal date.') }}</p>
+                <p>{{ __('Serfix runs a refer-and-earn program that credits referrers when someone they referred becomes a paying customer. Participation is governed by the') }} <a href="{{ route('referral-policy') }}">{{ __('Referral Program Policy') }}</a>.</p>
 
                 <h2>{{ __('6. Customer content') }}</h2>
                 <p>{{ __('You retain ownership of your content and data. You grant Serfix a limited license to process it to operate the service.') }}</p>

@@ -111,6 +111,7 @@ Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
 Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
 Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');
+Route::view('/referral-policy', 'legal.referral-policy')->name('referral-policy');
 // The guide is Content-AI-only since 2026-08-15 and shows in BOTH platform
 // modes — it used to redirect home when the SEO UI was off, which left the
 // content product with no public documentation at all.
