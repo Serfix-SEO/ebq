@@ -60,13 +60,69 @@ class RewriteCredits
             ->sum('delta'));
     }
 
-    /** @return array{free_remaining:int, purchased:int, total:int} */
+    /**
+     * In-flight rewrites (queued/running) — each holds ONE credit in reserve.
+     * Credits are only SPENT when a rewrite finalizes (owner rule 2026-08-23:
+     * never on optimization/internal passes, never on failures); the
+     * reservation keeps a 1-credit user from starting five rewrites at once.
+     */
+    public function reservedCount(User $user): int
+    {
+        return ContentRewriteRequest::query()
+            ->where('user_id', $user->id)
+            ->whereIn('status', [ContentRewriteRequest::STATUS_QUEUED, ContentRewriteRequest::STATUS_RUNNING])
+            ->count();
+    }
+
+    /** @return array{free_remaining:int, purchased:int, total:int, reserved:int, available:int} */
     public function summary(User $user): array
     {
         $free = max(0, $this->monthlyFreeAllowance($user) - $this->freeUsedThisMonth($user));
         $purchased = $this->purchasedBalance($user);
+        $reserved = $this->reservedCount($user);
 
-        return ['free_remaining' => $free, 'purchased' => $purchased, 'total' => $free + $purchased];
+        return [
+            'free_remaining' => $free,
+            'purchased' => $purchased,
+            'total' => $free + $purchased,
+            'reserved' => $reserved,
+            'available' => max(0, $free + $purchased - $reserved),
+        ];
+    }
+
+    /**
+     * Reservation gate at dispatch: true when the user can start one more
+     * rewrite. Serialized on the user row so two tabs can't both pass with a
+     * single credit; the request row must be created in the SAME transaction.
+     */
+    public function canStartRewrite(User $user): bool
+    {
+        User::query()->whereKey($user->id)->lockForUpdate()->first();
+
+        return $this->summary($user)['available'] >= 1;
+    }
+
+    /**
+     * Charge the credit for a FINALIZED rewrite (called from the job's
+     * success path only). Never blocks a delivered rewrite: an edge-case
+     * race that emptied the balance mid-run just logs and forgives.
+     */
+    public function spendForRequest(ContentRewriteRequest $request): void
+    {
+        $user = User::query()->find($request->user_id);
+        $topic = \App\Models\ContentTopic::query()->find($request->topic_id);
+        if ($user === null || $topic === null) {
+            return;
+        }
+
+        try {
+            $event = $this->spend($user, $topic, $request->id);
+            $request->update(['credit_event_id' => $event->id]);
+        } catch (InsufficientRewriteCreditsException) {
+            \Illuminate\Support\Facades\Log::warning('rewrite finalized with empty balance — credit forgiven', [
+                'request_id' => $request->id, 'user_id' => $user->id,
+            ]);
+        }
     }
 
     /**

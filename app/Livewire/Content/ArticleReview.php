@@ -6,7 +6,6 @@ use App\Jobs\CheckTrackedKeywordSerpJob;
 use App\Jobs\Content\RewriteArticleJob;
 use App\Models\ContentRewriteRequest;
 use App\Services\Content\ContentArticleProducer;
-use App\Services\Content\Exceptions\InsufficientRewriteCreditsException;
 use App\Services\Content\RewriteCredits;
 use App\Services\Content\RewritePromptEnhancer;
 use App\Jobs\GenerateInlineImageJob;
@@ -384,35 +383,32 @@ class ArticleReview extends Component
     }
 
     /**
-     * Spend one credit and queue the rewrite — one transaction with the
-     * request row; the job only ever refunds.
+     * Reserve one credit and queue the rewrite. The credit is only SPENT
+     * when the rewrite FINALIZES (owner rule 2026-08-23) — the in-flight
+     * request itself is the reservation, created in the same transaction as
+     * the availability check so a single credit can't start two rewrites.
      */
     private function dispatchRewrite(ContentTopic $topic, $user, ?string $prompt): void
     {
         $credits = app(RewriteCredits::class);
-        if ($credits->summary($user)['total'] < 1) {
+
+        $request = DB::transaction(function () use ($topic, $user, $prompt, $credits): ?ContentRewriteRequest {
+            if (! $credits->canStartRewrite($user)) {
+                return null;
+            }
+
+            return ContentRewriteRequest::query()->create([
+                'topic_id' => $topic->id,
+                'user_id' => $user->id,
+                'website_id' => $topic->website_id,
+                'prompt' => $prompt !== null && $prompt !== '' ? mb_substr($prompt, 0, 2000) : null,
+                'status' => ContentRewriteRequest::STATUS_QUEUED,
+                'prior_status' => $topic->status,
+            ]);
+        });
+
+        if ($request === null) {
             $this->showPacksModal = true;
-
-            return;
-        }
-
-        try {
-            $request = DB::transaction(function () use ($topic, $user, $prompt, $credits): ContentRewriteRequest {
-                $request = ContentRewriteRequest::query()->create([
-                    'topic_id' => $topic->id,
-                    'user_id' => $user->id,
-                    'website_id' => $topic->website_id,
-                    'prompt' => $prompt !== null && $prompt !== '' ? mb_substr($prompt, 0, 2000) : null,
-                    'status' => ContentRewriteRequest::STATUS_QUEUED,
-                    'prior_status' => $topic->status,
-                ]);
-                $event = $credits->spend($user, $topic, $request->id);
-                $request->update(['credit_event_id' => $event->id]);
-
-                return $request;
-            });
-        } catch (InsufficientRewriteCreditsException) {
-            $this->showPacksModal = true; // lost the race to another tab
 
             return;
         }

@@ -229,7 +229,7 @@
                             @if ($feedbackSaved)<span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">{{ __('Sent — thank you') }}</span>@endif
                             @if ($rewriteCredits !== null)
                                 <span class="text-[11px] font-medium text-slate-400" title="{{ __(':free free this month + :bought purchased', ['free' => $rewriteCredits['free_remaining'], 'bought' => $rewriteCredits['purchased']]) }}">
-                                    {{ __('1 credit · :n left', ['n' => $rewriteCredits['total']]) }}
+                                    {{ __('1 credit · :n left', ['n' => $rewriteCredits['available']]) }}
                                 </span>
                             @endif
                             @if ($activeRewrite !== null)

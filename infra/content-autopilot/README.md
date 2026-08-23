@@ -746,6 +746,13 @@ spend's source). `content_rewrite_requests` tracks each run (status,
 prior_status restore target, article_version, refund linkage);
 `RewriteArticleJob` (unique per topic, tries=1, timeout 900) wraps
 `reviseCurrentArticle` — success = a version beyond the bookkeeping rescore.
+**Spend-at-FINALIZE (owner rule 2026-08-23)**: dispatch only RESERVES (the
+queued/running request row is the reservation, gated by
+`canStartRewrite` under a user-row lock so 1 credit can't start 2 rewrites);
+the credit is charged in the job's success path via `spendForRequest` —
+internal passes (rescore/optimize/scrub) and failures never move the ledger,
+so failed runs need no refund (refund() stays for legacy dispatch-time
+spends). UI shows `summary()['available']` = total − reserved.
 
 **Packs** (Setting `content.rewrite.packs`, admin textarea `credits:usd` per
 line, defaults 10:5 + 25:20): one-time Cashier `checkoutCharge` payment

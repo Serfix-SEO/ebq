@@ -84,6 +84,11 @@ class RewriteArticleJob implements ShouldQueue, ShouldBeUnique
                 'status' => ContentRewriteRequest::STATUS_DONE,
                 'article_version' => (int) $final->version,
             ]);
+            // Owner rule (2026-08-23): the credit is charged ONLY here — on a
+            // FINALIZED rewrite. Internal passes and failures never spend.
+            if ($request->credit_event_id === null) {
+                $credits->spendForRequest($request);
+            }
         } else {
             $this->markFailed($request, $topic, $credits,
                 $topic->status === ContentTopic::STATUS_FAILED ? ('topic failed: '.$topic->last_error) : 'no rewrite version produced');
@@ -98,6 +103,9 @@ class RewriteArticleJob implements ShouldQueue, ShouldBeUnique
             'status' => ContentRewriteRequest::STATUS_FAILED,
             'error' => mb_substr($error, 0, 500),
         ]);
+        // Spend-at-finalize rows have nothing to refund (the failed request
+        // simply stops reserving); refund() is a no-op then, and still
+        // reverses any legacy spend-at-dispatch row.
         $credits->refund($request);
 
         // Put the topic back where it was — EXCEPT when the producer

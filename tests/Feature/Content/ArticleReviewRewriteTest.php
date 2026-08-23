@@ -89,7 +89,8 @@ class ArticleReviewRewriteTest extends TestCase
         $request = ContentRewriteRequest::query()->where('topic_id', $topic->id)->first();
         $this->assertNotNull($request);
         $this->assertSame('Make it friendlier', $request->prompt);
-        $this->assertSame(1, Event::query()->where('kind', Event::KIND_SPEND)->count());
+        // Spend-at-FINALIZE: dispatch only reserves — no ledger movement yet.
+        $this->assertSame(0, Event::query()->where('kind', Event::KIND_SPEND)->count());
         Queue::assertPushed(RewriteArticleJob::class, fn ($j) => $j->requestId === $request->id && $j->topicId === $topic->id);
     }
 
@@ -129,7 +130,8 @@ class ArticleReviewRewriteTest extends TestCase
 
         $request = ContentRewriteRequest::query()->where('topic_id', $topic->id)->first();
         $this->assertSame('Add a section with 100 decorated name examples.', $request->prompt);
-        $this->assertSame(1, Event::query()->where('kind', Event::KIND_SPEND)->count());
+        // Reserved, not spent — the job charges at finalization.
+        $this->assertSame(0, Event::query()->where('kind', Event::KIND_SPEND)->count());
         Queue::assertPushed(RewriteArticleJob::class);
     }
 
@@ -193,7 +195,39 @@ class ArticleReviewRewriteTest extends TestCase
             ->call('requestRewrite');
 
         $this->assertSame(1, ContentRewriteRequest::query()->count());
-        $this->assertSame(1, Event::query()->where('kind', Event::KIND_SPEND)->count());
+        $this->assertSame(0, Event::query()->where('kind', Event::KIND_SPEND)->count());
+    }
+
+    public function test_in_flight_rewrite_reserves_the_only_credit(): void
+    {
+        Queue::fake();
+        [$user, $topic] = $this->fixture(credits: 1);
+        // Second topic on the same site, same single-credit user.
+        $topicB = ContentTopic::create([
+            'plan_id' => $topic->plan_id, 'website_id' => $topic->website_id,
+            'title' => 'B', 'target_keyword' => 'kwb', 'status' => ContentTopic::STATUS_READY,
+        ]);
+        ContentArticle::create([
+            'topic_id' => $topicB->id, 'version' => 1, 'is_current' => true,
+            'h1' => 'B', 'meta_title' => 'B', 'meta_description' => 'D',
+            'slug' => 'b', 'html' => '<p>B.</p>', 'seo_score' => 90,
+        ]);
+
+        Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])
+            ->set('feedbackRating', ContentArticleFeedback::RATING_REWRITES)
+            ->set('feedbackComment', 'first rewrite')
+            ->call('requestRewrite');
+        $this->assertSame(1, ContentRewriteRequest::query()->count());
+
+        // The queued rewrite holds the only credit — topic B must hit the modal.
+        Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topicB->id])
+            ->set('feedbackRating', ContentArticleFeedback::RATING_REWRITES)
+            ->set('feedbackComment', 'second rewrite')
+            ->call('requestRewrite')
+            ->assertSet('showPacksModal', true);
+
+        $this->assertSame(1, ContentRewriteRequest::query()->count());
+        $this->assertSame(0, Event::query()->where('kind', Event::KIND_SPEND)->count());
     }
 
     public function test_version_history_hides_bookkeeping_rescore_versions(): void

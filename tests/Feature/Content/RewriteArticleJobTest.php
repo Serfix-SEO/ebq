@@ -55,9 +55,9 @@ class RewriteArticleJobTest extends TestCase
             'prompt' => 'Make it friendlier', 'status' => ContentRewriteRequest::STATUS_QUEUED,
             'prior_status' => $topicStatus,
         ]);
+        // Spend-at-FINALIZE (owner rule): nothing is spent at dispatch — the
+        // queued request itself reserves the credit granted here.
         app(RewriteCredits::class)->grantAdmin($user, 1);
-        $spend = app(RewriteCredits::class)->spend($user, $topic, $request->id);
-        $request->update(['credit_event_id' => $spend->id]);
 
         return [$user, $topic, $request];
     }
@@ -80,6 +80,9 @@ class RewriteArticleJobTest extends TestCase
         $this->assertSame(ContentRewriteRequest::STATUS_DONE, $request->status);
         $this->assertNotNull($request->article_version);
         $this->assertSame(ContentTopic::STATUS_READY, $topic->fresh()->status);
+        // Credit charged exactly at finalization — never before.
+        $this->assertSame(1, Event::query()->where('kind', Event::KIND_SPEND)->count());
+        $this->assertNotNull($request->credit_event_id);
         $this->assertSame(0, Event::query()->where('kind', Event::KIND_REFUND)->count());
         $this->assertStringContainsString('friendlier', (string) $topic->articles()->where('is_current', true)->value('html'));
     }
@@ -105,7 +108,9 @@ class RewriteArticleJobTest extends TestCase
 
         $request->refresh();
         $this->assertSame(ContentRewriteRequest::STATUS_FAILED, $request->status);
-        $this->assertSame(1, Event::query()->where('kind', Event::KIND_REFUND)->count());
+        // Nothing was spent, so nothing to refund — the balance never moved.
+        $this->assertSame(0, Event::query()->where('kind', Event::KIND_SPEND)->count());
+        $this->assertSame(0, Event::query()->where('kind', Event::KIND_REFUND)->count());
         $this->assertSame(ContentTopic::STATUS_READY, $topic->fresh()->status);
     }
 
@@ -118,6 +123,20 @@ class RewriteArticleJobTest extends TestCase
         $job->failed(new \RuntimeException('boom again'));
 
         $this->assertSame(ContentRewriteRequest::STATUS_FAILED, $request->fresh()->status);
+        $this->assertSame(0, Event::query()->where('kind', Event::KIND_SPEND)->count());
+        $this->assertSame(0, Event::query()->where('kind', Event::KIND_REFUND)->count());
+    }
+
+    public function test_legacy_dispatch_time_spend_is_refunded_on_failure(): void
+    {
+        [$user, $topic, $request] = $this->fixture();
+        // Pre-migration row: credit was spent at dispatch.
+        $spend = app(RewriteCredits::class)->spend($user, $topic, $request->id);
+        $request->update(['credit_event_id' => $spend->id]);
+        Http::fake(['*' => Http::response(['choices' => [['message' => ['content' => 'not json at all']]]])]);
+
+        $this->runJob($request, $topic);
+
         $this->assertSame(1, Event::query()->where('kind', Event::KIND_REFUND)->count());
     }
 }

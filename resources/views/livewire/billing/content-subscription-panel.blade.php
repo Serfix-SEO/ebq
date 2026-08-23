@@ -320,7 +320,7 @@
                 </div>
                 <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-200"
                       title="{{ __(':free free this month + :bought purchased', ['free' => $rewriteCredits['free_remaining'], 'bought' => $rewriteCredits['purchased']]) }}">
-                    {{ __(':n left', ['n' => $rewriteCredits['total']]) }}
+                    {{ __(':n left', ['n' => $rewriteCredits['available']]) }}
                 </span>
             </div>
             <div class="mt-3 flex flex-wrap gap-2">
