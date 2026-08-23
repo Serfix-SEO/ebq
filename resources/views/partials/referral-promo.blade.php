@@ -7,7 +7,7 @@
      if that banner is currently visible, the promo waits for a later page
      load rather than stacking two bottom overlays. --}}
 <div id="referral-promo" hidden
-     class="fixed bottom-4 start-4 z-40 w-[calc(100%-2rem)] max-w-sm">
+     class="fixed inset-x-0 bottom-4 z-40 mx-auto w-[calc(100%-2rem)] max-w-xl">
     <div class="relative rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_60px_-20px_rgba(15,23,42,0.35)] dark:border-slate-700 dark:bg-slate-900">
         <button type="button" id="referral-promo-close" aria-label="{{ __('Dismiss') }}"
             class="absolute end-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
