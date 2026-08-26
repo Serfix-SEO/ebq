@@ -313,9 +313,14 @@ class GenerateContentImagesJob implements ShouldQueue
                 .'lobbies, waiting rooms shown wide, shopfronts, storefronts, building exteriors and facades, '
                 .'entrances, shop windows, vehicles, uniforms with badges, packaging, screens or monitors showing '
                 .'an interface, notice boards, name plates, banners. '
-                .'INSTEAD frame images that physically cannot carry a name: close-ups of hands at work, tools, '
-                .'materials, ingredients or products in isolation, textures and details, a person mid-action framed '
-                .'tight, outdoor scenery and nature, or an abstract/graphic treatment. '
+                .'INSTEAD frame images that physically cannot carry a name: close-ups of products or objects in '
+                .'isolation, tools, materials or ingredients arranged as a flat lay, textures and details, '
+                .'outdoor scenery and nature, or an abstract/graphic treatment. '
+                // Anatomy: image models render hands/faces poorly (cocomii
+                // 2026-08-26: extra finger on a hero image). Same lesson as the
+                // SCENE RULE — steer the scene, never "no hands" in the prompt.
+                .'Never describe a scene with visible human hands or faces — image models render anatomy poorly. '
+                .'If a person is essential to the topic, place them distant, small in frame, or seen from behind. '
                 .'Do NOT write "no text" or "no signage" in the prompt — mentioning it makes the model add it. '
                 .'Simply describe a scene with nothing to write on. '
                 .'Never ask for text, words, letters, titles or captions. '
@@ -376,7 +381,7 @@ class GenerateContentImagesJob implements ShouldQueue
         // Close-up/detail framing on purpose: a scene with no signable surface
         // is the only thing that reliably keeps invented brand names out (the
         // old wording literally said "no text", which invites it).
-        $base = "Editorial close-up photograph evoking \"{$subject}\" — hands, tools, materials or textures in tight framing, "
+        $base = "Editorial close-up photograph evoking \"{$subject}\" — products, tools, materials or textures in tight framing, "
             ."soft natural light, shallow depth of field, clean and modern.";
 
         return $stylePrompt !== '' ? $base.' Style: '.$stylePrompt : $base;

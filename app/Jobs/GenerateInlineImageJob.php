@@ -38,7 +38,13 @@ class GenerateInlineImageJob implements ShouldQueue
 
     public int $timeout = 180;
 
-    public function __construct(public string $imageId, public string $prompt)
+    /**
+     * @param  ?string  $replaceImageId  set by the client "Generate a new
+     *   image" flow: on success the old image row is REJECTED and its src in
+     *   the CURRENT article html is swapped to the new file. New-row + swap,
+     *   never overwrite-in-place (URL caching, sideload rewrites, audit).
+     */
+    public function __construct(public string $imageId, public string $prompt, public ?string $replaceImageId = null)
     {
         $this->onQueue(Queues::CONTENT);
         $this->onConnection('redis-long');
@@ -63,12 +69,16 @@ class GenerateInlineImageJob implements ShouldQueue
         }
 
         $speed = ContentAutopilotConfig::renderingSpeed();
-        $style = ContentAutopilotConfig::styleType();
 
         // Client-directed prompt: block competitors and logos, but NOT text —
         // they may be asking for their own name on purpose (which is exactly
         // what the TMC client tried when a competitor's name appeared).
         $plan = $image->article?->topic?->plan;
+        // The plan's chosen image style, like the pipeline job — the global
+        // styleType() was silently ignoring per-plan styles here.
+        $style = \App\Support\ContentImageStyles::isValid($plan?->image_style)
+            ? \App\Support\ContentImageStyles::ideogramStyle($plan->image_style)
+            : ContentAutopilotConfig::styleType();
         $negativePrompt = \App\Support\ContentImageGuardrails::forCompetitors(
             (array) (((array) ($plan?->competitor_overrides ?? []))['added'] ?? []),
             \App\Support\ContentImageGuardrails::MANUAL_NEGATIVE_PROMPT,
@@ -104,7 +114,7 @@ class GenerateInlineImageJob implements ShouldQueue
             'filename' => $filename,
             'bytes' => strlen($bytes),
             'params' => array_merge((array) $image->params, [
-                'source' => 'editor-generate',
+                'source' => ((array) $image->params)['source'] ?? 'editor-generate',
                 'rendering_speed' => $speed,
                 'style_type' => $style,
                 'aspect_ratio' => '16x9',
@@ -114,7 +124,35 @@ class GenerateInlineImageJob implements ShouldQueue
             'status' => ContentImage::STATUS_GENERATED,
         ])->save();
 
+        if ($this->replaceImageId !== null) {
+            $this->swapReplacedImage($image);
+        }
+
         Log::info('content_autopilot.inline_image_generated', ['image_id' => $image->id]);
+    }
+
+    /**
+     * Regeneration landing: swap the old image's src in the topic's CURRENT
+     * article (re-fetched — the crown may have moved since dispatch) and
+     * retire the old row. A deleted figure makes the swap a no-op — correct:
+     * the Main-image card still shows the new file, and REJECTED rows are
+     * never sideloaded to WordPress.
+     */
+    private function swapReplacedImage(ContentImage $new): void
+    {
+        $old = ContentImage::query()->find($this->replaceImageId);
+        if ($old === null) {
+            return;
+        }
+
+        $article = $new->article?->topic?->articles()->where('is_current', true)->first();
+        if ($article !== null && str_contains((string) $article->html, (string) $old->url())) {
+            $article->forceFill([
+                'html' => str_replace((string) $old->url(), (string) $new->url(), (string) $article->html),
+            ])->saveQuietly();
+        }
+
+        $old->forceFill(['status' => ContentImage::STATUS_REJECTED])->save();
     }
 
     public function failed(\Throwable $e): void

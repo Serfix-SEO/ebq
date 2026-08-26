@@ -4920,5 +4920,14 @@
     "Program rules": "قواعد البرنامج",
     "Referrals": "الإحالات",
     "Referral Program Policy": "سياسة برنامج الإحالة",
-    "Serfix runs a refer-and-earn program that credits referrers when someone they referred becomes a paying customer. Participation is governed by the": "يدير Serfix برنامج «أوصِ واربح» يمنح رصيدًا للمحيلين عندما يصبح من أحالوه عميلًا مدفوعًا. تخضع المشاركة لـ"
+    "Serfix runs a refer-and-earn program that credits referrers when someone they referred becomes a paying customer. Participation is governed by the": "يدير Serfix برنامج «أوصِ واربح» يمنح رصيدًا للمحيلين عندما يصبح من أحالوه عميلًا مدفوعًا. تخضع المشاركة لـ",
+    "Main image": "الصورة الرئيسية",
+    "Used as your post's featured image and shown at the top of your article.": "تُستخدم كصورة بارزة لمنشورك وتظهر أعلى مقالتك.",
+    "Used as your post's featured image. You removed it from the article body — it will still be your post's thumbnail.": "تُستخدم كصورة بارزة لمنشورك. لقد أزلتها من نص المقالة — ستبقى مع ذلك الصورة المصغرة لمنشورك.",
+    "Generate a new image": "إنشاء صورة جديدة",
+    "Images in this article": "الصور في هذه المقالة",
+    "Article image": "صورة المقالة",
+    "You've reached the regeneration limit for this image.": "لقد وصلت إلى حد إعادة إنشاء هذه الصورة.",
+    "Too many image generations — try again in a little while.": "عدد كبير من عمليات إنشاء الصور — حاول مجددًا بعد قليل.",
+    "Republish the article to update the image on your site.": "أعد نشر المقالة لتحديث الصورة على موقعك."
 }

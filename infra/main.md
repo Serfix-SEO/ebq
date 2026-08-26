@@ -287,6 +287,12 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-26 — Cocomii feedback: main-image preview, relevant internal links, image
+  regeneration.** Review page always shows the Main-image card (3 states); internal-link
+  candidates are titled + topic-ranked with an anchor↔target scorer gate + post-verdict
+  strip; clients can regenerate AI images (free, 3/lineage cap, new-row+src-swap); scene
+  prompts avoid hands/faces (anatomy artifacts). infra/content-autopilot/README.md.
+
 - **2026-08-23 — Client-paid article rewrites + version history.** Feedback widget's
   rewrite verdicts now trigger a credit-gated rewrite (5 free/month for subscribers,
   purchasable packs via one-time Stripe checkout, auto-refund on failure); the client

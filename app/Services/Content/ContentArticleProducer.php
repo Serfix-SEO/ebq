@@ -105,9 +105,21 @@ class ContentArticleProducer
             'additional_keywords' => (array) ($topic->secondary_keywords ?? []),
             'language' => strtolower((string) ($plan->language ?: 'en')),
             'country' => strtoupper((string) ($plan->country ?: '')),
-            'custom_prompt' => $this->templateInstructions($plan, $topic)
-                .(($urls = array_slice((array) ($context['site_urls'] ?? []), 0, 15)) === [] ? ''
-                    : "\nInternal pages you may link to (2-3, exact URLs only):\n".implode("\n", $urls)),
+            'custom_prompt' => $this->templateInstructions($plan, $topic),
+            // Titled, topic-relevant internal-link candidates through the
+            // writer's OWN link contract (anchor rules + placement) instead of
+            // a bare-URL footnote — bare URLs made the model invent
+            // topic-derived anchors for random pages (cocomii 2026-08-26).
+            // Non-manual entries normalize to source user_selected →
+            // anchor_locked false, i.e. paraphraseable suggestions.
+            'selected_links' => ($sel = (array) ($context['selected_pages'] ?? [])) === [] ? null : [
+                'internal' => array_map(static fn ($p) => [
+                    'url' => (string) $p['url'],
+                    // Anchor seed = page title with a trailing "| Site Name"
+                    // style suffix stripped.
+                    'anchor' => trim((string) preg_replace('/\s*[|–—]\s*[^|–—]*$/u', '', (string) $p['title'])) ?: (string) $p['title'],
+                ], array_slice($sel, 0, 8)),
+            ],
             '__user_id' => $website->user_id,
             '__source' => 'content_autopilot.write',
             '__unmetered' => true, // capped by ContentLlmSpendMeter + entitlements, not the dashboard token cap
@@ -288,6 +300,10 @@ class ContentArticleProducer
 
             return $article;
         }
+
+        // AFTER the verdict (a link nit must never fail a topic): unwrap any
+        // internal link whose anchor doesn't match its target page.
+        $article = $this->stripMismatchedInternalLinks($article, $topic, $context);
 
         $topic->enterStage(ContentTopic::STATUS_READY);
 
@@ -611,6 +627,8 @@ class ContentArticleProducer
             return $article;
         }
 
+        $article = $this->stripMismatchedInternalLinks($article, $topic, $context);
+
         // Restore where the topic was — a published topic stays published; an
         // in-review one goes back to READY for the client.
         $topic->forceFill(['status' => $priorStatus === ContentTopic::STATUS_PUBLISHED
@@ -618,6 +636,51 @@ class ContentArticleProducer
             : ContentTopic::STATUS_READY])->save();
 
         return $article;
+    }
+
+    /**
+     * Final-gate belt for the anchor↔target rule (cocomii 2026-08-26):
+     * unwrap internal links whose anchor doesn't match the target page —
+     * plain text instead of a misleading link. Runs AFTER the READY/status
+     * verdict so the honest re-score can never fail an already-passing topic,
+     * and NOT inside the revise loop (stripping there erases the informative
+     * internal_anchor_match message and causes strip/re-add churn).
+     */
+    private function stripMismatchedInternalLinks(ContentArticle $article, ContentTopic $topic, array $context): ContentArticle
+    {
+        try {
+            $mismatched = $this->scorer->mismatchedAnchors((string) $article->html, $context);
+            if ($mismatched === []) {
+                return $article;
+            }
+
+            $html = (string) $article->html;
+            foreach ($mismatched as $bad) {
+                $quoted = preg_quote($bad['url'], '/');
+                $html = (string) preg_replace(
+                    '/<a\b[^>]*href="'.$quoted.'"[^>]*>(.*?)<\/a>/is',
+                    '$1',
+                    $html
+                );
+            }
+            if ($html === (string) $article->html) {
+                return $article;
+            }
+
+            return $this->storeScoredVersion($topic, $context, [
+                'h1' => (string) $article->h1,
+                'meta_title' => (string) $article->meta_title,
+                'meta_description' => (string) $article->meta_description,
+                'slug' => (string) $article->slug,
+                'html' => $html,
+                'outline' => $article->outline,
+                'generation_meta' => ['stage' => 'anchor_strip'],
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('content_autopilot.anchor_strip_failed', ['topic_id' => $topic->id, 'error' => $e->getMessage()]);
+
+            return $article;
+        }
     }
 
     /**
@@ -1088,10 +1151,13 @@ class ContentArticleProducer
         // Real, existing pages the model may link to — without this list the
         // reviser cannot satisfy the internal-link checks (it would invent
         // URLs, which the scorer rejects).
-        $linkTargets = array_slice((array) ($this->scorerContext($topic, $plan, $topic->website)['site_urls'] ?? []), 0, 15);
+        $linkTargets = array_slice((array) ($this->scorerContext($topic, $plan, $topic->website)['selected_pages'] ?? []), 0, 15);
         $linkBlock = $linkTargets === [] ? ''
             : "INTERNAL PAGES YOU MAY LINK TO (use 2-3 naturally, exact URLs only):\n"
-                .implode("\n", $linkTargets)."\n\n";
+                .implode("\n", array_map(static fn ($p) => $p['url'].' — '.($p['title'] ?: '(untitled)'), $linkTargets))
+                ."\nANCHOR RULE: anchor text MUST describe the TARGET page using words from that page's title. "
+                ."Never attach an anchor about one product or topic to a link pointing at a different page. "
+                ."If no listed page fits a sentence naturally, use fewer links.\n\n";
 
         $user = "TARGET KEYWORD: {$topic->target_keyword}\n"
             .'LANGUAGE: '.($plan->language ?: 'en')."\n"
@@ -1143,29 +1209,19 @@ class ContentArticleProducer
     /** The site context the scorer verifies against (built once per run). */
     private function scorerContext(ContentTopic $topic, ContentPlan $plan, Website $website): array
     {
-        $siteUrls = [];
-        $existingTitles = [];
-        try {
-            if ($website->crawl_site_id) {
-                $pages = DB::table('website_pages')
-                    ->where('crawl_site_id', $website->crawl_site_id)
-                    ->where('http_status', 200)
-                    ->orderByDesc('inbound_link_count')
-                    ->limit(300)
-                    ->get(['url', 'title']);
-                $siteUrls = $pages->pluck('url')->map(fn ($u) => (string) $u)->all();
-                $existingTitles = $pages->pluck('title')->filter()->map(fn ($t) => (string) $t)->all();
-            }
-        } catch (\Throwable) {
-            // No crawl data — the scorer renormalizes without link checks.
-        }
+        $link = \App\Support\Content\InternalLinkCandidates::build(
+            $website->crawl_site_id,
+            $topic->target_keyword.' '.$topic->title,
+        );
 
         return [
             'target_keyword' => $topic->target_keyword,
             'secondary_keywords' => (array) ($topic->secondary_keywords ?? []),
             'site_host' => mb_strtolower((string) $website->domain),
-            'site_urls' => $siteUrls,
-            'existing_titles' => $existingTitles,
+            'site_urls' => $link['site_urls'],
+            'existing_titles' => $link['existing_titles'],
+            'selected_pages' => $link['selected_pages'],
+            'site_pages' => $link['site_pages'],
             'article_length' => (int) $plan->article_length,
             'toggles' => [
                 'toc' => $plan->toggle('toc'),

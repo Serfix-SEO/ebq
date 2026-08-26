@@ -234,6 +234,20 @@ class ContentSeoScorer
                 'Add at least 2 internal links to relevant pages from the provided site URL list.');
             $add('internal_links_valid', 6, $invalidInternal === [],
                 'These internal links do not exist on the site, replace them with URLs from the provided list: '.implode(', ', array_slice($invalidInternal, 0, 5)).'.');
+
+            // Anchor↔target relevance (cocomii 2026-08-26: "Rectangle iPhone
+            // 17 Pro Max Case" anchored to an unrelated blog post scored full
+            // marks). Specific anchors must share vocabulary with their
+            // target's title/slug.
+            if (! empty($context['site_pages'])) {
+                $mismatched = $this->mismatchedAnchors($html, $context);
+                $add('internal_anchor_match', 4, $mismatched === [],
+                    'These anchor texts do not match the page they link to — rewrite each anchor using words from the TARGET page\'s title, move the link to a matching page from the list, or remove the link: '
+                    .implode('; ', array_map(
+                        static fn ($p) => '"'.$p['anchor'].'" → '.$p['url'],
+                        array_slice($mismatched, 0, 5)
+                    )).'.');
+            }
         }
         if (($toggles['external_links'] ?? false)) {
             $add('external_link', 3, count($external) >= 1,
@@ -461,6 +475,68 @@ class ContentSeoScorer
         }
 
         return [$internal, $external, $invalid];
+    }
+
+    /**
+     * Internal links whose anchor text shares NO vocabulary with the target
+     * page's title/slug. Only anchors with ≥2 content words are judged —
+     * generic anchors ("learn more", "this guide") are not the failure mode.
+     * Pages with no crawl title are skipped (no basis to judge).
+     *
+     * @return list<array{anchor: string, url: string}>
+     */
+    public function mismatchedAnchors(string $html, array $context): array
+    {
+        if (! preg_match_all('/<a\b[^>]*href="([^"#][^"]*)"[^>]*>(.*?)<\/a>/is', $html, $m, PREG_SET_ORDER)) {
+            return [];
+        }
+
+        $siteHost = mb_strtolower((string) ($context['site_host'] ?? ''));
+        $sitePages = (array) ($context['site_pages'] ?? []);
+        // Normalize page keys by path for lookup.
+        $byPath = [];
+        foreach ($sitePages as $url => $title) {
+            $byPath[$this->pathOf(rtrim(mb_strtolower((string) $url), '/'))] = ['url' => (string) $url, 'title' => (string) $title];
+        }
+
+        $generic = ['here', 'click', 'learn', 'more', 'read', 'guide', 'page', 'shop', 'browse', 'view', 'this', 'article', 'post', 'our', 'see', 'check', 'out', 'website', 'link'];
+        $mismatched = [];
+        foreach ($m as $hit) {
+            $href = $hit[1];
+            $host = mb_strtolower((string) (parse_url($href, PHP_URL_HOST) ?? ''));
+            $isInternal = $host === '' || $host === $siteHost
+                || ($siteHost !== '' && str_ends_with($host, '.'.$siteHost));
+            if (! $isInternal) {
+                continue;
+            }
+            $page = $byPath[$this->pathOf(rtrim(mb_strtolower($href), '/'))] ?? null;
+            if ($page === null || trim($page['title']) === '') {
+                continue; // unknown page or untitled crawl row — no basis
+            }
+
+            $anchorText = trim(html_entity_decode(strip_tags($hit[2])));
+            $anchorTokens = array_values(array_filter(
+                \App\Support\Content\InternalLinkCandidates::tokens($anchorText),
+                static fn ($t) => ! in_array($t, $generic, true)
+            ));
+            if (count($anchorTokens) < 2) {
+                continue; // generic/short anchor — pass
+            }
+
+            $targetTokens = \App\Support\Content\InternalLinkCandidates::tokens(
+                $page['title'].' '.\App\Support\Content\InternalLinkCandidates::slugWords($page['url'])
+            );
+            // Latin-script light stemming: trailing s/es equivalence.
+            $stem = static fn ($t) => preg_match('/^[a-z0-9]+$/', $t) ? preg_replace('/(es|s)$/', '', $t) : $t;
+            $anchorStems = array_map($stem, $anchorTokens);
+            $targetStems = array_map($stem, $targetTokens);
+
+            if (array_intersect($anchorStems, $targetStems) === []) {
+                $mismatched[] = ['anchor' => mb_substr($anchorText, 0, 80), 'url' => $href];
+            }
+        }
+
+        return $mismatched;
     }
 
     private function pathOf(string $url): string

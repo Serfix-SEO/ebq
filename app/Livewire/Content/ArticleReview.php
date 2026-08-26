@@ -458,7 +458,7 @@ class ArticleReview extends Component
                     (int) $a->version === 1 => __('Draft'),
                     str_contains($stage, 'revise') => __('Optimized'),
                     str_starts_with($stage, 'brand_scrub'),
-                    $stage === 'de_ai' => __('Cleanup'),
+                    $stage === 'de_ai', $stage === 'anchor_strip' => __('Cleanup'),
                     str_contains($stage, 'edit') || str_contains($stage, 'manual') => __('Your edit'),
                     default => __('Update'),
                 };
@@ -812,6 +812,12 @@ class ArticleReview extends Component
 
             return null;
         }
+        // Paid API call — a loop of clicks must not run to the global cap.
+        if (! \Illuminate\Support\Facades\RateLimiter::attempt('inline-image:'.$topic->id, 10, fn () => true, 3600)) {
+            $this->dispatch('ai-edit-failed', message: __('Too many image generations — try again in a little while.'));
+
+            return null;
+        }
 
         $image = ContentImage::query()->create([
             'article_id' => $article->id,
@@ -823,6 +829,66 @@ class ArticleReview extends Component
         GenerateInlineImageJob::dispatch($image->id, $prompt);
 
         return $image->id;
+    }
+
+    /**
+     * Client-facing "Generate a new image" (cocomii 2026-08-26: extra-finger
+     * artifact with no way to regenerate). Free, capped: 3 regenerations per
+     * image lineage + 10/hour per article. New PENDING row; the job swaps the
+     * article html src and rejects the old row when the new image lands —
+     * never overwrite-in-place (URL caching + sideload rewrites + audit).
+     */
+    public function regenerateImage(string $imageId): ?string
+    {
+        $topic = $this->topic();
+        if ($topic === null || $topic->status === ContentTopic::STATUS_PUBLISHING) {
+            return null;
+        }
+        $image = ContentImage::query()->whereKey($imageId)->with('article')->first();
+        if ($image === null || $image->article === null || $image->article->topic_id !== $topic->id) {
+            return null;
+        }
+        // Only AI-generated images can regenerate (uploads have no prompt).
+        if ($image->status !== ContentImage::STATUS_GENERATED || trim((string) $image->prompt) === '') {
+            return null;
+        }
+        if (! ContentAutopilotConfig::imagesEnabled()
+            || ! app(IdeogramClient::class)->isConfigured()
+            || app(IdeogramSpendMeter::class)->exhausted()) {
+            $this->dispatch('ai-edit-failed', message: __('Image generation is unavailable right now.'));
+
+            return null;
+        }
+
+        $regenCount = (int) (((array) $image->params)['regen_count'] ?? 0);
+        if ($regenCount >= 3
+            || ! \Illuminate\Support\Facades\RateLimiter::attempt('image-regen:'.$topic->id, 10, fn () => true, 3600)) {
+            $this->dispatch('ai-edit-failed', message: __('You\'ve reached the regeneration limit for this image.'));
+
+            return null;
+        }
+
+        $new = ContentImage::query()->create([
+            'article_id' => $image->article_id,
+            'role' => $image->role,
+            'section_anchor' => $image->section_anchor,
+            'prompt' => $image->prompt,
+            'negative_prompt' => $image->negative_prompt,
+            'alt_text' => $image->alt_text,
+            'params' => [
+                'source' => 'client-regen',
+                'regenerated_from' => $image->id,
+                'regen_count' => $regenCount + 1,
+            ],
+            'status' => ContentImage::STATUS_PENDING,
+        ]);
+        GenerateInlineImageJob::dispatch($new->id, (string) $image->prompt, $image->id);
+
+        if ($topic->status === ContentTopic::STATUS_PUBLISHED) {
+            session()->flash('review-status', __('Republish the article to update the image on your site.'));
+        }
+
+        return $new->id;
     }
 
     /**
@@ -993,29 +1059,19 @@ class ArticleReview extends Component
     {
         $plan = $topic->plan;
         $website = $topic->website;
-        $siteUrls = [];
-        $existingTitles = [];
-        try {
-            if ($website?->crawl_site_id) {
-                $pages = DB::table('website_pages')
-                    ->where('crawl_site_id', $website->crawl_site_id)
-                    ->where('http_status', 200)
-                    ->orderByDesc('inbound_link_count')
-                    ->limit(300)
-                    ->get(['url', 'title']);
-                $siteUrls = $pages->pluck('url')->map(fn ($u) => (string) $u)->all();
-                $existingTitles = $pages->pluck('title')->filter()->map(fn ($t) => (string) $t)->all();
-            }
-        } catch (\Throwable) {
-            // no crawl data — scorer renormalizes
-        }
+        $link = \App\Support\Content\InternalLinkCandidates::build(
+            $website?->crawl_site_id,
+            $topic->target_keyword.' '.$topic->title,
+        );
 
         return [
             'target_keyword' => (string) $topic->target_keyword,
             'secondary_keywords' => (array) ($topic->secondary_keywords ?? []),
             'site_host' => mb_strtolower((string) ($website?->domain ?? '')),
-            'site_urls' => $siteUrls,
-            'existing_titles' => $existingTitles,
+            'site_urls' => $link['site_urls'],
+            'existing_titles' => $link['existing_titles'],
+            'selected_pages' => $link['selected_pages'],
+            'site_pages' => $link['site_pages'],
             'article_length' => (int) ($plan?->article_length ?? 2000),
             'toggles' => [
                 'toc' => (bool) $plan?->toggle('toc'),
@@ -1313,15 +1369,20 @@ class ArticleReview extends Component
             ->unique()
             ->values();
 
-        // Featured image is generated even when the "in article" toggle is off
-        // (it's the WP thumbnail). Surface it here with a note so the reviewer
-        // still sees it — but only when it isn't already embedded in the body.
+        // The main image is ALWAYS generated (it becomes the WP featured
+        // image/thumbnail) — so ALWAYS show the labelled card, whatever the
+        // embed toggle says (cocomii 2026-08-26: "is there a preview of the
+        // main image?" — with the toggle ON it was only an unlabelled figure
+        // in the body; deleted from the body it still shipped, invisibly).
         $featuredImage = null;
-        if ($article !== null && $topic?->plan !== null && ! $topic->plan->toggle('featured_image')) {
+        $featuredEmbedded = false;
+        if ($article !== null) {
             $featuredImage = $article->images()
                 ->where('role', ContentImage::ROLE_FEATURED)
                 ->where('status', ContentImage::STATUS_GENERATED)
                 ->latest()->first();
+            $featuredEmbedded = $featuredImage !== null
+                && str_contains((string) $article->html, (string) $featuredImage->url());
         }
 
         // Default social-preview image: the article's featured image (or any
@@ -1363,6 +1424,11 @@ class ArticleReview extends Component
             'generating' => $generating,
             'progress' => $progress,
             'featuredImage' => $featuredImage,
+            'featuredEmbedded' => $featuredEmbedded,
+            'inlineImages' => $article === null ? collect() : $article->images()
+                ->where('role', ContentImage::ROLE_INLINE)
+                ->where('status', ContentImage::STATUS_GENERATED)
+                ->latest()->limit(6)->get(),
             'socialImageFallback' => $socialImageFallback,
             'rewriteCredits' => $rewriteCredits,
             'activeRewrite' => $topic !== null ? $this->activeRewrite() : null,

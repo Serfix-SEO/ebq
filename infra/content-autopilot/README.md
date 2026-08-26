@@ -778,6 +778,40 @@ Tests: `RewriteCreditsTest`, `ClientRewriteCoverageTest`,
 `RewriteArticleJobTest`, `RewritePromptGuardTest`, `ArticleReviewRewriteTest`,
 `Billing/RewriteCreditPurchaseTest` (26 total, zero network).
 
+### Cocomii feedback fixes (2026-08-26): main image, link relevance, image regen
+
+**Main-image card**: ALWAYS shown on the review page (was toggle-OFF-only) with three
+states — embedded / kept-out-by-settings / removed-by-client-but-still-ships (the
+silent-thumbnail case says so explicitly). Partial
+`livewire/content/partials/main-image-card.blade.php`, data in ArticleReview::render.
+
+**Internal-link relevance** (was: 15 bare topic-agnostic URLs → model invented
+topic-derived anchors for random pages): `App\Support\Content\InternalLinkCandidates`
+builds titled candidates — inbound top-300 (indexable) + a topic-token title-LIKE
+widening query, ranked by token overlap vs the topic, top 10 relevant + 5 inbound,
+cap 15 (`selected_pages`) plus a url→title map for every fetched page (`site_pages`).
+Draft passes them as `selected_links` through the writer's OWN link contract
+(anchor rules + placement, paraphraseable); revise gets "URL — TITLE" + ANCHOR RULE.
+Scorer check `internal_anchor_match` (weight 4): specific anchors (≥2 content words)
+sharing ZERO stemmed tokens with target title+slug are flagged with named pairs; the
+revise loop fixes them. Belt: `stripMismatchedInternalLinks` unwraps offenders AFTER
+the READY/status verdict (stage `anchor_strip`, labeled "Cleanup") — never inside the
+loop (message erasure + churn), and a stripped link can never fail a topic.
+
+**Image regeneration** (free, capped): "Generate a new image" on the Main-image card +
+"Images in this article" panel. `ArticleReview::regenerateImage` — tenancy, GENERATED +
+prompt-bearing only (uploads excluded), RateLimiter 10/h/topic + lineage cap
+`params.regen_count < 3`. New PENDING row; `GenerateInlineImageJob(?replaceImageId)`
+swaps the old url→new url in the topic's CURRENT article html and flips the old row to
+STATUS_REJECTED (first real use — sideload only ships GENERATED). NEVER
+overwrite-in-place (URL caching, sideload str_replace, audit). Job now also honors the
+plan's image_style (was global-only). `requestInlineImage` gained the same 10/h limiter.
+
+**De-handed scenes** (Ideogram ignores negative_prompt — scene wording is the only
+control): fallback + art-director prompts no longer steer toward hands; explicit
+"never describe a scene with visible human hands or faces; essential people go
+distant/from behind". Tests: InternalLinkRelevanceTest (5), ImageRegenerationTest (7).
+
 ### Brand-safety hard guarantee (2026-08-20, cocomii incident)
 
 No article carrying a blocked term the lint can match ships READY or reaches a
