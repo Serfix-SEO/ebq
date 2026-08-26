@@ -85,6 +85,67 @@ class FailedJobsAlertTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_repeating_identical_failure_is_muted_then_realerts_with_total(): void
+    {
+        Mail::fake();
+        User::factory()->create(['is_admin' => true, 'email' => 'admin@example.com']);
+
+        // First digest: mails normally and starts the mute window.
+        $this->pushFailure();
+        $this->artisan('ebq:failed-jobs-alert')->assertSuccessful();
+        Mail::assertSent(FailedJobsDigestMail::class, 1);
+
+        // Same exception again 15 minutes later: suppressed entirely.
+        $this->pushFailure();
+        $this->artisan('ebq:failed-jobs-alert')
+            ->expectsOutputToContain('suppressed')
+            ->assertSuccessful();
+        Mail::assertSent(FailedJobsDigestMail::class, 1); // still just the first
+
+        // A DIFFERENT failure mails, and the muted repeat rides along as one
+        // compact "still repeating" line with the cumulative total.
+        $this->pushFailure();
+        $this->pushFailure('App\\Jobs\\OtherJob');
+        $this->artisan('ebq:failed-jobs-alert')->assertSuccessful();
+        Mail::assertSent(FailedJobsDigestMail::class, 2);
+        $sent = collect(Mail::sent(FailedJobsDigestMail::class))->last();
+        $this->assertStringContainsString('Still repeating', $sent->body);
+        $this->assertStringContainsString('×3 total', $sent->body);
+
+        // Past the re-alert window the fingerprint mails again, cumulative.
+        \Illuminate\Support\Carbon::setTestNow(now()->addHours(7));
+        $this->pushFailure();
+        $this->artisan('ebq:failed-jobs-alert')->assertSuccessful();
+        Mail::assertSent(FailedJobsDigestMail::class, 3);
+        $sent = collect(Mail::sent(FailedJobsDigestMail::class))->last();
+        $this->assertStringContainsString('(+3 reported earlier)', $sent->body);
+        \Illuminate\Support\Carbon::setTestNow();
+    }
+
+    public function test_fingerprint_ignores_ids_inside_the_exception(): void
+    {
+        Mail::fake();
+        User::factory()->create(['is_admin' => true, 'email' => 'admin@example.com']);
+
+        Redis::connection()->lpush(FailedJobAlertBuffer::KEY, json_encode([
+            'job' => 'App\\Jobs\\ProduceContentArticleJob', 'queue' => 'content',
+            'exception' => 'PDOException: bad row for topic 01kzk4m65assdfyrmdga4efem1 at line 53',
+            'box' => 'a', 'failed_at' => now()->toIso8601String(),
+        ]));
+        $this->artisan('ebq:failed-jobs-alert')->assertSuccessful();
+
+        // Same failure, different ULID + line number → still the same fingerprint.
+        Redis::connection()->lpush(FailedJobAlertBuffer::KEY, json_encode([
+            'job' => 'App\\Jobs\\ProduceContentArticleJob', 'queue' => 'content',
+            'exception' => 'PDOException: bad row for topic 01aaaaaaaaaaaaaaaaaaaaaaaa at line 99',
+            'box' => 'a', 'failed_at' => now()->toIso8601String(),
+        ]));
+        $this->artisan('ebq:failed-jobs-alert')
+            ->expectsOutputToContain('suppressed')
+            ->assertSuccessful();
+        Mail::assertSent(FailedJobsDigestMail::class, 1);
+    }
+
     public function test_stuck_pending_crawl_site_with_subscribers_is_reported(): void
     {
         Mail::fake();
