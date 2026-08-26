@@ -513,6 +513,91 @@ class ArticleReview extends Component
             : __('Done — this version is now current.'));
     }
 
+    /**
+     * "SEO Kit": every SEO value of the article, copy-ready (client ask
+     * 2026-08-27 — nowhere to copy titles/metas/schema for manual paste).
+     * Values only — assembly of the head-snippet and JSON-LD lives here so
+     * the blade stays a dumb list.
+     *
+     * @return array{rows: list<array{label: string, value: string}>, headHtml: string, schemaJson: string}|null
+     */
+    private function seoKit(ContentTopic $topic, ?ContentArticle $article, string $socialImageFallback): ?array
+    {
+        if ($article === null) {
+            return null;
+        }
+        $site = 'https://'.preg_replace('#^https?://#', '', (string) ($topic->website?->domain ?? ''));
+        $publishedUrl = (string) (ContentPublication::query()
+            ->whereIn('article_id', $topic->articles()->select('id'))
+            ->whereNotNull('external_url')
+            ->latest('created_at')
+            ->value('external_url') ?? '');
+        $canonical = trim((string) $article->canonical_url)
+            ?: ($publishedUrl ?: rtrim($site, '/').'/'.ltrim((string) $article->slug, '/').'/');
+        $ogImage = trim((string) $article->og_image) ?: $socialImageFallback;
+        $twImage = trim((string) $article->twitter_image) ?: $ogImage;
+        $robots = ($article->robots_noindex ? 'noindex' : 'index').', '.($article->robots_nofollow ? 'nofollow' : 'follow');
+        $keywords = implode(', ', array_filter(array_merge(
+            [trim((string) ($article->focus_keyword ?: $topic->target_keyword))],
+            (array) ($topic->secondary_keywords ?? []),
+        )));
+
+        $rows = array_values(array_filter([
+            ['label' => __('Meta title'), 'value' => (string) $article->meta_title],
+            ['label' => __('Meta description'), 'value' => (string) $article->meta_description],
+            ['label' => __('URL slug'), 'value' => (string) $article->slug],
+            ['label' => __('Focus keyword'), 'value' => (string) ($article->focus_keyword ?: $topic->target_keyword)],
+            $keywords !== '' ? ['label' => __('Keywords'), 'value' => $keywords] : null,
+            ['label' => __('Canonical URL'), 'value' => $canonical],
+            ['label' => __('Robots'), 'value' => $robots],
+            ['label' => __('Social title'), 'value' => (string) ($article->og_title ?: $article->meta_title)],
+            ['label' => __('Social description'), 'value' => (string) ($article->og_description ?: $article->meta_description)],
+            $ogImage !== '' ? ['label' => __('Social image'), 'value' => $ogImage] : null,
+        ], fn ($r) => $r !== null && trim($r['value']) !== ''));
+
+        $e = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+        $head = [
+            '<title>'.$e($article->meta_title).'</title>',
+            '<meta name="description" content="'.$e($article->meta_description).'">',
+            '<meta name="robots" content="'.$e($robots).'">',
+            '<link rel="canonical" href="'.$e($canonical).'">',
+            '<meta property="og:type" content="article">',
+            '<meta property="og:title" content="'.$e($article->og_title ?: $article->meta_title).'">',
+            '<meta property="og:description" content="'.$e($article->og_description ?: $article->meta_description).'">',
+            '<meta property="og:url" content="'.$e($canonical).'">',
+        ];
+        if ($ogImage !== '') {
+            $head[] = '<meta property="og:image" content="'.$e($ogImage).'">';
+        }
+        $head[] = '<meta name="twitter:card" content="'.$e($article->twitter_card ?: 'summary_large_image').'">';
+        $head[] = '<meta name="twitter:title" content="'.$e($article->twitter_title ?: $article->og_title ?: $article->meta_title).'">';
+        $head[] = '<meta name="twitter:description" content="'.$e($article->twitter_description ?: $article->og_description ?: $article->meta_description).'">';
+        if ($twImage !== '') {
+            $head[] = '<meta name="twitter:image" content="'.$e($twImage).'">';
+        }
+
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'Article',
+            'headline' => (string) $article->h1,
+            'description' => (string) $article->meta_description,
+            'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $canonical],
+            'author' => ['@type' => 'Organization', 'name' => (string) ($topic->website?->domain ?? ''), 'url' => $site],
+            'publisher' => ['@type' => 'Organization', 'name' => (string) ($topic->website?->domain ?? '')],
+            'datePublished' => $article->created_at?->toIso8601String(),
+            'dateModified' => $article->updated_at?->toIso8601String(),
+            'inLanguage' => (string) ($topic->plan?->language ?: 'en'),
+        ];
+        if ($ogImage !== '') {
+            $schema['image'] = [$ogImage];
+        }
+        $schemaJson = '<script type="application/ld+json">'."\n"
+            .json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+            ."\n".'</script>';
+
+        return ['rows' => $rows, 'headHtml' => implode("\n", $head), 'schemaJson' => $schemaJson];
+    }
+
     private function topic(): ?ContentTopic
     {
         $websiteIds = Auth::user()?->accessibleWebsitesQuery()->select('id');
@@ -1425,6 +1510,7 @@ class ArticleReview extends Component
             'progress' => $progress,
             'featuredImage' => $featuredImage,
             'featuredEmbedded' => $featuredEmbedded,
+            'seoKit' => $topic !== null ? $this->seoKit($topic, $article, $socialImageFallback) : null,
             'inlineImages' => $article === null ? collect() : $article->images()
                 ->where('role', ContentImage::ROLE_INLINE)
                 ->where('status', ContentImage::STATUS_GENERATED)

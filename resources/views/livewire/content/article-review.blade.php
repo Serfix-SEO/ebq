@@ -328,6 +328,53 @@
             </div>
         @endunless
 
+        {{-- ── SEO Kit: every SEO value, copy-ready (collapsed accordion) ── --}}
+        @if (! $editing && ! empty($seoKit))
+            <div class="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                 x-data="{ open: false, copied: '', copy(key, text) { navigator.clipboard.writeText(text); this.copied = key; setTimeout(() => this.copied = '', 2000); } }">
+                <button type="button" x-on:click="open = ! open" class="flex w-full items-center gap-3 px-5 py-4 text-start">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-blue-600/25">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"/></svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('SEO Kit') }}</span>
+                        <span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{{ __('Titles, metas, schema and social tags — ready to copy into your site editor.') }}</span>
+                    </span>
+                    <svg class="h-4 w-4 shrink-0 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+                </button>
+
+                <div x-show="open" x-cloak class="border-t border-slate-100 dark:border-slate-800">
+                    <div class="divide-y divide-slate-100 dark:divide-slate-800">
+                        @foreach ($seoKit['rows'] as $i => $row)
+                            <div class="flex items-center gap-3 px-5 py-2.5">
+                                <span class="w-36 shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $row['label'] }}</span>
+                                <span class="min-w-0 flex-1 truncate text-xs text-slate-700 dark:text-slate-200" title="{{ $row['value'] }}">{{ $row['value'] }}</span>
+                                <button type="button" x-on:click="copy('row{{ $i }}', @js($row['value']))" aria-label="{{ __('Copy') }}"
+                                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
+                                    <svg x-show="copied !== 'row{{ $i }}'" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5"/></svg>
+                                    <svg x-show="copied === 'row{{ $i }}'" x-cloak class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 py-3 dark:border-slate-800">
+                        <button type="button" x-on:click="copy('head', @js($seoKit['headHtml']))"
+                            class="rounded-lg bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-slate-700">
+                            <span x-show="copied !== 'head'">{{ __('Copy all meta tags (HTML)') }}</span>
+                            <span x-show="copied === 'head'" x-cloak>{{ __('Copied') }}</span>
+                        </button>
+                        <button type="button" x-on:click="copy('schema', @js($seoKit['schemaJson']))"
+                            class="rounded-lg border border-slate-300 px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                            <span x-show="copied !== 'schema'">{{ __('Copy schema (JSON-LD)') }}</span>
+                            <span x-show="copied === 'schema'" x-cloak>{{ __('Copied') }}</span>
+                        </button>
+                        <span class="text-[11px] text-slate-400">{{ __('Paste into your page\'s head or your SEO plugin.') }}</span>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Poll while publishing so the status flips to Published without a reload. --}}
         <div class="grid gap-6 lg:grid-cols-3" @if($topic?->status === \App\Models\ContentTopic::STATUS_PUBLISHING) wire:poll.5s @endif>
             {{-- ── Quality panel ────────────────────────────────────── --}}

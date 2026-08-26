@@ -4929,5 +4929,14 @@
     "Article image": "صورة المقالة",
     "You've reached the regeneration limit for this image.": "لقد وصلت إلى حد إعادة إنشاء هذه الصورة.",
     "Too many image generations — try again in a little while.": "عدد كبير من عمليات إنشاء الصور — حاول مجددًا بعد قليل.",
-    "Republish the article to update the image on your site.": "أعد نشر المقالة لتحديث الصورة على موقعك."
+    "Republish the article to update the image on your site.": "أعد نشر المقالة لتحديث الصورة على موقعك.",
+    "SEO Kit": "عدة السيو",
+    "Titles, metas, schema and social tags — ready to copy into your site editor.": "العناوين والوصوف والسكيما ووسوم الشبكات الاجتماعية — جاهزة للنسخ إلى محرر موقعك.",
+    "Focus keyword": "الكلمة المفتاحية الرئيسية",
+    "Robots": "توجيهات Robots",
+    "Social description": "وصف المشاركة الاجتماعية",
+    "Social image": "صورة المشاركة الاجتماعية",
+    "Copy all meta tags (HTML)": "نسخ كل وسوم الميتا (HTML)",
+    "Copy schema (JSON-LD)": "نسخ السكيما (JSON-LD)",
+    "Paste into your page's head or your SEO plugin.": "الصقها في head الصفحة أو في إضافة السيو لديك."
 }
