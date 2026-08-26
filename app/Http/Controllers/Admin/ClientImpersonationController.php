@@ -54,14 +54,18 @@ class ClientImpersonationController extends Controller
 
         $impersonatedId = Auth::id();
         $returnUrl = (string) session('impersonator_return_url', route('admin.clients.index'));
+
+        // Log BEFORE forgetting impersonator_id: the logger derives
+        // is_impersonated from that session key, and an unflagged end-marker
+        // read back as the CLIENT's own "last activity" (2026-08-26).
+        if ($impersonatedId) {
+            $logger->log('admin.impersonation_ended', userId: $impersonatedId, actorUserId: $impersonatorId);
+        }
+
         $request->session()->forget(['impersonator_id', 'impersonator_return_url']);
 
         Auth::loginUsingId($impersonatorId);
         $request->session()->regenerate();
-
-        if ($impersonatedId) {
-            $logger->log('admin.impersonation_ended', userId: $impersonatedId, actorUserId: $impersonatorId);
-        }
 
         return redirect()->to($returnUrl);
     }

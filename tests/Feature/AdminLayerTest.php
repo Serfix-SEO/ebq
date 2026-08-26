@@ -89,6 +89,16 @@ class AdminLayerTest extends TestCase
             (string) $profile['last_client_activity_at'],
         );
 
+        // The full impersonate -> stop round trip leaves the stat untouched
+        // (the end-marker used to log AFTER the session flag was cleared).
+        $this->actingAs($admin)->post(route('admin.clients.impersonate', $client));
+        $this->post(route('admin.impersonation.stop'));
+        $this->assertSame(0, \App\Models\ClientActivity::query()
+            ->where('user_id', $client->id)->where('is_impersonated', false)
+            ->where('type', 'like', 'admin.%')->count(), 'impersonation markers must be flagged');
+        $profile = app(\App\Services\Admin\ClientProfileService::class)->profile($client);
+        $this->assertSame(now()->subDays(3)->toDateTimeString(), (string) $profile['last_client_activity_at']);
+
         // Listing column excludes impersonated rows too (existing behavior).
         $response = $this->actingAs($admin)->get(route('admin.clients.index'));
         $row = collect($response->viewData('clients')->items() ?? $response->viewData('clients'))
