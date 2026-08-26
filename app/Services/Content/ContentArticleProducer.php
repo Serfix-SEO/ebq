@@ -482,7 +482,12 @@ class ContentArticleProducer
         // half-word — drop it along with trailing punctuation.
         $cut = (string) preg_replace('/\s+(?:and|or|but|with|for|to|the|a|an|of|in|on|at|is|are)$/iu', '', $cut);
 
-        return rtrim($cut, " ,.;:-\u{2013}\u{2014}");
+        // NEVER rtrim() with multibyte chars in the charlist: it strips BYTES,
+        // and the dashes' bytes (E2 80 93/94) are also the trailing bytes of
+        // many Devanagari/CJK characters — Hindi ी (E0 A5 80) lost its 0x80,
+        // leaving invalid UTF-8 that MySQL rejected with error 1366
+        // (2026-08-23, Hindi article meta_description).
+        return (string) preg_replace('/[\s,.;:\-\x{2013}\x{2014}]+$/u', '', $cut);
     }
 
     /** True when the article's persisted style lint found tells. */
