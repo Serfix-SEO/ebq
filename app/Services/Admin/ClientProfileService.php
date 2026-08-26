@@ -96,6 +96,12 @@ class ClientProfileService
                 ->latest('created_at')
                 ->limit(15)
                 ->get(),
+            // The client's OWN last activity — admin work while impersonating
+            // is silent here (the feed above still shows it, labeled).
+            'last_client_activity_at' => ClientActivity::query()
+                ->where('user_id', $client->id)
+                ->where('is_impersonated', false)
+                ->max('created_at'),
             'perf_days' => self::PERF_DAYS,
             'totals' => [
                 'websites' => count($rows),

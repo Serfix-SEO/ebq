@@ -172,7 +172,8 @@
                         ['Phone', $client->phone ?: '—'],
                         ['Timezone', $client->timezone ?: '—'],
                         ['Language', $client->locale ?: 'en'],
-                        ['Last activity', $rel($profile['activity']->first()?->created_at)],
+                        {{-- Impersonated admin actions are silent here (feed labels them). --}}
+                        ['Last activity', $rel($profile['last_client_activity_at'] ? \Illuminate\Support\Carbon::parse($profile['last_client_activity_at']) : null)],
                         ['Marketing emails', $client->marketing_emails_opted_out_at ? 'Opted out '.$rel($client->marketing_emails_opted_out_at) : 'Subscribed'],
                     ] as [$k, $v])
                         <div class="flex items-start justify-between gap-3 border-b border-slate-50 pb-2 last:border-0 last:pb-0">

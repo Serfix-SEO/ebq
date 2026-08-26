@@ -65,6 +65,37 @@ class AdminLayerTest extends TestCase
         ]);
     }
 
+    public function test_impersonated_activity_never_moves_the_clients_last_activity(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $client = User::factory()->create();
+
+        // The client's own action, then a LATER impersonated admin action.
+        $own = \App\Models\ClientActivity::create([
+            'user_id' => $client->id, 'type' => 'auth.login', 'is_impersonated' => false,
+        ]);
+        // created_at is not fillable — backdate directly.
+        \Illuminate\Support\Facades\DB::table('client_activities')->where('id', $own->id)
+            ->update(['created_at' => now()->subDays(3)]);
+        \App\Models\ClientActivity::create([
+            'user_id' => $client->id, 'type' => 'admin.impersonation_started',
+            'is_impersonated' => true, 'actor_user_id' => $admin->id,
+        ]);
+
+        // Detail page stat uses the client's OWN latest activity.
+        $profile = app(\App\Services\Admin\ClientProfileService::class)->profile($client);
+        $this->assertSame(
+            now()->subDays(3)->toDateTimeString(),
+            (string) $profile['last_client_activity_at'],
+        );
+
+        // Listing column excludes impersonated rows too (existing behavior).
+        $response = $this->actingAs($admin)->get(route('admin.clients.index'));
+        $row = collect($response->viewData('clients')->items() ?? $response->viewData('clients'))
+            ->first(fn ($c) => $c->id === $client->id);
+        $this->assertSame(now()->subDays(3)->toDateTimeString(), (string) $row->last_activity_at);
+    }
+
     public function test_admin_can_force_apply_plan_without_payment(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
