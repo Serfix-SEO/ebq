@@ -69,7 +69,7 @@
 
         <div class="pad">
             <span class="live-pill">{{ __('Published') }}</span>
-            <h1>{{ $f['h1'] }}</h1>
+            <h1 dir="auto">{{ $f['h1'] }}</h1>
             <p class="sub">
                 <strong>{{ $website->domain }}</strong>
                 &nbsp;•&nbsp; {{ $publishedAt }}
@@ -156,7 +156,7 @@
                 <p class="section-title">{{ __('How it looks in Google') }}</p>
                 <div class="serp">
                     <p class="serp-url">{{ $f['display_url'] ?? $website->domain }}</p>
-                    <p class="serp-title">{{ \Illuminate\Support\Str::limit($f['title'], 65) }}</p>
+                    <p class="serp-title" dir="auto">{{ \Illuminate\Support\Str::limit($f['title'], 65) }}</p>
                     <p class="serp-desc">{{ \Illuminate\Support\Str::limit($f['meta_description'], 160) }}</p>
                 </div>
             @endif

@@ -63,7 +63,9 @@
             {{-- Teaser behind: the draft-in-progress if we have one, else a skeleton --}}
             <div class="pointer-events-none select-none overflow-hidden p-6 blur sm:p-10" aria-hidden="true">
                 @if ($article)
-                    <div class="prose prose-slate mx-auto max-w-3xl opacity-60 dark:prose-invert">
+                    {{-- dir=auto: Arabic articles in the English UI must lay out RTL —
+                         a fixed LTR container scrambles mixed Arabic/Latin lines. --}}
+                    <div dir="auto" class="prose prose-slate mx-auto max-w-3xl opacity-60 dark:prose-invert">
                         <h1>{{ $article->h1 ?: $topic?->title }}</h1>
                         {!! $previewHtml !!}
                     </div>
@@ -348,7 +350,7 @@
                         @foreach ($seoKit['rows'] as $i => $row)
                             <div class="flex items-center gap-3 px-5 py-2.5">
                                 <span class="w-36 shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $row['label'] }}</span>
-                                <span class="min-w-0 flex-1 truncate text-xs text-slate-700 dark:text-slate-200" title="{{ $row['value'] }}">{{ $row['value'] }}</span>
+                                <span dir="auto" class="min-w-0 flex-1 truncate text-xs text-slate-700 dark:text-slate-200" title="{{ $row['value'] }}">{{ $row['value'] }}</span>
                                 <button type="button" x-on:click="copy('row{{ $i }}', @js($row['value']))" aria-label="{{ __('Copy') }}"
                                     class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
                                     <svg x-show="copied !== 'row{{ $i }}'" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5"/></svg>
@@ -636,7 +638,7 @@
                     </div>
                 @endif
                 @if (! $editing)
-                    <article class="ca-preview prose prose-slate max-w-none rounded-xl border border-slate-200 bg-white p-6 sm:p-8 dark:border-slate-800 dark:bg-slate-900 dark:prose-invert">
+                    <article dir="auto" class="ca-preview prose prose-slate max-w-none rounded-xl border border-slate-200 bg-white p-6 sm:p-8 dark:border-slate-800 dark:bg-slate-900 dark:prose-invert">
                         <h1>{{ $article->h1 }}</h1>
                         {!! $previewHtml !!}
                     </article>
@@ -903,7 +905,7 @@
                         </div>
 
                         {{-- ProseMirror mount (TipTap builds its editable node inside) --}}
-                        <div x-ref="mount"
+                        <div x-ref="mount" dir="auto"
                             class="rounded-xl border-2 border-orange-200 bg-white p-6 focus-within:border-orange-400 sm:p-8 dark:border-orange-900 dark:bg-slate-900"></div>
 
                         <p class="mt-2 text-center text-xs text-slate-400">{{ __('Format with the toolbar, add images and tables, or select text to edit it with AI. Changes save as a new draft version — nothing is lost.') }}</p>
