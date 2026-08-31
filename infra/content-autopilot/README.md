@@ -906,7 +906,12 @@ the runaway's only stop). The stuck topic was re-crowned (crash had left NO
 is_current row), plan language fixed English→Arabic, and one
 `reviseCurrentArticle` pass took it 50→93 READY. `UnicodeScoringTest` (4).
 NOTE: the WP plugin's mirror checks still use the old matching — align on next
-plugin release. skyexchangebet.vip's below-floor failure is unrelated (Latin,
+plugin release.
+RTL display (same day): Arabic article content rendered in fixed-LTR
+containers scrambled mixed Arabic/Latin lines — `dir="auto"` added on the
+review preview containers, the TipTap editor mount, SEO Kit value cells and
+the publish-email title lines; the typography plugin uses
+`padding-inline-start` so list indentation flips for free. skyexchangebet.vip's below-floor failure is unrelated (Latin,
 correctly counted, genuinely ~48).
 
 ### Self-heal round (2026-08-31, simcardairportbali incident)
