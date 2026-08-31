@@ -743,7 +743,7 @@ class ArticleReview extends Component
             'outline' => $article->outline,
             'html' => $clean,
             'markdown' => $article->markdown,
-            'word_count' => str_word_count($text),
+            'word_count' => \App\Support\UnicodeText::wordCount($text),
             'seo_score' => $result['score'],
             'seo_issues' => $result['issues'],
             'style_issues' => $result['style_issues'],

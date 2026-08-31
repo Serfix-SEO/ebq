@@ -287,6 +287,16 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-31 — Unicode scoring (Arabic articles were unmeasurable).** `str_word_count`
+  counted a 2,000-word Arabic article as 39 words and exact keyword matching missed
+  hamza-variant spellings ("اسماء" typed vs "أسماء" written) — every version pinned ~50,
+  fed the 64-write regeneration runaway. New `App\Support\UnicodeText` (`wordCount`
+  any-script, `fold` = lowercase + Lucene-style Arabic normalization) wired through
+  ContentSeoScorer, producer word counts, HumanizerService sentence stats, editor
+  counter, publish mail, competitor-discovery filters. `content_articles.version`
+  widened tinyint→smallint. Runaway topic re-crowned + revised: 50→93, READY.
+  infra/content-autopilot/README.md.
+
 - **2026-08-31 — Monthly article cap scales to the calendar month.** The cap is now
   one article per calendar day: `ContentAutopilotConfig::monthlyArticlesFor($month)`
   = admin base (per 30 days, default 30) x daysInMonth/30 — 31 in January, 28/29 in

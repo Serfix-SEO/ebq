@@ -44,10 +44,13 @@ class ContentSeoScorer
         string $slug,
         array $context
     ): array {
-        $keyword = mb_strtolower(trim((string) ($context['target_keyword'] ?? '')));
+        // fold() = lowercase + Arabic orthography normalization, so "اسماء"
+        // (typed) matches "أسماء" (written) — see App\Support\UnicodeText.
+        // Every haystack below folds the same way; Latin behavior unchanged.
+        $keyword = \App\Support\UnicodeText::fold(trim((string) ($context['target_keyword'] ?? '')));
         $text = $this->toText($html);
-        $lowerText = mb_strtolower($text);
-        $wordCount = str_word_count($text);
+        $lowerText = \App\Support\UnicodeText::fold($text);
+        $wordCount = \App\Support\UnicodeText::wordCount($text);
         // Intro + first-100-words are measured from the BODY only. The "Key
         // takeaways" box and the "In this article" TOC render at the very top
         // but are widgets, not the article's opening — counting them makes the
@@ -67,7 +70,7 @@ class ContentSeoScorer
         };
 
         // ── Keyword placement ───────────────────────────────────────────
-        $kwIn = fn (string $haystack): bool => $keyword !== '' && str_contains(mb_strtolower($haystack), $keyword);
+        $kwIn = fn (string $haystack): bool => $keyword !== '' && str_contains(\App\Support\UnicodeText::fold($haystack), $keyword);
         // Token-complete match: every keyword word present regardless of
         // order ("free pubg name generator" ≈ "pubg name generator free").
         // Used where natural word order matters more than the exact phrase
@@ -77,7 +80,7 @@ class ContentSeoScorer
             if ($kwTokens === []) {
                 return false;
             }
-            $lower = mb_strtolower($haystack);
+            $lower = \App\Support\UnicodeText::fold($haystack);
             foreach ($kwTokens as $token) {
                 if (! str_contains($lower, $token)) {
                     return false;
@@ -108,7 +111,7 @@ class ContentSeoScorer
         // long-tail keyphrases pass when all their words appear (Yoast-style),
         // so a naturally-worded opener isn't punished for not repeating the
         // exact 6-word string.
-        $add('kw_in_first_words', 6, $this->keyphrasePresent(mb_strtolower(implode(' ', array_slice(explode(' ', $bodyText), 0, 100))), $keyword),
+        $add('kw_in_first_words', 6, $this->keyphrasePresent(\App\Support\UnicodeText::fold(implode(' ', array_slice(explode(' ', $bodyText), 0, 100))), $keyword),
             "Use the keyword \"{$keyword}\" (all its words) within the first 100 words of the article body.");
         $add('kw_in_slug', 3, $slug !== '' && str_contains($slug, $this->slugify($keyword)),
             'Use the keyword in the URL slug (lowercase, hyphenated).');
@@ -204,13 +207,13 @@ class ContentSeoScorer
             // Opener = the first <p> of the BODY (Key-takeaways/TOC boxes stripped
             // so a leading summary widget never counts as the intro). Phrase-length
             // aware so a naturally-worded long-tail opener passes.
-            $intro = mb_strtolower($this->firstParagraph($bodyHtml));
+            $intro = \App\Support\UnicodeText::fold($this->firstParagraph($bodyHtml));
             $add('kw_in_intro', 10, $intro !== '' && $this->keyphrasePresent($intro, $keyword),
                 "Put the focus keyphrase \"{$keyword}\" (all its words) in the opening paragraph (the first <p>).");
         }
 
         $secondary = array_values(array_filter(array_map(
-            static fn ($k) => mb_strtolower(trim((string) $k)),
+            static fn ($k) => \App\Support\UnicodeText::fold(trim((string) $k)),
             (array) ($context['secondary_keywords'] ?? [])
         )));
         if ($secondary !== []) {

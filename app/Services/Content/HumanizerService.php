@@ -335,7 +335,7 @@ class HumanizerService
 
         $counts = [];
         foreach ($sentences as $sentence) {
-            $words = str_word_count(strip_tags($sentence));
+            $words = \App\Support\UnicodeText::wordCount(strip_tags($sentence));
             if ($words >= 2) {
                 $counts[] = $words;
             }

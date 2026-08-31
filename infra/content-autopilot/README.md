@@ -883,6 +883,32 @@ Shopify: `articleCreate/articleUpdate` now always send `author.name`
 failure). `verify()` stores `config['shop_name']`; publish falls back to the
 shop_url host for integrations connected before that existed.
 
+### Unicode scoring (2026-08-31, namesforfreefire runaway root cause)
+
+The 64-write regeneration runaway's root cause was the scorer, not the writer:
+`str_word_count()` counts only Latin letters (a full ~2,000-word Arabic article
+measured 39 — its few Latin tokens), and exact keyword matching treated the
+typed keyword "اسماء" (bare alif) and the written "أسماء" (hamza) as different
+strings — 34 weight of kw_* checks + word_count failed unfixably, pinning
+every version at ~50 (below floor → FAILED → regenerate → repeat).
+
+Fix: `App\Support\UnicodeText` — `wordCount()` counts `[\p{L}\p{N}]+` runs
+(any script); `fold()` = mb_strtolower + standard Arabic search normalization
+(Lucene ArabicNormalizer set: strip tashkeel/tatweel, أإآٱ→ا, ى→ي, ئ→ي, ة→ه).
+Wired at: every keyword/haystack entry point in `ContentSeoScorer::score`
+(keyword, lowerText, kwIn/kwLoose closures, first-words, intro, secondaries),
+producer `word_count` storage + revise length target, HumanizerService sentence
+stats, ArticleReview editor counter, publish-mail word count, and
+`DiscoverContentCompetitorsJob`'s ≥3-word query filters (which silently
+dropped ALL Arabic queries). Latin behavior: fold = plain lowercase, unchanged.
+`content_articles.version` widened tinyint→smallint unsigned (the overflow was
+the runaway's only stop). The stuck topic was re-crowned (crash had left NO
+is_current row), plan language fixed English→Arabic, and one
+`reviseCurrentArticle` pass took it 50→93 READY. `UnicodeScoringTest` (4).
+NOTE: the WP plugin's mirror checks still use the old matching — align on next
+plugin release. skyexchangebet.vip's below-floor failure is unrelated (Latin,
+correctly counted, genuinely ~48).
+
 ### Self-heal round (2026-08-31, simcardairportbali incident)
 
 What happened: both of the site's first articles finished with scores 91/92

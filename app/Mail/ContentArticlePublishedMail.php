@@ -81,7 +81,7 @@ class ContentArticlePublishedMail extends Mailable
     private function snapshot(ContentArticle $article, ?string $liveUrl, array $platforms): array
     {
         $html = (string) $article->html;
-        $words = (int) ($article->word_count ?: str_word_count(strip_tags($html)));
+        $words = (int) ($article->word_count ?: \App\Support\UnicodeText::wordCount(strip_tags($html)));
         $featured = $article->images()
             ->where('role', ContentImage::ROLE_FEATURED)
             ->where('status', ContentImage::STATUS_GENERATED)

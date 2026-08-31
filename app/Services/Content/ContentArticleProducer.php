@@ -1248,7 +1248,7 @@ class ContentArticleProducer
         );
 
         return ContentArticle::storeVersion($topic, $attributes + [
-            'word_count' => str_word_count(trim(strip_tags($html))),
+            'word_count' => \App\Support\UnicodeText::wordCount(trim(strip_tags($html))),
             'seo_score' => $result['score'],
             'seo_issues' => $result['issues'],
             'style_issues' => $styleIssues,
@@ -1284,7 +1284,7 @@ class ContentArticleProducer
         );
         $issueList = implode("\n- ", array_unique(array_filter($issues)));
 
-        $currentWords = str_word_count(trim(strip_tags((string) $article->html)));
+        $currentWords = \App\Support\UnicodeText::wordCount(trim(strip_tags((string) $article->html)));
         // With a client request, "fix ONLY the listed problems" must not win:
         // deepseek took the conservative reading and returned near-identical
         // HTML (pubg 2026-08-23: "+17 chars" for "add name examples"). The

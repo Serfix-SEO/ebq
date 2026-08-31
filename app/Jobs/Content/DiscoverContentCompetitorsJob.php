@@ -215,7 +215,7 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
             ->limit(40)
             ->pluck('target_keyword')
             ->map(static fn ($k) => trim((string) $k))
-            ->filter(static fn ($k) => str_word_count($k) >= 3)
+            ->filter(static fn ($k) => \App\Support\UnicodeText::wordCount($k) >= 3)
             ->values()
             ->all();
 
@@ -227,7 +227,7 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
         // can drift), parentheticals stripped, long-tail only.
         $offeringQueries = collect((array) ($plan->offerings['sell'] ?? []))
             ->map(static fn ($o) => trim((string) preg_replace('/\([^)]*\)/', '', (string) $o)))
-            ->filter(static fn ($o) => str_word_count($o) >= 3)
+            ->filter(static fn ($o) => \App\Support\UnicodeText::wordCount($o) >= 3)
             ->take(6)
             ->all();
 
@@ -238,7 +238,7 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
         $out = [];
         foreach ($queries as $q) {
             $key = mb_strtolower(trim($q));
-            if ($key === '' || isset($seen[$key]) || str_word_count($key) < 3) {
+            if ($key === '' || isset($seen[$key]) || \App\Support\UnicodeText::wordCount($key) < 3) {
                 continue;
             }
             $seen[$key] = true;
@@ -300,7 +300,7 @@ class DiscoverContentCompetitorsJob implements ShouldQueue
 
             return array_values(array_filter(
                 array_map(static fn ($q) => trim((string) $q), $list),
-                static fn ($q) => str_word_count($q) >= 3,
+                static fn ($q) => \App\Support\UnicodeText::wordCount($q) >= 3,
             ));
         } catch (\Throwable) {
             return [];
