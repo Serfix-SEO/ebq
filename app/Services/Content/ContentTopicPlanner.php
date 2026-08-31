@@ -607,15 +607,18 @@ class ContentTopicPlanner
         // The plan cap is PER CALENDAR MONTH — a full current month must not
         // block scheduling into the next one.
         $monthCounts = $scheduled->countBy(fn (string $d) => substr($d, 0, 7))->all();
-        $cap = ContentAutopilotConfig::monthlyArticlesPerWebsite();
 
         $out = [];
+        $capByMonth = [];
         $cursor = now()->addDay()->startOfDay();
         for ($i = 0; $i < $horizonDays; $i++) {
             $key = $cursor->toDateString();
+            $ym = substr($key, 0, 7);
+            // Cap scales with each month's day count (31 in Jan, 28/29 in Feb).
+            $capByMonth[$ym] ??= ContentAutopilotConfig::monthlyArticlesFor($cursor);
             if (in_array($cursor->isoWeekday(), $days, true)
                 && ! isset($used[$key])
-                && ($monthCounts[substr($key, 0, 7)] ?? 0) < $cap) {
+                && ($monthCounts[$ym] ?? 0) < $capByMonth[$ym]) {
                 $out[] = $key;
             }
             $cursor->addDay();

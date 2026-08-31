@@ -654,6 +654,21 @@ Migration backfills the ledger from existing v1 articles so nobody's current usa
 reset at introduction. Tests: `ContentGenerationLedgerTest` (4 — incl. both
 delete-and-re-add loophole regressions).
 
+**Cap scales with the calendar month (2026-08-31).** The product promise is one
+article every day, so the enforced/displayed cap is
+`ContentAutopilotConfig::monthlyArticlesFor($month)` = admin base
+(`content.limits.monthly_articles_per_website`, semantically "per 30 days",
+default 30) × daysInMonth/30, rounded — 31 in January, 28/29 in February; small
+admin values (e.g. 2) stay stable in every month. Wired at: both `blockReason`
+monthly checks (per-website + per-user×sites, current month), planner
+`availableDates()` (per-month cap for each future month in the horizon),
+calendar `capAndTrialBindings` (displayed month) + block toast. The raw
+`monthlyArticlesPerWebsite()` remains for pool sizing
+(`ContentTopicPlanner` min/eviction, `THIN_CALENDAR_TOPICS`,
+`PlanContentTopicsJob::$count` — rolling backlog, intentionally NOT day-scaled).
+Marketing copy still says "30 articles a month" (sells 30, delivers up to 31 —
+deliberate). Tests: `ContentMonthlyCapScalingTest` (5).
+
 ### Site directives — admin steering prompt (2026-08-21)
 
 `content_plans.admin_content_prompt` (admin-set, per website, `/admin/clients/{user}`

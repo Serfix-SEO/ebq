@@ -254,9 +254,22 @@ class ContentAutopilotConfig
         return max(0, (int) self::setting('content.limits.trial_articles', 3));
     }
 
+    /**
+     * Raw admin knob: articles per STANDARD 30-DAY month. Use
+     * monthlyArticlesFor() wherever an actual calendar month is enforced or
+     * displayed — the product promise is one article every day (owner
+     * 2026-08-31), so a 31-day month allows 31 and February 28/29, scaled
+     * off this base.
+     */
     public static function monthlyArticlesPerWebsite(): int
     {
         return max(1, (int) self::setting('content.limits.monthly_articles_per_website', 30));
+    }
+
+    /** The cap for one specific calendar month: base scaled by its day count. */
+    public static function monthlyArticlesFor(\Carbon\CarbonInterface $month): int
+    {
+        return max(1, (int) round(self::monthlyArticlesPerWebsite() * $month->daysInMonth / 30));
     }
 
     /** Keyword Tracker capacity for a PAID content website (delete-to-add). */

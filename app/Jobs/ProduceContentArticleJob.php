@@ -63,7 +63,8 @@ class ProduceContentArticleJob implements ShouldBeUnique, ShouldQueue
         // Entitlement/limit gate — the SINGLE choke point every dispatch path
         // funnels through (manual writeNow/addAndWriteTopic/retry + the
         // dispatcher claim). Blocked = no access, website not covered, trial's
-        // 3-article cap, or the monthly 60/website cap. The topic stays
+        // 3-article cap, or the monthly per-website cap (one per calendar
+        // day at the default setting — day-scaled per month). The topic stays
         // APPROVED so it's producible again after upgrade / next month.
         // Publishing is never gated here.
         $reason = app(ContentEntitlements::class)->blockReason($topic);

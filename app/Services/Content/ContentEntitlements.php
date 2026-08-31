@@ -365,9 +365,11 @@ class ContentEntitlements
             }
         }
 
-        // Monthly per-website cap.
+        // Monthly per-website cap — scaled to the actual calendar month so the
+        // "one article every day" promise holds (31 in January, 28/29 in
+        // February; a flat 30 silently blocked day 31, owner 2026-08-31).
         $monthly = $this->usageForWebsite($website->id, now()->startOfMonth(), $topic->id);
-        if ($monthly >= ContentAutopilotConfig::monthlyArticlesPerWebsite()) {
+        if ($monthly >= ContentAutopilotConfig::monthlyArticlesFor(now())) {
             return 'monthly_limit';
         }
 
@@ -378,7 +380,7 @@ class ContentEntitlements
         // (2026-08-21). The ledger survives deletion; reservations are live.
         $userMonthly = $this->ledgerCount($user, now()->startOfMonth())
             + $this->reservedForUser($user, $topic->id);
-        $userCap = ContentAutopilotConfig::monthlyArticlesPerWebsite() * max(1, $this->sitesAllowed($user));
+        $userCap = ContentAutopilotConfig::monthlyArticlesFor(now()) * max(1, $this->sitesAllowed($user));
         if ($userMonthly >= $userCap) {
             return 'monthly_limit';
         }

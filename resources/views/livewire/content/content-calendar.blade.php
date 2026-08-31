@@ -408,7 +408,7 @@
         @if (! empty($overCapIds))
             <div class="flex items-start gap-3 rounded-2xl border border-error/30 bg-error/5 p-4 text-sm dark:border-error/40">
                 <svg class="mt-0.5 h-5 w-5 flex-none text-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 8v4m0 4h.01"/></svg>
-                <p class="text-slate-700 dark:text-slate-200">{{ __('You can publish up to :cap articles a month on your plan. Articles past that (marked in red) won\'t be generated until next month or a higher plan.', ['cap' => $monthlyCap ?? 30]) }}</p>
+                <p class="text-slate-700 dark:text-slate-200">{{ __('You can publish up to :cap articles a month on your plan. Articles past that (marked in red) won\'t be generated until next month or a higher plan.', ['cap' => $monthlyCap ?? \App\Support\ContentAutopilotConfig::monthlyArticlesFor(now())]) }}</p>
             </div>
         @endif
 

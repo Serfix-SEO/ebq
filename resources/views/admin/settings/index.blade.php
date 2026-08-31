@@ -215,7 +215,7 @@
                     @foreach ([
                         'content_trial_days' => ['Trial length (days)', 'trial_days', 0, 60],
                         'content_trial_articles' => ['Trial article limit', 'trial_articles', 0, 50],
-                        'content_monthly_articles_per_website' => ['Monthly articles / website', 'monthly_articles_per_website', 1, 1000],
+                        'content_monthly_articles_per_website' => ['Articles / website per 30 days (scales: Feb 28, Jan 31)', 'monthly_articles_per_website', 1, 1000],
                         'content_only_crawl_pages' => ['Content-only crawl pages', 'content_only_crawl_pages', 20, 100000],
                         'content_tracker_keywords' => ['Tracker keywords (paid)', 'tracker_keywords', 0, 100000],
                         'content_trial_tracker_keywords' => ['Tracker keywords (trial)', 'trial_tracker_keywords', 0, 1000],

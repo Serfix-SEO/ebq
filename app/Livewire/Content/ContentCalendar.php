@@ -993,7 +993,7 @@ class ContentCalendar extends Component
     {
         return match ($reason) {
             'trial_limit' => __('You\'ve used all :n free trial articles. Choose a plan to keep generating.', ['n' => ContentAutopilotConfig::trialArticles()]),
-            'monthly_limit' => __('You\'ve reached your plan\'s limit of :n articles this month for this website. It resets next month, or upgrade for more.', ['n' => ContentAutopilotConfig::monthlyArticlesPerWebsite()]),
+            'monthly_limit' => __('You\'ve reached your plan\'s limit of :n articles this month for this website. It resets next month, or upgrade for more.', ['n' => ContentAutopilotConfig::monthlyArticlesFor(now())]),
             'not_covered' => __('This website is not on your content plan yet. Add it from Get started.'),
             default => __('Content Autopilot is not active for this website. Start it from Get started.'),
         };
@@ -1635,11 +1635,12 @@ class ContentCalendar extends Component
 
     /**
      * Monthly-cap (mark the cap-th article + beyond) and trial-limit view data.
-     * The cap comes from plan/admin settings (default 30).
+     * The cap is the DISPLAYED month's day-scaled allowance (one article per
+     * calendar day at the default setting — 31 in January, 28/29 in February).
      */
     private function capAndTrialBindings($topics, Carbon $monthStart): array
     {
-        $cap = ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        $cap = ContentAutopilotConfig::monthlyArticlesFor($monthStart);
         $monthKey = $monthStart->format('Y-m');
         $rank = 0;
         $overCapIds = [];

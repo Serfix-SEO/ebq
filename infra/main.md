@@ -287,6 +287,12 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-31 — Monthly article cap scales to the calendar month.** The cap is now
+  one article per calendar day: `ContentAutopilotConfig::monthlyArticlesFor($month)`
+  = admin base (per 30 days, default 30) x daysInMonth/30 — 31 in January, 28/29 in
+  February. Wired at both entitlement checks, planner `availableDates()` (per-month),
+  calendar over-cap bindings + toasts. Pool mechanics (30-topic backlog) unchanged.
+
 - **2026-08-31 — Content pipeline self-heal (simcardairportbali + namesforfreefire
   incidents).** Publish now backstops missing images (`ensureImages`) and late images
   push to the live post via `PublishContentArticleJob $forceUpdate` (update over the

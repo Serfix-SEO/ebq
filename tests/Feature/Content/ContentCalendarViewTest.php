@@ -125,7 +125,8 @@ class ContentCalendarViewTest extends TestCase
      */
     public function test_a_month_exactly_on_the_article_cap_is_not_flagged_as_over_limit(): void
     {
-        $cap = ContentAutopilotConfig::monthlyArticlesPerWebsite();
+        // Day-scaled cap of the CURRENT month (2026-08-31: one per calendar day).
+        $cap = ContentAutopilotConfig::monthlyArticlesFor(now()->startOfMonth());
         $user = User::factory()->create();
         $website = Website::factory()->for($user)->create();
         $plan = ContentPlan::factory()->create([
