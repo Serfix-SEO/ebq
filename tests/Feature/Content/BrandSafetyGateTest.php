@@ -245,6 +245,52 @@ class BrandSafetyGateTest extends TestCase
             fn ($job) => $job->topicId === $topic->id);
     }
 
+    public function test_dispatcher_stops_regenerating_after_the_write_attempt_cap(): void
+    {
+        // 2026-08-29 runaway: a below-floor topic was regenerated every tick
+        // (64 writes, 191 revises, all billed) until version overflowed at 255.
+        Queue::fake();
+        [, , $topic] = $this->guardedTopic();
+        $topic->forceFill([
+            'status' => ContentTopic::STATUS_FAILED,
+            'last_error' => 'below_publish_floor: score 50',
+            'scheduled_for' => now()->subDay()->toDateString(),
+        ])->save();
+        foreach (range(1, 4) as $v) {
+            ContentArticle::create([
+                'topic_id' => $topic->id, 'version' => $v, 'is_current' => $v === 4,
+                'h1' => 'T', 'html' => '<p>x</p>', 'seo_score' => 50,
+                'generation_meta' => ['stage' => 'write'],
+            ]);
+        }
+
+        $this->artisan('ebq:content-autopilot');
+
+        Queue::assertNotPushed(\App\Jobs\ProduceContentArticleJob::class,
+            fn ($job) => $job->topicId === $topic->id);
+    }
+
+    public function test_dispatcher_still_regenerates_below_the_write_attempt_cap(): void
+    {
+        Queue::fake();
+        [, , $topic] = $this->guardedTopic();
+        $topic->forceFill([
+            'status' => ContentTopic::STATUS_FAILED,
+            'last_error' => 'below_publish_floor: score 50',
+            'scheduled_for' => now()->subDay()->toDateString(),
+        ])->save();
+        ContentArticle::create([
+            'topic_id' => $topic->id, 'version' => 1, 'is_current' => true,
+            'h1' => 'T', 'html' => '<p>x</p>', 'seo_score' => 50,
+            'generation_meta' => ['stage' => 'write'],
+        ]);
+
+        $this->artisan('ebq:content-autopilot');
+
+        Queue::assertPushed(\App\Jobs\ProduceContentArticleJob::class,
+            fn ($job) => $job->topicId === $topic->id);
+    }
+
     // ── reviseCurrentArticle (context refresh) ──────────────────────────
 
     public function test_revise_current_article_rescores_and_returns_to_ready(): void

@@ -4938,5 +4938,7 @@
     "Social image": "صورة المشاركة الاجتماعية",
     "Copy all meta tags (HTML)": "نسخ كل وسوم الميتا (HTML)",
     "Copy schema (JSON-LD)": "نسخ السكيما (JSON-LD)",
-    "Paste into your page's head or your SEO plugin.": "الصقها في head الصفحة أو في إضافة السيو لديك."
+    "Paste into your page's head or your SEO plugin.": "الصقها في head الصفحة أو في إضافة السيو لديك.",
+    "Send the current version to your site, updating the live article?": "إرسال النسخة الحالية إلى موقعك وتحديث المقال المنشور؟",
+    "Updating the article on your site — it can take a moment to refresh.": "جارٍ تحديث المقال على موقعك، قد يستغرق التحديث لحظات."
 }

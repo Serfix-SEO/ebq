@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\ContentArticle;
 use App\Models\ContentImage;
+use App\Models\ContentTopic;
 use App\Services\Content\ContentLlmSpendMeter;
 use App\Services\Content\IdeogramClient;
 use App\Services\Content\IdeogramSpendMeter;
@@ -236,6 +237,16 @@ class GenerateContentImagesJob implements ShouldQueue
             'inline' => count($inlineInjections),
             'spent' => $meter->spent(),
         ]);
+
+        // Late images (this article was already live when they were generated —
+        // the publish-time backstop path) must reach the published post: re-send
+        // as a forced update over the same external ids. Without this the images
+        // exist only in our DB while the live post stays imageless forever
+        // (prod 2026-08-31, simcardairportbali.com).
+        if ($topic !== null && $topic->fresh()?->status === ContentTopic::STATUS_PUBLISHED) {
+            \App\Jobs\PublishContentArticleJob::dispatch($topic->id, forceUpdate: true);
+            Log::info('content_autopilot.images_republish', ['topic_id' => $topic->id]);
+        }
         } finally {
             \Illuminate\Support\Facades\Cache::forget($imagesFlag);
             $clearPending();

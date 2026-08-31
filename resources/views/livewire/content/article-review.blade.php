@@ -585,6 +585,14 @@
                         @elseif ($topic->status === \App\Models\ContentTopic::STATUS_SCHEDULED)
                             <p class="rounded-lg bg-success/10 px-3 py-2 text-center text-sm text-success">{{ __('Approved and ready to go.') }}</p>
                         @endif
+                        @if ($topic->status === \App\Models\ContentTopic::STATUS_PUBLISHED && $publishConnected)
+                            <button wire:click="republishNow" wire:confirm="{{ __('Send the current version to your site, updating the live article?') }}"
+                                    wire:loading.attr="disabled" wire:target="republishNow"
+                                    class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-70 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                                {{ __('Republish to your site') }}
+                            </button>
+                        @endif
                         @if (\App\Livewire\Content\ContentCalendar::publishableNow($topic))
                             @if ($publishConnected)
                                 <button wire:click="publishNow" wire:confirm="{{ __('Publish this article to your site now?') }}"

@@ -55,6 +55,12 @@ class ContentAutopilotDispatcher extends Command
      *  throttle is bypassed so an imminent slot is never missed. */
     private const CATCH_UP_HOURS = 24;
 
+    /**
+     * Max from-scratch write attempts before a repeatedly-FAILED topic stops
+     * being auto-regenerated (2026-08-29 runaway: 64 writes on one topic).
+     */
+    private const MAX_REGENERATION_WRITES = 4;
+
     /** Keep the calendar filled this many topics ahead (matches the monthly cap). */
     private const THIN_CALENDAR_TOPICS = 30;
 
@@ -255,12 +261,33 @@ class ContentAutopilotDispatcher extends Command
             if ($entitlements->blockReason($topic) !== null) {
                 continue;
             }
+            // Regeneration cap (prod 2026-08-29, namesforfreefire.com): a
+            // FAILED dated topic that keeps failing for any non-brand reason
+            // (there: below_publish_floor, an Arabic article stuck at ~50)
+            // was regenerated EVERY tick — 64 full writes + 191 revises in
+            // 16 hours, all billed, until the version tinyint overflowed at
+            // 255. After a handful of from-scratch attempts the pipeline has
+            // proven it can't write this topic; park it in "needs attention"
+            // like brand_safety instead of burning money forever.
+            if ($topic->status === ContentTopic::STATUS_FAILED
+                && $this->writeAttempts($topic) >= self::MAX_REGENERATION_WRITES) {
+                continue;
+            }
             ProduceContentArticleJob::dispatch($topic->id);
             $this->claimedTopicIds[] = $topic->id;
             $count++;
         }
 
         return $count;
+    }
+
+    /** Full from-scratch write attempts already spent on a topic. */
+    private function writeAttempts(ContentTopic $topic): int
+    {
+        return \App\Models\ContentArticle::query()
+            ->where('topic_id', $topic->id)
+            ->where('generation_meta->stage', 'write')
+            ->count();
     }
 
     /** Phase 3: dispatch publish jobs for topics whose moment has come. */

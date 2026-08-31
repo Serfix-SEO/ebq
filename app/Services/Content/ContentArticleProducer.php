@@ -288,6 +288,9 @@ class ContentArticleProducer
             $article = $this->scrubLoop($article, $topic, $plan, $context);
         }
         if ($this->hasBlockedMention($article)) {
+            $article = $this->hardScrub($article, $topic, $plan, $context, editSlug: true);
+        }
+        if ($this->hasBlockedMention($article)) {
             $topic->fail('brand_safety: could not remove blocked terms — '
                 .$this->blockedMentionSummary($article));
 
@@ -562,6 +565,159 @@ class ContentArticleProducer
     }
 
     /**
+     * Deterministic last-resort scrub — runs only when both LLM scrub passes
+     * left a blocked mention behind, and guarantees the gate terminates:
+     *
+     *  1. links to blocked competitor domains are removed (inner text kept),
+     *  2. blocked terms in text nodes, image alts and the meta fields are
+     *     replaced with a generic phrase; enumerations of several replaced
+     *     brands collapse to a single phrase ("A, B and C" → one "other brands").
+     *
+     * The result can read slightly clumsy — accepted trade-off: the previous
+     * behavior stranded the topic FAILED until a human rescued it by clicking
+     * scrub repeatedly and hand-editing (simcardairportbali 2026-08-31: three
+     * manual attempts + two hand edits, and both articles then published with
+     * zero images because the READY-gated image dispatch never ran). The slug
+     * is never touched here (a live URL must not move); a term that survives
+     * only in the slug still fails the topic — the one remaining human case.
+     */
+    private function hardScrub(ContentArticle $article, ContentTopic $topic, ContentPlan $plan, array $context, bool $editSlug = false): ContentArticle
+    {
+        try {
+            $guard = app(CompetitorMentionGuard::class);
+            $terms = $guard->termsForTopic($plan, $topic);
+            $domains = $guard->enabled($plan) ? $guard->blockedDomains($plan) : [];
+            if ($terms === [] && $domains === []) {
+                return $article;
+            }
+
+            $replacement = str_starts_with(strtolower((string) ($plan->language ?: 'en')), 'ar')
+                ? 'علامات تجارية أخرى'
+                : 'other brands';
+
+            $html = (string) $article->html;
+            $html = $this->stripBlockedDomainLinks($html, $domains);
+            $html = $this->replaceTermsInTextNodes($html, $terms, $replacement);
+
+            $fields = [
+                'meta_title' => $this->replaceTermsInPlainText((string) $article->meta_title, $terms, $replacement),
+                'meta_description' => $this->replaceTermsInPlainText((string) $article->meta_description, $terms, $replacement),
+                'h1' => $this->replaceTermsInPlainText((string) $article->h1, $terms, $replacement),
+            ];
+
+            // Same deterministic slug fix as the LLM scrub (pre-publish only —
+            // a live article's slug is its URL and must not move).
+            $slug = (string) $article->slug;
+            if ($editSlug) {
+                foreach ($terms as $t) {
+                    $token = Str::slug($t);
+                    if ($token !== '') {
+                        $slug = preg_replace('/\b'.preg_quote($token, '/').'\b/', '', $slug) ?? $slug;
+                    }
+                }
+                $slug = trim((string) preg_replace('/-{2,}/', '-', $slug), '-');
+                if ($slug === '') {
+                    $slug = (string) $article->slug;
+                }
+            }
+
+            if ($html === (string) $article->html
+                && $slug === (string) $article->slug
+                && $fields['meta_title'] === (string) $article->meta_title
+                && $fields['meta_description'] === (string) $article->meta_description
+                && $fields['h1'] === (string) $article->h1) {
+                return $article; // nothing to change (term hides in the slug or lint noise)
+            }
+
+            Log::info('content_autopilot.brand_scrub_hard', ['topic_id' => $topic->id]);
+
+            return $this->storeScoredVersion($topic, $context, $fields + [
+                'slug' => $slug,
+                'html' => $html,
+                'outline' => $article->outline,
+                'generation_meta' => ['stage' => 'brand_scrub_hard'],
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('content_autopilot.brand_scrub_hard_failed', [
+                'topic_id' => $topic->id, 'error' => mb_substr($e->getMessage(), 0, 300),
+            ]);
+
+            return $article;
+        }
+    }
+
+    /** Remove <a> tags whose href points at a blocked competitor domain, keeping the inner text. */
+    private function stripBlockedDomainLinks(string $html, array $domains): string
+    {
+        if ($domains === []) {
+            return $html;
+        }
+        $domains = array_map(static fn ($d) => strtolower(preg_replace('/^www\./', '', trim((string) $d))), $domains);
+
+        return (string) preg_replace_callback(
+            '/<a\b[^>]*\bhref="([^"]*)"[^>]*>(.*?)<\/a>/is',
+            static function (array $m) use ($domains): string {
+                $host = strtolower((string) (parse_url($m[1], PHP_URL_HOST) ?: ''));
+                $host = preg_replace('/^www\./', '', $host) ?? $host;
+                foreach ($domains as $d) {
+                    if ($d !== '' && ($host === $d || str_ends_with($host, '.'.$d))) {
+                        return $m[2]; // unwrap — the anchor text goes through term replacement next
+                    }
+                }
+
+                return $m[0];
+            },
+            $html
+        );
+    }
+
+    /** Replace blocked terms in TEXT NODES + img alt attributes only — attributes/URLs stay intact. */
+    private function replaceTermsInTextNodes(string $html, array $terms, string $replacement): string
+    {
+        if ($terms === []) {
+            return $html;
+        }
+        // Sentinel-wrap so every text node sits between '>' and '<'.
+        $wrapped = '>'.$html.'<';
+        $wrapped = (string) preg_replace_callback(
+            '/>([^<]*)</s',
+            fn (array $m): string => '>'.$this->replaceTermsInPlainText($m[1], $terms, $replacement).'<',
+            $wrapped
+        );
+        $html = substr($wrapped, 1, -1);
+
+        // alt="…" carries reader-visible text too (and ships to WP).
+        return (string) preg_replace_callback(
+            '/\balt="([^"]*)"/i',
+            fn (array $m): string => 'alt="'.$this->replaceTermsInPlainText($m[1], $terms, $replacement).'"',
+            $html
+        );
+    }
+
+    /** Word-boundary replace of each term (incl. plural/possessive), then collapse "X, X and X" runs. */
+    private function replaceTermsInPlainText(string $text, array $terms, string $replacement): string
+    {
+        if ($text === '') {
+            return $text;
+        }
+        foreach ($terms as $term) {
+            $text = (string) preg_replace(
+                '/\b'.preg_quote($term, '/').'(?:\'s|s)?\b/iu',
+                $replacement,
+                $text
+            );
+        }
+        // "other brands, other brands and other brands" → "other brands".
+        $rep = preg_quote($replacement, '/');
+
+        return (string) preg_replace(
+            '/'.$rep.'(?:\s*(?:,|و|&|\/|\bvs\.?\b|\band\b|\bor\b)\s*'.$rep.')+/iu',
+            $replacement,
+            $text
+        );
+    }
+
+    /**
      * Re-run the revise tail of the pipeline on a topic's CURRENT article —
      * for articles whose generation context has since improved (cocomii
      * 2026-08-20: the site's crawl was blocked at write time, so site_urls
@@ -620,6 +776,9 @@ class ContentArticleProducer
 
         if ($this->hasBlockedMention($article)) {
             $article = $this->scrubLoop($article, $topic, $plan, $context, editSlug: false, clientInstruction: $clientInstruction);
+        }
+        if ($this->hasBlockedMention($article)) {
+            $article = $this->hardScrub($article, $topic, $plan, $context);
         }
         if ($this->hasBlockedMention($article)) {
             $topic->fail('brand_safety: could not remove blocked terms — '.$this->blockedMentionSummary($article));
@@ -717,6 +876,9 @@ class ContentArticleProducer
         // editSlug false: the article may already be live — rewriting the slug
         // would move its URL out from under the published post.
         $article = $this->scrubLoop($article, $topic, $plan, $context, editSlug: false);
+        if ($this->hasBlockedMention($article)) {
+            $article = $this->hardScrub($article, $topic, $plan, $context);
+        }
 
         return ! $this->hasBlockedMention($article);
     }

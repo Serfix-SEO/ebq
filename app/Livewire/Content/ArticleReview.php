@@ -1037,6 +1037,33 @@ class ArticleReview extends Component
     }
 
     /**
+     * Push the current version of an already-PUBLISHED article to the site as
+     * an update over the same post (never a duplicate). This is the button the
+     * version-restore and image-regeneration flows have been pointing at with
+     * their "Republish to update it on your site" messages — until 2026-08-31
+     * it didn't exist (publishNow excludes published topics), leaving those
+     * flows a dead end.
+     */
+    public function republishNow(): void
+    {
+        $topic = $this->topic();
+        if ($topic === null || $topic->status !== ContentTopic::STATUS_PUBLISHED) {
+            return;
+        }
+        $connected = (bool) $topic->plan?->website
+            ?->contentIntegrations()
+            ->where('status', ContentIntegration::STATUS_CONNECTED)
+            ->exists();
+        if (! $connected) {
+            session()->flash('review-status', __('Connect a site in Settings → Integrations before publishing.'));
+
+            return;
+        }
+        PublishContentArticleJob::dispatch($topic->id, forceUpdate: true);
+        session()->flash('review-status', __('Updating the article on your site — it can take a moment to refresh.'));
+    }
+
+    /**
      * "Remove blocked mentions" — the article (usually already published, or
      * held by the brand gate) carries a blocked competitor term. Queue the
      * scrub job: it rewrites just those mentions and re-sends the clean

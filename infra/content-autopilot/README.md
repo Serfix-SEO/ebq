@@ -868,6 +868,58 @@ Shopify: `articleCreate/articleUpdate` now always send `author.name`
 failure). `verify()` stores `config['shop_name']`; publish falls back to the
 shop_url host for integrations connected before that existed.
 
+### Self-heal round (2026-08-31, simcardairportbali incident)
+
+What happened: both of the site's first articles finished with scores 91/92
+but the brand gate failed produce() (comparison topics — "Best eSIM: Top
+Providers" — inevitably name Holafly/Saily-class competitors, and the LLM
+scrub couldn't fully clean them). Because `ProduceContentArticleJob`
+dispatches `GenerateContentImagesJob` ONLY when the post-produce status is
+READY, the failed-then-manually-rescued topics published with **zero images**
+(no featured thumbnail), silently. The rescue itself was manual: three
+"Remove blocked mentions" clicks + two hand edits. Three gaps, three fixes
+(`PublishImagesSelfHealTest`, 12 tests):
+
+1. **Publish-time image backstop** — `PublishContentArticleJob::ensureImages()`
+   runs after every confirmed publish: images enabled (global + plan opt-out
+   respected) and the article has no GENERATED/PENDING row and no
+   `content:images:pending:` flag → dispatch `GenerateContentImagesJob`.
+   Covers the scrub-recovery path and any future path that reaches publish
+   imageless.
+2. **Late images reach the live post** — `GenerateContentImagesJob`, after
+   injecting figures, re-dispatches `PublishContentArticleJob` with the new
+   `$forceUpdate` flag when the topic is already PUBLISHED. `$forceUpdate`
+   allows PUBLISHED topics through the status gate, keeps the status stable
+   (no PUBLISHING flicker, `failed()` can't reset a live post), preserves the
+   original `published_at`, and re-sends CONFIRMED publication rows through
+   `driver->update()` over the stored external_id — an update, never a
+   duplicate. No loop: the next publish pass sees the image rows and the
+   backstop stays quiet.
+3. **Deterministic scrub fallback** — `ContentArticleProducer::hardScrub()`
+   (stage `brand_scrub_hard`, "Cleanup" in version history) runs when both
+   LLM scrub passes leave a blocked mention: unwraps links to blocked
+   domains, replaces blocked terms in TEXT NODES + `alt=` + meta fields with
+   a generic phrase ("other brands" / Arabic equivalent), collapses
+   enumerations ("A, B and C" → one phrase), never touches attributes/URLs.
+   Slug is included only on the produce() path (`$editSlug`) — a live URL
+   never moves; a term that survives ONLY in a live slug is the one case
+   still stranded for a human. Wired at all three gate sites: `produce()`,
+   `reviseCurrentArticle()`, `cleanCurrentArticle()` — so the review-page
+   scrub and `CleanBlockedTermsJob` now terminate instead of failing until a
+   human hand-edits. Trade-off accepted: last-resort replacement can read
+   slightly clumsy; the client's explicit block outranks prose polish (same
+   owner rule as "brand-clean outranks SEO score").
+
+Also: the review page's dead-end "Republish to update it on your site"
+flashes (version restore, image regen) now have a real button —
+`ArticleReview::republishNow()` (PUBLISHED + connected → `$forceUpdate`
+publish). Note the CALENDAR's `republish()` is a different mechanism kept
+for recovery re-sends: it re-arms claims (CONFIRMED→QUEUED) and resets
+`published_at`; the review button/forceUpdate is the content-update path.
+Backfill for incidents: `ebq:backfill-article-images --website=… --force`
+now self-completes end-to-end (images generate → forced update pushes them
+to the live posts).
+
 ## Type-aware writing (Phase F, 2026-07-23)
 
 Instruction-text only — the chunked write protocol, scorer, and revise loop

@@ -61,8 +61,14 @@ class PublishContentArticleJob implements ShouldQueue
      * $afterScrub: set only by CleanBlockedTermsJob when it re-dispatches
      * publish after a scrub — if the brand gate STILL trips then, we fail the
      * topic instead of scrubbing again (breaks the publish↔scrub loop).
+     *
+     * $forceUpdate: push the CURRENT article to the platforms even when the
+     * topic is already PUBLISHED and the publication rows are CONFIRMED —
+     * driver->update() over the stored external_id, never a duplicate post.
+     * Used by the images job (late images must reach the live post) and the
+     * review page's Republish button.
      */
-    public function __construct(public string $topicId, public bool $afterScrub = false)
+    public function __construct(public string $topicId, public bool $afterScrub = false, public bool $forceUpdate = false)
     {
         $this->onQueue(Queues::CONTENT);
         $this->onConnection('redis-long');
@@ -79,9 +85,14 @@ class PublishContentArticleJob implements ShouldQueue
         if ($topic === null) {
             return;
         }
-        if (! in_array($topic->status, [ContentTopic::STATUS_SCHEDULED, ContentTopic::STATUS_PUBLISHING], true)) {
+        $allowed = [ContentTopic::STATUS_SCHEDULED, ContentTopic::STATUS_PUBLISHING];
+        if ($this->forceUpdate) {
+            $allowed[] = ContentTopic::STATUS_PUBLISHED; // re-send as an update over the same external ids
+        }
+        if (! in_array($topic->status, $allowed, true)) {
             return; // veto'd / already handled — never re-publish
         }
+        $wasPublished = $topic->status === ContentTopic::STATUS_PUBLISHED;
 
         $article = $topic->currentArticle()->first() ?? $topic->articles()->where('is_current', true)->first();
         if ($article === null) {
@@ -118,7 +129,12 @@ class PublishContentArticleJob implements ShouldQueue
             return;
         }
 
-        $topic->enterStage(ContentTopic::STATUS_PUBLISHING);
+        if (! $wasPublished) {
+            // A forceUpdate on a live topic keeps its PUBLISHED status — the
+            // client must never see a published article flicker back to
+            // "publishing", and failed() must not reset a live post to READY.
+            $topic->enterStage(ContentTopic::STATUS_PUBLISHING);
+        }
 
         $confirmed = 0;
         $hardFailed = 0;
@@ -151,6 +167,25 @@ class PublishContentArticleJob implements ShouldQueue
                 ['status' => ContentPublication::STATUS_QUEUED, 'external_id' => $priorExternalId],
             );
             if ($publication->status === ContentPublication::STATUS_CONFIRMED) {
+                // forceUpdate: the row was delivered, but the article content
+                // changed since (late images, restored version, client edit) —
+                // re-send as an update over the stored external_id. Failure is
+                // non-fatal: the post stays live with its previous content.
+                if ($this->forceUpdate && $publication->external_id) {
+                    $result = $driver->update($article, $integration, (string) $publication->external_id);
+                    if ($result->ok) {
+                        $publication->forceFill([
+                            'external_url' => $result->externalUrl ? mb_substr($result->externalUrl, 0, 600) : $publication->external_url,
+                            'response' => $result->response,
+                        ])->save();
+                    } else {
+                        Log::warning('Content publish forced update failed', [
+                            'topic_id' => $topic->id,
+                            'integration' => $integration->platform,
+                            'error' => $result->error,
+                        ]);
+                    }
+                }
                 $confirmed++;
                 $liveUrl ??= $publication->external_url;
 
@@ -195,7 +230,9 @@ class PublishContentArticleJob implements ShouldQueue
         if ($confirmed > 0) {
             $topic->forceFill([
                 'status' => ContentTopic::STATUS_PUBLISHED,
-                'published_at' => now(),
+                // A forceUpdate of an already-live post keeps its original
+                // publish date — this is an update, not a re-publish.
+                'published_at' => $wasPublished ? $topic->published_at : now(),
                 'last_error' => null,
             ])->save();
             $this->verifyLiveUrl($topic, $article, $liveUrl, $guard);
@@ -203,6 +240,7 @@ class PublishContentArticleJob implements ShouldQueue
             $this->addToKeywordTracker($topic, $liveUrl);
             $this->notifyPublished($topic, $article, $liveUrl, $integrations);
             $this->shareToSocial($topic, $liveUrl);
+            $this->ensureImages($topic, $article);
 
             return;
         }
@@ -237,6 +275,45 @@ class PublishContentArticleJob implements ShouldQueue
                 'status' => ContentTopic::STATUS_READY,
                 'last_error' => mb_substr('Publishing error: '.$e->getMessage(), 0, 2000),
             ])->save();
+    }
+
+    /**
+     * Backstop for every path that reaches publish without images (prod
+     * 2026-08-31, simcardairportbali.com: the brand gate failed produce() so
+     * ProduceContentArticleJob's READY-gated image dispatch never ran; the
+     * scrub recovery then published both articles with zero images — no
+     * featured thumbnail, silently). If images are enabled and the article
+     * has none, generate them now; GenerateContentImagesJob pushes them to
+     * the live post afterwards (it re-dispatches publish with $forceUpdate),
+     * and on its next pass this backstop sees the rows and stays quiet — no
+     * loop by construction.
+     */
+    private function ensureImages(ContentTopic $topic, $article): void
+    {
+        try {
+            if (! \App\Support\ContentAutopilotConfig::imagesEnabled()) {
+                return; // platform kill-switch (the job re-checks the rest)
+            }
+            if ($topic->plan !== null && $topic->plan->images_enabled === false) {
+                return; // the client's own opt-out
+            }
+            if (\App\Models\ContentImage::query()->where('article_id', $article->id)
+                ->whereIn('status', [\App\Models\ContentImage::STATUS_GENERATED, \App\Models\ContentImage::STATUS_PENDING])
+                ->exists()) {
+                return;
+            }
+            $pendingKey = 'content:images:pending:'.$article->id;
+            if (\Illuminate\Support\Facades\Cache::has($pendingKey)) {
+                return; // a generation run is already queued/underway
+            }
+            \Illuminate\Support\Facades\Cache::put($pendingKey, 1, now()->addMinutes(15));
+            GenerateContentImagesJob::dispatch($article->id);
+            Log::info('content_autopilot.images_backstop', ['topic_id' => $topic->id, 'article_id' => $article->id]);
+        } catch (\Throwable $e) {
+            Log::warning('content_autopilot.images_backstop_error', [
+                'topic_id' => $topic->id, 'error' => mb_substr($e->getMessage(), 0, 300),
+            ]);
+        }
     }
 
     /**

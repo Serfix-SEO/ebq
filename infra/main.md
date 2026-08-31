@@ -287,6 +287,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-08-31 — Content pipeline self-heal (simcardairportbali + namesforfreefire
+  incidents).** Publish now backstops missing images (`ensureImages`) and late images
+  push to the live post via `PublishContentArticleJob $forceUpdate` (update over the
+  same external ids, no status flicker, `published_at` preserved); the review page
+  gained a real Republish button for PUBLISHED topics; a deterministic
+  `hardScrub()` fallback (stage `brand_scrub_hard`) guarantees the brand gate
+  terminates instead of stranding topics for manual scrub clicks; the dispatcher's
+  `catchUpImminent` caps from-scratch regenerations at 4 writes (a below-floor topic
+  had burned 64 writes/191 revises in 16h until the version tinyint overflowed).
+  infra/content-autopilot/README.md "Self-heal round".
+
 - **2026-08-26 — Cocomii feedback: main-image preview, relevant internal links, image
   regeneration.** Review page always shows the Main-image card (3 states); internal-link
   candidates are titled + topic-ranked with an anchor↔target scorer gate + post-verdict
