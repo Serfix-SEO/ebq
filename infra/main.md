@@ -287,6 +287,13 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-03 — Medusa publish destination (guided receiver).** Medusa v2 has no blog
+  API, so the new tile pairs `MedusaDriver` (WebhookDriver subclass, fixed
+  `/serfix/articles` route, HMAC contract) with a paste-in kit under
+  `resources/snippets/medusa/` (blog module + signed intake + store routes +
+  storefront pages) and a full on-card setup guide. Webhook payload gained an
+  additive `status` key. infra/content-autopilot/README.md "Medusa — guided receiver".
+
 - **2026-08-31 — Unicode scoring (Arabic articles were unmeasurable).** `str_word_count`
   counted a 2,000-word Arabic article as 39 words and exact keyword matching missed
   hamza-variant spellings ("اسماء" typed vs "أسماء" written) — every version pinned ~50,

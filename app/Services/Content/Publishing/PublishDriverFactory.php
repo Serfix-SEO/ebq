@@ -12,6 +12,7 @@ class PublishDriverFactory
         return match ($integration->platform) {
             ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD => app(WordPressAppPasswordDriver::class),
             ContentIntegration::PLATFORM_WEBHOOK => app(WebhookDriver::class),
+            ContentIntegration::PLATFORM_MEDUSA => app(MedusaDriver::class),
             ContentIntegration::PLATFORM_SHOPIFY => app(ShopifyDriver::class),
             ContentIntegration::PLATFORM_HUBSPOT => app(HubSpotDriver::class),
             ContentIntegration::PLATFORM_WEBFLOW => app(WebflowDriver::class),

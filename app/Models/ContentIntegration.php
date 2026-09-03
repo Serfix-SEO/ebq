@@ -34,6 +34,8 @@ class ContentIntegration extends Model
 
     public const PLATFORM_WEBHOOK = 'webhook';
 
+    public const PLATFORM_MEDUSA = 'medusa';
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_CONNECTED = 'connected';
@@ -71,6 +73,7 @@ class ContentIntegration extends Model
             self::PLATFORM_WIX => 'Wix',
             self::PLATFORM_SANITY => 'Sanity',
             self::PLATFORM_HUBSPOT => 'HubSpot',
+            self::PLATFORM_MEDUSA => 'Medusa',
             self::PLATFORM_WEBHOOK => __('Custom integration'),
             default => ucfirst((string) $this->platform),
         };
@@ -124,6 +127,10 @@ class ContentIntegration extends Model
             self::PLATFORM_HUBSPOT => [
                 __('Blog URL') => $cfg('blog_url'),
                 __('Blog ID') => $cfg('content_group_id'),
+            ],
+            self::PLATFORM_MEDUSA => [
+                __('Medusa server') => $get('base_url'),
+                __('Signed') => $get('secret') !== '' ? __('Yes') : __('No'),
             ],
             default => [],
         };

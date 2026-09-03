@@ -201,7 +201,8 @@
                         $isWix = $platform === \App\Models\ContentIntegration::PLATFORM_WIX;
                         $isSanity = $platform === \App\Models\ContentIntegration::PLATFORM_SANITY;
                         $isHubSpot = $platform === \App\Models\ContentIntegration::PLATFORM_HUBSPOT;
-                        $isWordPress = ! $isLaravel && ! $isWebhook && ! $isShopify && ! $isWebflow && ! $isWix && ! $isSanity && ! $isHubSpot;
+                        $isMedusa = $platform === \App\Models\ContentIntegration::PLATFORM_MEDUSA;
+                        $isWordPress = ! $isLaravel && ! $isWebhook && ! $isShopify && ! $isWebflow && ! $isWix && ! $isSanity && ! $isHubSpot && ! $isMedusa;
                         $tiles = [
                             [\App\Models\ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD, 'WordPress', $isWordPress],
                             [\App\Models\ContentIntegration::PLATFORM_SHOPIFY, 'Shopify', $isShopify],
@@ -209,6 +210,7 @@
                             [\App\Models\ContentIntegration::PLATFORM_WIX, 'Wix', $isWix],
                             [\App\Models\ContentIntegration::PLATFORM_HUBSPOT, 'HubSpot', $isHubSpot],
                             [\App\Models\ContentIntegration::PLATFORM_SANITY, 'Sanity', $isSanity],
+                            [\App\Models\ContentIntegration::PLATFORM_MEDUSA, 'Medusa', $isMedusa],
                             [\App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL, 'Laravel', $isLaravel],
                             [\App\Models\ContentIntegration::PLATFORM_WEBHOOK, __('Custom (webhook)'), $isWebhook],
                         ];
@@ -265,6 +267,8 @@
                         @include('partials.content-connect.sanity')
                     @elseif ($isHubSpot)
                         @include('partials.content-connect.hubspot')
+                    @elseif ($isMedusa)
+                        @include('partials.content-connect.medusa')
                     @elseif ($isWordPress)
                         <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ __('In WordPress go to Users → Profile → Application Passwords, create one named "Serfix", and paste it here. The account needs to be an Author or above.') }}</p>
                         {{-- The one-line instruction above assumes the reader already

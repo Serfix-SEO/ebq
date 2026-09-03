@@ -1394,6 +1394,29 @@ download links. Tests: `tests/Feature/ArticleExportTest.php`,
   `{url}` response for the live link; retries live in the job, not the driver.
   Credentials `{endpoint_url, secret}`.
 
+### Medusa — guided receiver (2026-09-03)
+
+Medusa v2 has NO blog/article API (their docs' answer is "build a custom
+module"; the one community plugin is v1-era/EditorJS/unmaintained), so the
+Medusa tile ships a **receiver kit** instead of calling a vendor API:
+ready-made TS files under `resources/snippets/medusa/` that the client pastes
+into their Medusa v2 project — a `serfix_blog` module (post model + service),
+`src/api/serfix/articles/route.ts` (HMAC-verified intake, upserts by our
+external_id, echoes `{ok,id,url}` using SERFIX_STOREFRONT_URL), public
+`/store/blog` list/read routes, and two Next.js-starter storefront pages
+(`dir="auto"` — RTL rule). `MedusaDriver extends WebhookDriver` (same payload
++ `X-Serfix-Signature` HMAC; endpoint = `{base_url}/serfix/articles`;
+credentials `{base_url, secret}`; own connection() wording + 404→"install the
+kit" / 401→"SERFIX_SECRET mismatch" verify guidance). WebhookDriver gained an
+additive `status: published|draft` payload key (post_status config) — existing
+receivers ignore it. The connect card carries the complete numbered setup
+guide with per-file copy buttons (partial
+`resources/views/partials/content-connect/medusa.blade.php`; a snippet-files
+test guards the file_get_contents). Tests: `MedusaDriverTest` (10) + 2
+connect-flow tests. No real-Medusa smoke on our infra — the contract tests +
+the webhook contract's prod track record cover the driver; send a test
+article once a client installs the kit.
+
 ### Five token-paste destinations (2026-08-10): Shopify, HubSpot, Webflow, Sanity, Wix
 
 All follow the WP-driver conventions (timeouts 20/8 verify · 45 publish · 60

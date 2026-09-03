@@ -59,8 +59,43 @@ class ContentConnectPlatformsTest extends TestCase
             ->assertSee('Wix')
             ->assertSee('HubSpot')
             ->assertSee('Sanity')
+            ->assertSee('Medusa')
             ->assertSee('Laravel')
             ->assertSee(__('Custom (webhook)'));
+    }
+
+    public function test_medusa_connects_when_the_receiver_answers_the_signed_test(): void
+    {
+        \Illuminate\Support\Facades\Http::fake(['api.medusa-store.com/*' => \Illuminate\Support\Facades\Http::response(['ok' => true], 200)]);
+
+        Livewire::actingAs($this->user)
+            ->test(PublishingSettings::class)
+            ->set('showConnect', true)
+            ->call('selectPlatform', \App\Models\ContentIntegration::PLATFORM_MEDUSA)
+            ->set('medusaUrl', 'https://api.medusa-store.com')
+            ->call('connect');
+
+        $integration = \App\Models\ContentIntegration::query()
+            ->where('platform', \App\Models\ContentIntegration::PLATFORM_MEDUSA)->firstOrFail();
+        $this->assertSame(\App\Models\ContentIntegration::STATUS_CONNECTED, $integration->status);
+        // selectPlatform pre-filled a strong secret; it must be stored encrypted.
+        $this->assertGreaterThanOrEqual(32, strlen((string) ($integration->credentials['secret'] ?? '')));
+    }
+
+    public function test_medusa_missing_receiver_marks_the_integration_errored(): void
+    {
+        \Illuminate\Support\Facades\Http::fake(['api.medusa-store.com/*' => \Illuminate\Support\Facades\Http::response('nope', 404)]);
+
+        Livewire::actingAs($this->user)
+            ->test(PublishingSettings::class)
+            ->set('showConnect', true)
+            ->call('selectPlatform', \App\Models\ContentIntegration::PLATFORM_MEDUSA)
+            ->set('medusaUrl', 'https://api.medusa-store.com')
+            ->call('connect')
+            ->assertHasErrors('connect');
+
+        $this->assertSame(\App\Models\ContentIntegration::STATUS_ERROR,
+            \App\Models\ContentIntegration::query()->where('platform', 'medusa')->value('status'));
     }
 
     public function test_shopify_with_multiple_blogs_pauses_on_the_blog_picker_then_connects(): void

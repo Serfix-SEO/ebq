@@ -185,6 +185,7 @@
                             ['Wix', __('Publishes into your Wix blog, with images imported into your Wix media library.')],
                             ['HubSpot', __('Publishes into your HubSpot blog as draft or live — your choice during connect.')],
                             ['Sanity', __('Creates a post document in the dataset you pick, ready for your site to render.')],
+                            ['Medusa', __('For Medusa stores: we provide ready-made files that add a blog to your store — paste them in once and articles publish automatically, with blog pages for your storefront included.')],
                             ['Laravel', __('A small package for your developers — articles arrive at your site over a signed, secure connection.')],
                             [__('Custom (webhook)'), __('Works with any platform: we send each article to an address your developer provides, cryptographically signed so only Serfix can post to it.')],
                         ] as [$platform, $desc])
@@ -316,6 +317,7 @@
                                 [__('Wix: “blog not available” during connect'), __('The Wix Blog app must be installed on your site (Wix → App Market → Wix Blog). Connect again after installing, and pick the author the posts should appear under.')],
                                 [__('HubSpot: articles arrive but stay drafts'), __('Two things to check: your HubSpot blog needs an author (we create one if we can, but some accounts restrict this), and the connection’s “publish live” choice controls draft vs live. Re-check the connection and choose live publishing if that’s what you want.')],
                                 [__('Sanity: connected, but I can’t see the articles on my site'), __('Articles are created as documents in your dataset — your site decides how to render them. Ask your developer to confirm the document type matches what your site queries. They’ll find each article in your studio, fully populated.')],
+                                [__('Medusa: the connection test fails'), __('A “route not found” message means the receiver files from the setup guide aren’t deployed (or Medusa wasn’t restarted after adding them, or the migration wasn’t run). A “signature” message means the SERFIX_SECRET on your Medusa server doesn’t match the signing secret in Serfix — the two values must be identical.')],
                             ]],
                             [__('My website isn’t one of these'), [
                                 [__('My site is built with Hostinger Horizon, and I can’t connect it'), __('Automatic posting works by adding the post to your website for you, which needs your site to offer a way in for outside tools. Site builders like Hostinger Horizon build and host the page themselves and don’t offer that, so no tool can post into them automatically. You have two good options, both below — the first keeps everything automatic.')],

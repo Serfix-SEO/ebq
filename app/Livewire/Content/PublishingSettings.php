@@ -70,6 +70,10 @@ class PublishingSettings extends Component
 
     public string $hubspotToken = '';
 
+    public string $medusaUrl = '';
+
+    public string $medusaSecret = '';
+
     /** Publish live vs save as draft — stored as config.post_status. */
     public string $postStatus = 'publish';
 
@@ -106,6 +110,11 @@ class PublishingSettings extends Component
         $this->whSecret = $this->generatedSecret();
     }
 
+    public function regenerateMedusaSecret(): void
+    {
+        $this->medusaSecret = $this->generatedSecret();
+    }
+
     private function generatedSecret(): string
     {
         return Str::random(48);
@@ -124,6 +133,9 @@ class PublishingSettings extends Component
 
         if ($platform === self::FLAVOR_LARAVEL && trim($this->whEndpoint) === '') {
             $this->whEndpoint = $this->suggestedLaravelEndpoint();
+        }
+        if ($platform === \App\Models\ContentIntegration::PLATFORM_MEDUSA && trim($this->medusaSecret) === '') {
+            $this->medusaSecret = $this->generatedSecret();
         }
     }
 
@@ -150,7 +162,8 @@ class PublishingSettings extends Component
     {
         $this->reset(
             'shopifyStoreDomain', 'shopifyToken', 'webflowToken', 'wixApiKey', 'wixSiteId',
-            'sanityProjectId', 'sanityToken', 'sanityUrlPattern', 'hubspotToken', 'postStatus',
+            'sanityProjectId', 'sanityToken', 'sanityUrlPattern', 'hubspotToken',
+            'medusaUrl', 'medusaSecret', 'postStatus',
             'pendingTarget', 'pendingIntegrationId', 'chosenTargetId',
         );
     }
@@ -228,6 +241,21 @@ class PublishingSettings extends Component
                 'hubspotToken' => 'required|string|max:255',
             ], [], ['hubspotToken' => __('private app token')]);
             $credentials = ['token' => trim($this->hubspotToken)];
+            $config = $this->postStatusConfig();
+        } elseif ($this->platform === ContentIntegration::PLATFORM_MEDUSA) {
+            $this->validate([
+                'medusaUrl' => 'required|url|starts_with:https://|max:600',
+                // Same entropy floor as the webhook secret — this value IS the
+                // authentication boundary for the client's blog.
+                'medusaSecret' => 'required|string|min:32|max:200',
+            ], [
+                'medusaUrl.starts_with' => __('The Medusa server URL must use https:// — articles are sent over the public internet.'),
+                'medusaSecret.min' => __('The signing secret must be at least 32 characters. Use the generated one.'),
+            ], ['medusaUrl' => __('Medusa server URL'), 'medusaSecret' => __('signing secret')]);
+            $credentials = [
+                'base_url' => rtrim(trim($this->medusaUrl), '/'),
+                'secret' => trim($this->medusaSecret),
+            ];
             $config = $this->postStatusConfig();
         } else {
             // https ONLY: the signature stops forgery, not disclosure. Over
@@ -410,6 +438,7 @@ class PublishingSettings extends Component
         // secret (password/token/key) always has to be re-pasted.
         $this->wpSiteUrl = (string) ($creds['site_url'] ?? '');
         $this->shopifyStoreDomain = (string) ($creds['store_domain'] ?? '');
+        $this->medusaUrl = (string) ($creds['base_url'] ?? '');
         $this->wixSiteId = (string) ($creds['site_id'] ?? '');
         $this->sanityProjectId = (string) ($creds['project_id'] ?? '');
         $this->reset('wpUsername', 'wpAppPassword', 'shopifyToken', 'webflowToken', 'wixApiKey', 'sanityToken', 'hubspotToken');

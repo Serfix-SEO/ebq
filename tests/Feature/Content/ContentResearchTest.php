@@ -305,8 +305,9 @@ class ContentResearchTest extends TestCase
         $this->keywordRow($plan, 'best coffee grinder');
         // Fill NEXT month to the cap (current month may have too few days
         // left to reach the cap depending on today's date).
-        $cap = (int) ContentAutopilotConfig::monthlyArticlesPerWebsite();
         $monthStart = now()->addMonthNoOverflow()->startOfMonth();
+        // Day-scaled cap (2026-08-31): "full" means that month's own allowance.
+        $cap = (int) ContentAutopilotConfig::monthlyArticlesFor($monthStart);
         for ($i = 0; $i < $cap; $i++) {
             ContentTopic::factory()->create([
                 'plan_id' => $plan->id,

@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Http;
  */
 class WebhookDriver implements PublishDriver
 {
-    public function __construct(private readonly SafeHttpGuard $guard) {}
+    public function __construct(protected readonly SafeHttpGuard $guard) {}
 
     public function verify(ContentIntegration $integration): PublishResult
     {
@@ -143,7 +143,7 @@ class WebhookDriver implements PublishDriver
 
     // ── internals ───────────────────────────────────────────────────────
 
-    private function push(ContentArticle $article, ContentIntegration $integration, ?string $externalId): PublishResult
+    protected function push(ContentArticle $article, ContentIntegration $integration, ?string $externalId): PublishResult
     {
         [$endpoint, $secret, $err] = $this->connection($integration);
         if ($err !== null) {
@@ -179,6 +179,10 @@ class WebhookDriver implements PublishDriver
                 'twitter_image' => (string) ($article->twitter_image ?? ''),
                 'twitter_card' => (string) ($article->twitter_card ?? ''),
             ],
+            // Additive (2026-09-03, for the Medusa kit; existing receivers
+            // ignore unknown keys): the client's publish-live vs save-draft
+            // choice, when the connect card offered one.
+            'status' => (($integration->config['post_status'] ?? 'publish') !== 'draft') ? 'published' : 'draft',
             'sent_at' => now()->toIso8601String(),
         ];
 
@@ -205,7 +209,7 @@ class WebhookDriver implements PublishDriver
         );
     }
 
-    private function post(string $endpoint, string $secret, array $payload): PublishResult
+    protected function post(string $endpoint, string $secret, array $payload): PublishResult
     {
         $body = (string) json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $signature = 'sha256='.hash_hmac('sha256', $body, $secret);
@@ -238,7 +242,7 @@ class WebhookDriver implements PublishDriver
     /**
      * @return array{0: string, 1: string, 2: ?string}
      */
-    private function connection(ContentIntegration $integration): array
+    protected function connection(ContentIntegration $integration): array
     {
         $creds = $integration->credentials !== null ? $integration->credentials->toArray() : [];
         $endpoint = trim((string) ($creds['endpoint_url'] ?? ''));
