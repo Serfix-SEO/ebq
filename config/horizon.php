@@ -296,10 +296,17 @@ return [
         // no quota/abuse flag, guest clean), so Ideogram's ~6 MB PNG downloads
         // timed out at 60s after paying for the generation. Box A pulls 50 MB/s.
         // Move back to 'worker' once B's receive path is fixed/rebuilt.
-        'local' => [
+        // HORIZON_ALL_QUEUES=true (box D, 2026-09 migration): the consolidated
+        // 64GB box runs EVERY pool — web, content, plus the crawl/heavy pools
+        // that used to live on worker box B. The flag keeps this inert on any
+        // box that isn't the consolidated one (box A during the transition).
+        'local' => array_merge([
             'web' => $webPool,
             'worker-content' => $contentPool,
-        ],
+        ], env('HORIZON_ALL_QUEUES') ? [
+            'worker-crawl' => $crawlPool,
+            'worker-heavy' => $heavyPool,
+        ] : []),
         // If the web box is ever flipped to APP_ENV=production, same role, more procs.
         'production' => [
             'web' => array_replace($webPool, ['maxProcesses' => 6]),

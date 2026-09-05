@@ -1,0 +1,56 @@
+# Box D app stack (2026-09 migration): every PHP process for the platform,
+# from the single ebq-app:8.3 image (php:8.3-fpm + our extensions — same
+# approach as box B's long-standing ebq-worker:8.3). The host runs Ubuntu
+# 26.04 whose native PHP is 8.5, which the app cannot use (queue closures);
+# these containers ARE the PHP runtime. Apache, MariaDB and Redis are native
+# host services; network_mode host means 127.0.0.1 works everywhere and FPM
+# listens on the host's 9000 for Apache's proxy_fcgi.
+#
+# Code is bind-mounted from /var/www/ebq (the git working tree — box A
+# convention preserved). Deploys do NOT need container restarts (opcache
+# validates timestamps in this image), except when this file or the image
+# changes.
+#
+#   docker compose -f docker-compose.appstack.yml up -d
+services:
+  fpm:
+    image: ebq-app:8.3
+    network_mode: host
+    restart: always
+    volumes:
+      - /var/www/ebq:/var/www/ebq
+      - /var/www/marketing:/var/www/marketing
+      # Pool sizing for the 64GB box (image default is 5 children).
+      - /var/www/ebq/docker/app/fpm-pool.conf:/usr/local/etc/php-fpm.d/zz-ebq.conf:ro
+    working_dir: /var/www/ebq
+
+  horizon:
+    image: ebq-app:8.3
+    network_mode: host
+    restart: always
+    stop_grace_period: 420s
+    volumes:
+      - /var/www/ebq:/var/www/ebq
+    working_dir: /var/www/ebq
+    command: php artisan horizon
+
+  scheduler:
+    image: ebq-app:8.3
+    network_mode: host
+    restart: always
+    volumes:
+      - /var/www/ebq:/var/www/ebq
+    working_dir: /var/www/ebq
+    command: php artisan schedule:work
+
+  # Fleet provisioning jobs (autoscaler) — needs the worker SSH key to reach
+  # new ephemeral boxes, exactly like the root queue:work it replaces.
+  fleet:
+    image: ebq-app:8.3
+    network_mode: host
+    restart: always
+    volumes:
+      - /var/www/ebq:/var/www/ebq
+      - /root/.ssh:/root/.ssh:ro
+    working_dir: /var/www/ebq
+    command: php artisan queue:work --queue=fleet --sleep=3 --tries=1 --timeout=1800
