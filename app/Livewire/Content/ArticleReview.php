@@ -830,6 +830,26 @@ class ArticleReview extends Component
                     return null;
                 }
             }
+            // Strict Product Mode: an edit must not INTRODUCE a product link
+            // that is not in the catalog (invented product URLs 404).
+            if ($plan->product_mode === \App\Models\ContentPlan::PRODUCT_MODE_STRICT
+                && preg_match_all('/<a\b[^>]*href="([^"]+)"/i', $replacement, $m)) {
+                $catalog = array_flip(array_map(fn ($u) => rtrim(mb_strtolower((string) $u), '/'),
+                    \App\Models\ContentProduct::query()->where('website_id', $topic->website_id)->usable()->pluck('url')->all()));
+                $host = mb_strtolower((string) ($topic->website?->domain ?? ''));
+                foreach ($m[1] as $href) {
+                    $h = strtolower((string) (parse_url($href, PHP_URL_HOST) ?: ''));
+                    $path = strtolower((string) (parse_url($href, PHP_URL_PATH) ?: '/'));
+                    $own = $h === '' || $h === $host || str_ends_with($h, '.'.$host);
+                    if ($own && preg_match('#/(products?|p|item)/.#', $path)
+                        && $catalog !== [] && ! isset($catalog[rtrim(mb_strtolower($href), '/')])
+                        && ! str_contains(mb_strtolower($text), mb_strtolower($href))) {
+                        $this->dispatch('ai-edit-failed', message: __('The AI edit linked to a product that is not in your catalog, so it was not applied. Try again.'));
+
+                        return null;
+                    }
+                }
+            }
         }
 
         return $replacement;
@@ -1194,6 +1214,12 @@ class ArticleReview extends Component
             ],
             'cta_url' => (string) ($plan?->cta_url ?? ''),
             'language' => (string) ($plan?->language ?: 'en'),
+            'products' => $plan?->product_mode === \App\Models\ContentPlan::PRODUCT_MODE_STRICT
+                ? array_values((array) data_get($topic->meta, 'products', []))
+                : [],
+            'catalog_urls' => $plan?->product_mode === \App\Models\ContentPlan::PRODUCT_MODE_STRICT
+                ? \App\Models\ContentProduct::query()->where('website_id', $topic->website_id)->usable()->pluck('url')->all()
+                : [],
         ];
     }
 

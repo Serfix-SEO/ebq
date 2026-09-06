@@ -240,7 +240,7 @@ class AiWriterService
         // v25: locale/voice joined the key — same keyword in a different
         // language must never serve the other language's cached draft.
         $cacheKey = sprintf(
-            'ai_writer_v25:%s:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s:%s',
+            'ai_writer_v26:%s:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),

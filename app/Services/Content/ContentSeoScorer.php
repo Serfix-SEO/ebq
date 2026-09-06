@@ -256,6 +256,57 @@ class ContentSeoScorer
             $add('external_link', 3, count($external) >= 1,
                 'Add at least one link to an authoritative external source.');
         }
+
+        // ── Strict Product Mode grounding (gated on a product selection —
+        // absent for normal/undecided plans, so behavior is unchanged) ─────
+        $products = (array) ($context['products'] ?? []);
+        if ($products !== []) {
+            $foldedText = \App\Support\UnicodeText::fold($text);
+            $featured = array_values(array_filter($products, static function ($p) use ($foldedText) {
+                $name = \App\Support\UnicodeText::fold((string) ($p['name'] ?? ''));
+
+                return $name !== '' && str_contains($foldedText, $name);
+            }));
+            $need = min(2, count($products));
+            $missing = array_slice(array_diff(
+                array_map(static fn ($p) => (string) $p['name'], $products),
+                array_map(static fn ($p) => (string) $p['name'], $featured),
+            ), 0, 4);
+            $add('products_featured', 5, count($featured) >= $need,
+                'Feature at least '.$need.' of the store\'s own products by name (e.g. '.implode('; ', $missing).').');
+
+            // Own-domain product links must point at real catalog URLs.
+            // Scan raw hrefs (NOT classifyLinks' internal bucket — that
+            // depends on site_urls, which is empty for thin/blocked crawls).
+            $catalog = array_flip(array_map(
+                static fn ($u) => rtrim(mb_strtolower((string) $u), '/'),
+                (array) ($context['catalog_urls'] ?? []),
+            ));
+            $siteHost = mb_strtolower((string) ($context['site_host'] ?? ''));
+            // "Own" hosts = the site itself + every host the catalog lives on
+            // (a Shopify store's products may sit on a different host than
+            // the marketing domain).
+            $ownHosts = array_flip(array_filter(array_merge(
+                [$siteHost],
+                array_map(static fn ($u) => strtolower((string) (parse_url((string) $u, PHP_URL_HOST) ?: '')),
+                    (array) ($context['catalog_urls'] ?? [])),
+            )));
+            $badProductLinks = [];
+            if ($catalog !== [] && preg_match_all('/<a\b[^>]*href\s*=\s*["\']([^"\']+)["\']/i', $html, $hrefMatches)) {
+                foreach (array_unique($hrefMatches[1]) as $href) {
+                    $host = strtolower((string) (parse_url($href, PHP_URL_HOST) ?: ''));
+                    $own = $host === '' || isset($ownHosts[$host]);
+                    $path = strtolower((string) (parse_url($href, PHP_URL_PATH) ?: '/'));
+                    if ($own && preg_match('#/(products?|p|item)/.#', $path)
+                        && ! isset($catalog[rtrim(mb_strtolower($href), '/')])) {
+                        $badProductLinks[] = $href;
+                    }
+                }
+            }
+            $add('product_links_valid', 3, $badProductLinks === [],
+                'These product links do not exist in the store\'s catalog — replace with real product URLs from the list: '
+                .implode(', ', array_slice($badProductLinks, 0, 4)).'.');
+        }
         $linkCount = count($internal) + count($external);
         $add('link_density', 2, $wordCount === 0 || $linkCount <= max(3, (int) ceil($wordCount / 150)),
             'Too many links for the article length; keep roughly one link per 150+ words.');

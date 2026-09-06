@@ -97,6 +97,9 @@ class ContentArticleProducer
         $writer = new AiWriterService($llm);
 
         $context = $this->scorerContext($topic, $plan, $website);
+        // Strict Product Mode: resolve + persist the product selection BEFORE
+        // templateInstructions reads it (productBlock pulls from topic.meta).
+        $products = $this->productContext($topic, $plan);
 
         $draftInput = [
             'focus_keyword' => $topic->target_keyword,
@@ -112,14 +115,23 @@ class ContentArticleProducer
             // topic-derived anchors for random pages (cocomii 2026-08-26).
             // Non-manual entries normalize to source user_selected →
             // anchor_locked false, i.e. paraphraseable suggestions.
-            'selected_links' => ($sel = (array) ($context['selected_pages'] ?? [])) === [] ? null : [
-                'internal' => array_map(static fn ($p) => [
+            'selected_links' => (function () use ($context, $products) {
+                $internal = array_map(static fn ($p) => [
                     'url' => (string) $p['url'],
                     // Anchor seed = page title with a trailing "| Site Name"
                     // style suffix stripped.
                     'anchor' => trim((string) preg_replace('/\s*[|–—]\s*[^|–—]*$/u', '', (string) $p['title'])) ?: (string) $p['title'],
-                ], array_slice($sel, 0, 8)),
-            ],
+                ], array_slice((array) ($context['selected_pages'] ?? []), 0, $products === [] ? 8 : 5));
+                // Strict Product Mode: product links ride the SAME contract,
+                // marked manual → user_manual source → presence is HARD-
+                // enforced by ensureManualLinksPresent and the anchor (the
+                // exact product name) is LOCKED by enforceLockedAnchors.
+                foreach (array_slice($products, 0, 5) as $p) {
+                    $internal[] = ['url' => $p['url'], 'anchor' => $p['name'], 'manual' => true];
+                }
+
+                return $internal === [] ? null : ['internal' => $internal];
+            })(),
             '__user_id' => $website->user_id,
             '__source' => 'content_autopilot.write',
             '__unmetered' => true, // capped by ContentLlmSpendMeter + entitlements, not the dashboard token cap
@@ -742,6 +754,11 @@ class ContentArticleProducer
         }
         $priorStatus = $topic->status;
 
+        // Strict Product Mode: ensure the product selection exists before any
+        // revise/scrub stage reads productBlock (covers topics that predate
+        // strict mode or came in via research/manual add).
+        $this->productContext($topic, $plan);
+
         $context = $this->scorerContext($topic, $plan, $website);
         $article = $this->storeScoredVersion($topic, $context, [
             'h1' => (string) $article->h1,
@@ -809,9 +826,6 @@ class ContentArticleProducer
     {
         try {
             $mismatched = $this->scorer->mismatchedAnchors((string) $article->html, $context);
-            if ($mismatched === []) {
-                return $article;
-            }
 
             $html = (string) $article->html;
             foreach ($mismatched as $bad) {
@@ -822,6 +836,36 @@ class ContentArticleProducer
                     $html
                 );
             }
+
+            // Strict Product Mode belt: unwrap own-domain product-shaped
+            // links that are NOT in the catalog (an invented product URL is
+            // a 404 to a shopper). Valid catalog links are never touched.
+            $catalogUrls = (array) ($context['catalog_urls'] ?? []);
+            if (! empty($context['products']) && $catalogUrls !== []) {
+                $catalog = array_flip(array_map(static fn ($u) => rtrim(mb_strtolower((string) $u), '/'), $catalogUrls));
+                // Own hosts = site + every catalog host (store domain may
+                // differ from the marketing domain) — mirrors the scorer.
+                $ownHosts = array_flip(array_filter(array_merge(
+                    [strtolower((string) ($context['site_host'] ?? ''))],
+                    array_map(static fn ($u) => strtolower((string) (parse_url((string) $u, PHP_URL_HOST) ?: '')), $catalogUrls),
+                )));
+                $html = (string) preg_replace_callback(
+                    '/<a\b[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/is',
+                    static function (array $m) use ($catalog, $ownHosts): string {
+                        $host = strtolower((string) (parse_url($m[1], PHP_URL_HOST) ?: ''));
+                        $path = strtolower((string) (parse_url($m[1], PHP_URL_PATH) ?: '/'));
+                        $own = $host === '' || isset($ownHosts[$host]);
+                        $productish = (bool) preg_match('#/(products?|p|item)/.#', $path);
+                        if ($own && $productish && ! isset($catalog[rtrim(mb_strtolower($m[1]), '/')])) {
+                            return $m[2];
+                        }
+
+                        return $m[0];
+                    },
+                    $html
+                );
+            }
+
             if ($html === (string) $article->html) {
                 return $article;
             }
@@ -916,7 +960,10 @@ class ContentArticleProducer
         }
         $offending = array_slice(array_keys($offending), 0, 15);
 
-        $system = 'You are an editor with exactly ONE job: remove every occurrence of the banned words below from the article. '
+        $preserveProducts = data_get($topic->meta, 'products') !== null
+            && $plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT
+            ? ' '.self::PRESERVE_PRODUCTS_RULE : '';
+        $system = 'You are an editor with exactly ONE job: remove every occurrence of the banned words below from the article.'.$preserveProducts.' '
             .'This is a hard compliance requirement, not a style preference — returning the article unchanged is a FAILURE. '
             .'Do NOT restructure, do not add or remove sections, do not change headings that lack a banned word, keep the same length and tone. '
             .'For each occurrence: if it names a rival product or company, replace it with a generic description ("a protective case brand"); '
@@ -1020,7 +1067,10 @@ class ContentArticleProducer
             (array) ($article->style_issues ?? [])
         )));
 
-        $system = 'You are a senior editor whose ONLY job is to make an article read like a knowledgeable human wrote it, not an AI. '
+        $preserveProducts = data_get($topic->meta, 'products') !== null
+            && $plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT
+            ? self::PRESERVE_PRODUCTS_RULE.' ' : '';
+        $system = $preserveProducts.'You are a senior editor whose ONLY job is to make an article read like a knowledgeable human wrote it, not an AI. '
             .'Do NOT restructure, do not change headings, do not add or remove sections, do not touch links, images, tables, or the FAQ. '
             .'Keep the meaning, the useful specifics, and roughly the same length. Edit sentence by sentence to fix these problems:'
             ."\n- {$tells}\n"
@@ -1321,6 +1371,13 @@ class ContentArticleProducer
                 ."Never attach an anchor about one product or topic to a link pointing at a different page. "
                 ."If no listed page fits a sentence naturally, use fewer links.\n\n";
 
+        // Strict Product Mode: same stored selection as the draft — revise
+        // must feature the identical products (from topic.meta, never
+        // re-matched, or draft and revision could diverge).
+        if (($productBlock = $this->productBlock($topic)) !== '') {
+            $linkBlock .= $productBlock."\n\n";
+        }
+
         $user = "TARGET KEYWORD: {$topic->target_keyword}\n"
             .'LANGUAGE: '.($plan->language ?: 'en')."\n"
             // The request comes FIRST and verbatim in the user message — the
@@ -1394,6 +1451,17 @@ class ContentArticleProducer
             ],
             'cta_url' => (string) ($plan->cta_url ?? ''),
             'language' => (string) ($plan->language ?: 'en'),
+            // Strict Product Mode: the STORED selection (topic.meta) feeds
+            // the scorer's grounding checks + the final-gate strip. Also make
+            // product pages linkable candidates directly — catalog PDPs rank
+            // low on inbound links so the generic ranking misses them.
+            'products' => $plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT
+                ? array_values((array) data_get($topic->meta, 'products', []))
+                : [],
+            'catalog_urls' => $plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT
+                ? \App\Models\ContentProduct::query()->where('website_id', $website->id)
+                    ->usable()->pluck('url')->all()
+                : [],
         ];
     }
 
@@ -1454,9 +1522,90 @@ class ContentArticleProducer
                 .'refer to '.$topic->website?->normalized_domain.' or describe the category generically '
                 .'("an SEO audit tool", "a rank tracker") instead of naming a brand.';
         }
+        // Strict Product Mode: the positive mirror of the brand rule —
+        // articles are grounded in the client's OWN catalog.
+        if (($productBlock = $this->productBlock($topic)) !== '') {
+            $rules[] = $productBlock;
+        }
 
         return implode("\n", array_merge($rules, $this->onPageSeoRules($topic)))
             ."\n".$this->humanizer->promptRules();
+    }
+
+    /**
+     * Strict Product Mode — the YOUR PRODUCTS block for CREATIVE LLM stages
+     * (write/revise/client rewrite). Reads the selection STORED on
+     * topic.meta['products'] (set once by productContext()), so draft and
+     * every later revision feature the identical products.
+     */
+    public function productBlock(ContentTopic $topic): string
+    {
+        $products = (array) data_get($topic->meta, 'products', []);
+        if ($products === [] || $topic->plan?->product_mode !== ContentPlan::PRODUCT_MODE_STRICT) {
+            return '';
+        }
+        $lines = array_map(
+            static fn ($p) => '- '.$p['name'].' — '.$p['url'].(blank($p['blurb'] ?? null) ? '' : ' ('.$p['blurb'].')'),
+            $products
+        );
+
+        return "YOUR PRODUCTS — this store's OWN catalog items for this article:\n".implode("\n", $lines)."\n"
+            .'PRODUCT RULES: feature these products naturally where they genuinely help the reader; link each listed product AT MOST once using its exact name as the anchor; '
+            .'NEVER invent, guess, or mention a product that is not on this list (competitor products stay excluded by the brand rule); '
+            .'comparison sections may only compare products from this list; NEVER state prices — they change.';
+    }
+
+    /**
+     * Strict Product Mode — preservation rule for EDITOR/CLEANUP LLM stages
+     * (brand scrub, de-AI): whole-article rewrites must not lose grounding.
+     */
+    public const PRESERVE_PRODUCTS_RULE = 'PRESERVE PRODUCTS: keep every existing product mention and product link exactly intact '
+        .'(same names, same URLs); never add a product that is not already in the article.';
+
+    /**
+     * Resolve + PERSIST the product selection for a strict topic: pivot rows
+     * (planner-attached, featured first) else TopicProductMatcher at write
+     * time — the path that covers research/manual/legacy topics which never
+     * passed ideation. Stored in topic.meta['products'] (never brief — the
+     * producer overwrites brief every run).
+     *
+     * @return list<array{id:string, name:string, url:string, blurb:?string}>
+     */
+    private function productContext(ContentTopic $topic, ContentPlan $plan): array
+    {
+        if ($plan->product_mode !== ContentPlan::PRODUCT_MODE_STRICT) {
+            return [];
+        }
+        $existing = (array) data_get($topic->meta, 'products', []);
+        if ($existing !== []) {
+            return $existing;
+        }
+
+        $products = $topic->products()->get()
+            ->sortByDesc(fn ($p) => $p->pivot->role === 'featured' ? 1 : 0)
+            ->filter(fn ($p) => $p->status === \App\Models\ContentProduct::STATUS_ACTIVE && ! $p->is_excluded);
+        if ($products->isEmpty()) {
+            $products = app(\App\Services\Content\Catalog\TopicProductMatcher::class)
+                ->match((string) $topic->website_id, $topic->title.' '.$topic->target_keyword, 8);
+        }
+        // Out-of-stock never gets FEATURED billing; keep at most 8, min viable 1.
+        $selection = $products
+            ->reject(fn ($p) => $p->availability === \App\Models\ContentProduct::AVAILABILITY_OUT_OF_STOCK)
+            ->take(8)
+            ->map(fn ($p) => [
+                'id' => (string) $p->id,
+                'name' => (string) $p->name,
+                'url' => (string) $p->url,
+                'blurb' => filled($p->description) ? mb_substr((string) $p->description, 0, 120) : null,
+            ])->values()->all();
+
+        if ($selection !== []) {
+            $meta = (array) ($topic->meta ?? []);
+            $meta['products'] = $selection;
+            $topic->forceFill(['meta' => $meta])->save();
+        }
+
+        return $selection;
     }
 
     /**

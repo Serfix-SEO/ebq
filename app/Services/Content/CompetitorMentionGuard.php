@@ -524,8 +524,22 @@ class CompetitorMentionGuard
         // stocked_only (resellers): brands the shop itself carries are the
         // point of the content — anything named in the sell-offerings is
         // never blocked, only competing retailers are. Manual adds still win.
+        // Strict Product Mode upgrade: the REAL catalog (names + brands)
+        // replaces the LLM-guessed sell list as the stocked set — this also
+        // exempts catalog product names from the brand scrubs (hardScrub
+        // included) since those run off this same term list.
         if ($this->mode($plan) === \App\Support\ContentSiteTypeProfiles::GUARD_STOCKED_ONLY) {
             $stocked = mb_strtolower(implode(' ', (array) (($plan->offerings ?? [])['sell'] ?? [])));
+            if ($plan->product_mode === \App\Models\ContentPlan::PRODUCT_MODE_STRICT) {
+                $catalogNames = \App\Models\ContentProduct::query()
+                    ->where('website_id', $plan->website_id)->usable()
+                    ->get(['name', 'brand'])
+                    ->flatMap(fn ($p) => [(string) $p->name, (string) $p->brand])
+                    ->filter()->implode(' ');
+                if ($catalogNames !== '') {
+                    $stocked = mb_strtolower($catalogNames.' '.$stocked);
+                }
+            }
             $terms = array_values(array_filter(
                 $terms,
                 static fn (string $term) => in_array($term, $manual, true) || ! $inText($term, $stocked)

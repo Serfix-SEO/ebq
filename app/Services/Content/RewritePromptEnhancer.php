@@ -79,6 +79,23 @@ class RewritePromptEnhancer
      * requirements. Null when the LLM is unavailable or unhelpful — the
      * caller then just uses the original prompt.
      */
+    /**
+     * Strict Product Mode: the enhancer must never suggest adding products
+     * that are not in the client's own catalog.
+     */
+    private function catalogNote(ContentTopic $topic): string
+    {
+        if ($topic->plan?->product_mode !== \App\Models\ContentPlan::PRODUCT_MODE_STRICT) {
+            return '';
+        }
+        $names = \App\Models\ContentProduct::query()
+            ->where('website_id', $topic->website_id)->usable()
+            ->limit(15)->pluck('name')->implode('; ');
+
+        return $names === '' ? ''
+            : "STORE CATALOG (this site only writes about its OWN products — never suggest adding any other product): {$names}\n";
+    }
+
     public function enhance(string $prompt, ContentTopic $topic): ?string
     {
         $prompt = trim($prompt);
@@ -95,7 +112,9 @@ class RewritePromptEnhancer
 
             $response = $llm->completeJson([
                 ['role' => 'system', 'content' => "You improve a client's article-rewrite request into a clear, specific instruction for an article editor.\n\nRules:\n- Preserve EVERY specific the client gave: quantities, example strings, symbols, unicode, names — copy them verbatim.\n- Make the intent concrete and actionable (where in the article, what form, how much) without inventing requirements the client didn't imply.\n- Keep it under 1200 characters, same language as the client's request.\n\nReturn STRICT JSON: {\"enhanced_prompt\": string}."],
-                ['role' => 'user', 'content' => "ARTICLE TOPIC: {$topic->title}\nTARGET KEYWORD: {$topic->target_keyword}\n\nCLIENT REQUEST:\n{$prompt}"],
+                ['role' => 'user', 'content' => "ARTICLE TOPIC: {$topic->title}\nTARGET KEYWORD: {$topic->target_keyword}\n"
+                    .$this->catalogNote($topic)
+                    ."\nCLIENT REQUEST:\n{$prompt}"],
             ], array_filter([
                 'temperature' => 0.2,
                 'max_tokens' => 600,
