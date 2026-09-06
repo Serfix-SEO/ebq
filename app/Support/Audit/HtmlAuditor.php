@@ -343,6 +343,53 @@ class HtmlAuditor
         ];
     }
 
+    /**
+     * Decoded JSON-LD graphs, filtered to the given @types (Strict Product
+     * Mode, 2026-09). Unlike schema() — which keeps only the @type string —
+     * this returns the full decoded nodes so product name/offers/image/sku
+     * survive. Handles: top-level arrays, `@graph` wrappers, and array
+     * `@type` values. Invalid JSON blocks are skipped silently (schema()
+     * already counts them for the audit).
+     *
+     * @param  list<string>  $types  e.g. ['Product', 'ItemList']
+     * @return list<array<string, mixed>> matching nodes, order preserved
+     */
+    public function structuredData(array $types): array
+    {
+        $wanted = array_map('strtolower', $types);
+        $nodes = $this->xpath->query('//script[translate(@type, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="application/ld+json"]');
+
+        $out = [];
+        foreach ($nodes as $n) {
+            $decoded = json_decode(trim($n->textContent ?? ''), true);
+            if (! is_array($decoded)) {
+                continue;
+            }
+            // Normalize every block to a flat list of candidate nodes:
+            // a bare node, a top-level array of nodes, or a @graph wrapper.
+            $candidates = [];
+            if (array_is_list($decoded)) {
+                $candidates = $decoded;
+            } elseif (isset($decoded['@graph']) && is_array($decoded['@graph'])) {
+                $candidates = $decoded['@graph'];
+            } else {
+                $candidates = [$decoded];
+            }
+            foreach ($candidates as $node) {
+                if (! is_array($node)) {
+                    continue;
+                }
+                $type = $node['@type'] ?? null;
+                $nodeTypes = array_map('strtolower', is_array($type) ? $type : [(string) $type]);
+                if (array_intersect($nodeTypes, $wanted) !== []) {
+                    $out[] = $node;
+                }
+            }
+        }
+
+        return $out;
+    }
+
     public function favicon(): array
     {
         $href = trim((string) $this->xpath->evaluate(

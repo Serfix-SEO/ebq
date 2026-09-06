@@ -116,6 +116,8 @@ class ContentOnboardingConverter
                 // setup over first, or a user who ALREADY owned this domain
                 // silently ends up on a bare stub plan (prod 2026-07-20).
                 $carried = $this->carryOverProfile($provisional);
+                // Catalog rows would cascade with the provisional website.
+                self::reparentCatalog($provisional->id, $existing->id);
                 $provisional->delete();
             } else {
                 $provisional->forceFill(['user_id' => $user->id])->save();
@@ -221,6 +223,9 @@ class ContentOnboardingConverter
             'articles_per_week', 'article_length', 'images_enabled', 'image_style',
             'image_style_prompt', 'toggles', 'competitor_overrides', 'internal_urls',
             'custom_instructions', 'cta_url',
+            // Strict Product Mode (2026-09): the client's strict/normal choice
+            // must survive the provisional→real website conversion.
+            'product_mode', 'product_mode_decided_at',
         ];
 
         $carried = [];
@@ -232,5 +237,18 @@ class ContentOnboardingConverter
         }
 
         return $carried;
+    }
+
+    /**
+     * Strict Product Mode: catalog rows hang off the provisional website and
+     * would cascade-delete with it — re-parent them to the surviving website
+     * so an onboarding-time scrape isn't thrown away.
+     */
+    public static function reparentCatalog(string $fromWebsiteId, string $toWebsiteId): void
+    {
+        \App\Models\ContentProduct::query()->where('website_id', $fromWebsiteId)
+            ->update(['website_id' => $toWebsiteId]);
+        \App\Models\ContentProductRun::query()->where('website_id', $fromWebsiteId)
+            ->update(['website_id' => $toWebsiteId]);
     }
 }

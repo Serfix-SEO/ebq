@@ -78,6 +78,9 @@ class PlatformSettingsController extends Controller
                 'trial_articles' => ContentAutopilotConfig::trialArticles(),
                 'monthly_articles_per_website' => ContentAutopilotConfig::monthlyArticlesPerWebsite(),
                 'content_only_crawl_pages' => ContentAutopilotConfig::contentOnlyCrawlCap(),
+                'content_catalog_page_budget' => ContentAutopilotConfig::productCrawlPageBudget(),
+                'content_catalog_llm_extract_cap' => ContentAutopilotConfig::productLlmExtractCap(),
+                'content_catalog_firecrawl_daily_budget' => ContentAutopilotConfig::firecrawlProductDailyBudget(),
                 'tracker_keywords' => ContentAutopilotConfig::trackerKeywords(),
                 'trial_tracker_keywords' => ContentAutopilotConfig::trialTrackerKeywords(),
                 'rewrite_monthly_free' => ContentAutopilotConfig::rewriteMonthlyFree(),
@@ -154,6 +157,9 @@ class PlatformSettingsController extends Controller
             'content_tracker_keywords' => ['required', 'integer', 'min:0', 'max:100000'],
             'content_trial_tracker_keywords' => ['required', 'integer', 'min:0', 'max:1000'],
             'content_only_crawl_pages' => ['required', 'integer', 'min:20', 'max:100000'],
+            'content_catalog_page_budget' => ['required', 'integer', 'min:100', 'max:50000'],
+            'content_catalog_llm_extract_cap' => ['required', 'integer', 'min:0', 'max:2000'],
+            'content_catalog_firecrawl_daily_budget' => ['required', 'integer', 'min:0', 'max:5000'],
             'content_rewrite_monthly_free' => ['required', 'integer', 'min:0', 'max:100'],
             // One "credits:usd" pack per line, e.g. "10:5".
             'content_rewrite_packs' => ['nullable', 'string', 'max:2000', 'regex:/^\s*(\d{1,4}:\d{1,5}\s*(\r?\n\s*\d{1,4}:\d{1,5}\s*)*)?$/'],
@@ -227,6 +233,9 @@ class PlatformSettingsController extends Controller
         Setting::set('content.limits.trial_articles', (int) $data['content_trial_articles']);
         Setting::set('content.limits.monthly_articles_per_website', (int) $data['content_monthly_articles_per_website']);
         Setting::set('content.limits.content_only_crawl_pages', (int) $data['content_only_crawl_pages']);
+        Setting::set('content.catalog.page_budget', (int) $data['content_catalog_page_budget']);
+        Setting::set('content.catalog.llm_extract_cap', (int) $data['content_catalog_llm_extract_cap']);
+        Setting::set('content.catalog.firecrawl_daily_budget', (int) $data['content_catalog_firecrawl_daily_budget']);
         Setting::set('content.limits.tracker_keywords', (int) $data['content_tracker_keywords']);
         Setting::set('content.limits.trial_tracker_keywords', (int) $data['content_trial_tracker_keywords']);
         Setting::set('content.rewrite.monthly_free', (int) $data['content_rewrite_monthly_free']);

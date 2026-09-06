@@ -429,6 +429,44 @@
             @endforelse
         </div>
 
+        {{-- ── Product catalog (Strict Product Mode, dark-shipped) ──────── --}}
+        @php
+            $catSites = collect($profile['websites'])->filter(fn ($w) => $w['plan'] !== null)->values();
+        @endphp
+        @if ($catSites->isNotEmpty())
+            <div id="content-catalog" class="{{ $card }} p-4">
+                <h2 class="text-sm font-bold text-slate-900">Product catalog</h2>
+                <p class="mt-0.5 text-xs text-slate-500">Scraped product inventory for Strict Product Mode. Scan is safe to re-run (upserts).</p>
+                <div class="mt-3 space-y-2">
+                    @foreach ($catSites as $w)
+                        @php
+                            $catCount = \App\Models\ContentProduct::query()->where('website_id', $w['id'])->usable()->count();
+                            $catRun = \App\Models\ContentProductRun::query()->where('website_id', $w['id'])->latest('id')->first();
+                        @endphp
+                        <div class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+                            <div class="min-w-0">
+                                <p class="truncate text-xs font-semibold text-slate-800">{{ $w['domain'] }}</p>
+                                <p class="text-[11px] text-slate-500">
+                                    {{ $catCount }} products
+                                    · mode: {{ $w['plan']->product_mode ?? 'undecided' }}
+                                    @if ($catRun)
+                                        · last scan: {{ $catRun->status }}{{ $catRun->error ? ' ('.$catRun->error.')' : '' }}
+                                        @if (in_array($catRun->status, \App\Models\ContentProductRun::IN_FLIGHT, true))
+                                            — {{ $catRun->products_extracted }}/{{ $catRun->pages_found }} pages
+                                        @endif
+                                    @endif
+                                </p>
+                            </div>
+                            <form method="POST" action="{{ route('admin.clients.scan-products', [$profile['user'], $w['id']]) }}">
+                                @csrf
+                                <button class="shrink-0 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50">Scan products</button>
+                            </form>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         {{-- ── Content directives (admin steering prompt) ───────────────── --}}
         @php
             $dirSites = collect($profile['websites'])->filter(fn ($w) => $w['plan'] !== null)->values();

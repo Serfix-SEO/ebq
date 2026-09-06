@@ -71,6 +71,7 @@ class ContentAutopilotDispatcher extends Command
     {
         $this->claimedTopicIds = [];
         $reaped = $this->reapStuck();
+        $this->superviseCatalogRuns();
         $topped = $this->topUpThinCalendars();
         $researched = $this->advanceKeywordResearch();
         $claimed = $meter->exhausted() ? 0 : $this->claimDueTopics((int) $this->option('claim-limit'));
@@ -86,6 +87,40 @@ class ContentAutopilotDispatcher extends Command
         $this->info("reaped={$reaped} topup_plans={$topped} kw_research={$researched} claimed={$claimed} rushed={$rushed} published={$published}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Strict Product Mode: fail catalog runs whose workers died (stale
+     * heartbeat) so the client's progress screen never spins forever, and
+     * auto-retry up to 3 times per website (CrawlSupervisor precedent). A
+     * strict plan whose run failed stays planner-gated but VISIBLY failed —
+     * the UI offers retry + "switch to Normal".
+     */
+    private function superviseCatalogRuns(): void
+    {
+        $stale = \App\Models\ContentProductRun::query()
+            ->whereIn('status', \App\Models\ContentProductRun::IN_FLIGHT)
+            ->where('heartbeat_at', '<', now()->subMinutes(30))
+            ->get();
+
+        foreach ($stale as $run) {
+            $run->forceFill([
+                'status' => \App\Models\ContentProductRun::STATUS_FAILED,
+                'error' => 'stalled',
+                'finished_at' => now(),
+            ])->save();
+            Log::warning('content_catalog.run_stalled', ['run_id' => $run->id, 'website_id' => $run->website_id]);
+
+            $recentFailures = \App\Models\ContentProductRun::query()
+                ->where('website_id', $run->website_id)
+                ->where('status', \App\Models\ContentProductRun::STATUS_FAILED)
+                ->where('created_at', '>', now()->subDays(7))
+                ->count();
+            $plan = \App\Models\ContentPlan::query()->where('website_id', $run->website_id)->first();
+            if ($recentFailures <= 3 && $plan !== null && $plan->product_mode === 'strict') {
+                app(\App\Services\Content\Catalog\ProductCatalogService::class)->startRun($plan, 'refresh');
+            }
+        }
     }
 
     /**

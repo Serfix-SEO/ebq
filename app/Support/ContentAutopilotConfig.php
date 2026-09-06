@@ -322,6 +322,24 @@ class ContentAutopilotConfig
         return max(20, (int) self::setting('content.limits.content_only_crawl_pages', 200));
     }
 
+    /** Strict Product Mode: max product pages fetched per catalog run (own budget — never the content crawl cap). */
+    public static function productCrawlPageBudget(): int
+    {
+        return max(100, (int) self::setting('content.catalog.page_budget', 2000));
+    }
+
+    /** Strict Product Mode: max LLM-extracted pages per run (schema-less shops). */
+    public static function productLlmExtractCap(): int
+    {
+        return max(0, (int) self::setting('content.catalog.llm_extract_cap', 100));
+    }
+
+    /** Strict Product Mode: daily Firecrawl renders per site for catalog work (separate from the audit crawler's budget). */
+    public static function firecrawlProductDailyBudget(): int
+    {
+        return max(0, (int) self::setting('content.catalog.firecrawl_daily_budget', 200));
+    }
+
     /** @return array{per_ip_hourly:int, per_ip_daily:int, global_daily:int} */
     public static function onboardingThrottle(): array
     {

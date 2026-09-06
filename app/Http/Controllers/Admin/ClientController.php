@@ -374,6 +374,25 @@ class ClientController extends Controller
                 .' — the planner is rebuilding the calendar with the current directives.');
     }
 
+    /**
+     * Strict Product Mode (dark-shipped Phase 1): kick a product-catalog
+     * scrape for one client website so extraction quality can be piloted
+     * before any client-facing UI exists.
+     */
+    public function scanProducts(User $user, Website $website): RedirectResponse
+    {
+        abort_unless($website->user_id === $user->id, 404);
+        $plan = ContentPlan::query()->where('website_id', $website->id)->first();
+        abort_if($plan === null, 404);
+
+        $run = app(\App\Services\Content\Catalog\ProductCatalogService::class)
+            ->startRun($plan, 'admin');
+
+        return redirect()
+            ->to(route('admin.clients.show', $user).'?directives_site='.$website->id.'#content-catalog')
+            ->with('status', 'Product scan '.($run->wasRecentlyCreated ? 'started' : 'already running').' for '.$website->domain.'.');
+    }
+
     public function update(Request $request, User $user, ClientActivityLogger $logger): RedirectResponse
     {
         $data = $request->validate([
