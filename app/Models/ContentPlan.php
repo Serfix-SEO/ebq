@@ -26,6 +26,15 @@ class ContentPlan extends Model
     // until the user finishes the wizard and the plan flips to active.
     public const STATUS_DRAFT = 'draft';
 
+    /**
+     * Strict Product Mode (2026-09). null = undecided — MUST behave exactly
+     * like pre-feature plans (never gates anything); the mandatory choice is
+     * a UI concern only.
+     */
+    public const PRODUCT_MODE_STRICT = 'strict';
+
+    public const PRODUCT_MODE_NORMAL = 'normal';
+
     protected $guarded = [];
 
     protected function casts(): array

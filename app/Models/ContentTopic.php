@@ -83,6 +83,14 @@ class ContentTopic extends Model
         return $this->hasMany(ContentArticle::class, 'topic_id');
     }
 
+    /** Strict Product Mode: catalog products this topic features/mentions. */
+    public function products(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            ContentProduct::class, 'content_topic_product', 'content_topic_id', 'content_product_id'
+        )->withPivot('role');
+    }
+
     public function currentArticle(): HasOne
     {
         return $this->hasOne(ContentArticle::class, 'topic_id')->where('is_current', true);

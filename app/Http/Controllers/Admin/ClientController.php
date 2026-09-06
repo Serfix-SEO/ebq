@@ -331,11 +331,10 @@ class ClientController extends Controller
     /** Shared by updateContentPrompt (clear_future) and clearFutureTopics. */
     private function clearFutureTopicsFor(ContentPlan $plan, User $user, Website $website, ClientActivityLogger $logger): int
     {
-        $scope = $plan->topics()
-            ->whereIn('status', [\App\Models\ContentTopic::STATUS_SUGGESTED, \App\Models\ContentTopic::STATUS_APPROVED])
-            ->whereDoesntHave('articles');
-        $cleared = (clone $scope)->count();
-        $scope->delete();
+        // Same scope as StrictModeActivator::clearUnwrittenFutureTopics —
+        // shared so admin-clear and strict-activation can never drift.
+        $cleared = app(\App\Services\Content\Catalog\StrictModeActivator::class)
+            ->clearUnwrittenFutureTopics($plan);
 
         $logger->log(
             'admin.content_topics_cleared',

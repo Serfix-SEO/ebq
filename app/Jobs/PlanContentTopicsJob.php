@@ -72,6 +72,24 @@ class PlanContentTopicsJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
+        // Strict Product Mode (2026-09): a plan that PROMISED product-grounded
+        // articles must not plan off-catalog topics while the catalog is still
+        // being scraped. INVARIANT: this is the ONLY planner-blocking state —
+        // product_mode null (undecided) and 'normal' behave exactly like
+        // before, so no bypass path (instant-convert, async site-type, admin
+        // plans) can ever silently stall top-ups. Self-heals the same way as
+        // the profile guard: FinalizeProductCatalogJob dispatches this job the
+        // moment the catalog is ready, and the dispatcher retries every 15 min.
+        if ($plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT
+            && ! app(\App\Services\Content\Catalog\ProductCatalogService::class)->readyFor((string) $plan->website_id)) {
+            Log::info('content_autopilot.topics_skipped_catalog_pending', [
+                'plan_id' => $plan->id,
+                'website_id' => $plan->website_id,
+            ]);
+
+            return;
+        }
+
         $created = app(ContentTopicPlanner::class, [
             'llm' => LlmClientFactory::make(),
         ])->plan($plan, $this->count);

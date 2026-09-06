@@ -1574,6 +1574,23 @@ class ContentKeywordInsights
             }
         }
 
+        // Strict Product Mode: the real catalog's top categories + terms are
+        // better seed material than the LLM-guessed offerings sentences.
+        if ($plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT) {
+            try {
+                $summary = app(\App\Services\Content\Catalog\ProductCatalogService::class)
+                    ->summaryFor((string) $plan->website_id);
+                foreach (array_slice(array_keys($summary['categories']), 0, 5) as $cat) {
+                    $seeds[] = mb_strtolower(trim((string) $cat));
+                }
+                foreach (array_slice($summary['top_terms'], 0, 5) as $term) {
+                    $seeds[] = $term;
+                }
+            } catch (\Throwable) {
+                // catalog absent — classic seeding continues
+            }
+        }
+
         foreach ((array) (($plan->offerings ?? [])['sell'] ?? []) as $item) {
             $item = mb_strtolower(trim((string) $item));
             // Offerings are sentences ("PUBG name generator tool for creating

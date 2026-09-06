@@ -104,6 +104,17 @@ class ContentTopicPlanner
         $created = [];
         $dates = $this->scheduleDates($plan, $count);
 
+        // Strict Product Mode: deterministic grounding gate — an ideated
+        // topic that matches NO catalog product is dropped, whatever the LLM
+        // claimed. Independent of filterRelevant (which is skipped for
+        // classified plans).
+        $strict = $plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT;
+        $matcher = $strict ? app(\App\Services\Content\Catalog\TopicProductMatcher::class) : null;
+        $catalogUrls = $strict
+            ? \App\Models\ContentProduct::query()->where('website_id', $website->id)->usable()
+                ->pluck('id', 'url')->all()
+            : [];
+
         foreach ($candidates as $candidate) {
             if (count($created) >= $count) {
                 break;
@@ -113,6 +124,13 @@ class ContentTopicPlanner
             if ($title === '' || $keyword === '') {
                 continue;
             }
+            $matched = null;
+            if ($strict) {
+                $matched = $matcher->match((string) $website->id, $title.' '.$keyword, 5);
+                if ($matched->isEmpty()) {
+                    continue; // off-catalog idea — the whole point of strict mode
+                }
+            }
             foreach ($taken as $existing) {
                 if ($this->similarity($title, (string) $existing) >= 0.75) {
                     continue 2;
@@ -120,7 +138,7 @@ class ContentTopicPlanner
             }
             $taken[] = $title;
 
-            $created[] = $plan->topics()->create([
+            $created[] = $topic = $plan->topics()->create([
                 'website_id' => $website->id,
                 'title' => mb_substr($title, 0, 300),
                 'target_keyword' => mb_substr($keyword, 0, 200),
@@ -133,9 +151,25 @@ class ContentTopicPlanner
                 'source' => in_array($candidate['source'] ?? null, ['gsc_gap', 'gap', 'keywords', 'competitor', 'llm', 'research'], true)
                     ? $candidate['source'] : 'llm',
                 'status' => ContentTopic::STATUS_APPROVED,
+                // count($created) evaluates BEFORE the append lands (RHS
+                // first), so it is the new topic's index — original semantics.
                 'scheduled_for' => $dates[count($created)] ?? null,
                 'position' => count($created),
             ]);
+
+            if ($strict) {
+                // featured = LLM-cited urls that really exist in the catalog;
+                // mentioned = matcher's picks. The producer reads this pivot
+                // at write time.
+                $featured = collect((array) ($candidate['product_urls'] ?? []))
+                    ->map(fn ($u) => $catalogUrls[trim((string) $u)] ?? null)
+                    ->filter()->unique()->take(3);
+                $attach = $featured->mapWithKeys(fn ($id) => [$id => ['role' => 'featured']])->all();
+                foreach ($matched->pluck('id') as $id) {
+                    $attach[$id] ??= ['role' => 'mentioned'];
+                }
+                $topic->products()->syncWithoutDetaching($attach);
+            }
         }
 
         return array_merge($confirmed, $created);
@@ -209,7 +243,7 @@ class ContentTopicPlanner
             $intent = in_array($term->search_intent, ['informational', 'commercial', 'transactional', 'navigational'], true)
                 ? $term->search_intent : 'informational';
 
-            $created[] = $plan->topics()->create([
+            $created[] = $topic = $plan->topics()->create([
                 'website_id' => $website->id,
                 'title' => mb_substr($this->confirmedTitle($keyword, $intent), 0, 300),
                 'target_keyword' => mb_substr($keyword, 0, 200),
@@ -221,6 +255,18 @@ class ContentTopicPlanner
                 'position' => $position,
                 'keyword_volume' => $term->search_volume,
             ]);
+            // Strict Product Mode: confirmed terms are HUMAN-chosen — attach
+            // best-matching products but NEVER drop the topic (deterministic
+            // path, no LLM; the producer grounds it at write time regardless).
+            if ($plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT) {
+                $matched = app(\App\Services\Content\Catalog\TopicProductMatcher::class)
+                    ->match((string) $website->id, $topic->title.' '.$keyword, 5);
+                if ($matched->isNotEmpty()) {
+                    $topic->products()->syncWithoutDetaching(
+                        $matched->pluck('id')->mapWithKeys(fn ($id) => [$id => ['role' => 'mentioned']])->all()
+                    );
+                }
+            }
             $existingKeywords->put($keyword, true);
         }
 
@@ -462,6 +508,33 @@ class ContentTopicPlanner
             $typeBlock .= "\n";
         }
 
+        // Strict Product Mode: the ideation prompt gets the real catalog and
+        // archetype rules; the output contract gains product_urls. The
+        // deterministic matcher gate in plan()'s persist loop is the actual
+        // enforcement — this block just makes the LLM aim well.
+        $catalogBlock = '';
+        $productContractField = '';
+        if ($plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT) {
+            $summary = app(\App\Services\Content\Catalog\ProductCatalogService::class)
+                ->summaryFor((string) $plan->website_id);
+            if ($summary['count'] > 0) {
+                $categoriesLine = implode('; ', array_map(
+                    static fn ($cat, $n) => "{$cat} ({$n})",
+                    array_keys($summary['categories']), array_values($summary['categories'])
+                )) ?: '(uncategorized)';
+                $samplesBlock = implode("\n", array_map(
+                    static fn ($p) => '- '.$p['name'].' — '.$p['url'],
+                    $summary['samples']
+                ));
+                $catalogBlock = "\nTHEIR PRODUCT CATALOG ({$summary['count']} products; categories: {$categoriesLine}). Sample products (name — url):\n{$samplesBlock}\n"
+                    ."STRICT PRODUCT RULES:\n"
+                    ."- EVERY topic must be answerable by featuring products from this catalog; skip ideas their catalog cannot support.\n"
+                    ."- Favor these article shapes: benefit/ingredient roundups built from their products; comparisons BETWEEN their own listed products; buying guides for their categories; use-case how-tos that naturally feature their products; \"alternatives to <rival>\" articles that present THEIR product as the alternative; collection deep-dives; seasonal/gift guides from their range.\n"
+                    ."- For each topic, cite up to 3 product URLs FROM THE LIST ABOVE in \"product_urls\". Never cite a URL that is not listed.\n";
+                $productContractField = ', "product_urls": ["..."]';
+            }
+        }
+
         $system = 'You are an SEO content strategist. Respond with valid JSON only.';
         $directivesBlock = $plan->promptAddendumBlock();
         $user = <<<PROMPT
@@ -471,7 +544,7 @@ class ContentTopicPlanner
         {$plan->business_description}
         They offer: {$sell}
         They do NOT offer (never write about these as if they do): {$dontSell}
-        {$marketBlock}{$typeBlock}{$directivesBlock}
+        {$marketBlock}{$typeBlock}{$catalogBlock}{$directivesBlock}
 
         REAL SEARCH QUERIES the site already appears for (impressions = demand, position 8-30 = a dedicated article can win the ranking):
         {$gscBlock}
@@ -490,7 +563,7 @@ class ContentTopicPlanner
         - Write titles in language "{$language}".
         - Never invent topics about things they do not offer.
 
-        Return JSON: {"topics": [{"title": "...", "target_keyword": "...", "secondary_keywords": ["..."], "intent": "informational|commercial|transactional|navigational", "source": "gsc_gap|gap|llm"}]}
+        Return JSON: {"topics": [{"title": "...", "target_keyword": "...", "secondary_keywords": ["..."], "intent": "informational|commercial|transactional|navigational", "source": "gsc_gap|gap|llm"{$productContractField}}]}
         PROMPT;
 
         $options = [
