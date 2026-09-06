@@ -183,13 +183,24 @@ class ProductExtractor
 
     // ── shared ──────────────────────────────────────────────────────────
 
-    /** Trimmed, length-capped string or null for anything blank/non-scalar. */
+    /**
+     * Trimmed, entity-decoded, length-capped string or null. Shop platforms
+     * routinely DOUBLE-encode entities inside JSON-LD ("&amp;amp;" in the
+     * pilot scans) — decode until stable, max 3 passes.
+     */
     private function str(mixed $value, int $max): ?string
     {
         if (! is_scalar($value)) {
             return null;
         }
         $value = trim((string) $value);
+        for ($i = 0; $i < 3; $i++) {
+            $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5);
+            if ($decoded === $value) {
+                break;
+            }
+            $value = $decoded;
+        }
 
         return $value === '' ? null : mb_substr($value, 0, $max);
     }
