@@ -673,6 +673,29 @@ trait ContentWizard
     }
 
     /** Topics generated so far, for the "first articles" step. */
+    /** Strict Product Mode twins (dual-host rule — see ContentCalendar). */
+    public string $productModeChoice = '';
+
+    public function chooseProductMode(string $mode): void
+    {
+        $this->productModeChoice = in_array($mode, ['strict', 'normal'], true) ? $mode : '';
+    }
+
+    protected function requiresProductChoice($plan): bool
+    {
+        return $plan !== null
+            && in_array($plan->site_type, [\App\Support\ContentSiteTypeProfiles::BRAND, \App\Support\ContentSiteTypeProfiles::RESELLER], true)
+            && $plan->product_mode === null;
+    }
+
+    protected function applyProductModeChoice($plan): void
+    {
+        if ($plan !== null && $this->productModeChoice !== '' && $plan->product_mode === null) {
+            app(\App\Services\Content\Catalog\StrictModeActivator::class)
+                ->choose($plan, $this->productModeChoice, 'onboarding');
+        }
+    }
+
     protected function draftTopics()
     {
         $plan = $this->plan();
@@ -747,6 +770,7 @@ trait ContentWizard
 
         return [
             'guard' => $guard,
+            'requiresProductChoice' => $this->requiresProductChoice($plan),
             'draftTopics' => $this->wizardStep >= 7 ? $this->draftTopics() : collect(),
             'insights' => $insights,
             'generating' => $generating,

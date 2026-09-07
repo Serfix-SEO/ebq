@@ -12,8 +12,12 @@ use App\Jobs\PublishContentArticleJob;
 use App\Models\ContentImage;
 use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
+use App\Models\ContentProduct;
+use App\Models\ContentProductRun;
 use App\Models\ContentTopic;
 use App\Models\Website;
+use App\Services\Content\Catalog\ProductCatalogService;
+use App\Services\Content\Catalog\StrictModeActivator;
 use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentEntitlements;
 use App\Services\Content\ContentKeywordInsights;
@@ -145,6 +149,12 @@ class ContentCalendar extends Component
     public int $publishHourEnd = 11;
 
     public string $publishTimezone = 'UTC';
+
+    /** Strict Product Mode: the step-7 selection ('' until picked). */
+    public string $productModeChoice = '';
+
+    /** Settings → Products tab: catalog search box. */
+    public string $productSearch = '';
 
     public function mount(string $mode = 'calendar'): void
     {
@@ -854,18 +864,160 @@ class ContentCalendar extends Component
      * begins; already active → just a settings save) and return to the
      * Calendar page.
      */
+    /** Strict Product Mode: e-commerce plans must pick strict/normal at step 7. */
+    public function chooseProductMode(string $mode): void
+    {
+        $this->productModeChoice = in_array($mode, ['strict', 'normal'], true) ? $mode : '';
+    }
+
+    private function requiresProductChoice(?ContentPlan $plan): bool
+    {
+        return $plan !== null
+            && in_array($plan->site_type, [\App\Support\ContentSiteTypeProfiles::BRAND, \App\Support\ContentSiteTypeProfiles::RESELLER], true)
+            && $plan->product_mode === null;
+    }
+
+    /** Apply the step-7 product-mode selection through the single activator path. */
+    private function applyProductModeChoice(?ContentPlan $plan): void
+    {
+        if ($plan !== null && $this->productModeChoice !== '' && $plan->product_mode === null) {
+            app(StrictModeActivator::class)
+                ->choose($plan, $this->productModeChoice, 'onboarding');
+        }
+    }
+
     public function launch(): void
     {
         $plan = $this->plan();
         if ($plan === null) {
             return;
         }
+        if ($this->requiresProductChoice($plan) && $this->productModeChoice === '') {
+            return; // step-7 card blocks launch until a product mode is picked
+        }
         $wasActive = $plan->isActive();
         $plan->update(['status' => ContentPlan::STATUS_ACTIVE]);
+        $this->applyProductModeChoice($plan->fresh());
         session()->flash('content-status', $wasActive
             ? __('Your content settings have been saved.')
             : __('Your content calendar is live. Articles are being written and will appear for your review.'));
         $this->redirect(route('content.index'), navigate: true);
+    }
+
+    /** Banner (existing ecom client, undecided): one-click strict opt-in. */
+    public function activateStrictMode(): void
+    {
+        $plan = $this->plan();
+        if ($plan === null || $plan->product_mode !== null) {
+            return;
+        }
+        app(StrictModeActivator::class)->choose($plan, ContentPlan::PRODUCT_MODE_STRICT, 'banner');
+        session()->flash('content-status', __('We\'re reading your store now — upcoming articles will be built around your own products.'));
+    }
+
+    /** Banner "Keep as is": records the choice so the banner never returns. */
+    public function keepNormalMode(): void
+    {
+        $plan = $this->plan();
+        if ($plan === null || $plan->product_mode !== null) {
+            return;
+        }
+        app(StrictModeActivator::class)->choose($plan, ContentPlan::PRODUCT_MODE_NORMAL, 'banner');
+    }
+
+    /** Progress screen: retry a failed catalog scan. */
+    public function retryCatalogScan(): void
+    {
+        $plan = $this->plan();
+        if ($plan === null || $plan->product_mode !== ContentPlan::PRODUCT_MODE_STRICT) {
+            return;
+        }
+        app(ProductCatalogService::class)->startRun($plan, 'settings');
+    }
+
+    /** Progress screen escape hatch: give up on strict, resume normal planning. */
+    public function useNormalInstead(): void
+    {
+        $plan = $this->plan();
+        if ($plan === null || $plan->product_mode !== ContentPlan::PRODUCT_MODE_STRICT) {
+            return;
+        }
+        app(StrictModeActivator::class)->choose($plan, ContentPlan::PRODUCT_MODE_NORMAL, 'settings');
+        session()->flash('content-status', __('Switched to broader topics. Articles will keep flowing as before.'));
+    }
+
+    /** Settings → Products: exclude/include a product from article grounding. */
+    public function toggleProductExclusion(string $productId): void
+    {
+        $plan = $this->plan();
+        if ($plan === null) {
+            return;
+        }
+        $product = ContentProduct::query()
+            ->where('website_id', $plan->website_id)
+            ->find($productId);
+        $product?->update(['is_excluded' => ! $product->is_excluded]);
+    }
+
+    /** Settings → Products: client-triggered re-scan, rate-limited to 1/day. */
+    public function scanProductsAgain(): void
+    {
+        $plan = $this->plan();
+        if ($plan === null) {
+            return;
+        }
+        if (! Cache::add('content:catalog:client-scan:'.$plan->website_id, 1, now()->addDay())) {
+            session()->flash('content-error', __('Your store was already scanned today. You can scan once per day — try again tomorrow.'));
+
+            return;
+        }
+        app(ProductCatalogService::class)->startRun($plan, 'settings');
+        session()->flash('content-status', __('Re-reading your store — new and changed products will appear here shortly.'));
+    }
+
+    /** Settings → Products: switch between strict and normal product mode. */
+    public function setProductMode(string $mode): void
+    {
+        $plan = $this->plan();
+        if ($plan === null || ! in_array($mode, [ContentPlan::PRODUCT_MODE_STRICT, ContentPlan::PRODUCT_MODE_NORMAL], true) || $plan->product_mode === $mode) {
+            return;
+        }
+        app(StrictModeActivator::class)->choose($plan, $mode, 'settings');
+        session()->flash('content-status', $mode === ContentPlan::PRODUCT_MODE_STRICT
+            ? __('We\'re reading your store now — upcoming articles will be built around your own products.')
+            : __('Switched to broader topics. Articles will keep flowing as before.'));
+    }
+
+    /** Settings → Products tab data; null hides the tab (non-ecommerce plans). */
+    private function productsTabData(ContentPlan $plan): ?array
+    {
+        $isEcom = in_array($plan->site_type, [ContentSiteTypeProfiles::BRAND, ContentSiteTypeProfiles::RESELLER], true);
+        if (! $isEcom && $plan->product_mode === null) {
+            return null;
+        }
+        $catalog = app(ProductCatalogService::class);
+        $run = $catalog->latestRun($plan->website_id);
+        $query = ContentProduct::query()
+            ->where('website_id', $plan->website_id)
+            ->where('status', ContentProduct::STATUS_ACTIVE);
+        $total = (clone $query)->count();
+        if (trim($this->productSearch) !== '') {
+            $query->where(function ($q) {
+                $term = '%'.trim($this->productSearch).'%';
+                $q->where('name', 'like', $term)->orWhere('category', 'like', $term);
+            });
+        }
+
+        return [
+            'mode' => $plan->product_mode,
+            'total' => $total,
+            'excluded' => ContentProduct::query()->where('website_id', $plan->website_id)->where('is_excluded', true)->count(),
+            'run' => $run,
+            'inFlight' => $run !== null && in_array($run->status, ContentProductRun::IN_FLIGHT, true),
+            'canScan' => ! Cache::has('content:catalog:client-scan:'.$plan->website_id),
+            'products' => $query->orderBy('category')->orderBy('name')->limit(60)
+                ->get(['id', 'name', 'url', 'image_url', 'category', 'availability', 'is_excluded']),
+        ];
     }
 
     /**
@@ -1505,6 +1657,7 @@ class ContentCalendar extends Component
                 // "no destination connected" warning, so it needs the real
                 // connection state (emptyCalendarBindings defaults it false).
                 'publishConnected' => $this->hasPublishDestination(),
+                'productsTab' => $this->productsTabData($plan),
             ] + $this->emptyCalendarBindings());
         }
 
@@ -1554,6 +1707,7 @@ class ContentCalendar extends Component
 
             $wizard = [
                 'guard' => $guardState,
+                'requiresProductChoice' => $this->requiresProductChoice($anyPlan),
                 'draftTopics' => $this->wizardStep >= 7 ? $this->draftTopics() : collect(),
                 'insights' => $insights,
                 'generating' => $generating,
@@ -1578,6 +1732,36 @@ class ContentCalendar extends Component
                 'needsSetup' => true,
                 'wizard' => [],
             ] + $this->emptyCalendarBindings());
+        }
+
+        // ── Strict Product Mode: full-screen catalog progress ──
+        // While the product scan is running (or failed with an empty catalog)
+        // the calendar page becomes a live "what we're doing for you" screen.
+        // Planning is gated on the catalog anyway (PlanContentTopicsJob), so
+        // there is nothing useful to show underneath yet.
+        if ($plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT) {
+            $catalog = app(ProductCatalogService::class);
+            $run = $catalog->latestRun($plan->website_id);
+            $inFlight = $run !== null && in_array($run->status, ContentProductRun::IN_FLIGHT, true);
+            $failedEmpty = ! $catalog->readyFor($plan->website_id)
+                && ($run === null || $run->status === ContentProductRun::STATUS_FAILED);
+            if ($inFlight || $failedEmpty) {
+                return view('livewire.content.content-calendar', [
+                    'inWizard' => false,
+                    'needsSetup' => false,
+                    'wizard' => [],
+                    'catalogProgress' => [
+                        'run' => $run,
+                        'count' => $catalog->usableCount($plan->website_id),
+                        'products' => ContentProduct::query()
+                            ->where('website_id', $plan->website_id)
+                            ->whereNotNull('image_url')
+                            ->orderByDesc('updated_at')
+                            ->limit(12)
+                            ->get(['id', 'name', 'image_url', 'category']),
+                    ],
+                ] + $this->emptyCalendarBindings());
+            }
         }
 
         // ── Calendar data ──
@@ -1630,6 +1814,10 @@ class ContentCalendar extends Component
             'publishConnected' => $this->hasPublishDestination(),
             'hasInFlight' => $topics->contains(fn ($t) => in_array($t->status, ContentTopic::IN_FLIGHT, true)),
             'hasImagesPending' => $topics->contains(fn ($t) => self::imagesPending($t)),
+            // Existing e-commerce client who never chose a product mode →
+            // opt-in banner (never forced; planning continues underneath).
+            'showProductModeBanner' => $this->requiresProductChoice($plan),
+            'catalogProgress' => null,
         ] + $this->capAndTrialBindings($topics, $monthStart));
     }
 
@@ -1688,6 +1876,7 @@ class ContentCalendar extends Component
             'clusters' => [],
             'publishConnected' => false,
             'hasInFlight' => false,
+            'catalogProgress' => null,
         ];
     }
 }

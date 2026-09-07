@@ -154,6 +154,9 @@ class PublicOnboarding extends Component
 
     public function toAccount(): void
     {
+        if ($this->requiresProductChoice($this->plan()) && $this->productModeChoice === '') {
+            return; // step-7 card blocks continuing until a product mode is picked
+        }
         if ($this->websiteId !== null) {
             $this->wizardStep = 8;
         }
@@ -210,6 +213,7 @@ class PublicOnboarding extends Component
         }
 
         $result = $converter->convert($session, $user, $this->builtProfile());
+        $this->applyChoiceToConverted($result);
 
         session(['current_website_id' => $result['website']->id]);
         session()->forget('content_onboarding_token');
@@ -230,6 +234,9 @@ class PublicOnboarding extends Component
         if (! Auth::check() || $this->token === null) {
             return;
         }
+        if ($this->requiresProductChoice($this->plan()) && $this->productModeChoice === '') {
+            return;
+        }
 
         $session = $this->session();
         if ($session === null || $session->converted_at !== null) {
@@ -240,11 +247,27 @@ class PublicOnboarding extends Component
         }
 
         $result = $converter->convert($session, Auth::user(), $this->builtProfile());
+        $this->applyChoiceToConverted($result);
 
         session(['current_website_id' => $result['website']->id]);
         session()->forget('content_onboarding_token');
 
         $this->redirectRoute($result['covered'] ? 'content.index' : 'content.get-started', navigate: false);
+    }
+
+    /**
+     * Strict Product Mode: the step-7 choice is applied to the plan that
+     * SURVIVES conversion (the provisional plan may be deleted/merged), so
+     * the activator's run + topic-clear land on the real website.
+     */
+    private function applyChoiceToConverted(array $result): void
+    {
+        $website = $result['website'] ?? null;
+        if ($website === null || $this->productModeChoice === '') {
+            return;
+        }
+        $plan = \App\Models\ContentPlan::query()->where('website_id', $website->id)->first();
+        $this->applyProductModeChoice($plan);
     }
 
     /** The wizard-typed profile convert() persists onto the plan. */

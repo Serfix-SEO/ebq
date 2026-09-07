@@ -2563,3 +2563,120 @@ Presentation rules, each of them load-bearing and pinned by
 
 Seven days is a short window — revisit and update the figures rather than leaving first-week
 numbers on the page indefinitely.
+
+## Strict Product Mode (2026-09-07, PROD)
+
+E-commerce clients complained the AI wrote about random products. Plans with
+`site_type ∈ {brand, ecommerce_reseller}` now carry `content_plans.product_mode`
+(`null` undecided | `'normal'` | `'strict'`) + `product_mode_decided_at`.
+**Strict = every article grounded in the client's own scraped catalog.**
+Included in price — no premium gating, no client-visible cost.
+
+### Core invariants
+
+1. **`product_mode = null` NEVER blocks planning.** Mandatoriness is UI-only
+   (step-7 card blocks launch; calendar banner fronts bypass paths). The ONLY
+   planner gate is `strict` + catalog-not-ready
+   ([PlanContentTopicsJob.php](../../app/Jobs/PlanContentTopicsJob.php),
+   `topics_skipped_catalog_pending`). Null mode ≡ old behavior, pinned by
+   `StrictModeGateTest`.
+2. All run state on `content_product_runs` rows (status pending→discovering→
+   extracting→finalizing→ready|failed, live counters, `heartbeat_at`) — never
+   cache-only.
+3. No prices in article prose; never invent products; comparisons only among
+   the client's own listed products.
+4. Every LLM stage that touches article HTML is classified (full YOUR PRODUCTS
+   block for creative stages, `PRESERVE_PRODUCTS_RULE` for editor/cleanup) —
+   enforced by `ProductGroundingCoverageTest`, which FAILS if a future stage
+   ships unclassified (ClientRewriteCoverageTest pattern).
+
+### Catalog pipeline (`app/Jobs/Content/`, `app/Services/Content/Catalog/`)
+
+`StrictModeActivator::choose(plan, mode, trigger)` is the SINGLE entry point
+(wizard launch, public-onboarding convert, banner, settings switch, admin).
+Strict → clears unwritten future topics (shared with admin clear) → catalog
+ready? replan : `ProductCatalogService::startRun`.
+
+`DiscoverProductPagesJob` (CRAWL): sources = crawled pages with Product schema
++ product-path heuristics (`ProductCatalogService::isProductPath`, shared
+const). Budget `product_crawl_page_budget` (2000) with category-spread
+sampling. → `ExtractProductBatchJob` chunks (25): plain fetch → JSON-LD
+(`HtmlAuditor::structuredData`) → OG meta → Firecrawl re-render under
+`firecrawl_product_daily_budget` (200) → `ExtractProductLlmJob` capped by
+`product_llm_extract_cap` (100/run, temperature 0, __unmetered). Upsert by
+(website_id, url_hash); `is_excluded` survives re-scrapes.
+→ `FinalizeProductCatalogJob` (CRAWL_FINALIZE): variant dedupe (keep richest),
+gone-marking ONLY for full triggers (`onboarding|settings|banner|admin|monthly`
+— refresh runs are partial and must never nuke the catalog), ready/failed,
+**auto-proceed**: strict plans get `PlanContentTopicsJob` immediately (owner
+decision: no review pause; exclusions live in Settings → Products).
+
+### Writer grounding (Phase 3)
+
+`ContentArticleProducer::productContext()` resolves the selection ONCE
+(pivot rows → matcher fallback for research/manual topics; out-of-stock
+rejected) and persists to `content_topics.meta['products']` — draft and every
+later revise/rewrite feature the IDENTICAL products (`productBlock()` reads
+stored meta). Product links ride `selected_links` with `'manual' => true` →
+hard-enforced by `AiWriterService::ensureManualLinksPresent` + locked anchors
+(zero AiWriterService logic changes; cache key bumped v25→v26). Scorer gains
+`products_featured` + `product_links_valid` (raw-href scan, ownHosts includes
+catalog hosts); `stripMismatchedInternalLinks` unwraps own-host productish
+links not in the catalog; `CompetitorMentionGuard` exempts real catalog
+names from stocked-only blocks and hardScrub.
+
+### Client UX (Phase 4, dual-host rule applies)
+
+- **Step-7 choice card** `partials/wizard-product-mode.blade.php` (skin
+  `wizard`): twin `chooseProductMode` in ContentCalendar AND the ContentWizard
+  trait; all three finish buttons `@disabled` until picked; server guards in
+  `launch()`/`toAccount()`/`finish()`. Public host applies the choice to the
+  plan that SURVIVES conversion (`applyChoiceToConverted`).
+- **Catalog progress screen** `partials/catalog-progress.blade.php`: full-screen
+  from `ContentCalendar::render()` while strict && (run in flight || failed
+  with empty catalog) — staged checklist, live counters (poll 4s), streaming
+  product thumbnails, failed → retry + "continue with broader topics" escape.
+- **Existing-client banner** (same partial, skin `banner`): active ecom plan,
+  mode null → one-click `activateStrictMode` (wire:confirm) / `keepNormalMode`
+  ("Keep as is" records normal so the banner never returns; no dismissal storage).
+- **Settings → Products tab** (`partials/settings-products.blade.php`, tab
+  hidden for non-ecom): mode switch with confirm, catalog grid + search,
+  exclude/include toggles (never featured when excluded), "Scan again"
+  rate-limited 1/day (`content:catalog:client-scan:{website}`).
+- All strings `__()` + hand-written `lang/ar.json` entries (MT verb-form trap);
+  product names render `dir="auto"`.
+
+### Freshness + ops (Phase 5)
+
+- `RefreshProductPagesJob(websiteId, urls)`: partial `refresh` run (≤200 urls,
+  never races an in-flight run, never gone-marks).
+- `CrawlSitemapDeltaJob`: brand-new sitemap URLs matching product paths on a
+  strict-plan website → RefreshProductPagesJob.
+- `ContentAutopilotDispatcher::refreshCatalogs()` (daily cache-guarded per
+  website, strict active plans only): monthly full re-run (trigger `monthly`,
+  gone-marking applies) + re-extract of catalog pages whose
+  `website_pages.last_changed_at` (SimHash) outran the product row.
+- `SendFailedJobsAlert`: failed catalog runs (last 24h) get a digest section —
+  a failed strict run means a client is parked on the progress screen.
+- Admin: client page "Product catalog" card + Scan products button
+  (`admin.clients.scan-products`); budgets on the platform settings page
+  (`content.catalog.*` Setting keys).
+
+### Tests
+
+`ProductExtractionTest`, `ProductCatalogRunTest` (lifecycle + Phase-5 refresh),
+`StrictModeGateTest` (full null-safety matrix), `StrictModeActivationTest`,
+`ProductAwarePlanningTest`, `ProductGroundingCoverageTest` (per-stage net),
+`ProductModeWizardTest` (dual-host UX, banner, progress, settings tab).
+
+### Landmines
+
+- The step-7 wizard partial is shared by TWO Livewire hosts — any new `$wire.*`
+  must exist in BOTH (see "Two parallel wizard implementations").
+- `ExtractProductBatchJob` refuses runs not in `extracting` — refresh jobs
+  create their run row already in that state.
+- Shop JSON-LD double-encodes entities (`&amp;amp;`) — `ProductExtractor::str()`
+  decode-loops (max 3) until stable.
+- `topic.meta['products']` is the identity of the article's product set —
+  NEVER re-match at revise time, and never store the selection on the brief
+  (produce() overwrites the brief).

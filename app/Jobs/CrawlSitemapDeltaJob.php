@@ -161,6 +161,20 @@ class CrawlSitemapDeltaJob implements ShouldBeUnique, ShouldQueue
                 });
         }
 
+        // Strict Product Mode: brand-new sitemap URLs that look like product
+        // pages feed the catalog directly (partial refresh run — never
+        // gone-marks). Cheap: only fires for websites with a strict plan.
+        if ($newHashes !== []) {
+            $productUrls = array_values(array_filter(
+                array_map(fn ($hash) => (string) $candidates[$hash]['url'], $newHashes),
+                fn ($url) => \App\Services\Content\Catalog\ProductCatalogService::isProductPath($url),
+            ));
+            if ($productUrls !== []
+                && app(\App\Services\Content\Catalog\ProductCatalogService::class)->strictPlanFor((string) $website->id) !== null) {
+                \App\Jobs\Content\RefreshProductPagesJob::dispatch((string) $website->id, $productUrls);
+            }
+        }
+
         if ($newHashes === [] && $triggered === 0) {
             return;
         }

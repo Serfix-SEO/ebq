@@ -80,7 +80,19 @@ class SendFailedJobsAlert extends Command
             $muted ? $mutedGroups[] = $group : $freshGroups[] = $group;
         }
 
-        if ($freshGroups === [] && $stuckPending->isEmpty() && $spendLine === null) {
+        // Strict Product Mode: failed catalog runs on strict plans mean a
+        // client is blocked on their progress screen — surface within a day.
+        // One digest line per run (cache flag), so a stuck run doesn't repeat.
+        $failedCatalogRuns = \App\Models\ContentProductRun::query()
+            ->where('status', \App\Models\ContentProductRun::STATUS_FAILED)
+            ->where('finished_at', '>', now()->subDay())
+            ->latest('finished_at')
+            ->get()
+            ->filter(fn ($run) => $this->option('dry-run')
+                ? ! \Illuminate\Support\Facades\Cache::has('failed-digest:catalog:'.$run->id)
+                : \Illuminate\Support\Facades\Cache::add('failed-digest:catalog:'.$run->id, true, now()->addDays(3)));
+
+        if ($freshGroups === [] && $stuckPending->isEmpty() && $spendLine === null && $failedCatalogRuns->isEmpty()) {
             $this->rememberGroups($freshGroups, $mutedGroups);
             $this->info($mutedGroups === []
                 ? 'Nothing to report.'
@@ -129,6 +141,16 @@ class SendFailedJobsAlert extends Command
                 $lines[] = '  '.$site->normalized_domain.' (since '.$site->created_at->toDateString().')';
             }
             $lines[] = 'These never created a CrawlRun, so the crawl supervisor cannot see them.';
+        }
+
+        if ($failedCatalogRuns->isNotEmpty()) {
+            $lines[] = '';
+            $lines[] = $failedCatalogRuns->count().' product catalog run(s) failed in the last 24h:';
+            foreach ($failedCatalogRuns as $run) {
+                $domain = \App\Models\Website::query()->find($run->website_id)?->normalized_domain ?? $run->website_id;
+                $lines[] = '  '.$domain.' — '.($run->error ?? '?').' (trigger='.$run->trigger.')';
+            }
+            $lines[] = 'Re-scan from /admin/clients (Product catalog card) after checking the shop.';
         }
 
         $body = implode("\n", $lines);

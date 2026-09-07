@@ -5,6 +5,7 @@ namespace Tests\Feature\Content;
 use App\Jobs\Content\DiscoverProductPagesJob;
 use App\Jobs\Content\ExtractProductBatchJob;
 use App\Jobs\Content\FinalizeProductCatalogJob;
+use App\Jobs\Content\RefreshProductPagesJob;
 use App\Jobs\PlanContentTopicsJob;
 use App\Models\ContentPlan;
 use App\Models\ContentProduct;
@@ -212,5 +213,121 @@ class ProductCatalogRunTest extends TestCase
 
         $this->assertTrue(ContentProduct::query()->where('url_hash', hash('sha256', $url))->firstOrFail()->is_excluded,
             'the client\'s exclusion is durable across re-scrapes');
+    }
+
+    // ── Phase 5: refresh + freshness ────────────────────────────────────
+
+    public function test_refresh_job_creates_a_partial_refresh_run(): void
+    {
+        Bus::fake();
+        [$website] = $this->site();
+
+        (new RefreshProductPagesJob($website->id, ['https://shop.example/products/a', 'https://shop.example/products/a']))->handle();
+
+        $run = ContentProductRun::query()->where('website_id', $website->id)->first();
+        $this->assertNotNull($run);
+        $this->assertSame('refresh', $run->trigger);
+        $this->assertSame(ContentProductRun::STATUS_EXTRACTING, $run->status);
+        $this->assertSame(1, $run->pages_found, 'urls dedupe');
+        Bus::assertBatchCount(1);
+    }
+
+    public function test_refresh_job_never_races_an_in_flight_run(): void
+    {
+        Bus::fake();
+        [$website] = $this->site();
+        ContentProductRun::factory()->create([
+            'website_id' => $website->id, 'status' => ContentProductRun::STATUS_EXTRACTING,
+        ]);
+
+        (new RefreshProductPagesJob($website->id, ['https://shop.example/products/a']))->handle();
+
+        $this->assertSame(1, ContentProductRun::query()->where('website_id', $website->id)->count());
+        Bus::assertBatchCount(0);
+    }
+
+    public function test_refresh_finalize_never_marks_products_gone(): void
+    {
+        Queue::fake();
+        [$website] = $this->site();
+        $untouched = ContentProduct::factory()->create([
+            'website_id' => $website->id, 'last_seen_at' => now()->subDays(20),
+        ]);
+        $run = ContentProductRun::factory()->create([
+            'website_id' => $website->id, 'trigger' => 'refresh',
+            'status' => ContentProductRun::STATUS_EXTRACTING, 'started_at' => now()->subMinute(),
+        ]);
+
+        (new FinalizeProductCatalogJob($run->id))->handle();
+
+        $this->assertSame(ContentProduct::STATUS_ACTIVE, $untouched->refresh()->status);
+        $this->assertSame(ContentProductRun::STATUS_READY, $run->refresh()->status);
+    }
+
+    public function test_dispatcher_starts_a_monthly_full_rerun_for_stale_strict_catalogs(): void
+    {
+        Queue::fake();
+        [$website, ] = $this->site(['product_mode' => 'strict']);
+        ContentProduct::factory()->create(['website_id' => $website->id]);
+        ContentProductRun::factory()->create([
+            'website_id' => $website->id, 'trigger' => 'onboarding',
+            'status' => ContentProductRun::STATUS_READY,
+            'started_at' => now()->subDays(40), 'finished_at' => now()->subDays(40),
+        ]);
+
+        $this->artisan('ebq:content-autopilot');
+
+        $this->assertTrue(
+            ContentProductRun::query()->where('website_id', $website->id)->where('trigger', 'monthly')->exists()
+        );
+        Queue::assertPushed(DiscoverProductPagesJob::class);
+    }
+
+    public function test_dispatcher_refreshes_catalog_pages_the_crawler_saw_change(): void
+    {
+        Queue::fake();
+        [$website, ] = $this->site(['product_mode' => 'strict']);
+        $url = 'https://'.$website->normalized_domain.'/products/changed-item';
+        ContentProduct::factory()->create([
+            'website_id' => $website->id, 'url' => $url, 'updated_at' => now()->subDays(5),
+        ]);
+        ContentProductRun::factory()->create([
+            'website_id' => $website->id, 'trigger' => 'onboarding',
+            'status' => ContentProductRun::STATUS_READY,
+            'started_at' => now()->subDays(6), 'finished_at' => now()->subDays(6),
+        ]);
+        \App\Models\WebsitePage::create([
+            'crawl_site_id' => $website->crawl_site_id, 'url' => $url,
+            'url_hash' => \App\Models\WebsitePage::hashUrl($url),
+            'http_status' => 200, 'last_crawled_at' => now(),
+            'last_changed_at' => now()->subDay(),
+        ]);
+
+        $this->artisan('ebq:content-autopilot');
+
+        Queue::assertPushed(RefreshProductPagesJob::class, fn ($j) => $j->urls === [$url]);
+    }
+
+    public function test_dispatcher_catalog_refresh_is_daily_guarded(): void
+    {
+        Queue::fake();
+        [$website, ] = $this->site(['product_mode' => 'strict']);
+        ContentProduct::factory()->create(['website_id' => $website->id]);
+        // No full run ever → first tick starts a monthly; second tick must not
+        // stack another (daily cache guard).
+        $this->artisan('ebq:content-autopilot');
+        ContentProductRun::query()->update(['status' => ContentProductRun::STATUS_READY, 'finished_at' => now()]);
+        $this->artisan('ebq:content-autopilot');
+
+        $this->assertSame(1, ContentProductRun::query()->where('website_id', $website->id)->count());
+    }
+
+    public function test_product_path_heuristic(): void
+    {
+        $svc = ProductCatalogService::class;
+        $this->assertTrue($svc::isProductPath('https://x.com/products/blue-shoe'));
+        $this->assertTrue($svc::isProductPath('https://x.com/p/123'));
+        $this->assertFalse($svc::isProductPath('https://x.com/products/'), 'bare collection index');
+        $this->assertFalse($svc::isProductPath('https://x.com/blog/why-products-matter/extra'));
     }
 }

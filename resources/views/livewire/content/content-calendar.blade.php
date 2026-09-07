@@ -76,11 +76,13 @@
                     $settingsTabs = [
                         'profile' => ['label' => __('Business profile'), 'icon' => 'M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0'],
                         'offerings' => ['label' => __('Offerings'), 'icon' => 'M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3zM6 6h.008v.008H6V6z'],
+                        'products' => ($productsTab ?? null) !== null ? ['label' => __('Products'), 'icon' => 'M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z'] : null,
                         'structure' => ['label' => __('Article structure'), 'icon' => 'M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zM3.75 12h.007v.008H3.75V12zm0 5.25h.007v.008H3.75v-.008z'],
                         'images' => ['label' => __('Images'), 'icon' => 'M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.375 19.5h17.25c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125z'],
                         'publishing' => ['label' => __('Publishing'), 'icon' => 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5'],
                         'protection' => ['label' => __('Brand protection'), 'icon' => 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z'],
                     ];
+                    $settingsTabs = array_filter($settingsTabs);
                 @endphp
                 <nav class="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm lg:sticky lg:top-24 lg:w-56 lg:shrink-0 lg:flex-col lg:p-2 dark:border-slate-800 dark:bg-slate-900" role="tablist">
                     @foreach ($settingsTabs as $tabKey => $tabDef)
@@ -134,6 +136,13 @@
             <div x-show="tab === 'protection'" x-cloak>
                 @include('livewire.content.partials.competitor-guard', ['guard' => $guard ?? null])
             </div>
+
+            {{-- Products (e-commerce plans): catalog review + strict/normal switch --}}
+            @if (($productsTab ?? null) !== null)
+                <div x-show="tab === 'products'" x-cloak>
+                    @include('livewire.content.partials.settings-products')
+                </div>
+            @endif
 
             {{-- Offerings --}}
             <div x-show="tab === 'offerings'" x-cloak>
@@ -349,6 +358,10 @@
 
     @elseif ($inWizard)
     @include('livewire.content.partials.wizard')
+    @elseif (($catalogProgress ?? null) !== null)
+        {{-- Strict Product Mode: live catalog-build screen (calendar is gated
+             on the catalog anyway, so this replaces it until ready). --}}
+        @include('livewire.content.partials.catalog-progress')
     @else
         {{-- ── Calendar ─────────────────────────────────────────────── --}}
         @php
@@ -367,6 +380,12 @@
             ];
         @endphp
         <x-content.connect-integration />
+
+        {{-- Existing e-commerce client, product mode never chosen → opt-in
+             banner ("Keep as is" records normal and the banner never returns). --}}
+        @if ($showProductModeBanner ?? false)
+            @include('livewire.content.partials.wizard-product-mode', ['skin' => 'banner'])
+        @endif
 
         {{-- Auto-publish off → nudge with a one-click toggle; hides once on. --}}
         @unless ($autoPublish)

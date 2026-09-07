@@ -92,6 +92,11 @@ class ContentPublicOnboardingTest extends TestCase
             ->set('audience', 'Apartment dwellers who want compact furniture.')
             ->call('toOfferings')
             ->call('toHowItWorks')
+            // Strict Product Mode: ecom site types must pick a mode before
+            // continuing past step 7 (toAccount is server-guarded).
+            ->call('toAccount')
+            ->assertSet('wizardStep', 3)
+            ->call('chooseProductMode', 'normal')
             ->call('toAccount')
             ->assertSet('wizardStep', 8)
             ->set('name', 'Jane Doe')
@@ -116,6 +121,8 @@ class ContentPublicOnboardingTest extends TestCase
         // Site type: a chip click is a human decision, recorded as such.
         $this->assertSame('brand', $plan->site_type);
         $this->assertSame('user', $plan->site_type_source);
+        // The step-7 product-mode choice survives conversion onto the real plan.
+        $this->assertSame(ContentPlan::PRODUCT_MODE_NORMAL, $plan->product_mode);
         $this->assertSame('Apartment dwellers who want compact furniture.', $plan->audience);
         // Covered → plan goes LIVE so the dashboard shows the calendar, not the wizard.
         $this->assertSame(ContentPlan::STATUS_ACTIVE, $plan->status);

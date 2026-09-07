@@ -15,6 +15,34 @@ use Illuminate\Support\Facades\Cache;
  */
 class ProductCatalogService
 {
+    /** URL path fragments that mark a product page (shared with discovery + refresh hooks). */
+    public const PRODUCT_PATHS = ['/products/', '/product/', '/p/', '/item/', '/shop/'];
+
+    /**
+     * Product-page path heuristic: the fragment must be a segment WITH
+     * something after it — the bare collection index is not a product page.
+     */
+    public static function isProductPath(string $url): bool
+    {
+        $path = strtolower((string) (parse_url($url, PHP_URL_PATH) ?: '/'));
+        foreach (self::PRODUCT_PATHS as $needle) {
+            if (str_contains($path, $needle) && rtrim($path, '/') !== rtrim($needle, '/')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Does any plan on this website run strict product mode? (refresh hooks gate on this) */
+    public function strictPlanFor(string $websiteId): ?ContentPlan
+    {
+        return ContentPlan::query()
+            ->where('website_id', $websiteId)
+            ->where('product_mode', ContentPlan::PRODUCT_MODE_STRICT)
+            ->first();
+    }
+
     /** A strict plan may start planning once at least one usable product exists. */
     public function readyFor(string $websiteId): bool
     {

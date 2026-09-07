@@ -287,6 +287,15 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-07 — Strict Product Mode (e-commerce catalog grounding).** E-commerce
+  content plans get a mandatory Strict ("write only about my products") vs Normal
+  choice: catalog scrape pipeline (`content_products`/`content_product_runs`,
+  Discover→ExtractBatch→Finalize jobs, deterministic-first JSON-LD/OG → Firecrawl →
+  capped LLM), planner gate + product-grounded ideation, per-stage writer grounding
+  (14-row stage matrix, `ProductGroundingCoverageTest`), client UX (step-7 wizard
+  card, live catalog progress screen, opt-in banner, Settings→Products tab), and
+  freshness (sitemap-delta + SimHash changed-page refresh, monthly full re-run,
+  failed-run ops digest). infra/content-autopilot/README.md "Strict Product Mode".
 - **2026-09-03 — Medusa publish destination (guided receiver).** Medusa v2 has no blog
   API, so the new tile pairs `MedusaDriver` (WebhookDriver subclass, fixed
   `/serfix/articles` route, HMAC contract) with a paste-in kit under

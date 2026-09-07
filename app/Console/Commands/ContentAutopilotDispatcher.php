@@ -14,6 +14,7 @@ use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentLlmSpendMeter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -72,6 +73,7 @@ class ContentAutopilotDispatcher extends Command
         $this->claimedTopicIds = [];
         $reaped = $this->reapStuck();
         $this->superviseCatalogRuns();
+        $this->refreshCatalogs();
         $topped = $this->topUpThinCalendars();
         $researched = $this->advanceKeywordResearch();
         $claimed = $meter->exhausted() ? 0 : $this->claimDueTopics((int) $this->option('claim-limit'));
@@ -119,6 +121,88 @@ class ContentAutopilotDispatcher extends Command
             $plan = \App\Models\ContentPlan::query()->where('website_id', $run->website_id)->first();
             if ($recentFailures <= 3 && $plan !== null && $plan->product_mode === 'strict') {
                 app(\App\Services\Content\Catalog\ProductCatalogService::class)->startRun($plan, 'refresh');
+            }
+        }
+    }
+
+    /**
+     * Strict Product Mode freshness (daily-guarded per website, so this is a
+     * cheap no-op on almost every tick):
+     *
+     *  1. monthly FULL re-run ('monthly' trigger → gone-marking applies), so
+     *     discontinued products leave the catalog without any client action;
+     *  2. partial re-extract of catalog pages the crawler saw CHANGE
+     *     (SimHash → website_pages.last_changed_at) since we last read them —
+     *     price/availability/name edits reach the writer within a day of the
+     *     recrawl, without a full scrape.
+     */
+    private function refreshCatalogs(): void
+    {
+        $catalog = app(\App\Services\Content\Catalog\ProductCatalogService::class);
+        $plans = ContentPlan::query()
+            ->where('status', ContentPlan::STATUS_ACTIVE)
+            ->where('product_mode', ContentPlan::PRODUCT_MODE_STRICT)
+            ->get();
+
+        foreach ($plans as $plan) {
+            $websiteId = (string) $plan->website_id;
+            if (! Cache::add('catalog:auto-refresh:'.$websiteId, 1, now()->addDay())) {
+                continue;
+            }
+            $inFlight = \App\Models\ContentProductRun::query()
+                ->where('website_id', $websiteId)
+                ->whereIn('status', \App\Models\ContentProductRun::IN_FLIGHT)
+                ->exists();
+            if ($inFlight) {
+                continue;
+            }
+
+            // (1) Monthly full re-run.
+            $lastFull = \App\Models\ContentProductRun::query()
+                ->where('website_id', $websiteId)
+                ->whereIn('trigger', ['onboarding', 'settings', 'banner', 'admin', 'monthly'])
+                ->whereNotNull('finished_at')
+                ->latest('finished_at')
+                ->first();
+            if ($lastFull === null || $lastFull->finished_at->lt(now()->subDays(30))) {
+                $catalog->startRun($plan, 'monthly');
+
+                continue; // full run covers the changed pages too
+            }
+
+            // (2) Changed catalog pages since last extraction.
+            $website = \App\Models\Website::query()->find($websiteId);
+            if ($website?->crawl_site_id === null) {
+                continue;
+            }
+            $products = \App\Models\ContentProduct::query()
+                ->where('website_id', $websiteId)
+                ->where('status', \App\Models\ContentProduct::STATUS_ACTIVE)
+                ->get(['url', 'updated_at']);
+            if ($products->isEmpty()) {
+                continue;
+            }
+            $byHash = [];
+            foreach ($products as $product) {
+                $byHash[\App\Models\WebsitePage::hashUrl((string) $product->url)] = $product;
+            }
+            $changed = [];
+            foreach (array_chunk(array_keys($byHash), 500) as $chunk) {
+                $pages = \App\Models\WebsitePage::query()
+                    ->where('crawl_site_id', $website->crawl_site_id)
+                    ->whereIn('url_hash', $chunk)
+                    ->whereNotNull('last_changed_at')
+                    ->get(['url_hash', 'last_changed_at']);
+                foreach ($pages as $page) {
+                    $product = $byHash[$page->url_hash] ?? null;
+                    if ($product !== null && $page->last_changed_at->gt($product->updated_at)) {
+                        $changed[] = (string) $product->url;
+                    }
+                }
+            }
+            if ($changed !== []) {
+                \App\Jobs\Content\RefreshProductPagesJob::dispatch($websiteId, $changed);
+                Log::info('content_catalog.changed_pages_refresh', ['website_id' => $websiteId, 'pages' => count($changed)]);
             }
         }
     }

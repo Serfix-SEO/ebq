@@ -128,6 +128,9 @@ class LlmProviderSwitchTest extends TestCase
             'content_trial_articles' => 3,
             'content_monthly_articles_per_website' => 60,
             'content_only_crawl_pages' => 200,
+            'content_catalog_page_budget' => 2000,
+            'content_catalog_llm_extract_cap' => 100,
+            'content_catalog_firecrawl_daily_budget' => 200,
             // Added by the Keyword Tracker work (PlatformSettingsController:149)
             // and required ever since; this payload was never updated, so the
             // save 302'd back with validation errors instead of reaching the

@@ -41,8 +41,6 @@ class DiscoverProductPagesJob implements ShouldQueue
 
     public int $timeout = 300;
 
-    private const PRODUCT_PATHS = ['/products/', '/product/', '/p/', '/item/', '/shop/'];
-
     private const CHUNK = 25;
 
     public function __construct(public string $runId)
@@ -135,16 +133,7 @@ class DiscoverProductPagesJob implements ShouldQueue
 
     private function looksLikeProductPath(string $url): bool
     {
-        $path = strtolower((string) (parse_url($url, PHP_URL_PATH) ?: '/'));
-        foreach (self::PRODUCT_PATHS as $needle) {
-            // "/products/" must be a segment with something after it — the
-            // bare collection index is not a product page.
-            if (str_contains($path, $needle) && rtrim($path, '/') !== rtrim($needle, '/')) {
-                return true;
-            }
-        }
-
-        return false;
+        return \App\Services\Content\Catalog\ProductCatalogService::isProductPath($url);
     }
 
     /**

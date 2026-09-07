@@ -147,6 +147,8 @@ class RewriteCreditPurchaseTest extends TestCase
             'content_addon_annual_usd' => 10, 'content_first_month_usd' => 1,
             'content_trial_days' => 5, 'content_trial_articles' => 3,
             'content_monthly_articles_per_website' => 30, 'content_only_crawl_pages' => 200,
+            'content_catalog_page_budget' => 2000, 'content_catalog_llm_extract_cap' => 100,
+            'content_catalog_firecrawl_daily_budget' => 200,
             'content_tracker_keywords' => 500, 'content_trial_tracker_keywords' => 3,
         ];
     }

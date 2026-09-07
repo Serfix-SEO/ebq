@@ -54,7 +54,7 @@ class FinalizeProductCatalogJob implements ShouldQueue
 
         // Full onboarding/settings/admin runs saw the whole catalog: anything
         // not seen this run is gone. Refresh runs are partial — never mark.
-        if (in_array($run->trigger, ['onboarding', 'settings', 'banner', 'admin'], true) && $run->started_at !== null) {
+        if (in_array($run->trigger, ['onboarding', 'settings', 'banner', 'admin', 'monthly'], true) && $run->started_at !== null) {
             ContentProduct::query()
                 ->where('website_id', $run->website_id)
                 ->where('status', ContentProduct::STATUS_ACTIVE)
