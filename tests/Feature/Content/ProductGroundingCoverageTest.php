@@ -354,6 +354,23 @@ class ProductGroundingCoverageTest extends TestCase
         $this->assertSame([], $guard->strictBlockedBrands($plan->refresh()));
     }
 
+    public function test_strict_image_fallback_subject_is_catalog_derived_not_the_title(): void
+    {
+        // The fallback prompt used to embed the raw title — "Tom Ford Oud
+        // Wood Clone" rode straight into the render. Strict plans get an
+        // unbranded catalog subject; normal plans keep the title path (null).
+        [$plan, , $product] = $this->strictFixture();
+        $product->forceFill(['category' => 'Face serums'])->save();
+
+        $this->assertSame('Face serums', \App\Jobs\GenerateContentImagesJob::strictFallbackSubject($plan));
+
+        $product->forceFill(['category' => null])->save();
+        $this->assertSame('serums', \App\Jobs\GenerateContentImagesJob::strictFallbackSubject($plan->refresh()));
+
+        $plan->forceFill(['product_mode' => \App\Models\ContentPlan::PRODUCT_MODE_NORMAL])->save();
+        $this->assertNull(\App\Jobs\GenerateContentImagesJob::strictFallbackSubject($plan->refresh()));
+    }
+
     public function test_product_figures_injected_once_with_live_image_after_first_mention(): void
     {
         [$plan, $topic, $product] = $this->strictFixture();

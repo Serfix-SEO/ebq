@@ -145,12 +145,19 @@ class GenerateContentImagesJob implements ShouldQueue
         // whether it is also embedded at the TOP of the article body — off avoids
         // a duplicate when the WP theme already renders the featured image.
         $embedFeatured = $plan === null || $plan->toggle('featured_image');
+        // Strict Product Mode: the FALLBACK prompt embeds raw article text
+        // (title / section heading), which can carry an outside brand straight
+        // into the render (carmenperfumes 2026-09-07: "Tom Ford Oud Wood
+        // Clone" title → fallback prompt → branded-looking bottle). The
+        // art-director path has explicit rules; the fallback gets an
+        // unbranded catalog-derived subject instead of the title.
+        $strictSubject = self::strictFallbackSubject($plan);
         $jobs = [];
         if (ContentAutopilotConfig::featuredImageEnabled()) {
             $jobs[] = [
                 'role' => ContentImage::ROLE_FEATURED,
                 'anchor' => null,
-                'prompt' => $llmPrompts['featured'] ?? $this->prompt((string) $article->h1, $stylePrompt),
+                'prompt' => $llmPrompts['featured'] ?? $this->prompt($strictSubject ?? (string) $article->h1, $stylePrompt),
                 'alt' => $focus !== '' ? Str::ucfirst($focus) : (string) $article->h1,
                 'aspect' => '16x9',
             ];
@@ -159,7 +166,7 @@ class GenerateContentImagesJob implements ShouldQueue
             $jobs[] = [
                 'role' => ContentImage::ROLE_INLINE,
                 'anchor' => $anchor['id'],
-                'prompt' => $llmPrompts['inline'][$anchor['id']] ?? $this->prompt($anchor['text'].' — '.$article->h1, $stylePrompt),
+                'prompt' => $llmPrompts['inline'][$anchor['id']] ?? $this->prompt($strictSubject ?? ($anchor['text'].' — '.$article->h1), $stylePrompt),
                 // Weave an additional keyphrase into the alt for topical coverage.
                 'alt' => ($additional[$i] ?? $anchor['text']),
                 'aspect' => '16x9',
@@ -392,6 +399,25 @@ class GenerateContentImagesJob implements ShouldQueue
 
             return [];
         }
+    }
+
+    /**
+     * Unbranded scene subject for strict plans' fallback prompts: the
+     * catalog's top category (or the sell-offering), never article text.
+     * Null for non-strict plans — they keep the title-derived subject.
+     */
+    public static function strictFallbackSubject(?\App\Models\ContentPlan $plan): ?string
+    {
+        if ($plan?->product_mode !== \App\Models\ContentPlan::PRODUCT_MODE_STRICT) {
+            return null;
+        }
+        $category = \App\Models\ContentProduct::query()
+            ->where('website_id', $plan->website_id)->usable()
+            ->whereNotNull('category')->where('category', '!=', '')
+            ->value('category');
+        $sell = array_values(array_filter(array_map('trim', (array) (($plan->offerings ?? [])['sell'] ?? []))));
+
+        return trim((string) ($category ?: ($sell[0] ?? 'the products this store sells')));
     }
 
     private function prompt(string $subject, string $stylePrompt): string
