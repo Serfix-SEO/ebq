@@ -841,7 +841,7 @@ class ArticleReview extends Component
                     $h = strtolower((string) (parse_url($href, PHP_URL_HOST) ?: ''));
                     $path = strtolower((string) (parse_url($href, PHP_URL_PATH) ?: '/'));
                     $own = $h === '' || $h === $host || str_ends_with($h, '.'.$host);
-                    if ($own && preg_match('#/(products?|p|item)/.#', $path)
+                    if ($own && preg_match('#/(products?|p|item)([/-]).#', $path)
                         && $catalog !== [] && ! isset($catalog[rtrim(mb_strtolower($href), '/')])
                         && ! str_contains(mb_strtolower($text), mb_strtolower($href))) {
                         $this->dispatch('ai-edit-failed', message: __('The AI edit linked to a product that is not in your catalog, so it was not applied. Try again.'));
@@ -1460,6 +1460,29 @@ class ArticleReview extends Component
         return ['steps' => $steps, 'etaText' => $etaText, 'failed' => $failed];
     }
 
+    /**
+     * Strict Product Mode: the products this article was built around (the
+     * stored selection in topic.meta, joined with the live catalog rows for
+     * thumbnails) — shown as a sidebar card on the article detail page.
+     */
+    private function articleProducts(?ContentTopic $topic): \Illuminate\Support\Collection
+    {
+        $selection = array_values((array) data_get($topic?->meta, 'products', []));
+        if ($selection === [] || $topic?->plan?->product_mode !== \App\Models\ContentPlan::PRODUCT_MODE_STRICT) {
+            return collect();
+        }
+        $rows = \App\Models\ContentProduct::query()
+            ->whereIn('id', array_filter(array_map(static fn ($p) => $p['id'] ?? null, $selection)))
+            ->get(['id', 'image_url', 'status'])
+            ->keyBy('id');
+
+        return collect($selection)->map(static fn ($p) => [
+            'name' => (string) ($p['name'] ?? ''),
+            'url' => (string) ($p['url'] ?? ''),
+            'image' => (string) ($rows[$p['id'] ?? '']->image_url ?? ''),
+        ])->filter(static fn ($p) => $p['name'] !== '' && $p['url'] !== '')->values();
+    }
+
     public function render()
     {
         $topic = $this->topic();
@@ -1583,6 +1606,7 @@ class ArticleReview extends Component
             'publishConnected' => (bool) $topic?->plan?->website
                 ?->contentIntegrations()->where('status', ContentIntegration::STATUS_CONNECTED)->exists(),
             'presentation' => $topic ? ContentCalendar::statusPresentation($topic->status) : null,
+            'articleProducts' => $this->articleProducts($topic),
         ]);
     }
 }

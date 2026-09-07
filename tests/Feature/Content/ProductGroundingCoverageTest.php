@@ -328,6 +328,61 @@ class ProductGroundingCoverageTest extends TestCase
         $this->assertSame($selection, $again);
     }
 
+    public function test_product_figures_injected_once_with_live_image_after_first_mention(): void
+    {
+        [$plan, $topic, $product] = $this->strictFixture();
+        $product->forceFill(['image_url' => 'https://shop.test/cdn/serum.jpg'])->save();
+        $m = new \ReflectionMethod(ContentArticleProducer::class, 'productContext');
+        $m->setAccessible(true);
+        $m->invoke(app(ContentArticleProducer::class), $topic, $plan);
+        $r = new \ReflectionMethod(ContentArticleProducer::class, 'scorerContext');
+        $r->setAccessible(true);
+        $ctx = $r->invoke(app(ContentArticleProducer::class), $topic->refresh(), $plan, $topic->website);
+
+        $article = $this->articleFor($topic,
+            '<p>Intro paragraph.</p><p>Try <a href="'.$product->url.'">'.self::PRODUCT.'</a> daily.</p><p>Outro.</p>');
+        $s = new \ReflectionMethod(ContentArticleProducer::class, 'stripMismatchedInternalLinks');
+        $s->setAccessible(true);
+        $result = $s->invoke(app(ContentArticleProducer::class), $article, $topic->refresh(), $ctx);
+        $html = (string) $result->html;
+
+        // Figure lands right after the paragraph that links the product.
+        $this->assertStringContainsString('daily.</p>'."\n".'<figure class="serfix-product-figure"', $html);
+        $this->assertStringContainsString('<img src="https://shop.test/cdn/serum.jpg" alt="'.self::PRODUCT.'"', $html);
+        $this->assertStringContainsString('<a href="'.$product->url.'"><img', $html);
+        // Dedupe never strips the image link even though a text link exists.
+        $this->assertSame(2, substr_count($html, 'href="'.$product->url.'"'), 'text link + image link');
+
+        // Idempotent: a second gate pass injects nothing new.
+        $again = $s->invoke(app(ContentArticleProducer::class), $result, $topic->refresh(), $ctx);
+        $this->assertSame(1, substr_count((string) $again->html, 'serfix-product-figure'));
+    }
+
+    public function test_product_figure_skipped_when_image_is_dead_or_missing(): void
+    {
+        config(['features.article_link_verify' => true]);
+        [$plan, $topic, $product] = $this->strictFixture();
+        $product->forceFill(['image_url' => 'https://shop.test/cdn/gone.jpg'])->save();
+        \Illuminate\Support\Facades\Http::fake([
+            'https://shop.test/cdn/gone.jpg' => \Illuminate\Support\Facades\Http::response('', 404),
+            'https://shop.test/*' => \Illuminate\Support\Facades\Http::response('ok', 200),
+        ]);
+        $m = new \ReflectionMethod(ContentArticleProducer::class, 'productContext');
+        $m->setAccessible(true);
+        $m->invoke(app(ContentArticleProducer::class), $topic, $plan);
+        $r = new \ReflectionMethod(ContentArticleProducer::class, 'scorerContext');
+        $r->setAccessible(true);
+        $ctx = $r->invoke(app(ContentArticleProducer::class), $topic->refresh(), $plan, $topic->website);
+
+        $article = $this->articleFor($topic, '<p><a href="'.$product->url.'">'.self::PRODUCT.'</a></p>');
+        $s = new \ReflectionMethod(ContentArticleProducer::class, 'stripMismatchedInternalLinks');
+        $s->setAccessible(true);
+        $result = $s->invoke(app(ContentArticleProducer::class), $article, $topic->refresh(), $ctx);
+
+        $this->assertStringNotContainsString('serfix-product-figure', (string) $result->html,
+            'a dead product image must never be injected');
+    }
+
     public function test_produce_resolves_products_before_building_scorer_context(): void
     {
         // Ordering pin (pilot 2026-09-07): scorerContext reads topic.meta,

@@ -876,7 +876,10 @@ class ContentArticleProducer
                         // product but the LLM over-links (pilot: same sandal
                         // linked 8×) — keep the first, unwrap the repeats.
                         // Any exact catalog match dedupes, whatever its shape.
-                        if ($own && isset($catalog[$key])) {
+                        // Image links (the injected product figures) are a
+                        // separate, standard e-commerce pattern — never
+                        // counted against, or removed by, the text-link rule.
+                        if ($own && isset($catalog[$key]) && ! str_contains($m[2], '<img')) {
                             if (isset($seen[$key])) {
                                 return $m[2];
                             }
@@ -890,6 +893,7 @@ class ContentArticleProducer
             }
 
             $html = $this->unwrapDeadExternalLinks($html, $context);
+            $html = $this->injectProductFigures($html, $context);
 
             if ($html === (string) $article->html) {
                 return $article;
@@ -939,6 +943,82 @@ class ContentArticleProducer
         }
 
         return $html;
+    }
+
+    /**
+     * Real product photos as clickable figures (strict plans): after the
+     * final verdict, inject up to 3 <figure> blocks — the product's OWN store
+     * image wrapped in its product link — right after the paragraph that
+     * first links (or mentions) the product. Deterministic, idempotent
+     * (data-product marker), zero LLM involvement, and the image URL is
+     * live-checked first so a swapped shop photo never 404s in the article.
+     */
+    private function injectProductFigures(string $html, array $context): string
+    {
+        $selection = array_values((array) ($context['products'] ?? []));
+        if ($selection === []) {
+            return $html;
+        }
+
+        $ids = array_filter(array_map(static fn ($p) => $p['id'] ?? null, $selection));
+        $images = \App\Models\ContentProduct::query()
+            ->whereIn('id', $ids)
+            ->whereNotNull('image_url')
+            ->pluck('image_url', 'id');
+
+        $candidates = [];
+        foreach ($selection as $p) {
+            $img = (string) ($images[$p['id'] ?? ''] ?? '');
+            if ($img === '' || ! str_starts_with($img, 'https://')) {
+                continue;
+            }
+            if (str_contains($html, 'data-product="'.e((string) $p['id']).'"')) {
+                continue; // already injected on an earlier pass
+            }
+            $candidates[] = $p + ['image' => $img];
+            if (count($candidates) >= 3) {
+                break;
+            }
+        }
+        if ($candidates === []) {
+            return $html;
+        }
+
+        $deadImages = app(LinkVerifier::class)->deadSet(array_map(static fn ($p) => $p['image'], $candidates));
+
+        foreach ($candidates as $p) {
+            if (isset($deadImages[$p['image']])) {
+                continue;
+            }
+            // Anchor point: the paragraph that first links the product, else
+            // the paragraph with the first name mention. No match → skip.
+            $pos = $this->firstParagraphEnd($html, 'href="'.$p['url'].'"')
+                ?? $this->firstParagraphEnd($html, (string) $p['name']);
+            if ($pos === null) {
+                continue;
+            }
+            $figure = '<figure class="serfix-product-figure" data-product="'.e((string) $p['id']).'">'
+                .'<a href="'.e((string) $p['url']).'">'
+                .'<img src="'.e($p['image']).'" alt="'.e((string) $p['name']).'" loading="lazy"/></a>'
+                .'<figcaption>'.e((string) $p['name']).'</figcaption></figure>';
+            $html = substr($html, 0, $pos)."\n".$figure.substr($html, $pos);
+        }
+
+        return $html;
+    }
+
+    /** Byte offset just past the </p> of the first paragraph containing $needle, or null. */
+    private function firstParagraphEnd(string $html, string $needle): ?int
+    {
+        // stripos, NOT mb_stripos: substr() below slices by BYTES, so the
+        // offset must be a byte offset (mb_* offsets corrupt Arabic articles).
+        $at = stripos($html, $needle);
+        if ($at === false) {
+            return null;
+        }
+        $close = stripos($html, '</p>', $at);
+
+        return $close === false ? null : $close + 4;
     }
 
     /**

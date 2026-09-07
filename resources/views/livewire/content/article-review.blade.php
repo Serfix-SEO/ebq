@@ -383,7 +383,11 @@
             {{-- ca-sticky-col: stays in view while the long article scrolls
                  (grid items stretch by default, so align-self:start is required
                  for sticky to have room to move). --}}
-            <div class="space-y-4 ca-sticky-col">
+            {{-- order-2/lg:order-1: on phones the ARTICLE comes first — the
+                 client opens this page to read; the quality panel + actions
+                 follow below (they used to push the article a full screen of
+                 scrolling down). --}}
+            <div class="order-2 space-y-4 ca-sticky-col lg:order-1">
                 @if ($editing)
                     {{-- Live on-page checks (re-score as you type — same rules as the site plugin) --}}
                     <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -400,7 +404,7 @@
                                 <div class="text-xs text-slate-500 dark:text-slate-400">{{ __('Updates as you edit') }}</div>
                             </div>
                         </div>
-                        <ul class="mt-4 max-h-[26rem] space-y-1 overflow-y-auto pr-1">
+                        <ul class="mt-4 space-y-1 overflow-y-auto pr-1" style="max-height: 26rem">
                             @foreach (collect($liveChecks)->sortBy('passed') as $check)
                                 <li class="flex items-start gap-2 py-0.5 text-sm {{ $check['passed'] ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200 font-medium' }}" wire:key="chk-{{ $check['code'] }}">
                                     @if ($check['passed'])
@@ -552,6 +556,33 @@
                     </div>
                 @endif
 
+                {{-- Strict Product Mode: the products this article features --}}
+                @if (($articleProducts ?? collect())->isNotEmpty())
+                    <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                        <div class="flex items-center gap-2">
+                            <svg class="h-4 w-4 text-orange-600 dark:text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z"/></svg>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ __('Products in this article') }}</div>
+                        </div>
+                        <div class="mt-3 space-y-2">
+                            @foreach ($articleProducts as $p)
+                                <a href="{{ $p['url'] }}" target="_blank" rel="noopener" wire:key="ap-{{ md5($p['url']) }}"
+                                   class="flex items-center gap-3 rounded-lg border border-slate-100 p-2 transition hover:border-orange-200 hover:bg-orange-50 dark:border-slate-800 dark:hover:bg-slate-800">
+                                    @if ($p['image'] !== '')
+                                        <img src="{{ $p['image'] }}" alt="" loading="lazy" class="h-10 w-10 shrink-0 rounded-lg object-cover"/>
+                                    @else
+                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-800">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z"/></svg>
+                                        </span>
+                                    @endif
+                                    <span dir="auto" class="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 dark:text-slate-200">{{ $p['name'] }}</span>
+                                    <svg class="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+                                </a>
+                            @endforeach
+                        </div>
+                        <p class="mt-2 text-xs text-slate-400 dark:text-slate-500">{{ __('Your article links to these products from your store.') }}</p>
+                    </div>
+                @endif
+
                 @php $brandSafety = (array) (($topic->meta ?? [])['brand_safety'] ?? []); @endphp
                 @if ($brandSafety !== [] || str_starts_with((string) $topic->last_error, 'brand_safety'))
                     <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
@@ -611,7 +642,7 @@
             </div>
 
             {{-- ── Article preview / editor ─────────────────────────── --}}
-            <div class="lg:col-span-2">
+            <div class="order-1 lg:order-2 lg:col-span-2">
                 @include('livewire.content.partials.main-image-card')
 
                 {{-- Inline article images — regenerate without touching the editor. --}}
@@ -930,6 +961,10 @@
                 .ca-preview figure.content-image { margin: 1.25rem 0; }
                 .ca-preview figure.content-image img { width: 100%; height: auto; border-radius: .75rem; display: block; }
                 .ca-preview figure.content-image figcaption { margin-top: .4rem; font-size: .8rem; color: #64748b; text-align: center; }
+                /* Injected real-product figures (strict plans) */
+                .ca-preview .serfix-product-figure { margin: 1.25rem auto; max-width: 340px; text-align: center; }
+                .ca-preview .serfix-product-figure img { width: 100%; height: auto; border-radius: .75rem; display: block; }
+                .ca-preview .serfix-product-figure figcaption { margin-top: .4rem; font-size: .8rem; color: #64748b; }
                 /* TipTap / ProseMirror chrome — NONE of this is in the prebuilt
                    Tailwind bundle, so it must live here as raw CSS. */
                 /* Sticky quality/checks column on wide screens — keeps Live SEO
