@@ -249,6 +249,65 @@ class ProductGroundingCoverageTest extends TestCase
         $this->assertStringContainsString('a third time', $result->html);
     }
 
+    public function test_strip_handles_dash_style_product_urls(): void
+    {
+        // mashrafshoes pilot: catalog URLs are /product-slug (no /product/
+        // segment) — the shape heuristic must still catch invented links and
+        // dedupe repeats for these shops.
+        [$plan, $topic, $product] = $this->strictFixture();
+        $product->forceFill(['url' => 'https://shop.test/product-vitamin-serum'])->save();
+        $m = new \ReflectionMethod(ContentArticleProducer::class, 'productContext');
+        $m->setAccessible(true);
+        $m->invoke(app(ContentArticleProducer::class), $topic, $plan);
+        $r = new \ReflectionMethod(ContentArticleProducer::class, 'scorerContext');
+        $r->setAccessible(true);
+        $ctx = $r->invoke(app(ContentArticleProducer::class), $topic->refresh(), $plan, $topic->website);
+
+        $article = $this->articleFor($topic,
+            '<p><a href="https://shop.test/product-vitamin-serum">ok</a>'
+            .' <a href="https://shop.test/product-vitamin-serum">repeat</a>'
+            .' <a href="https://shop.test/product-invented-cream">fake</a></p>');
+        $s = new \ReflectionMethod(ContentArticleProducer::class, 'stripMismatchedInternalLinks');
+        $s->setAccessible(true);
+        $result = $s->invoke(app(ContentArticleProducer::class), $article, $topic->refresh(), $ctx);
+
+        $this->assertSame(1, substr_count((string) $result->html, 'href="https://shop.test/product-vitamin-serum"'));
+        $this->assertStringNotContainsString('product-invented-cream', $result->html);
+        $this->assertStringContainsString('fake', $result->html);
+    }
+
+    public function test_dead_external_links_are_unwrapped_live_ones_kept(): void
+    {
+        [$plan, $topic, $product] = $this->strictFixture();
+        $m = new \ReflectionMethod(ContentArticleProducer::class, 'productContext');
+        $m->setAccessible(true);
+        $m->invoke(app(ContentArticleProducer::class), $topic, $plan);
+        $r = new \ReflectionMethod(ContentArticleProducer::class, 'scorerContext');
+        $r->setAccessible(true);
+        $ctx = $r->invoke(app(ContentArticleProducer::class), $topic->refresh(), $plan, $topic->website);
+
+        \Illuminate\Support\Facades\Http::fake([
+            'https://dead.example/gone-page' => \Illuminate\Support\Facades\Http::response('', 404),
+            'https://alive.example/reference' => \Illuminate\Support\Facades\Http::response('ok', 200),
+            'https://flaky.example/*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timeout'),
+        ]);
+
+        $article = $this->articleFor($topic,
+            '<p><a href="'.$product->url.'">'.self::PRODUCT.'</a>'
+            .' <a href="https://dead.example/gone-page">dead citation</a>'
+            .' <a href="https://alive.example/reference">live citation</a>'
+            .' <a href="https://flaky.example/maybe">flaky citation</a></p>');
+        $s = new \ReflectionMethod(ContentArticleProducer::class, 'stripMismatchedInternalLinks');
+        $s->setAccessible(true);
+        $result = $s->invoke(app(ContentArticleProducer::class), $article, $topic->refresh(), $ctx);
+
+        $this->assertStringNotContainsString('href="https://dead.example/gone-page"', $result->html);
+        $this->assertStringContainsString('dead citation', $result->html, 'anchor text survives as plain text');
+        $this->assertStringContainsString('href="https://alive.example/reference"', $result->html);
+        $this->assertStringContainsString('href="https://flaky.example/maybe"', $result->html,
+            'a transient failure must never strip a citation');
+    }
+
     public function test_draft_selected_links_mark_products_manual(): void
     {
         [$plan, $topic, $product] = $this->strictFixture();

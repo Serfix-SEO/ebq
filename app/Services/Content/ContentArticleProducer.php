@@ -12,7 +12,9 @@ use App\Services\AiWriterService;
 use App\Services\Llm\LlmClientFactory;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentSiteTypeProfiles;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -856,7 +858,9 @@ class ContentArticleProducer
                         $host = strtolower((string) (parse_url($m[1], PHP_URL_HOST) ?: ''));
                         $path = strtolower((string) (parse_url($m[1], PHP_URL_PATH) ?: '/'));
                         $own = $host === '' || isset($ownHosts[$host]);
-                        $productish = (bool) preg_match('#/(products?|p|item)/.#', $path);
+                        // Shape covers both /products/slug and dash-style
+                        // /product-slug shops (mashrafshoes pilot 2026-09-07).
+                        $productish = (bool) preg_match('#/(products?|p|item)([/-]).#', $path);
                         $key = rtrim(mb_strtolower($m[1]), '/');
                         if ($own && $productish && ! isset($catalog[$key])) {
                             return $m[2];
@@ -864,7 +868,8 @@ class ContentArticleProducer
                         // Dedupe: the prompt asks for AT MOST one link per
                         // product but the LLM over-links (pilot: same sandal
                         // linked 8×) — keep the first, unwrap the repeats.
-                        if ($own && $productish && isset($catalog[$key])) {
+                        // Any exact catalog match dedupes, whatever its shape.
+                        if ($own && isset($catalog[$key])) {
                             if (isset($seen[$key])) {
                                 return $m[2];
                             }
@@ -876,6 +881,8 @@ class ContentArticleProducer
                     $html
                 );
             }
+
+            $html = $this->unwrapDeadExternalLinks($html, $context);
 
             if ($html === (string) $article->html) {
                 return $article;
@@ -895,6 +902,49 @@ class ContentArticleProducer
 
             return $article;
         }
+    }
+
+    /**
+     * External citations the LLM invents can be dead on arrival (pilot
+     * 2026-09-07: a birkenstock.com deep link 404'd). Verify each external
+     * href once (cached a week) and unwrap ONLY on a definitive 404/410 —
+     * timeouts, DNS blips and 403 bot-walls keep the link (a transient
+     * failure must never strip a legitimate citation). Capped at 10 checks
+     * per article; runs in the post-verdict gate, so scores are unaffected.
+     */
+    private function unwrapDeadExternalLinks(string $html, array $context): string
+    {
+        $ownHosts = array_flip(array_filter(array_merge(
+            [strtolower((string) ($context['site_host'] ?? ''))],
+            array_map(static fn ($u) => strtolower((string) (parse_url((string) $u, PHP_URL_HOST) ?: '')), (array) ($context['catalog_urls'] ?? [])),
+        )));
+
+        preg_match_all('/href="(https?:\/\/[^"]+)"/i', $html, $m);
+        $checked = 0;
+        foreach (array_unique($m[1]) as $url) {
+            $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: ''));
+            if ($host === '' || isset($ownHosts[$host]) || $checked >= 10) {
+                continue;
+            }
+            $checked++;
+            $dead = Cache::remember('content:extlink-dead:'.sha1($url), 604800, function () use ($url): bool {
+                try {
+                    $status = Http::withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; SerfixBot)'])
+                        ->timeout(10)->connectTimeout(5)->withoutVerifying()->get($url)->status();
+
+                    return in_array($status, [404, 410], true);
+                } catch (\Throwable) {
+                    return false; // transient/unknown → keep the link
+                }
+            });
+            if ($dead) {
+                $quoted = preg_quote($url, '/');
+                $html = (string) preg_replace('/<a\b[^>]*href="'.$quoted.'"[^>]*>(.*?)<\/a>/is', '$1', $html);
+                Log::info('content_autopilot.dead_external_link_stripped', ['url' => $url]);
+            }
+        }
+
+        return $html;
     }
 
     /**
