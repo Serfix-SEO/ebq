@@ -80,7 +80,28 @@ class ContentTopicPlanner
             ->pluck('title')->all();
         $gscSignals = $this->gscSignals($website);
 
-        $candidates = $this->ideate($plan, $website, $gscSignals, $existingTitles, $count);
+        // BATCHED ideation (carmenperfumes 2026-09-07): asking for 26 topics
+        // in one call truncated the JSON past the completion cap (the strict
+        // catalog block + product_urls contract grew the output) → parse
+        // failed → 0 candidates → the calendar silently never filled past the
+        // confirmed terms. Same lesson as chunked article writing: cap each
+        // request and loop, feeding created titles forward against dupes.
+        $candidates = [];
+        for ($batch = 0; $batch < 3 && count($candidates) < $count; $batch++) {
+            $ask = min(12, $count - count($candidates));
+            $got = $this->ideate(
+                $plan, $website, $gscSignals,
+                array_merge($existingTitles, array_map(static fn ($c) => (string) ($c['title'] ?? ''), $candidates)),
+                $ask
+            );
+            if ($got === []) {
+                break;
+            }
+            $candidates = array_merge($candidates, $got);
+            if (count($got) < $ask) {
+                break; // the model has run out of distinct ideas
+            }
+        }
         if ($candidates === [] && $confirmed !== []) {
             return $confirmed;
         }
