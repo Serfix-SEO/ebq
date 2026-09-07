@@ -165,7 +165,7 @@ class DiscoverProductPagesJob implements ShouldQueue
             if ($candidates === []) {
                 $candidates[] = 'https://'.$domain.'/sitemap.xml';
             }
-            $candidates = array_slice(array_values(array_unique($candidates)), 0, 5);
+            $candidates = $this->expandIndexesProductFirst(array_slice(array_values(array_unique($candidates)), 0, 5));
 
             $urls = [];
             foreach (app(\App\Support\Crawler\SitemapUrlExtractor::class)->extract($candidates) as $entry) {
@@ -184,6 +184,41 @@ class DiscoverProductPagesJob implements ShouldQueue
 
             return [];
         }
+    }
+
+    /**
+     * Expand top-level sitemap INDEXES ourselves, product-named children
+     * first. Shopify-style indexes list an "agentic discovery" index with
+     * hundreds of children BEFORE the products sitemap, and the shared
+     * extractor's global fetch cap exhausted on them without ever reaching
+     * the products child (carmenperfumes 2026-09-08: 87 sitemap products,
+     * the blind index walk surfaced 4). Non-index candidates pass through.
+     *
+     * @param  list<string>  $candidates
+     * @return list<string>
+     */
+    private function expandIndexesProductFirst(array $candidates): array
+    {
+        $out = [];
+        foreach ($candidates as $candidate) {
+            try {
+                $res = app(\App\Services\Crawler\CrawlFetcher::class)->fetch($candidate, [], 20);
+                $body = (string) ($res['body'] ?? '');
+                if (($res['ok'] ?? false) && stripos($body, '<sitemapindex') !== false
+                    && preg_match_all('#<loc>\s*([^<\s]+)\s*</loc>#i', $body, $m)) {
+                    $children = array_map(static fn ($u) => html_entity_decode(trim($u)), $m[1]);
+                    usort($children, static fn ($a, $b) => (int) (stripos($b, 'product') !== false) <=> (int) (stripos($a, 'product') !== false));
+                    $out = array_merge($out, array_slice($children, 0, 20));
+
+                    continue;
+                }
+            } catch (\Throwable) {
+                // fall through — keep the candidate as-is
+            }
+            $out[] = $candidate;
+        }
+
+        return array_values(array_unique($out));
     }
 
     private function looksLikeProductPath(string $url): bool

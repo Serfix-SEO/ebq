@@ -358,6 +358,47 @@ class ProductCatalogRunTest extends TestCase
         Bus::assertBatched(fn ($batch) => $batch->jobs->count() === 1);
     }
 
+    public function test_index_walk_reaches_the_products_child_past_noise_siblings(): void
+    {
+        // carmenperfumes 2026-09-08: a Shopify "agentic discovery" child index
+        // sat before the products sitemap and starved the walk. Product-named
+        // children must be visited first, entities decoded (&amp; in child
+        // querystring URLs).
+        Bus::fake();
+        $this->app->bind(\App\Support\Audit\SafeHttpGuard::class, fn () => new class extends \App\Support\Audit\SafeHttpGuard
+        {
+            public function check(string $url): array
+            {
+                return ['ok' => true];
+            }
+        });
+        $website = Website::factory()->for(\App\Models\User::factory())->create(['domain' => 'shop.example', 'normalized_domain' => 'shop.example']);
+        $run = ContentProductRun::factory()->create([
+            'website_id' => $website->id, 'status' => ContentProductRun::STATUS_PENDING,
+        ]);
+        \Illuminate\Support\Facades\Http::fake([
+            'https://shop.example/robots.txt' => \Illuminate\Support\Facades\Http::response("Sitemap: https://shop.example/sitemap.xml", 200),
+            'https://shop.example/sitemap.xml' => \Illuminate\Support\Facades\Http::response(
+                '<?xml version="1.0"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                .'<sitemap><loc>https://shop.example/sitemap_agentic.xml</loc></sitemap>'
+                .'<sitemap><loc>https://shop.example/sitemap_products_1.xml?from=1&amp;to=99</loc></sitemap>'
+                .'</sitemapindex>', 200),
+            'https://shop.example/sitemap_agentic.xml' => \Illuminate\Support\Facades\Http::response(
+                '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                .'<url><loc>https://shop.example/s/agent-junk</loc></url></urlset>', 200),
+            'https://shop.example/sitemap_products_1.xml?from=1&to=99' => \Illuminate\Support\Facades\Http::response(
+                '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                .'<url><loc>https://shop.example/products/gamma</loc></url>'
+                .'<url><loc>https://shop.example/products/delta</loc></url></urlset>', 200),
+        ]);
+
+        (new DiscoverProductPagesJob($run->id))->handle();
+
+        $run->refresh();
+        $this->assertSame(ContentProductRun::STATUS_EXTRACTING, $run->status);
+        $this->assertSame(2, $run->pages_found, 'both products from the entity-encoded child sitemap');
+    }
+
     public function test_product_path_heuristic(): void
     {
         $svc = ProductCatalogService::class;
