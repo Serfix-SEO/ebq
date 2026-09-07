@@ -222,10 +222,22 @@ class ContentTopicPlanner
         $cap = ContentAutopilotConfig::monthlyArticlesPerWebsite();
         $created = [];
 
+        // Strict Product Mode: confirmed terms are human-chosen, but the
+        // ABSOLUTE brand rule outranks them (carmenperfumes 2026-09-07: the
+        // onboarding-confirmed "best tom ford oud wood clone" term resurrected
+        // a rival-brand topic on EVERY replan, bypassing the ideation gate).
+        // A confirmed term naming a known outside brand never materializes.
+        $strictBrandTerms = app(\App\Services\Content\CompetitorMentionGuard::class)->strictBlockedBrands($plan);
+
         foreach ($terms as $term) {
             $keyword = mb_strtolower(trim((string) $term->keyword));
             if ($keyword === '' || $existingKeywords->has($keyword) || count($created) >= 10) {
                 continue;
+            }
+            foreach ($strictBrandTerms as $brand) {
+                if (preg_match('/\b'.preg_quote($brand, '/').'\b/ui', $keyword)) {
+                    continue 2;
+                }
             }
 
             $poolSize = $plan->topics()

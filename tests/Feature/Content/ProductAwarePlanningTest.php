@@ -166,6 +166,33 @@ class ProductAwarePlanningTest extends TestCase
         $this->assertTrue($titles->contains('Best Oud Perfume For Men'));
     }
 
+    public function test_confirmed_terms_naming_outside_brands_never_materialize_on_strict(): void
+    {
+        // Third topic-creation path (carmenperfumes): onboarding-confirmed
+        // keywords materialize 1:1 and bypassed the ideation brand gate — a
+        // confirmed "tom ford ..." term resurrected the topic on every replan.
+        [$website, $plan] = $this->shop(['product_mode' => 'strict']);
+        $this->product($website->id, 'Oud Royale Perfume 50ml', 'https://s.test/products/oud-royale');
+        $plan->forceFill(['competitor_guard' => [
+            'assessed_at' => now()->toIso8601String(), 'harmful' => true,
+            'auto' => [], 'manual' => ['tom ford'], 'removed' => [],
+        ]])->save();
+        foreach ([['best tom ford oud wood clone', 900], ['best oud perfume for men', 800]] as [$kw, $vol]) {
+            ContentPlanKeyword::create([
+                'plan_id' => $plan->id, 'keyword' => $kw, 'keyword_hash' => sha1($kw),
+                'type' => ContentPlanKeyword::TYPE_CONFIRMED, 'search_volume' => $vol,
+            ]);
+        }
+
+        $created = (new ContentTopicPlanner($this->stubLlm([])))->plan($plan, 5);
+
+        $keywords = collect($created)->pluck('target_keyword');
+        $this->assertFalse($keywords->contains('best tom ford oud wood clone'));
+        $this->assertTrue($keywords->contains('best oud perfume for men'));
+        // Normal plans keep every confirmed term (regression pin).
+        $this->assertSame(0, ContentTopic::query()->where('target_keyword', 'best tom ford oud wood clone')->count());
+    }
+
     public function test_null_mode_planning_is_untouched(): void
     {
         [, $plan] = $this->shop(['product_mode' => null]);
