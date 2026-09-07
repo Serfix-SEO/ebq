@@ -28,6 +28,16 @@ class GoogleSsoLoginTest extends TestCase
         ]);
     }
 
+    public function test_sso_redirect_forces_the_account_picker(): void
+    {
+        // prompt=select_account sidesteps Google's silent stored-session
+        // resume, which 500s inside Google for stale multi-account cookie
+        // states (owner reproduced 2026-09-08).
+        $res = $this->get(route('google.sso.redirect', ['intent' => 'login']));
+        $res->assertRedirect();
+        $this->assertStringContainsString('prompt=select_account', (string) $res->headers->get('Location'));
+    }
+
     public function test_sso_redirect_requests_minimum_scopes_only(): void
     {
         $res = $this->get(route('google.sso.redirect', ['intent' => 'register']));

@@ -59,6 +59,11 @@ class GoogleOAuthController extends Controller
         return Socialite::driver('google')
             ->redirectUrl(route('google.sso.callback', absolute: true))
             ->scopes(['openid', 'profile', 'email'])
+            // prompt=select_account: without it Google silently resumes the
+            // browser's stored session for this client, and a stale multi-
+            // account state 500s INSIDE Google before any page renders
+            // (owner hit this 2026-09-08). The picker path never does.
+            ->with(['prompt' => 'select_account'])
             ->redirect();
     }
 
