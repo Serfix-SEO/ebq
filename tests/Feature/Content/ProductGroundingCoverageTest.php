@@ -286,6 +286,7 @@ class ProductGroundingCoverageTest extends TestCase
         $r->setAccessible(true);
         $ctx = $r->invoke(app(ContentArticleProducer::class), $topic->refresh(), $plan, $topic->website);
 
+        config(['features.article_link_verify' => true]);
         \Illuminate\Support\Facades\Http::fake([
             'https://dead.example/gone-page' => \Illuminate\Support\Facades\Http::response('', 404),
             'https://alive.example/reference' => \Illuminate\Support\Facades\Http::response('ok', 200),
@@ -325,6 +326,22 @@ class ProductGroundingCoverageTest extends TestCase
         // Stored once — second call returns the identical stored selection.
         $again = $m->invoke(app(ContentArticleProducer::class), $topic->refresh(), $plan);
         $this->assertSame($selection, $again);
+    }
+
+    public function test_dead_product_urls_are_dropped_and_marked_gone(): void
+    {
+        config(['features.article_link_verify' => true]);
+        [$plan, $topic, $product] = $this->strictFixture();
+        \Illuminate\Support\Facades\Http::fake([
+            $product->url => \Illuminate\Support\Facades\Http::response('', 404),
+        ]);
+
+        $m = new \ReflectionMethod(ContentArticleProducer::class, 'productContext');
+        $m->setAccessible(true);
+        $selection = $m->invoke(app(ContentArticleProducer::class), $topic, $plan);
+
+        $this->assertSame([], $selection, 'a 404 product URL never reaches the writer');
+        $this->assertSame(ContentProduct::STATUS_GONE, $product->refresh()->status, 'catalog self-heals');
     }
 
     public function test_out_of_stock_products_are_not_selected_for_featuring(): void

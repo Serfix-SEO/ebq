@@ -2680,3 +2680,17 @@ names from stocked-only blocks and hardScrub.
 - `topic.meta['products']` is the identity of the article's product set —
   NEVER re-match at revise time, and never store the selection on the brief
   (produce() overwrites the brief).
+
+### Link verification (global, 2026-09-07)
+
+`app/Services/Content/LinkVerifier` HTTP-verifies EVERY URL before it reaches
+the writer and after the verdict: draft `selected_links` internal pages,
+product selection in `productContext()` (a dead product URL is dropped AND the
+catalog row marked gone — self-heal), revise `linkBlock` targets, and the
+post-verdict external-citation strip. Only a definitive 404/410 is dead;
+timeouts/403 bot-walls/5xx keep the link. Verdicts cached (alive 1d, dead 7d),
+Http::pool chunks of 10, ≤25 URLs per call. Kill-switch
+`features.article_link_verify` (`CONTENT_LINK_VERIFY`) — **pinned false in
+phpunit.xml so pipeline tests never issue real HTTP; LinkVerifier/coverage
+tests enable it per-test.** Product-shape heuristic in the anchor strip covers
+`/products/slug` AND dash-style `/product-slug` (mashrafshoes pilot).

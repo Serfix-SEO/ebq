@@ -12,9 +12,7 @@ use App\Services\AiWriterService;
 use App\Services\Llm\LlmClientFactory;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentSiteTypeProfiles;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -118,12 +116,17 @@ class ContentArticleProducer
             // Non-manual entries normalize to source user_selected →
             // anchor_locked false, i.e. paraphraseable suggestions.
             'selected_links' => (function () use ($context, $products) {
+                // Pre-flight: crawl data says these pages were 200, but the
+                // crawl can be stale — verify before the writer links them.
+                $pages = array_slice((array) ($context['selected_pages'] ?? []), 0, $products === [] ? 8 : 5);
+                $deadPages = app(LinkVerifier::class)->deadSet(array_map(static fn ($p) => (string) $p['url'], $pages));
+                $pages = array_values(array_filter($pages, static fn ($p) => ! isset($deadPages[(string) $p['url']])));
                 $internal = array_map(static fn ($p) => [
                     'url' => (string) $p['url'],
                     // Anchor seed = page title with a trailing "| Site Name"
                     // style suffix stripped.
                     'anchor' => trim((string) preg_replace('/\s*[|–—]\s*[^|–—]*$/u', '', (string) $p['title'])) ?: (string) $p['title'],
-                ], array_slice((array) ($context['selected_pages'] ?? []), 0, $products === [] ? 8 : 5));
+                ], $pages);
                 // Strict Product Mode: product links ride the SAME contract,
                 // marked manual → user_manual source → presence is HARD-
                 // enforced by ensureManualLinksPresent and the anchor (the
@@ -906,11 +909,10 @@ class ContentArticleProducer
 
     /**
      * External citations the LLM invents can be dead on arrival (pilot
-     * 2026-09-07: a birkenstock.com deep link 404'd). Verify each external
-     * href once (cached a week) and unwrap ONLY on a definitive 404/410 —
-     * timeouts, DNS blips and 403 bot-walls keep the link (a transient
-     * failure must never strip a legitimate citation). Capped at 10 checks
-     * per article; runs in the post-verdict gate, so scores are unaffected.
+     * 2026-09-07: a birkenstock.com deep link 404'd). LinkVerifier checks
+     * each external href (cached) and this unwraps ONLY definitive 404/410 —
+     * transient failures keep the link. Capped at 10 checks per article;
+     * runs in the post-verdict gate, so scores are unaffected.
      */
     private function unwrapDeadExternalLinks(string $html, array $context): string
     {
@@ -920,28 +922,16 @@ class ContentArticleProducer
         )));
 
         preg_match_all('/href="(https?:\/\/[^"]+)"/i', $html, $m);
-        $checked = 0;
-        foreach (array_unique($m[1]) as $url) {
+        $external = array_values(array_filter(array_unique($m[1]), static function ($url) use ($ownHosts): bool {
             $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: ''));
-            if ($host === '' || isset($ownHosts[$host]) || $checked >= 10) {
-                continue;
-            }
-            $checked++;
-            $dead = Cache::remember('content:extlink-dead:'.sha1($url), 604800, function () use ($url): bool {
-                try {
-                    $status = Http::withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; SerfixBot)'])
-                        ->timeout(10)->connectTimeout(5)->withoutVerifying()->get($url)->status();
 
-                    return in_array($status, [404, 410], true);
-                } catch (\Throwable) {
-                    return false; // transient/unknown → keep the link
-                }
-            });
-            if ($dead) {
-                $quoted = preg_quote($url, '/');
-                $html = (string) preg_replace('/<a\b[^>]*href="'.$quoted.'"[^>]*>(.*?)<\/a>/is', '$1', $html);
-                Log::info('content_autopilot.dead_external_link_stripped', ['url' => $url]);
-            }
+            return $host !== '' && ! isset($ownHosts[$host]);
+        }));
+
+        foreach (app(LinkVerifier::class)->deadSet(array_slice($external, 0, 10)) as $url => $_) {
+            $quoted = preg_quote($url, '/');
+            $html = (string) preg_replace('/<a\b[^>]*href="'.$quoted.'"[^>]*>(.*?)<\/a>/is', '$1', $html);
+            Log::info('content_autopilot.dead_external_link_stripped', ['url' => $url]);
         }
 
         return $html;
@@ -1425,6 +1415,9 @@ class ContentArticleProducer
         // reviser cannot satisfy the internal-link checks (it would invent
         // URLs, which the scorer rejects).
         $linkTargets = array_slice((array) ($this->scorerContext($topic, $plan, $topic->website)['selected_pages'] ?? []), 0, 15);
+        // Pre-flight, same rule as the draft: no dead targets reach the model.
+        $deadTargets = app(LinkVerifier::class)->deadSet(array_map(static fn ($p) => (string) $p['url'], $linkTargets));
+        $linkTargets = array_values(array_filter($linkTargets, static fn ($p) => ! isset($deadTargets[(string) $p['url']])));
         $linkBlock = $linkTargets === [] ? ''
             : "INTERNAL PAGES YOU MAY LINK TO (use 2-3 naturally, exact URLs only):\n"
                 .implode("\n", array_map(static fn ($p) => $p['url'].' — '.($p['title'] ?: '(untitled)'), $linkTargets))
@@ -1650,9 +1643,21 @@ class ContentArticleProducer
                 ->match((string) $topic->website_id, $topic->title.' '.$topic->target_keyword, 8);
         }
         // Out-of-stock never gets FEATURED billing; keep at most 8, min viable 1.
-        $selection = $products
+        $candidates = $products
             ->reject(fn ($p) => $p->availability === \App\Models\ContentProduct::AVAILABILITY_OUT_OF_STOCK)
-            ->take(8)
+            ->take(8)->values();
+
+        // Pre-flight: never hand the writer a product URL that 404s. A dead
+        // URL also self-heals the catalog (marked gone, off future selections).
+        $dead = app(LinkVerifier::class)->deadSet($candidates->map(fn ($p) => (string) $p->url)->all());
+        if ($dead !== []) {
+            \App\Models\ContentProduct::query()
+                ->whereIn('id', $candidates->filter(fn ($p) => isset($dead[(string) $p->url]))->map(fn ($p) => (string) $p->id)->all())
+                ->update(['status' => \App\Models\ContentProduct::STATUS_GONE]);
+        }
+
+        $selection = $candidates
+            ->reject(fn ($p) => isset($dead[(string) $p->url]))
             ->map(fn ($p) => [
                 'id' => (string) $p->id,
                 'name' => (string) $p->name,

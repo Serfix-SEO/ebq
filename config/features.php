@@ -32,4 +32,12 @@ return [
     // goes live before deploy decisions, so the env flag, not code presence,
     // decides visibility. Default true = deploying this code changes nothing.
     'seo_platform_ui' => (bool) env('SEO_PLATFORM_UI', true),
+
+    /*
+    | Pre-flight HTTP verification of article link targets (internal pages,
+    | catalog products, external citations) + the post-verdict dead-external
+    | strip. Pinned OFF in phpunit.xml so tests never issue real HTTP —
+    | LinkVerifier tests enable it explicitly.
+    */
+    'article_link_verify' => (bool) env('CONTENT_LINK_VERIFY', true),
 ];
