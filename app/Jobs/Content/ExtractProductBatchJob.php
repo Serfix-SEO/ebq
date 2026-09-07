@@ -96,8 +96,18 @@ class ExtractProductBatchJob implements ShouldQueue
             $used = (int) Cache::get('catalog:llm-used:'.$run->id, 0);
             $take = max(0, min(count($llmCandidates), $cap - $used));
             if ($take > 0) {
+                $queued = array_slice($llmCandidates, 0, $take);
+                // These pages WERE seen — extraction just needs the async LLM.
+                // Touch last_seen_at on their existing rows NOW, or finalize
+                // (which can run before the LLM job) gone-marks live products
+                // for the LLM-to-un-gone window (carmen 2026-09-08: 15
+                // hair mists/gift boxes flickered gone after every full scan).
+                ContentProduct::query()
+                    ->where('website_id', $run->website_id)
+                    ->whereIn('url_hash', array_map(static fn ($u) => hash('sha256', $u), $queued))
+                    ->update(['last_seen_at' => now()]);
                 Cache::put('catalog:llm-used:'.$run->id, $used + $take, 86400);
-                ExtractProductLlmJob::dispatch($run->id, array_slice($llmCandidates, 0, $take));
+                ExtractProductLlmJob::dispatch($run->id, $queued);
             }
             $failed += count($llmCandidates) - $take;
         }

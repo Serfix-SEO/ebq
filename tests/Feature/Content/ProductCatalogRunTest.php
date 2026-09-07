@@ -463,6 +463,45 @@ class ProductCatalogRunTest extends TestCase
             'localized twin dropped; locale-only product kept');
     }
 
+    public function test_pending_llm_pages_are_not_gone_marked_by_finalize(): void
+    {
+        // Full-scan race (carmen 2026-09-08): pages with no JSON-LD go to the
+        // async LLM extractor; finalize ran first and gone-marked their live
+        // rows until the LLM landed. Queueing for LLM must count as "seen".
+        \Illuminate\Support\Facades\Http::fake([
+            'https://shop.test/products/schemaless' => \Illuminate\Support\Facades\Http::response('<html><body>No structured data here</body></html>', 200),
+        ]);
+        $this->app->bind(\App\Support\Audit\SafeHttpGuard::class, fn () => new class extends \App\Support\Audit\SafeHttpGuard
+        {
+            public function check(string $url): array
+            {
+                return ['ok' => true];
+            }
+        });
+        Queue::fake();
+        [$website] = $this->site();
+        $existing = ContentProduct::factory()->create([
+            'website_id' => $website->id, 'name' => 'Schemaless Mist',
+            'url' => 'https://shop.test/products/schemaless',
+            'url_hash' => hash('sha256', 'https://shop.test/products/schemaless'),
+            'last_seen_at' => now()->subDays(10),
+        ]);
+        $run = ContentProductRun::factory()->create([
+            'website_id' => $website->id, 'trigger' => 'admin',
+            'status' => ContentProductRun::STATUS_EXTRACTING, 'started_at' => now()->subMinute(),
+        ]);
+
+        (new \App\Jobs\Content\ExtractProductBatchJob($run->id, ['https://shop.test/products/schemaless']))->handle(
+            app(\App\Services\Crawler\CrawlFetcher::class),
+            app(\App\Services\Crawler\FirecrawlClient::class),
+            app(\App\Services\Content\Catalog\ProductExtractor::class),
+        );
+        (new FinalizeProductCatalogJob($run->id))->handle();
+
+        $this->assertSame(ContentProduct::STATUS_ACTIVE, $existing->refresh()->status,
+            'a page queued for LLM extraction was seen — never gone-marked');
+    }
+
     public function test_product_path_heuristic(): void
     {
         $svc = ProductCatalogService::class;
