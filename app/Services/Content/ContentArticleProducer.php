@@ -1690,6 +1690,8 @@ class ContentArticleProducer
         return "YOUR PRODUCTS — this store's OWN catalog items for this article:\n".implode("\n", $lines)."\n"
             .'PRODUCT RULES: feature these products naturally where they genuinely help the reader; link each listed product AT MOST once using its exact name as the anchor; '
             .'NEVER invent, guess, or mention a product that is not on this list (competitor products stay excluded by the brand rule); '
+            .'ABSOLUTE BRAND RULE: never mention ANY brand, maker, shop or product line other than the client\'s own listed products — '
+            .'no rival brand names, no "top brands" lists, no "compared to <brand>" asides, no "<brand> alternatives" framing, in any section including FAQs; '
             .'comparison sections may only compare products from this list; NEVER state prices — they change.';
     }
 

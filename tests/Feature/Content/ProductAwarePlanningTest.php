@@ -123,6 +123,49 @@ class ProductAwarePlanningTest extends TestCase
         $this->assertCount(1, $roles->filter(fn ($r) => $r === 'featured'));
     }
 
+    public function test_strict_never_mentions_outside_brands(): void
+    {
+        // carmenperfumes 2026-09-07: gap keywords mined off competitor rankings
+        // carried rival brand names into ideation ("Top 5 Arabic Perfume
+        // Brands"), and the token matcher can't stop them ("perfume" overlaps
+        // every product). Strict = no outside brand anywhere.
+        [$website, $plan] = $this->shop(['product_mode' => 'strict']);
+        $this->product($website->id, 'Oud Royale Perfume 50ml', 'https://s.test/products/oud-royale');
+        $plan->forceFill(['competitor_guard' => [
+            'assessed_at' => now()->toIso8601String(), 'harmful' => true,
+            'auto' => [['brand' => 'swiss arabian', 'domain' => 'swissarabian.com', 'reason' => 'rival']],
+            'manual' => [], 'removed' => [],
+        ]])->save();
+        foreach ([['swiss arabian perfume price', 900], ['best oud perfume for men', 800]] as [$kw, $vol]) {
+            ContentPlanKeyword::create([
+                'plan_id' => $plan->id, 'keyword' => $kw, 'keyword_hash' => sha1($kw),
+                'type' => ContentPlanKeyword::TYPE_GAP, 'search_volume' => $vol,
+            ]);
+        }
+
+        $captured = null;
+        $llm = $this->stubLlm([
+            ['title' => 'Swiss Arabian Alternatives You Will Love', 'target_keyword' => 'swiss arabian alternatives',
+                'secondary_keywords' => [], 'intent' => 'commercial', 'source' => 'gap'],
+            ['title' => 'Best Oud Perfume For Men', 'target_keyword' => 'best oud perfume for men',
+                'secondary_keywords' => [], 'intent' => 'commercial', 'source' => 'gap'],
+        ], $captured);
+
+        $created = (new ContentTopicPlanner($llm))->plan($plan, 5);
+
+        // Rival-brand gap keyword never reached the prompt; clean one did.
+        $this->assertStringNotContainsString('swiss arabian perfume price', (string) $captured);
+        $this->assertStringContainsString('best oud perfume for men', (string) $captured);
+        // Prompt carries the absolute brand rule; rival archetype removed.
+        $this->assertStringContainsString('ABSOLUTE BRAND RULE', (string) $captured);
+        $this->assertStringNotContainsString('alternatives to <rival>', (string) $captured);
+        // Persist gate: brand-titled candidate dropped even though the LLM
+        // returned it; the clean topic survives.
+        $titles = collect($created)->pluck('title');
+        $this->assertFalse($titles->contains('Swiss Arabian Alternatives You Will Love'));
+        $this->assertTrue($titles->contains('Best Oud Perfume For Men'));
+    }
+
     public function test_null_mode_planning_is_untouched(): void
     {
         [, $plan] = $this->shop(['product_mode' => null]);

@@ -110,6 +110,9 @@ class ContentTopicPlanner
         // classified plans).
         $strict = $plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT;
         $matcher = $strict ? app(\App\Services\Content\Catalog\TopicProductMatcher::class) : null;
+        $strictBrandTerms = $strict
+            ? app(\App\Services\Content\CompetitorMentionGuard::class)->strictBlockedBrands($plan)
+            : [];
         $catalogUrls = $strict
             ? \App\Models\ContentProduct::query()->where('website_id', $website->id)->usable()
                 ->pluck('id', 'url')->all()
@@ -129,6 +132,14 @@ class ContentTopicPlanner
                 $matched = $matcher->match((string) $website->id, $title.' '.$keyword, 5);
                 if ($matched->isEmpty()) {
                     continue; // off-catalog idea — the whole point of strict mode
+                }
+                // A known rival brand in the title/keyword is an instant drop —
+                // the token-overlap matcher can't catch these ("perfume"
+                // overlaps everything) and a strict client never names them.
+                foreach ($strictBrandTerms as $brand) {
+                    if (preg_match('/\b'.preg_quote($brand, '/').'\b/ui', $title.' '.$keyword)) {
+                        continue 2;
+                    }
                 }
             }
             foreach ($taken as $existing) {
@@ -477,6 +488,22 @@ class ContentTopicPlanner
         $gapKeywords = ContentPlanKeyword::query()
             ->where('plan_id', $plan->id)->where('type', ContentPlanKeyword::TYPE_GAP)
             ->orderByDesc('search_volume')->limit(40)->pluck('keyword')->all();
+        // Strict Product Mode: gap keywords are mined from COMPETITOR rankings,
+        // so rival brand names ride straight into the ideation prompt
+        // (carmenperfumes 2026-09-07: "Top 5 Arabic Perfume Brands"). Drop any
+        // that name a known outside brand before the LLM ever sees them.
+        $strictBrands = app(\App\Services\Content\CompetitorMentionGuard::class)->strictBlockedBrands($plan);
+        if ($strictBrands !== []) {
+            $gapKeywords = array_values(array_filter($gapKeywords, static function ($k) use ($strictBrands) {
+                foreach ($strictBrands as $brand) {
+                    if (preg_match('/\b'.preg_quote($brand, '/').'\b/ui', (string) $k)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }));
+        }
         $gapBlock = $gapKeywords === [] ? '(none yet)' : implode("\n", array_map(
             static fn ($k) => '- '.$k, $gapKeywords
         ));
@@ -529,7 +556,8 @@ class ContentTopicPlanner
                 $catalogBlock = "\nTHEIR PRODUCT CATALOG ({$summary['count']} products; categories: {$categoriesLine}). Sample products (name — url):\n{$samplesBlock}\n"
                     ."STRICT PRODUCT RULES:\n"
                     ."- EVERY topic must be answerable by featuring products from this catalog; skip ideas their catalog cannot support.\n"
-                    ."- Favor these article shapes: benefit/ingredient roundups built from their products; comparisons BETWEEN their own listed products; buying guides for their categories; use-case how-tos that naturally feature their products; \"alternatives to <rival>\" articles that present THEIR product as the alternative; collection deep-dives; seasonal/gift guides from their range.\n"
+                    ."- Favor these article shapes: benefit/ingredient roundups built from their products; comparisons BETWEEN their own listed products; buying guides for their categories; use-case how-tos that naturally feature their products; collection deep-dives; seasonal/gift guides from their range.\n"
+                    ."- ABSOLUTE BRAND RULE: never put ANY brand, shop or maker name in a title or keyword unless it appears in the catalog above. No \"top brands\" roundups, no comparisons against outside brands, no \"<brand> alternatives\" articles — this client never mentions other brands, in any form.\n"
                     ."- For each topic, cite up to 3 product URLs FROM THE LIST ABOVE in \"product_urls\". Never cite a URL that is not listed.\n";
                 $productContractField = ', "product_urls": ["..."]';
             }

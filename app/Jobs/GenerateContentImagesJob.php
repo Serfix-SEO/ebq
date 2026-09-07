@@ -111,9 +111,16 @@ class GenerateContentImagesJob implements ShouldQueue
         // (no insights call) — this runs per article and must stay cheap.
         // Parenthesised on purpose: `(array) $a['added'] ?? []` casts BEFORE
         // the coalesce, so the guard never fires on a plan with no overrides.
-        $negativePrompt = \App\Support\ContentImageGuardrails::forCompetitors(
-            (array) (((array) ($plan?->competitor_overrides ?? []))['added'] ?? [])
-        );
+        // Strict Product Mode: every known rival brand joins the negatives
+        // too — a strict client's images must never show another brand's
+        // product or packaging (carmenperfumes 2026-09-07).
+        $strictBrands = $plan !== null
+            ? app(\App\Services\Content\CompetitorMentionGuard::class)->strictBlockedBrands($plan)
+            : [];
+        $negativePrompt = \App\Support\ContentImageGuardrails::forCompetitors(array_merge(
+            (array) (((array) ($plan?->competitor_overrides ?? []))['added'] ?? []),
+            $strictBrands,
+        ));
 
         // Tell the review page that images are actively being generated so its
         // progress overlay stays up until every image is done. Image rows are
@@ -337,6 +344,7 @@ class GenerateContentImagesJob implements ShouldQueue
                 .'Never ask for text, words, letters, titles or captions. '
                 .'Never include logos, watermarks, real brand marks, celebrities, or anything offensive. '
                 .'Never name any business, clinic, shop or brand in a prompt — not the client\'s and not anyone else\'s. '
+                .'Never describe another brand\'s product, bottle, packaging or logo — generic unbranded items only. '
                 .'Keep each prompt 1-3 sentences.'
                 .($stylePrompt !== '' ? ' Preferred visual style: '.$stylePrompt.'.' : '')
                 .$plan->promptAddendumBlock();

@@ -487,6 +487,41 @@ class CompetitorMentionGuard
      *
      * @return list<string>
      */
+    /**
+     * Strict Product Mode (owner 2026-09-07, carmenperfumes): a strict client
+     * never mentions ANY outside brand — no rival roundups, no "<brand>
+     * alternatives", no comparison targets. This is every known rival brand
+     * term (auto + manual, aliases included), with the client's own stocked/
+     * catalog names exempted. Read straight off the plan column so it works
+     * even before the guard toggle/assessment flow ran. Used to filter topic
+     * ideas, gap keywords and image subjects — NOT a replacement for
+     * termsForTopic (which also feeds the scrubs).
+     *
+     * @return list<string>
+     */
+    public function strictBlockedBrands(ContentPlan $plan): array
+    {
+        if ($plan->product_mode !== \App\Models\ContentPlan::PRODUCT_MODE_STRICT) {
+            return [];
+        }
+        $terms = $this->terms($plan);
+        if ($terms === []) {
+            return [];
+        }
+        $stocked = mb_strtolower(implode(' ', array_merge(
+            (array) (($plan->offerings ?? [])['sell'] ?? []),
+            \App\Models\ContentProduct::query()
+                ->where('website_id', $plan->website_id)->usable()
+                ->get(['name', 'brand'])
+                ->flatMap(fn ($p) => [(string) $p->name, (string) $p->brand])
+                ->filter()->all(),
+        )));
+
+        return array_values(array_filter($terms, static fn (string $term) => ! (bool) preg_match(
+            '/\b'.preg_quote($term, '/').'\b/u', $stocked
+        )));
+    }
+
     public function termsForTopic(ContentPlan $plan, ContentTopic $topic): array
     {
         // Mode gate (Phase E): brands_required (affiliates — rival brands ARE
@@ -516,9 +551,13 @@ class CompetitorMentionGuard
             '/\b'.preg_quote($needle, '/').'\b/u', $haystack
         );
 
+        // Strict Product Mode: the AUTO-term topic exemption is OFF — it
+        // exists so "otterbox alternatives" articles can say otterbox, but a
+        // strict client never writes those articles at all (owner 2026-09-07).
+        $strictNoBrands = $plan->product_mode === \App\Models\ContentPlan::PRODUCT_MODE_STRICT;
         $terms = array_values(array_filter(
             $this->terms($plan),
-            static fn (string $term) => in_array($term, $manual, true) || ! $inText($term, $keywords)
+            static fn (string $term) => in_array($term, $manual, true) || $strictNoBrands || ! $inText($term, $keywords)
         ));
 
         // stocked_only (resellers): brands the shop itself carries are the

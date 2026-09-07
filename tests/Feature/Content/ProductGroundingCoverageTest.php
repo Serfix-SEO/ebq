@@ -328,6 +328,32 @@ class ProductGroundingCoverageTest extends TestCase
         $this->assertSame($selection, $again);
     }
 
+    public function test_strict_disables_the_auto_brand_topic_exemption(): void
+    {
+        // "otterbox alternatives" articles may say otterbox on NORMAL plans;
+        // a strict client never writes them, so the exemption is off and the
+        // scrubs strip the rival brand even from a brand-keyword topic.
+        [$plan, $topic] = $this->strictFixture();
+        $topic->forceFill(['target_keyword' => 'rivalglow alternatives'])->save();
+        $plan->forceFill([
+            'competitor_guard' => [
+                'assessed_at' => now()->toIso8601String(), 'harmful' => true,
+                'auto' => [['brand' => 'rivalglow', 'domain' => 'rivalglow.test', 'reason' => 'competitor']],
+                'manual' => [], 'removed' => [],
+            ],
+            'toggles' => [\App\Services\Content\CompetitorMentionGuard::TOGGLE => true],
+        ])->save();
+
+        $guard = app(\App\Services\Content\CompetitorMentionGuard::class);
+        $this->assertContains('rivalglow', $guard->termsForTopic($plan->refresh(), $topic->refresh()));
+        $this->assertContains('rivalglow', $guard->strictBlockedBrands($plan));
+
+        // Normal mode keeps the exemption (regression pin on old behavior).
+        $plan->forceFill(['product_mode' => \App\Models\ContentPlan::PRODUCT_MODE_NORMAL])->save();
+        $this->assertNotContains('rivalglow', $guard->termsForTopic($plan->refresh(), $topic));
+        $this->assertSame([], $guard->strictBlockedBrands($plan->refresh()));
+    }
+
     public function test_product_figures_injected_once_with_live_image_after_first_mention(): void
     {
         [$plan, $topic, $product] = $this->strictFixture();
