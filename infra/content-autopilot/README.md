@@ -2693,4 +2693,14 @@ Http::pool chunks of 10, ≤25 URLs per call. Kill-switch
 `features.article_link_verify` (`CONTENT_LINK_VERIFY`) — **pinned false in
 phpunit.xml so pipeline tests never issue real HTTP; LinkVerifier/coverage
 tests enable it per-test.** Product-shape heuristic in the anchor strip covers
-`/products/slug` AND dash-style `/product-slug` (mashrafshoes pilot).
+`/products/slug` AND dash-style `/product-slug` (mashrafshoes pilot; same
+parity in ArticleReview::aiEdit).
+
+**Real product figures**: the final gate also injects ≤3
+`<figure class="serfix-product-figure">` blocks per strict article — the
+shop's own photo wrapped in the product link, after the paragraph that first
+mentions the product. Deterministic + idempotent (`data-product` marker),
+image URL live-checked, figures exempt from the one-text-link dedupe. The
+article detail page shows a "Products in this article" sidebar card (stored
+meta joined with catalog thumbnails) and renders the ARTICLE first on phones
+(order utilities — required a Tailwind rebuild).
