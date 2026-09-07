@@ -73,8 +73,11 @@ class ProductGroundingCoverageTest extends TestCase
 
     private function articleFor(ContentTopic $topic, string $html = '<p>Body.</p>'): ContentArticle
     {
+        $version = 1 + (int) ContentArticle::query()->where('topic_id', $topic->id)->max('version');
+        ContentArticle::query()->where('topic_id', $topic->id)->update(['is_current' => false]);
+
         return ContentArticle::create([
-            'topic_id' => $topic->id, 'version' => 1, 'is_current' => true,
+            'topic_id' => $topic->id, 'version' => $version, 'is_current' => true,
             'h1' => 'H', 'meta_title' => 'H', 'meta_description' => 'D',
             'slug' => 'h', 'html' => $html, 'seo_score' => 99,
         ]);
@@ -235,6 +238,15 @@ class ProductGroundingCoverageTest extends TestCase
 
         $this->assertStringContainsString($product->url, $result->html);
         $this->assertStringNotContainsString('invented-thing', $result->html);
+
+        // Over-linking dedupe (pilot 2026-09-07: same product linked 8×):
+        // repeats of a VALID catalog link unwrap to text, first stays.
+        $article = $this->articleFor($topic, '<p><a href="'.$product->url.'">'.self::PRODUCT.'</a> then <a href="'.$product->url.'">again</a> and <a href="'.$product->url.'">a third time</a></p>');
+        $result = $s->invoke(app(ContentArticleProducer::class), $article, $topic->refresh(), $ctx);
+        $this->assertSame(1, substr_count((string) $result->html, 'href="'.$product->url.'"'),
+            'a catalog product is linked at most once');
+        $this->assertStringContainsString('again', $result->html);
+        $this->assertStringContainsString('a third time', $result->html);
     }
 
     public function test_draft_selected_links_mark_products_manual(): void

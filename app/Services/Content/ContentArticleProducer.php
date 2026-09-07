@@ -849,15 +849,26 @@ class ContentArticleProducer
                     [strtolower((string) ($context['site_host'] ?? ''))],
                     array_map(static fn ($u) => strtolower((string) (parse_url((string) $u, PHP_URL_HOST) ?: '')), $catalogUrls),
                 )));
+                $seen = [];
                 $html = (string) preg_replace_callback(
                     '/<a\b[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/is',
-                    static function (array $m) use ($catalog, $ownHosts): string {
+                    static function (array $m) use ($catalog, $ownHosts, &$seen): string {
                         $host = strtolower((string) (parse_url($m[1], PHP_URL_HOST) ?: ''));
                         $path = strtolower((string) (parse_url($m[1], PHP_URL_PATH) ?: '/'));
                         $own = $host === '' || isset($ownHosts[$host]);
                         $productish = (bool) preg_match('#/(products?|p|item)/.#', $path);
-                        if ($own && $productish && ! isset($catalog[rtrim(mb_strtolower($m[1]), '/')])) {
+                        $key = rtrim(mb_strtolower($m[1]), '/');
+                        if ($own && $productish && ! isset($catalog[$key])) {
                             return $m[2];
+                        }
+                        // Dedupe: the prompt asks for AT MOST one link per
+                        // product but the LLM over-links (pilot: same sandal
+                        // linked 8×) — keep the first, unwrap the repeats.
+                        if ($own && $productish && isset($catalog[$key])) {
+                            if (isset($seen[$key])) {
+                                return $m[2];
+                            }
+                            $seen[$key] = true;
                         }
 
                         return $m[0];
