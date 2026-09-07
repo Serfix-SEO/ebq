@@ -328,6 +328,22 @@ class ProductGroundingCoverageTest extends TestCase
         $this->assertSame($selection, $again);
     }
 
+    public function test_produce_resolves_products_before_building_scorer_context(): void
+    {
+        // Ordering pin (pilot 2026-09-07): scorerContext reads topic.meta,
+        // which productContext persists — reversed, a topic's FIRST write ran
+        // every strict check against context['products'] = []. Source-order
+        // assertion, same style as the converter column-list pin.
+        $src = file_get_contents(app_path('Services/Content/ContentArticleProducer.php'));
+        $produce = substr($src, strpos($src, 'public function produce('));
+        $productPos = strpos($produce, '$this->productContext($topic, $plan)');
+        $contextPos = strpos($produce, '$this->scorerContext($topic, $plan, $website)');
+        $this->assertNotFalse($productPos);
+        $this->assertNotFalse($contextPos);
+        $this->assertLessThan($contextPos, $productPos,
+            'produce() must persist the product selection BEFORE scorerContext reads it');
+    }
+
     public function test_dead_product_urls_are_dropped_and_marked_gone(): void
     {
         config(['features.article_link_verify' => true]);

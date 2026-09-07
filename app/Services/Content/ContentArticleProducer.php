@@ -96,10 +96,14 @@ class ContentArticleProducer
         $llm = LlmClientFactory::make($writeModel['provider']);
         $writer = new AiWriterService($llm);
 
-        $context = $this->scorerContext($topic, $plan, $website);
         // Strict Product Mode: resolve + persist the product selection BEFORE
-        // templateInstructions reads it (productBlock pulls from topic.meta).
+        // scorerContext and templateInstructions read it (both pull from
+        // topic.meta). ORDER IS LOAD-BEARING: with scorerContext first, a
+        // topic's FIRST write saw context['products'] = [] — the strict
+        // scorer checks and the dedupe/invented-link belt silently skipped
+        // the initial article (mashrafshoes pilot, 2026-09-07).
         $products = $this->productContext($topic, $plan);
+        $context = $this->scorerContext($topic, $plan, $website);
 
         $draftInput = [
             'focus_keyword' => $topic->target_keyword,
