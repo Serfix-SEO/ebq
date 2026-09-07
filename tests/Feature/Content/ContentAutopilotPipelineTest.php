@@ -185,6 +185,10 @@ class ContentAutopilotPipelineTest extends TestCase
     public function test_dispatcher_claims_due_topics_one_per_website(): void
     {
         Queue::fake();
+        // Pin an off-peak hour: during DeepSeek peak (01-04 + 06-10 UTC) the
+        // dispatcher deliberately narrows the write-ahead window, so this
+        // test flaked whenever the suite ran in those hours.
+        \Illuminate\Support\Carbon::setTestNow(now()->setTime(14, 0));
 
         $plan = ContentPlan::factory()->create();
         // Owner needs content access for the dispatcher to claim (plan is

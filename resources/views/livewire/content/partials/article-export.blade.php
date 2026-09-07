@@ -48,7 +48,10 @@
             </p>
         </div>
 
-        <div class="flex flex-none flex-wrap items-center gap-2">
+        {{-- min-w-0, NOT flex-none: flex-none refuses to shrink, so on a
+             phone this ~460px row stretched the whole page past the viewport
+             and everything right-clipped (body overflow-x-clip hides it). --}}
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
             <button type="button" @click="grab(@js($exportHtml), 'html')"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-orange-400 hover:text-orange-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:text-orange-400">
                 <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-2m-6-12h6a2 2 0 012 2v6m-8-8V3.5L18.5 9H16"/></svg>

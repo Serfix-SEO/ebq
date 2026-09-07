@@ -1,4 +1,7 @@
-<div class="space-y-6">
+{{-- flex-col+gap (not space-y): lets order utilities push the secondary
+     cards (export / feedback / SEO kit) BELOW the article on phones while
+     desktop keeps the original order. --}}
+<div class="flex flex-col gap-6">
     {{-- Load the TipTap editor bundle on the INITIAL page render (not inside the
          $editing branch): a @vite <script type=module> morphed in later on the Edit
          click does NOT execute, so tiptapEditor would never register. @assets loads
@@ -13,7 +16,9 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="min-w-0">
             <a href="{{ route('content.index') }}" class="text-sm text-slate-500 hover:text-orange-600 dark:text-slate-400">&larr; {{ __('Back to calendar') }}</a>
-            <h1 class="mt-1 truncate text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ $topic?->title }}</h1>
+            {{-- sm:truncate: on phones the title WRAPS (an ellipsis hid most
+                 of it); one tidy line only where there's room. --}}
+            <h1 class="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:truncate dark:text-slate-100">{{ $topic?->title }}</h1>
             <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 {{ $topic?->target_keyword }}
                 @if ($topic?->scheduled_for) · {{ __('planned for :date', ['date' => $topic->scheduled_for->translatedFormat('M j, Y')]) }} @endif
@@ -28,7 +33,9 @@
          Only once there is a finished article to take — nothing to copy while
          it is still being written. --}}
     @if ($topic && $article && ! $generating)
-        @include('livewire.content.partials.article-export', ['topic' => $topic])
+        <div class="order-1 lg:order-none">
+            @include('livewire.content.partials.article-export', ['topic' => $topic])
+        </div>
     @endif
 
     @if (session('review-status'))
@@ -144,7 +151,7 @@
                     ['r' => \App\Models\ContentArticleFeedback::RATING_WRONG, 'label' => __('It\'s fundamentally wrong'), 'on' => 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700 dark:bg-rose-500/10 dark:text-rose-300'],
                 ];
             @endphp
-            <div class="space-y-3">
+            <div class="order-1 space-y-3 lg:order-none">
                 <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900">
                     <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ __('Do you like this article?') }}</span>
                     <div class="flex flex-wrap items-center gap-2">
@@ -332,7 +339,7 @@
 
         {{-- ── SEO Kit: every SEO value, copy-ready (collapsed accordion) ── --}}
         @if (! $editing && ! empty($seoKit))
-            <div class="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+            <div class="order-1 overflow-hidden rounded-2xl border border-slate-200 bg-white lg:order-none dark:border-slate-800 dark:bg-slate-900"
                  x-data="{ open: false, copied: '', copy(key, text) { navigator.clipboard.writeText(text); this.copied = key; setTimeout(() => this.copied = '', 2000); } }">
                 <button type="button" x-on:click="open = ! open" class="flex w-full items-center gap-3 px-5 py-4 text-start">
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-blue-600/25">

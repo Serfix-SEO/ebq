@@ -29,11 +29,13 @@
     <div
         x-data="{ open: true }"
         x-show="open"
-        class="mb-4 flex items-start justify-between gap-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-100"
+        class="mb-4 flex flex-wrap items-start justify-between gap-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-100"
         role="status"
     >
         <x-nodus state="searching" :size="40" class="mt-0.5 flex-none text-slate-400 dark:text-slate-500" />
-        <div class="flex-1">
+        {{-- min-width floor: without it the buttons squeezed this text to
+             2-3 words per line on phones (flex-1 alone can shrink to nothing). --}}
+        <div class="min-w-0 flex-1" style="min-width: 12rem">
             <div class="font-semibold">{{ $bannerLead }}</div>
             <div class="mt-1">{{ __('You haven’t connected') }} {{ $missingLabel }} {{ __('for') }} <span class="font-medium">{{ $bannerWebsite->domain ?: __('this website') }}</span>. {{ __('Some sections stay empty until you do.') }}</div>
         </div>
