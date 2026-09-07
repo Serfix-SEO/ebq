@@ -1818,6 +1818,12 @@ class ContentCalendar extends Component
             // opt-in banner (never forced; planning continues underneath).
             'showProductModeBanner' => $this->requiresProductChoice($plan),
             'catalogProgress' => null,
+            // Poll while the planner is running so new topics appear live
+            // (owner 2026-09-08: the calendar needed a manual refresh). An
+            // active plan with ZERO topics is always a planning-pending state
+            // (dispatcher self-heals within a tick), so poll then too — the
+            // page may have loaded before the planner raised its flag.
+            'planningActive' => $all->isEmpty() || Cache::has('content:planning:'.$plan->id),
         ] + $this->capAndTrialBindings($topics, $monthStart));
     }
 

@@ -53,6 +53,21 @@ class PlanContentTopicsJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
+        // Live-calendar signal: while this flag lives, the open calendar page
+        // polls so freshly planned topics appear WITHOUT a manual refresh.
+        // TTL covers the job's own runtime plus one last poll cycle; cleared
+        // in finally so a fast run stops the polling immediately.
+        \Illuminate\Support\Facades\Cache::put('content:planning:'.$plan->id, 1, 600);
+        try {
+            $this->plan($plan);
+        } finally {
+            \Illuminate\Support\Facades\Cache::put('content:planning:'.$plan->id, 1, 15);
+        }
+    }
+
+    private function plan(ContentPlan $plan): void
+    {
+
         // No business profile → do NOT ideate. Both of the planner's guardrails
         // are profile-derived: the ideation prompt interpolates description /
         // sell / don't-sell (so an empty profile leaves "They do NOT offer: "

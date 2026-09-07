@@ -161,4 +161,32 @@ class ContentCalendarViewTest extends TestCase
             ->assertOk()
             ->assertViewHas('overCapIds', [$extra->id]);
     }
+
+    /** New topics must appear live — no manual refresh (owner 2026-09-08). */
+    public function test_calendar_polls_while_planning_or_empty(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->for($user)->create();
+        $plan = ContentPlan::factory()->create([
+            'website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE,
+        ]);
+        $this->actingAs($user)->withSession(['current_website_id' => $website->id]);
+
+        // Empty active calendar = planning pending → polls.
+        Livewire::test(ContentCalendar::class, ['mode' => 'calendar'])
+            ->assertViewHas('planningActive', true);
+
+        // Topics present, planner idle → no poll.
+        ContentTopic::factory()->create([
+            'plan_id' => $plan->id, 'status' => ContentTopic::STATUS_APPROVED, 'scheduled_for' => now(),
+        ]);
+        Livewire::test(ContentCalendar::class, ['mode' => 'calendar'])
+            ->assertViewHas('planningActive', false);
+
+        // Planner flag raised (PlanContentTopicsJob running) → polls again.
+        \Illuminate\Support\Facades\Cache::put('content:planning:'.$plan->id, 1, 600);
+        Livewire::test(ContentCalendar::class, ['mode' => 'calendar'])
+            ->assertViewHas('planningActive', true);
+        \Illuminate\Support\Facades\Cache::forget('content:planning:'.$plan->id);
+    }
 }
