@@ -108,6 +108,15 @@ class DiscoverProductPagesJob implements ShouldQueue
         $crawlSiteId = $website->crawl_site_id;
         $urls = [];
 
+        // The live sitemap FIRST — the content-only crawl caps at ~200 pages,
+        // so big catalogs never fully enter crawl inventory (bellavest
+        // 2026-09-07: 108 sitemap products, 32 of them never crawled → a 72-
+        // product catalog). Extraction fetches pages itself, so discovery has
+        // no reason to depend on what the crawler happened to walk.
+        foreach ($this->sitemapProductUrls($website) as $url) {
+            $urls[$url] = 1; // path-heuristic tier; schema-flagged crawl rows below outrank
+        }
+
         if ($crawlSiteId !== null) {
             $pages = WebsitePage::query()
                 ->where('crawl_site_id', $crawlSiteId)
@@ -129,6 +138,52 @@ class DiscoverProductPagesJob implements ShouldQueue
         asort($urls);
 
         return array_keys($urls);
+    }
+
+    /**
+     * Product-path URLs straight from the site's sitemaps: registered ones,
+     * robots.txt `Sitemap:` lines, and the /sitemap.xml convention as a
+     * fallback. Fail-open — a broken sitemap must never fail discovery.
+     *
+     * @return list<string>
+     */
+    private function sitemapProductUrls(Website $website): array
+    {
+        try {
+            $domain = trim((string) $website->normalized_domain);
+            if ($domain === '') {
+                return [];
+            }
+            $candidates = $website->sitemaps()->pluck('path')
+                ->map(static fn ($p) => (string) $p)->filter()->values()->all();
+
+            $robots = app(\App\Services\Crawler\CrawlFetcher::class)
+                ->fetch('https://'.$domain.'/robots.txt', timeout: 10);
+            if (preg_match_all('/^\s*Sitemap:\s*(\S+)/im', (string) ($robots['body'] ?? ''), $m)) {
+                $candidates = array_merge($candidates, $m[1]);
+            }
+            if ($candidates === []) {
+                $candidates[] = 'https://'.$domain.'/sitemap.xml';
+            }
+            $candidates = array_slice(array_values(array_unique($candidates)), 0, 5);
+
+            $urls = [];
+            foreach (app(\App\Support\Crawler\SitemapUrlExtractor::class)->extract($candidates) as $entry) {
+                $url = trim((string) $entry['loc']);
+                if ($url === ''
+                    || ! \App\Support\DomainName::urlBelongsToSite($url, $domain)
+                    || ! $this->looksLikeProductPath($url)) {
+                    continue;
+                }
+                $urls[$url] = true;
+            }
+
+            return array_keys($urls);
+        } catch (\Throwable $e) {
+            Log::debug('content_catalog.sitemap_discovery_failed', ['website_id' => $website->id, 'error' => mb_substr($e->getMessage(), 0, 150)]);
+
+            return [];
+        }
     }
 
     private function looksLikeProductPath(string $url): bool

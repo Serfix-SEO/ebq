@@ -322,6 +322,42 @@ class ProductCatalogRunTest extends TestCase
         $this->assertSame(1, ContentProductRun::query()->where('website_id', $website->id)->count());
     }
 
+    public function test_discovery_pulls_product_urls_straight_from_the_sitemap(): void
+    {
+        // bellavest 2026-09-07: the content-only crawl caps at ~200 pages, so
+        // catalog discovery limited to crawl inventory missed a third of the
+        // shop. The sitemap is fetched directly now.
+        Bus::fake();
+        $this->app->bind(\App\Support\Audit\SafeHttpGuard::class, fn () => new class extends \App\Support\Audit\SafeHttpGuard
+        {
+            public function check(string $url): array
+            {
+                return ['ok' => true];
+            }
+        });
+        [$website, ] = [Website::factory()->for(\App\Models\User::factory())->create(['domain' => 'shop.example', 'normalized_domain' => 'shop.example']), null];
+        $run = ContentProductRun::factory()->create([
+            'website_id' => $website->id, 'status' => ContentProductRun::STATUS_PENDING,
+        ]);
+        \Illuminate\Support\Facades\Http::fake([
+            'https://shop.example/robots.txt' => \Illuminate\Support\Facades\Http::response("User-agent: *\nSitemap: https://shop.example/sitemap.xml", 200),
+            'https://shop.example/sitemap.xml' => \Illuminate\Support\Facades\Http::response(
+                '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                .'<url><loc>https://shop.example/products/alpha</loc></url>'
+                .'<url><loc>https://shop.example/products/beta</loc></url>'
+                .'<url><loc>https://shop.example/about-us</loc></url>'
+                .'<url><loc>https://other-site.example/products/foreign</loc></url>'
+                .'</urlset>', 200),
+        ]);
+
+        (new DiscoverProductPagesJob($run->id))->handle();
+
+        $run->refresh();
+        $this->assertSame(ContentProductRun::STATUS_EXTRACTING, $run->status);
+        $this->assertSame(2, $run->pages_found, 'both own-site product URLs, nothing else');
+        Bus::assertBatched(fn ($batch) => $batch->jobs->count() === 1);
+    }
+
     public function test_product_path_heuristic(): void
     {
         $svc = ProductCatalogService::class;
