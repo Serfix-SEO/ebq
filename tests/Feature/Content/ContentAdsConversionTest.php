@@ -80,6 +80,41 @@ class ContentAdsConversionTest extends TestCase
         );
         // Google Ads de-duplicates on this, so it must carry the real id.
         $this->assertSame('sub_test_123', $conv['transaction_id']);
+        // Enhanced conversions (Google flagged the setup 2026-09-07): the
+        // payload carries the SHA-256 of the normalized email — never raw PII.
+        $this->assertSame(hash('sha256', mb_strtolower(trim($user->email))), $conv['sha256_email']);
+        $this->assertStringNotContainsString($user->email, json_encode($conv));
+    }
+
+    public function test_enhanced_conversion_hashes_render_without_raw_pii(): void
+    {
+        $user = User::factory()->create(['email' => 'buyer@example.com', 'phone' => '+971501234567']);
+        session()->flash(\App\Support\AdsConversion::SESSION_KEY, [
+            'send_to' => self::SEND_TO, 'value' => 39.0, 'currency' => 'USD',
+            'transaction_id' => 'sub_x',
+            'sha256_email' => hash('sha256', 'buyer@example.com'),
+            'sha256_phone' => hash('sha256', '+971501234567'),
+        ]);
+        $html = view('partials.ads-conversion')->render();
+
+        $this->assertStringContainsString('sha256_email_address', $html);
+        $this->assertStringContainsString(hash('sha256', 'buyer@example.com'), $html);
+        $this->assertStringContainsString('sha256_phone_number', $html);
+        $this->assertStringContainsString('allow_enhanced_conversions', $html);
+        $this->assertStringNotContainsString('buyer@example.com', $html);
+        $this->assertStringNotContainsString('971501234567', $html);
+    }
+
+    public function test_malformed_phone_is_never_hashed(): void
+    {
+        $user = User::factory()->create(['phone' => '050 123 4567']); // no +country
+        $this->actingAs($user);
+        session()->start();
+        \App\Support\AdsConversion::queue(self::SEND_TO, 1.0, 'USD', 't1');
+
+        $conv = session('ads_conversion');
+        $this->assertArrayHasKey('sha256_email', $conv);
+        $this->assertArrayNotHasKey('sha256_phone', $conv, 'a non-E.164 phone hash can never match — omit it');
     }
 
     /**

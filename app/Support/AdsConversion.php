@@ -48,10 +48,39 @@ final class AdsConversion
                 'value' => $value,
                 'currency' => $currency,
                 'transaction_id' => $transactionId,
-            ]);
+            ] + self::userData());
         } catch (\Throwable $e) {
             Log::warning('AdsConversion: could not queue '.$sendTo.': '.$e->getMessage());
         }
+    }
+
+    /**
+     * Enhanced-conversions user_data (Google Ads flagged the setup 2026-09-07:
+     * the feature was ON for the conversion actions but the tag sent no
+     * first-party data). Values are SHA-256 hashes of Google's normalized
+     * forms — the page source never carries raw PII; Google matches on the
+     * same hashes. Phone only when it is already E.164-shaped (Google requires
+     * E.164 pre-normalization; a mangled hash can never match anyway).
+     *
+     * @return array{sha256_email?: string, sha256_phone?: string}
+     */
+    private static function userData(): array
+    {
+        $user = auth()->user();
+        if ($user === null) {
+            return [];
+        }
+        $out = [];
+        $email = mb_strtolower(trim((string) $user->email));
+        if ($email !== '') {
+            $out['sha256_email'] = hash('sha256', $email);
+        }
+        $phone = preg_replace('/[\s().-]/', '', (string) $user->phone);
+        if (preg_match('/^\+[0-9]{8,15}$/', (string) $phone)) {
+            $out['sha256_phone'] = hash('sha256', $phone);
+        }
+
+        return $out;
     }
 
     /**

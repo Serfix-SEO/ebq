@@ -31,7 +31,15 @@
         window.dataLayer = window.dataLayer || [];
         if (typeof gtag !== 'function') { function gtag(){dataLayer.push(arguments);} }
         gtag('js', new Date());
-        gtag('config', 'AW-18374890122');
+        gtag('config', 'AW-18374890122', { 'allow_enhanced_conversions': true });
+        @if (! empty($conv['sha256_email']) || ! empty($conv['sha256_phone']))
+        {{-- Enhanced conversions: pre-hashed first-party identifiers, set
+             BEFORE the event so gtag attaches them to it. --}}
+        gtag('set', 'user_data', {
+            @if (! empty($conv['sha256_email'])) 'sha256_email_address': @json($conv['sha256_email']), @endif
+            @if (! empty($conv['sha256_phone'])) 'sha256_phone_number': @json($conv['sha256_phone']), @endif
+        });
+        @endif
         gtag('event', 'conversion', {
             'send_to': @json($conv['send_to'] ?? 'AW-18374890122/U8gBCNCfkt0cEIql6rlE', JSON_UNESCAPED_SLASHES),
             'value': {{ (float) ($conv['value'] ?? 1.0) }},
