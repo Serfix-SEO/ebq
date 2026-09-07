@@ -39,6 +39,12 @@ class SocialShareOAuthController extends Controller
 
         return Socialite::driver('facebook')
             ->scopes(['pages_show_list', 'pages_manage_posts', 'pages_read_engagement'])
+            // auth_type=rerequest: without it Facebook silently reuses the
+            // previous granular page grant on reconnect — the page-selection
+            // dialog never reappears, so the user can't switch to a different
+            // Page (reported 2026-09-07). With it, every connect shows the
+            // "Edit previous settings" chooser.
+            ->with(['auth_type' => 'rerequest'])
             ->redirect();
     }
 

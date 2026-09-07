@@ -345,4 +345,21 @@ class ContentSocialShareTest extends TestCase
         (new ShareArticleToSocialJob($topic->id, self::LIVE_URL))->handle(app(SocialPoster::class));
         Http::assertNothingSent();
     }
+
+    public function test_facebook_redirect_forces_the_page_rerequest_dialog(): void
+    {
+        // Without auth_type=rerequest Facebook reuses the prior granular page
+        // grant on reconnect and the page picker never reappears — the user
+        // cannot switch Pages (2026-09-07).
+        config(['services.facebook.client_id' => 'fbid', 'services.facebook.client_secret' => 'fbsecret']);
+        $user = \App\Models\User::factory()->create();
+        $website = \App\Models\Website::factory()->for($user)->create();
+
+        $resp = $this->actingAs($user)
+            ->withSession(['current_website_id' => $website->id])
+            ->get(route('social.facebook.redirect'));
+
+        $resp->assertRedirect();
+        $this->assertStringContainsString('auth_type=rerequest', (string) $resp->headers->get('Location'));
+    }
 }
