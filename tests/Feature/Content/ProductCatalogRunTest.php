@@ -430,6 +430,39 @@ class ProductCatalogRunTest extends TestCase
         $this->assertSame('2026-09-01', $entries[0]['lastmod']);
     }
 
+    public function test_locale_alternate_product_urls_collapse_to_the_primary(): void
+    {
+        // /ar/products/x beside /products/x doubled carmen's catalog — the
+        // Arabic name dodges the variant dedupe. Locale-only stores keep
+        // their URLs (no unprefixed twin exists).
+        Bus::fake();
+        $this->app->bind(\App\Support\Audit\SafeHttpGuard::class, fn () => new class extends \App\Support\Audit\SafeHttpGuard
+        {
+            public function check(string $url): array
+            {
+                return ['ok' => true];
+            }
+        });
+        $website = Website::factory()->for(\App\Models\User::factory())->create(['domain' => 'shop.example', 'normalized_domain' => 'shop.example']);
+        $run = ContentProductRun::factory()->create([
+            'website_id' => $website->id, 'status' => ContentProductRun::STATUS_PENDING,
+        ]);
+        \Illuminate\Support\Facades\Http::fake([
+            'https://shop.example/robots.txt' => \Illuminate\Support\Facades\Http::response("Sitemap: https://shop.example/sitemap.xml", 200),
+            'https://shop.example/sitemap.xml' => \Illuminate\Support\Facades\Http::response(
+                '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                .'<url><loc>https://shop.example/products/alpha</loc></url>'
+                .'<url><loc>https://shop.example/ar/products/alpha</loc></url>'
+                .'<url><loc>https://shop.example/ar/products/arabic-only</loc></url>'
+                .'</urlset>', 200),
+        ]);
+
+        (new DiscoverProductPagesJob($run->id))->handle();
+
+        $this->assertSame(2, $run->refresh()->pages_found,
+            'localized twin dropped; locale-only product kept');
+    }
+
     public function test_product_path_heuristic(): void
     {
         $svc = ProductCatalogService::class;

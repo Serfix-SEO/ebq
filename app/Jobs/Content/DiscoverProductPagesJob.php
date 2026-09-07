@@ -178,6 +178,22 @@ class DiscoverProductPagesJob implements ShouldQueue
                 $urls[$url] = true;
             }
 
+            // Locale alternates: /ar/products/x next to /products/x is the SAME
+            // product with an Arabic (or any locale) name — it dodges the
+            // name+image variant dedupe and doubled carmen's catalog (157 vs
+            // 87 real, 2026-09-08). Keep the localized URL only when no
+            // unprefixed twin exists (locale-primary stores stay intact).
+            $set = $urls;
+            foreach (array_keys($urls) as $url) {
+                $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
+                if (preg_match('#^/([a-z]{2})(/.+)$#i', $path, $m)) {
+                    $twin = str_replace($path, $m[2], $url);
+                    if (isset($set[$twin])) {
+                        unset($urls[$url]);
+                    }
+                }
+            }
+
             return array_keys($urls);
         } catch (\Throwable $e) {
             Log::debug('content_catalog.sitemap_discovery_failed', ['website_id' => $website->id, 'error' => mb_substr($e->getMessage(), 0, 150)]);
