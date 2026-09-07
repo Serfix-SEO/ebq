@@ -95,6 +95,15 @@ class SitemapUrlExtractor
             while (@$reader->read()) {
                 if ($reader->nodeType === XMLReader::ELEMENT) {
                     $name = strtolower($reader->localName);
+                    // Un-prefixed elements ONLY: localName strips namespaces,
+                    // so Shopify's <image:image><image:loc> matched here and
+                    // OVERWROTE the page URL with the CDN image URL before
+                    // </url> closed (carmenperfumes 2026-09-08: 87 sitemap
+                    // products, 4 survived the domain filter). Same trap for
+                    // any namespaced lastmod/loc (video:, news:, xhtml:).
+                    if ($reader->prefix !== '') {
+                        continue;
+                    }
                     if ($name === 'loc') {
                         $currentLoc = trim((string) $reader->readString());
                     } elseif ($name === 'lastmod') {

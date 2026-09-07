@@ -399,6 +399,37 @@ class ProductCatalogRunTest extends TestCase
         $this->assertSame(2, $run->pages_found, 'both products from the entity-encoded child sitemap');
     }
 
+    public function test_extractor_ignores_namespaced_image_locs(): void
+    {
+        // Shopify product sitemaps embed <image:image><image:loc> inside each
+        // <url>; localName matching let the CDN image URL overwrite the page
+        // URL (carmenperfumes 2026-09-08: 87 products, 4 survived).
+        $this->app->bind(\App\Support\Audit\SafeHttpGuard::class, fn () => new class extends \App\Support\Audit\SafeHttpGuard
+        {
+            public function check(string $url): array
+            {
+                return ['ok' => true];
+            }
+        });
+        \Illuminate\Support\Facades\Http::fake([
+            'https://shop.example/sitemap_products.xml' => \Illuminate\Support\Facades\Http::response(
+                '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'
+                .'<url><loc>https://shop.example/products/alpha</loc><lastmod>2026-09-01</lastmod>'
+                .'<image:image><image:loc>https://cdn.example/img/alpha.jpg</image:loc></image:image></url>'
+                .'<url><loc>https://shop.example/products/beta</loc>'
+                .'<image:image><image:loc>https://cdn.example/img/beta.jpg</image:loc></image:image></url>'
+                .'</urlset>', 200),
+        ]);
+
+        $entries = app(\App\Support\Crawler\SitemapUrlExtractor::class)
+            ->extract(['https://shop.example/sitemap_products.xml']);
+
+        $locs = array_column($entries, 'loc');
+        $this->assertSame(['https://shop.example/products/alpha', 'https://shop.example/products/beta'], $locs,
+            'page locs survive; namespaced image locs never overwrite them');
+        $this->assertSame('2026-09-01', $entries[0]['lastmod']);
+    }
+
     public function test_product_path_heuristic(): void
     {
         $svc = ProductCatalogService::class;
