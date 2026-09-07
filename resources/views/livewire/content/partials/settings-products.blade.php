@@ -105,12 +105,15 @@
                             </span>
                         @endif
                         <div class="min-w-0 flex-1">
-                            <a href="{{ $p->url }}" target="_blank" rel="noopener" dir="auto" class="block truncate text-sm font-semibold text-slate-800 hover:text-orange-600 dark:text-slate-100">{{ $p->name }}</a>
+                            <button type="button" wire:click="viewProduct('{{ $p->id }}')" dir="auto" class="block w-full truncate text-start text-sm font-semibold text-slate-800 hover:text-orange-600 dark:text-slate-100">{{ $p->name }}</button>
                             <p class="truncate text-xs text-slate-400 dark:text-slate-500">
                                 @if ($p->category)<span dir="auto">{{ $p->category }}</span>@endif
                                 @if ($p->availability === 'out_of_stock') · {{ __('Out of stock') }}@endif
                             </p>
                         </div>
+                        <a href="{{ $p->url }}" target="_blank" rel="noopener" class="shrink-0 rounded-lg p-1.5 text-slate-300 hover:text-orange-600" title="{{ __('Open on your site') }}">
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+                        </a>
                         <button type="button" wire:click="toggleProductExclusion('{{ $p->id }}')"
                             class="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold {{ $p->is_excluded ? 'bg-orange-100 text-orange-700 hover:brightness-105 dark:bg-orange-950 dark:text-orange-300' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700' }}">
                             {{ $p->is_excluded ? __('Include') : __('Exclude') }}
@@ -123,4 +126,65 @@
             @endif
         @endif
     </div>
+
+    {{-- ── Product detail panel ─────────────────────────────────────── --}}
+    @if (($pt['detail'] ?? null) !== null)
+        @php $dp = $pt['detail']['product']; $dtopics = $pt['detail']['topics']; @endphp
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" wire:click.self="closeProduct">
+            <div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900" style="max-height: 90vh">
+                <div class="flex items-start gap-4">
+                    @if ($dp->image_url)
+                        <img src="{{ $dp->image_url }}" alt="" class="h-20 w-20 shrink-0 rounded-xl object-cover"/>
+                    @endif
+                    <div class="min-w-0 flex-1">
+                        <h3 dir="auto" class="text-base font-bold text-slate-900 dark:text-slate-100">{{ $dp->name }}</h3>
+                        <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                            <span class="rounded-full px-2 py-0.5 font-semibold {{ $dp->status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' }}">{{ $dp->status === 'active' ? __('Active') : __('No longer on your site') }}</span>
+                            @if ($dp->is_excluded)<span class="rounded-full bg-orange-100 px-2 py-0.5 font-semibold text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ __('Excluded from articles') }}</span>@endif
+                            @if ($dp->availability === 'out_of_stock')<span class="rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">{{ __('Out of stock') }}</span>@endif
+                        </div>
+                    </div>
+                    <button type="button" wire:click="closeProduct" class="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800" aria-label="{{ __('Close') }}">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                @if (filled($dp->description))
+                    <p dir="auto" class="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ mb_substr($dp->description, 0, 500) }}</p>
+                @endif
+
+                <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    @if (filled($dp->brand))<div><dt class="text-xs font-medium text-slate-400">{{ __('Brand') }}</dt><dd dir="auto" class="text-slate-700 dark:text-slate-200">{{ $dp->brand }}</dd></div>@endif
+                    @if (filled($dp->category))<div><dt class="text-xs font-medium text-slate-400">{{ __('Category') }}</dt><dd dir="auto" class="text-slate-700 dark:text-slate-200">{{ $dp->category }}</dd></div>@endif
+                    @if ($dp->price_cents !== null)<div><dt class="text-xs font-medium text-slate-400">{{ __('Price on your site') }}</dt><dd class="text-slate-700 dark:text-slate-200">{{ number_format($dp->price_cents / 100, 2) }} {{ strtoupper((string) $dp->currency) }}</dd></div>@endif
+                    @if (filled($dp->sku))<div><dt class="text-xs font-medium text-slate-400">{{ __('SKU') }}</dt><dd class="text-slate-700 dark:text-slate-200">{{ $dp->sku }}</dd></div>@endif
+                    <div><dt class="text-xs font-medium text-slate-400">{{ __('First seen') }}</dt><dd class="text-slate-700 dark:text-slate-200">{{ $dp->first_seen_at?->diffForHumans() }}</dd></div>
+                    <div><dt class="text-xs font-medium text-slate-400">{{ __('Last checked') }}</dt><dd class="text-slate-700 dark:text-slate-200">{{ $dp->last_seen_at?->diffForHumans() }}</dd></div>
+                </dl>
+
+                @if ($dtopics->isNotEmpty())
+                    <div class="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ __('Featured in these articles') }}</p>
+                        <div class="mt-2 space-y-1">
+                            @foreach ($dtopics as $dt)
+                                <a href="{{ route('content.review', $dt->id) }}" wire:navigate class="block truncate text-sm text-slate-700 hover:text-orange-600 dark:text-slate-200">{{ $dt->title }}</a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                <div class="mt-5 flex flex-wrap items-center gap-2">
+                    <a href="{{ $dp->url }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                        {{ __('Open on your site') }}
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+                    </a>
+                    <button type="button" wire:click="toggleProductExclusion('{{ $dp->id }}')"
+                        class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                        {{ $dp->is_excluded ? __('Include in articles') : __('Exclude from articles') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

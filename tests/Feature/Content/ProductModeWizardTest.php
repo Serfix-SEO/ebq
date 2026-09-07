@@ -264,6 +264,32 @@ class ProductModeWizardTest extends TestCase
         $this->assertFalse($foreign->refresh()->is_excluded);
     }
 
+    public function test_product_detail_panel_shows_info_and_blocks_foreign_products(): void
+    {
+        [, $website] = $this->ecomSetup(ContentPlan::STATUS_ACTIVE);
+        $own = ContentProduct::factory()->create([
+            'website_id' => $website->id, 'name' => 'Detail Serum',
+            'brand' => 'HouseBrand', 'category' => 'Serums',
+        ]);
+        $foreign = ContentProduct::factory()->create([
+            'website_id' => Website::factory()->for(User::factory())->create()->id,
+        ]);
+
+        $c = Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->call('viewProduct', $own->id)
+            ->assertViewHas('productsTab', fn ($pt) => ($pt['detail']['product']->id ?? null) === $own->id)
+            ->assertSee('Detail Serum')
+            ->assertSee('HouseBrand');
+
+        // Foreign product never resolves a detail panel.
+        $c->call('viewProduct', $foreign->id)
+            ->assertViewHas('productsTab', fn ($pt) => ($pt['detail'] ?? null) === null);
+
+        $c->call('viewProduct', $own->id)
+            ->call('closeProduct')
+            ->assertViewHas('productsTab', fn ($pt) => ($pt['detail'] ?? null) === null);
+    }
+
     public function test_client_scan_again_is_rate_limited_to_once_per_day(): void
     {
         Queue::fake();

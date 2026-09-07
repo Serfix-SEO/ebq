@@ -5020,5 +5020,16 @@
     "Your store was already scanned today. You can scan once per day — try again tomorrow.": "تم فحص متجرك اليوم بالفعل. يمكنك الفحص مرة واحدة يوميًا — حاول مجددًا غدًا.",
     "Re-reading your store — new and changed products will appear here shortly.": "نعيد قراءة متجرك — ستظهر المنتجات الجديدة والمتغيرة هنا قريبًا.",
     "Products in this article": "المنتجات في هذا المقال",
-    "Your article links to these products from your store.": "يرتبط مقالك بهذه المنتجات من متجرك."
+    "Your article links to these products from your store.": "يرتبط مقالك بهذه المنتجات من متجرك.",
+    "Open on your site": "فتح على موقعك",
+    "No longer on your site": "لم يعد على موقعك",
+    "Excluded from articles": "مستبعد من المقالات",
+    "Brand": "العلامة التجارية",
+    "Category": "الفئة",
+    "Price on your site": "السعر على موقعك",
+    "SKU": "رمز المنتج",
+    "First seen": "شوهد لأول مرة",
+    "Featured in these articles": "ظهر في هذه المقالات",
+    "Include in articles": "تضمين في المقالات",
+    "Exclude from articles": "استبعاد من المقالات"
 }

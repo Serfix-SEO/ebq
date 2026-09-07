@@ -156,6 +156,9 @@ class ContentCalendar extends Component
     /** Settings → Products tab: catalog search box. */
     public string $productSearch = '';
 
+    /** Settings → Products tab: product whose detail panel is open. */
+    public ?string $viewProductId = null;
+
     public function mount(string $mode = 'calendar'): void
     {
         $this->mode = in_array($mode, ['calendar', 'settings'], true) ? $mode : 'calendar';
@@ -946,6 +949,17 @@ class ContentCalendar extends Component
         session()->flash('content-status', __('Switched to broader topics. Articles will keep flowing as before.'));
     }
 
+    /** Settings → Products: open the detail panel for one product. */
+    public function viewProduct(string $productId): void
+    {
+        $this->viewProductId = $productId;
+    }
+
+    public function closeProduct(): void
+    {
+        $this->viewProductId = null;
+    }
+
     /** Settings → Products: exclude/include a product from article grounding. */
     public function toggleProductExclusion(string $productId): void
     {
@@ -1008,8 +1022,31 @@ class ContentCalendar extends Component
             });
         }
 
+        // Detail panel: everything we know about one product + the articles
+        // that feature it (topic pivots → review-page links).
+        $detail = null;
+        if ($this->viewProductId !== null) {
+            $product = ContentProduct::query()
+                ->where('website_id', $plan->website_id)
+                ->find($this->viewProductId);
+            if ($product !== null) {
+                $detail = [
+                    'product' => $product,
+                    'topics' => \App\Models\ContentTopic::query()
+                        ->whereHas('products', fn ($q) => $q->whereKey($product->id))
+                        ->where('plan_id', $plan->id)
+                        ->orderByDesc('scheduled_for')
+                        ->limit(10)
+                        ->get(['id', 'title', 'status', 'scheduled_for']),
+                ];
+            } else {
+                $this->viewProductId = null;
+            }
+        }
+
         return [
             'mode' => $plan->product_mode,
+            'detail' => $detail,
             'total' => $total,
             'excluded' => ContentProduct::query()->where('website_id', $plan->website_id)->where('is_excluded', true)->count(),
             'run' => $run,
