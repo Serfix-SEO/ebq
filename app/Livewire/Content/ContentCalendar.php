@@ -1742,6 +1742,11 @@ class ContentCalendar extends Component
                 ? $this->guardState($anyPlan)
                 : null;
 
+            // Detected e-commerce → default the step-7 card to "Only my
+            // products" (owner 2026-09-11); the client can still pick Broader.
+            if ($this->requiresProductChoice($anyPlan) && $this->productModeChoice === '') {
+                $this->productModeChoice = ContentPlan::PRODUCT_MODE_STRICT;
+            }
             $wizard = [
                 'guard' => $guardState,
                 'requiresProductChoice' => $this->requiresProductChoice($anyPlan),

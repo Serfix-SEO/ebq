@@ -768,6 +768,12 @@ trait ContentWizard
             $guard = app(CompetitorMentionGuard::class)->stateFor($plan);
         }
 
+        // Detected e-commerce → default to strict (dual-host twin of the
+        // ContentCalendar default; owner 2026-09-11).
+        if ($this->requiresProductChoice($plan) && $this->productModeChoice === '') {
+            $this->productModeChoice = \App\Models\ContentPlan::PRODUCT_MODE_STRICT;
+        }
+
         return [
             'guard' => $guard,
             'requiresProductChoice' => $this->requiresProductChoice($plan),

@@ -68,18 +68,30 @@ class ProductModeWizardTest extends TestCase
             ->assertViewHas('wizard', fn ($w) => $w['requiresProductChoice'] === false);
     }
 
-    public function test_launch_is_blocked_until_a_product_mode_is_picked(): void
+    public function test_ecommerce_wizard_defaults_to_strict(): void
     {
+        // Detected e-commerce → "Only my products" pre-selected (owner
+        // 2026-09-11); launching without touching the card activates strict.
         Queue::fake();
         [, , $plan] = $this->ecomSetup();
 
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
             ->set('wizardStep', 7)
+            ->assertSet('productModeChoice', ContentPlan::PRODUCT_MODE_STRICT)
             ->call('launch');
 
         $plan->refresh();
-        $this->assertSame(ContentPlan::STATUS_DRAFT, $plan->status);
-        $this->assertNull($plan->product_mode);
+        $this->assertSame(ContentPlan::PRODUCT_MODE_STRICT, $plan->product_mode);
+        Queue::assertPushed(DiscoverProductPagesJob::class);
+    }
+
+    public function test_non_ecommerce_wizard_gets_no_default_choice(): void
+    {
+        $this->ecomSetup(ContentPlan::STATUS_DRAFT, 'local_service');
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 7)
+            ->assertSet('productModeChoice', '');
     }
 
     public function test_launch_with_strict_choice_activates_through_the_single_path(): void
@@ -116,9 +128,11 @@ class ProductModeWizardTest extends TestCase
     {
         $this->ecomSetup();
 
+        // 'bogus' is rejected; the ecommerce default (strict) reasserts on
+        // the next render rather than leaving an invalid value.
         Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
             ->call('chooseProductMode', 'bogus')
-            ->assertSet('productModeChoice', '');
+            ->assertSet('productModeChoice', ContentPlan::PRODUCT_MODE_STRICT);
     }
 
     // ── Public onboarding host (dual-component rule) ────────────────────
