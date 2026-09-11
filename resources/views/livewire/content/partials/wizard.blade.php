@@ -1130,16 +1130,32 @@
                 @elseif ($wizardStep === 7)
                     @php
                         $dts = $wizard['draftTopics'] ?? collect();
-                        $needsProductChoice = ($wizard['requiresProductChoice'] ?? false) && $productModeChoice === '';
+                        $ecomChoice = (bool) ($wizard['requiresProductChoice'] ?? false);
+                        $needsProductChoice = $ecomChoice && $productModeChoice === '';
                     @endphp
+                    @if ($ecomChoice)
+                        {{-- E-commerce: the pre-planned sample topics get REBUILT
+                             around the product-mode choice, so showing them here
+                             is misleading (owner 2026-09-11) — the choice card
+                             IS the step. --}}
+                        <div class="text-center">
+                            <x-nodus state="success" :size="80" class="mx-auto mb-1 text-slate-400 dark:text-slate-500"/>
+                            <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 7 of 7') }}</p>
+                            <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('One last choice for your store') }}</h2>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Pick how your articles treat products — we\'ll build your article calendar around it the moment you launch.') }}</p>
+                        </div>
+                    @else
                     <div class="text-center">
                         <x-nodus :state="$dts->isEmpty() ? 'searching' : 'success'" :size="80" class="mx-auto mb-1 text-slate-400 dark:text-slate-500"/>
                         <p class="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">{{ __('Step 7 of 7') }}</p>
                         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{{ __('Your first articles are ready') }}</h2>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Built from what your audience is really searching for. Remove any that don\'t fit, then launch.') }}</p>
                     </div>
+                    @endif
 
-                    @if ($dts->isEmpty())
+                    @if ($ecomChoice)
+                        {{-- no sample-topic list in the ecommerce case --}}
+                    @elseif ($dts->isEmpty())
                         <div wire:poll.4s class="mt-6 flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-800/40">
                             <x-nodus state="analyzing" :size="92" class="text-slate-400 dark:text-slate-500"/>
                             <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ __('Researching the best topics for your site…') }}</p>
@@ -1200,7 +1216,7 @@
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                             </button>
                         @else
-                            <button wire:click="launch" @disabled($dts->isEmpty() || $needsProductChoice) wire:loading.attr="disabled" wire:target="launch"
+                            <button wire:click="launch" @disabled(($dts->isEmpty() && ! $ecomChoice) || $needsProductChoice) wire:loading.attr="disabled" wire:target="launch"
                                 class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
                                 <svg wire:loading wire:target="launch" class="-ms-1 me-1 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                                 {{ __('Looks good — launch') }}

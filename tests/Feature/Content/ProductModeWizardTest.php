@@ -85,6 +85,29 @@ class ProductModeWizardTest extends TestCase
         Queue::assertPushed(DiscoverProductPagesJob::class);
     }
 
+    public function test_ecommerce_step7_hides_sample_topics_and_launches_without_them(): void
+    {
+        // The pre-planned samples get rebuilt around the product choice, so
+        // the ecom step 7 shows only the choice card (owner 2026-09-11) and
+        // launch must not be gated on the topic list.
+        Queue::fake();
+        [, , $plan] = $this->ecomSetup();
+        $topic = ContentTopic::factory()->create([
+            'plan_id' => $plan->id, 'website_id' => $plan->website_id,
+            'title' => 'Sample Topic That Must Stay Hidden',
+            'status' => ContentTopic::STATUS_SUGGESTED, 'scheduled_for' => now(),
+        ]);
+
+        $c = Livewire::test(ContentCalendar::class, ['mode' => 'settings'])
+            ->set('wizardStep', 7)
+            ->assertSee('One last choice for your store')
+            ->assertDontSee('Sample Topic That Must Stay Hidden');
+
+        $topic->delete(); // even with ZERO topics, ecom launch is not blocked
+        $c->call('launch');
+        $this->assertSame(ContentPlan::STATUS_ACTIVE, $plan->refresh()->status);
+    }
+
     public function test_non_ecommerce_wizard_gets_no_default_choice(): void
     {
         $this->ecomSetup(ContentPlan::STATUS_DRAFT, 'local_service');
