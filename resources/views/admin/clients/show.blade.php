@@ -457,7 +457,7 @@
                                     @endif
                                 </p>
                             </div>
-                            <form method="POST" action="{{ route('admin.clients.scan-products', [$profile['user'], $w['id']]) }}">
+                            <form method="POST" action="{{ route('admin.clients.scan-products', [$client, $w['id']]) }}">
                                 @csrf
                                 <button class="shrink-0 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50">Scan products</button>
                             </form>

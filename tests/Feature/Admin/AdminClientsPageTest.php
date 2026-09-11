@@ -286,4 +286,21 @@ class AdminClientsPageTest extends TestCase
             // the +N tooltip listing every domain
             ->assertSee('three.test');
     }
+
+    /** Regression 2026-09-11: the Product catalog card referenced a missing
+     *  $profile['user'] key — every client detail page 500'd. */
+    public function test_client_detail_renders_with_a_content_plan_website(): void
+    {
+        $admin = \App\Models\User::factory()->create(['is_admin' => true]);
+        $user = \App\Models\User::factory()->create();
+        $website = \App\Models\Website::factory()->for($user)->create();
+        \App\Models\ContentPlan::factory()->create([
+            'website_id' => $website->id, 'status' => \App\Models\ContentPlan::STATUS_ACTIVE,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.clients.show', $user))
+            ->assertOk()
+            ->assertSee('scan-products');
+    }
 }
