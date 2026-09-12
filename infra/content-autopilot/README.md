@@ -2437,17 +2437,43 @@ pass the UNREFRESHED handle; a `->fresh()` model hides the bug entirely.
 
 ---
 
-## Public landing page + marketing visuals (2026-07-30)
+## Public landing page + marketing visuals (2026-07-30, redesigned 2026-09-12)
 
 `/content-autopilot` (`resources/views/content-landing.blade.php`, routed by
-`Route::view` at `routes/web.php:69`) was rebuilt from a short feature list into
-a full sales page. Section order follows the buyer's questions:
+`Route::view` at `routes/web.php:69`; served at `/` while `SEO_PLATFORM_UI` is
+false) is a full sales page. **The blade is now a ~110-line shell** — the `@php`
+data block, `<x-marketing.page>` and twelve `@include`s — with every section in
+`resources/views/partials/content-landing/`:
 
-hero (real calendar screen + domain capture) → **See it in action** (external
-Supademo walkthrough embed) → the quality objection ("does it read like AI?") →
-what it costs everywhere else → what you get → SEO-platform cross-sell →
-pricing incl. the **extra-website table** → why consistency matters → FAQ
-(+ `FAQPage` schema) → three real posts from our own blog → CTA.
+`hero` → `steps` (01–04 strip) → `tour` (dark product-tour card, desktop embed
++ mobile fallback) → `journey` (6-step timeline) → `quality` → `results` →
+`publishing` (destinations + "less work" + cost strip) → `faq` → `pricing` →
+`cross-sell` (flag-gated) → `blog` → `cta`.
+
+Blade `@include` inherits the parent scope, so the prices/`$faqs`/`$latestPosts`
+defined in the shell reach every partial with no plumbing, and the rendered HTML
+is byte-identical to a single file — which is why every regex-based test pin
+still passes. The case-study `@php` block lives inside `results.blade.php`
+because it is self-contained.
+
+**Two rules the 2026-09-12 redesign added:**
+
+- **One posting form per page.** reCAPTCHA is live in production and
+  `PublicOnboardingStartController` requires a token from guests. Google's
+  api.js binds `.g-recaptcha` divs in document order and a duplicate widget
+  silently fails to bind, so a second form would post an empty token and hard-
+  fail every guest signup. The hero owns the only form; the closing CTA is a
+  styled anchor to `#start` (`cta.blade.php` documents this).
+- **The mobile product tour is a link, not an embed.** `#demo` stays
+  `hidden … lg:block` so phones still make zero third-party requests; a
+  `lg:hidden` sibling card offers a poster + "Start interactive demo" that
+  opens the walkthrough in its own tab. Previously mobile saw nothing at all.
+
+The design mockup that drove this rebuild carried invented proof numbers
+(87.3K → 128.6K impressions). They were **not** used: `results.blade.php` keeps
+the real Search Console figures verbatim (owner: "keep the data, enhance the
+design"). The publishing section also stopped underselling — it now names all
+nine real drivers instead of "WordPress or webhook".
 
 Rules the page must keep (pinned by `tests/Feature/ContentLandingPageTest.php`
 and `tests/Feature/PricingPagesTest.php`):
