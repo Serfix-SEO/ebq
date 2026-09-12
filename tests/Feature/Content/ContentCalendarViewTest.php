@@ -189,4 +189,15 @@ class ContentCalendarViewTest extends TestCase
             ->assertViewHas('planningActive', true);
         \Illuminate\Support\Facades\Cache::forget('content:planning:'.$plan->id);
     }
+
+    /** Funnel fix 2026-09-12: the no-website state must carry a CTA, not a dead end. */
+    public function test_no_website_state_links_to_get_started(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user); // no current_website_id, no websites
+
+        Livewire::test(ContentCalendar::class, ['mode' => 'calendar'])
+            ->assertSee('Add a website first')
+            ->assertSee(route('content.get-started'));
+    }
 }

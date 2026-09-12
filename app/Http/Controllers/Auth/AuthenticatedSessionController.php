@@ -39,8 +39,13 @@ class AuthenticatedSessionController extends Controller
         }
 
         // Public tool gate → return to the tool result (safe local path only).
+        // ONLY for accounts that already have a website — a website-less user
+        // logging back in from a tool gate falls through to the wizard-resume /
+        // onboarding funnel below instead of re-stranding (funnel fix
+        // 2026-09-12).
         $redirect = (string) $request->input('redirect', '');
-        if ($redirect !== '' && str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//')) {
+        if ($redirect !== '' && str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//')
+            && $user !== null && $user->hasAccessibleWebsites()) {
             return redirect()->to($redirect);
         }
 

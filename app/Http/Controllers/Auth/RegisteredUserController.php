@@ -112,9 +112,15 @@ class RegisteredUserController extends Controller
         }
 
         // Public tool gate: return to the tool result the visitor was viewing
-        // (safe local path only — never an open redirect).
+        // (safe local path only — never an open redirect). ONLY when the
+        // account already has a website (e.g. granted via an invite accepted
+        // above): a fresh tool-gate signup used to exit here with an account
+        // and no website, stranded outside onboarding forever (funnel fix
+        // 2026-09-12). Website-less signups fall through to the onboarding
+        // funnel below; the tool stays one click away afterwards.
         $redirect = (string) $request->input('redirect', '');
-        if ($redirect !== '' && str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//')) {
+        if ($redirect !== '' && str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//')
+            && $user->hasAccessibleWebsites()) {
             return redirect()->to($redirect);
         }
 

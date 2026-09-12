@@ -26,6 +26,15 @@ class GoogleOAuthController extends Controller
     public function contentOnboardingRedirect(Request $request): RedirectResponse
     {
         if (Auth::check()) {
+            // A signed-in user with a pending wizard run resumes it — the old
+            // blanket get-started redirect silently dropped the provisional
+            // website they had already built (funnel fix 2026-09-12).
+            $token = (string) $request->session()->get('content_onboarding_token', '');
+            if ($token !== '' && ContentOnboardingSession::query()
+                ->where('token', $token)->whereNull('converted_at')->exists()) {
+                return redirect()->route('content.onboarding');
+            }
+
             return redirect()->route('content.get-started');
         }
         $request->session()->put('google_sso.intent', 'content_onboarding');
@@ -38,10 +47,11 @@ class GoogleOAuthController extends Controller
 
     public function ssoRedirect(Request $request): RedirectResponse
     {
-        // Keep intent in session so callback can distinguish login/register
-        // UX and preserve invite token if user came from invite onboarding.
+        // Keep intent in session so the callback can route content-wizard
+        // sign-ins. (A google_sso.invite key used to be written here too —
+        // never read anywhere; invites are auto-accepted by email match in
+        // the callback.)
         $request->session()->put('google_sso.intent', (string) $request->query('intent', 'login'));
-        $request->session()->put('google_sso.invite', (string) $request->query('invite', ''));
 
         // Return the visitor to the local path they came from (public-tool /
         // report teaser gate). Local-path only — never an open redirect.
@@ -120,7 +130,7 @@ class GoogleOAuthController extends Controller
         // account and route by coverage. Skip the GSC/Analytics account persist —
         // content signup requested identity scopes only.
         if ($request->session()->get('google_sso.intent') === 'content_onboarding') {
-            $request->session()->forget('google_sso.intent');
+            $request->session()->forget(['google_sso.intent', 'google_sso.redirect']);
 
             return $this->finishContentOnboarding($user);
         }
@@ -137,8 +147,14 @@ class GoogleOAuthController extends Controller
 
         // Public-tool / teaser gate: return to the local path the visitor was
         // viewing when they hit the signup wall (parity with password signup).
+        // ONLY for accounts that already have a website: this early return
+        // used to jump the zero-website onboarding funnel below, stranding
+        // every new-email SSO signup from a tool/teaser gate with an account
+        // and no website (owner report 2026-09-12). New or website-less users
+        // always funnel into onboarding; the tool is one click away after.
         $return = (string) $request->session()->pull('google_sso.redirect', '');
-        if ($return !== '' && str_starts_with($return, '/') && ! str_starts_with($return, '//')) {
+        if ($return !== '' && str_starts_with($return, '/') && ! str_starts_with($return, '//')
+            && $user->hasAccessibleWebsites()) {
             return redirect()->to($return);
         }
 

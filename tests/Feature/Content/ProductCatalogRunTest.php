@@ -61,6 +61,10 @@ class ProductCatalogRunTest extends TestCase
 
     public function test_discovery_with_no_pages_fails_run_honestly(): void
     {
+        // Discovery now fetches robots/sitemap live — fake it (the factory
+        // domain can be a REAL registrable name; tests must never hit the
+        // network, and an unlucky real sitemap made this flake in-suite).
+        \Illuminate\Support\Facades\Http::fake();
         [, $plan] = $this->site();
         $run = ContentProductRun::factory()->create([
             'website_id' => $plan->website_id, 'status' => ContentProductRun::STATUS_PENDING,

@@ -37,8 +37,13 @@
     @endif
 
     @if (! $hasWebsite)
-        <div class="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-            {{ __('Add a website first to start planning content.') }}
+        <div class="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
+            <p class="text-sm text-slate-500 dark:text-slate-400">{{ __('Add a website first to start planning content.') }}</p>
+            <a href="{{ route('content.get-started') }}" wire:navigate
+               class="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
+                {{ __('Add your website') }}
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </a>
         </div>
     @elseif ($needsSetup)
         {{-- ── No plan yet on the Calendar page: point to Settings ──── --}}
