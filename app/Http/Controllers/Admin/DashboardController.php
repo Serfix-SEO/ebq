@@ -154,12 +154,26 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
+        // The instruction that actually reached the writer. The feedback
+        // comment is the client's original wording; when they accept the
+        // enhancer's sharpened version it is the REWRITE prompt that ran, so
+        // the queue shows that instead of a note nobody acted on. Keyed
+        // "topicId:userId" — the pair feedback is unique on.
+        $feedbackPrompts = $feedback->isEmpty() ? collect() : \App\Models\ContentRewriteRequest::query()
+            ->whereIn('topic_id', $feedback->pluck('topic_id')->unique()->all())
+            ->whereIn('user_id', $feedback->pluck('user_id')->unique()->all())
+            ->latest()
+            ->get(['topic_id', 'user_id', 'prompt', 'status'])
+            ->groupBy(fn ($r) => $r->topic_id.':'.$r->user_id)
+            ->map(fn ($g) => $g->first());
+
         $payRange = $this->paymentRange($request, $today);
 
         return view('admin.dashboard', [
             'openTickets' => $openTickets,
             'openTicketTotal' => SupportTicket::query()->where('status', SupportTicket::STATUS_OPEN)->count(),
             'feedback' => $feedback,
+            'feedbackPrompts' => $feedbackPrompts,
             'feedbackTotal' => ContentArticleFeedback::query()->unseen()->count(),
             'daily' => $daily,
             'segments' => $segments,

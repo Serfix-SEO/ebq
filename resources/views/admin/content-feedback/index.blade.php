@@ -39,7 +39,7 @@
                             <th class="px-4 py-3">Website</th>
                             <th class="px-4 py-3">Article</th>
                             <th class="px-4 py-3">Verdict</th>
-                            <th class="px-4 py-3">Comment</th>
+                            <th class="px-4 py-3">What they asked for</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -72,7 +72,50 @@
                                 <td class="whitespace-nowrap px-4 py-3">
                                     <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold {{ $badge }}">{{ \App\Models\ContentArticleFeedback::label($row->rating) }}</span>
                                 </td>
-                                <td class="max-w-sm px-4 py-3 text-xs text-slate-600 dark:text-slate-400">{{ $row->comment }}</td>
+                                {{-- What the client actually asked for.
+
+                                     The note is their original wording; the
+                                     prompts below are the instructions that
+                                     really reached the writer — which differ
+                                     whenever they accepted the enhancer's
+                                     sharpened version, and accumulate when
+                                     they asked more than once (the note only
+                                     keeps the latest). --}}
+                                <td class="max-w-sm px-4 py-3 text-xs">
+                                    @php $reqs = $rewrites[$row->topic_id.':'.$row->user_id] ?? collect(); @endphp
+
+                                    @if (trim((string) $row->comment) !== '')
+                                        <p class="text-slate-600 dark:text-slate-400">“{{ $row->comment }}”</p>
+                                    @elseif ($reqs->isEmpty())
+                                        <span class="text-slate-400">—</span>
+                                    @endif
+
+                                    @foreach ($reqs as $req)
+                                        @php
+                                            $prompt = trim((string) $req->prompt);
+                                            $enhanced = $prompt !== '' && $prompt !== trim((string) $row->comment);
+                                        @endphp
+                                        <div @class(['mt-2 rounded border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800/60', 'mt-1' => $loop->first && trim((string) $row->comment) === ''])>
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rewrite {{ $reqs->count() > 1 ? '#'.($loop->iteration) : '' }}</span>
+                                                <span @class([
+                                                    'rounded px-1.5 py-0.5 text-[10px] font-bold uppercase',
+                                                    'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' => $req->status === 'done',
+                                                    'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' => $req->status === 'failed',
+                                                    'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' => ! in_array($req->status, ['done', 'failed'], true),
+                                                ])>{{ $req->status }}</span>
+                                                @if ($enhanced)
+                                                    <span class="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-sky-700 dark:bg-sky-950 dark:text-sky-300"
+                                                          title="The client accepted the sharpened version, so this is what reached the writer — not their note above.">sharpened</span>
+                                                @endif
+                                                <span class="text-[10px] text-slate-400">{{ $req->created_at?->diffForHumans() }}</span>
+                                            </div>
+                                            <p class="mt-1 leading-relaxed text-slate-700 dark:text-slate-300">
+                                                {{ $prompt !== '' ? $prompt : 'No instruction — a general quality pass.' }}
+                                            </p>
+                                        </div>
+                                    @endforeach
+                                </td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="px-4 py-10 text-center text-sm text-slate-400">No feedback yet.</td></tr>

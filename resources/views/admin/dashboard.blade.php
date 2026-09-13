@@ -385,6 +385,18 @@
                                 @if (trim((string) $f->comment) !== '')
                                     <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">“{{ $f->comment }}”</p>
                                 @endif
+                                {{-- The instruction that actually ran. Differs
+                                     from the note above whenever the client
+                                     accepted the sharpened version, so showing
+                                     only the note hid what we were really
+                                     asked to do. --}}
+                                @php $req = ($feedbackPrompts ?? collect())[$f->topic_id.':'.$f->user_id] ?? null; @endphp
+                                @if ($req && trim((string) $req->prompt) !== '')
+                                    <p class="mt-1.5 line-clamp-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs leading-relaxed text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                                        <span class="font-bold uppercase tracking-wider text-slate-400">Rewrite asked:</span>
+                                        {{ $req->prompt }}
+                                    </p>
+                                @endif
                                 <p class="mt-1 truncate text-xs text-slate-400">{{ $f->user?->email ?? '—' }} · {{ $f->created_at?->diffForHumans() }}</p>
                             </a>
                             <div class="px-4 pb-3 pt-2">
