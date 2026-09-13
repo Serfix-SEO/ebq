@@ -9,9 +9,11 @@ use App\Models\SupportTicket;
 use App\Models\Lead;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Admin\ContentPaymentSeries;
 use App\Services\Content\ContentEntitlements;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -35,7 +37,7 @@ class DashboardController extends Controller
 {
     private const SERIES_DAYS = 14;
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $now = Carbon::now();
         $today = $now->copy()->startOfDay();
@@ -152,6 +154,8 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
+        $payRange = $this->paymentRange($request, $today);
+
         return view('admin.dashboard', [
             'openTickets' => $openTickets,
             'openTicketTotal' => SupportTicket::query()->where('status', SupportTicket::STATUS_OPEN)->count(),
@@ -163,7 +167,60 @@ class DashboardController extends Controller
             'recentSignups' => $recentSignups,
             'recentSubscriptions' => $recentSubscriptions,
             'stripe' => $this->stripeSnapshot($today),
+            'payRange' => $payRange,
+            'payments' => app(ContentPaymentSeries::class)->build($payRange['from'], $payRange['to']),
         ]);
+    }
+
+    /**
+     * Date window for the Content Autopilot payment graph. Mirrors the
+     * site-explorer-usage filter: preset pills, or a custom from/to pair.
+     * Unlike every other range on this page the window may reach into the
+     * FUTURE — scheduled renewals are the point of the graph — so the
+     * presets are deliberately asymmetric.
+     *
+     * @return array{preset: string, from: Carbon, to: Carbon}
+     */
+    private function paymentRange(Request $request, Carbon $today): array
+    {
+        $preset = (string) $request->query('pay_range', '30');
+
+        $window = match ($preset) {
+            '7' => [$today->copy()->subDays(6), $today->copy()->endOfDay()],
+            '90' => [$today->copy()->subDays(89), $today->copy()->endOfDay()],
+            'next30' => [$today->copy(), $today->copy()->addDays(29)->endOfDay()],
+            'next90' => [$today->copy(), $today->copy()->addDays(89)->endOfDay()],
+            'custom' => [
+                $this->parseDate($request->query('pay_from')) ?? $today->copy()->subDays(29),
+                $this->parseDate($request->query('pay_to')) ?? $today->copy()->endOfDay(),
+            ],
+            default => [$today->copy()->subDays(29), $today->copy()->endOfDay()],
+        };
+        if ($preset !== 'custom' && ! in_array($preset, ['7', '30', '90', 'next30', 'next90'], true)) {
+            $preset = '30';
+        }
+
+        [$from, $to] = $window;
+        if ($to->lt($from)) {
+            [$from, $to] = [$to, $from];
+        }
+        // A 400-day cap keeps one bar per day readable and bounds the Stripe
+        // projection loop; the series builder enforces the same rail.
+        if ($from->diffInDays($to) > 370) {
+            $to = $from->copy()->addDays(370);
+        }
+
+        return ['preset' => $preset, 'from' => $from, 'to' => $to];
+    }
+
+    private function parseDate(?string $value): ?Carbon
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        return rescue(fn () => Carbon::parse($value), null, false);
     }
 
     /** @return array<int, int> one count per element of $days */

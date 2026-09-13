@@ -128,6 +128,151 @@
             @endforeach
         </div>
 
+        {{-- ── Content Autopilot payments ────────────────────────── --}}
+        {{-- Two series on one timeline: money COLLECTED (paid Stripe invoices,
+             history) and money SCHEDULED (future renewals, projected forward by
+             each subscription's billing interval). The window may reach into
+             the future on purpose — "what will we charge" is the question this
+             answers — so the presets are asymmetric and the custom pair accepts
+             any two dates. Both series come from Stripe, never from our local
+             price settings. --}}
+        @php
+            $pay = $payments;
+            $payDays = $pay['days'];
+            $payMax = max(1, max(array_merge([0], array_map(
+                fn ($d) => max($d['collected'], $d['scheduled']), $payDays
+            ))));
+            $todayKey = now()->toDateString();
+            // One bar per day is unreadable past ~120 days, so label sparsely.
+            $labelEvery = (int) max(1, ceil(count($payDays) / 12));
+        @endphp
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p class="text-sm font-semibold text-slate-900 dark:text-white">Content Autopilot payments</p>
+                    <p class="text-xs text-slate-400">
+                        {{ $payRange['from']->toFormattedDateString() }} — {{ $payRange['to']->toFormattedDateString() }}
+                        · {{ $fmtN(count($payDays)) }} days
+                    </p>
+                </div>
+
+                <form method="GET" class="flex flex-wrap items-end gap-2">
+                    <div class="flex flex-wrap gap-1">
+                        @foreach ([['7','7d'], ['30','30d'], ['90','90d'], ['next30','Next 30d'], ['next90','Next 90d']] as [$val, $label])
+                            <a href="{{ route('admin.dashboard', ['pay_range' => $val]) }}"
+                               @class([
+                                   'rounded border px-2.5 py-1 text-[11px] font-semibold',
+                                   'border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-500/10' => $payRange['preset'] === $val,
+                                   'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800' => $payRange['preset'] !== $val,
+                               ])>{{ $label }}</a>
+                        @endforeach
+                    </div>
+                    <div class="flex items-end gap-2 border-l border-slate-200 pl-2 dark:border-slate-700">
+                        <label class="text-[10px] uppercase tracking-wider text-slate-500">From
+                            <input type="date" name="pay_from" value="{{ $payRange['from']->toDateString() }}"
+                                   class="block rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800" />
+                        </label>
+                        <label class="text-[10px] uppercase tracking-wider text-slate-500">To
+                            <input type="date" name="pay_to" value="{{ $payRange['to']->toDateString() }}"
+                                   class="block rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800" />
+                        </label>
+                        <input type="hidden" name="pay_range" value="custom" />
+                        <button class="rounded bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white dark:bg-slate-700">Apply</button>
+                    </div>
+                </form>
+            </div>
+
+            @if (! $pay['available'])
+                <p class="mt-6 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400 dark:border-slate-700">
+                    Stripe is unavailable right now — payment figures cannot be shown.
+                </p>
+            @else
+                <div class="mt-4 grid gap-2 sm:grid-cols-4">
+                    @foreach ([
+                        ['label' => 'Collected in range', 'value' => $money($pay['collected_total'], $pay['currency']), 'tone' => 'text-emerald-600 dark:text-emerald-400'],
+                        ['label' => 'Scheduled in range', 'value' => $money($pay['scheduled_total'], $pay['currency']), 'tone' => 'text-orange-600 dark:text-orange-400'],
+                        ['label' => 'Payments received', 'value' => $fmtN($pay['collected_count']), 'tone' => 'text-slate-900 dark:text-white'],
+                        ['label' => 'Active subscribers', 'value' => $fmtN($pay['subscribers']), 'tone' => 'text-slate-900 dark:text-white'],
+                    ] as $tile)
+                        <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{{ $tile['label'] }}</p>
+                            <p class="mt-0.5 text-xl font-bold tabular-nums {{ $tile['tone'] }}">{{ $tile['value'] }}</p>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Bars are percentage-width so the chart reflows with the card;
+                     only the geometry is SVG, the axis labels stay real HTML so
+                     they survive a narrow screen. --}}
+                <div class="mt-5">
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="h-40 w-full"
+                         role="img" aria-label="Content Autopilot payments collected and scheduled per day">
+                        @php $n = max(1, count($payDays)); $w = 100 / $n; @endphp
+                        @foreach ($payDays as $i => $d)
+                            @php
+                                $x = $i * $w;
+                                $hC = $d['collected'] > 0 ? max(2, 96 * $d['collected'] / $payMax) : 0;
+                                $hS = $d['scheduled'] > 0 ? max(2, 96 * $d['scheduled'] / $payMax) : 0;
+                                $bw = $w * 0.72;
+                                $half = $hC > 0 && $hS > 0;
+                            @endphp
+                            @if ($hC > 0)
+                                <rect x="{{ round($x + $w * 0.14, 3) }}%" y="{{ round(100 - $hC, 2) }}"
+                                      width="{{ round($half ? $bw / 2 : $bw, 3) }}%" height="{{ round($hC, 2) }}"
+                                      class="fill-emerald-500"><title>{{ $d['label'] }} · collected {{ $money($d['collected'], $pay['currency']) }}</title></rect>
+                            @endif
+                            @if ($hS > 0)
+                                <rect x="{{ round($x + $w * 0.14 + ($half ? $bw / 2 : 0), 3) }}%" y="{{ round(100 - $hS, 2) }}"
+                                      width="{{ round($half ? $bw / 2 : $bw, 3) }}%" height="{{ round($hS, 2) }}"
+                                      class="fill-orange-400"><title>{{ $d['label'] }} · scheduled {{ $money($d['scheduled'], $pay['currency']) }}</title></rect>
+                            @endif
+                            @if ($d['date'] === $todayKey)
+                                <rect x="{{ round($x + $w * 0.14, 3) }}%" y="0" width="0.15%" height="100" class="fill-slate-300 dark:fill-slate-600"><title>Today</title></rect>
+                            @endif
+                        @endforeach
+                    </svg>
+                    <div class="mt-1 flex justify-between text-[10px] text-slate-400">
+                        @foreach ($payDays as $i => $d)
+                            @if ($i % $labelEvery === 0)
+                                <span>{{ $d['label'] }}</span>
+                            @endif
+                        @endforeach
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
+                        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span>Collected (paid invoices)</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-orange-400"></span>Scheduled (upcoming renewals)</span>
+                        <span class="text-slate-400">Scheduled is list price × quantity — coupons, proration and tax are applied by Stripe at invoice time, and a future cancellation cannot be predicted.</span>
+                    </div>
+                </div>
+
+                @if ($pay['upcoming'] !== [])
+                    <div class="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Next charges</p>
+                        <div class="mt-2 overflow-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="text-[10px] uppercase tracking-wider text-slate-400">
+                                    <tr><th class="py-1 pr-3">Date</th><th class="py-1 pr-3">Client</th><th class="py-1 pr-3">Billing</th><th class="py-1 text-right">Amount</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                    @foreach (array_slice($pay['upcoming'], 0, 12) as $row)
+                                        <tr>
+                                            <td class="py-1.5 pr-3 tabular-nums text-slate-600 dark:text-slate-300">{{ $row['at']->toFormattedDateString() }}</td>
+                                            <td class="py-1.5 pr-3 text-slate-600 dark:text-slate-300">{{ $row['email'] ?? '—' }}</td>
+                                            <td class="py-1.5 pr-3 text-slate-400">{{ $row['interval'] }}ly</td>
+                                            <td class="py-1.5 text-right font-semibold tabular-nums text-slate-900 dark:text-white">{{ $money($row['amount'], $pay['currency']) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (count($pay['upcoming']) > 12)
+                            <p class="mt-2 text-[11px] text-slate-400">{{ $fmtN(count($pay['upcoming']) - 12) }} more scheduled in this range.</p>
+                        @endif
+                    </div>
+                @endif
+            @endif
+        </div>
+
         {{-- ── 14-day trends ─────────────────────────────────────── --}}
         <div class="grid gap-3 lg:grid-cols-3">
             @foreach ([
