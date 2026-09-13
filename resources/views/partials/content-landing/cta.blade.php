@@ -9,19 +9,28 @@
      and the visitor lands on a focused input either way. --}}
 <section class="bg-white">
     <div class="mx-auto max-w-5xl px-6 py-16 lg:px-8 lg:py-20">
-        <div class="overflow-hidden rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-white px-8 py-14 shadow-sm">
+        <div class="overflow-hidden rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-white px-6 py-12 shadow-sm sm:px-8 sm:py-14">
+            {{-- min-w-0 on both columns: a grid item's automatic minimum size
+                 is its min-content width, so the pill below (whose button is
+                 whitespace-nowrap) would otherwise stretch the column past the
+                 card and the card's overflow-hidden would clip the heading and
+                 paragraph too. --}}
             <div class="grid items-center gap-8 lg:grid-cols-2">
-                <div>
+                <div class="min-w-0">
                     <h2 class="text-balance text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">{{ __('Ready to take content SEO off your weekly to-do list?') }}</h2>
                     <p class="mt-4 max-w-lg text-base leading-7 text-slate-600">{{ __('See your competitors, your keyword gaps and a month of planned topics — before you pay anything.') }}</p>
                 </div>
 
-                <div>
+                <div class="min-w-0">
+                    {{-- Stacks below sm, exactly like the real form it imitates
+                         (domain-form.blade.php): side by side, the nowrap button
+                         leaves the input a ~60px shred and "Enter your website"
+                         wraps to three lines. --}}
                     <a href="#start"
-                       class="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/5 transition hover:border-orange-300">
-                        <span class="flex flex-1 items-center gap-2.5 ps-3 text-[15px] text-slate-400">
+                       class="flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/5 transition hover:border-orange-300 sm:flex-row sm:items-center sm:rounded-full">
+                        <span class="flex min-w-0 flex-1 items-center gap-2.5 py-3 ps-3 text-[15px] text-slate-400 sm:py-0">
                             <svg class="h-5 w-5 flex-none text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5-2.5 3.75-5.75 3.75-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.75-5.75-3.75-9S9.5 5.5 12 3M3.6 9h16.8M3.6 15h16.8" /></svg>
-                            {{ __('Enter your website') }}
+                            <span class="truncate">{{ __('Enter your website') }}</span>
                         </span>
                         <span class="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/30">
                             {{ __('Analyze My Website') }}

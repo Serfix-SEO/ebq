@@ -111,6 +111,38 @@ class ContentLandingPageTest extends TestCase
     }
 
     /**
+     * The closing CTA imitates the hero's domain form with a plain anchor (one
+     * reCAPTCHA widget per page), and an imitation is free to drift from the
+     * thing it imitates. It did: shipped as a bare flex row, on a 390px phone
+     * the nowrap "Analyze My Website" button left the input a shred, the
+     * placeholder wrapped to three lines, and — because a grid item's automatic
+     * minimum is its min-content width — the pill stretched its column past the
+     * card, whose overflow-hidden then clipped the heading and paragraph too.
+     * So: it stacks below sm, and both columns stay shrinkable.
+     */
+    public function test_the_closing_cta_pill_stacks_on_a_phone_like_the_real_form(): void
+    {
+        $html = $this->get(route('content.landing'))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/<a href="#start"\s+class="flex flex-col[^"]*\bsm:flex-row\b/',
+            $html,
+            'the CTA pill must stack below sm, like domain-form.blade.php it imitates',
+        );
+        // Both CTA columns shrinkable: the text one, and the one holding the pill.
+        $this->assertMatchesRegularExpression(
+            '/grid items-center gap-8 lg:grid-cols-2">\s*<div class="min-w-0">\s*<h2[^>]*>\s*Ready to take/',
+            $html,
+            'the CTA text column must stay shrinkable or the card clips its own heading',
+        );
+        $this->assertMatchesRegularExpression(
+            '/<div class="min-w-0">\s*<a href="#start"/',
+            $html,
+            'the CTA pill column must stay shrinkable or it stretches the grid past the card',
+        );
+    }
+
+    /**
      * The case study is the page's only first-party evidence, so its integrity
      * matters more than its presence:
      *  - per-day rates, because the source windows are unequal (21 days vs 7)

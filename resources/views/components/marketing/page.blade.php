@@ -102,7 +102,15 @@
         // happened), then wizard → account at the end.
         $signupUrl = $seoUi ? route('register') : route('content.onboarding');
     @endphp
-    <header x-data="{ mobileOpen: false }" @keydown.escape.window="mobileOpen = false" class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
+    {{-- Opaque below md, frosted from md up. iOS Safari composites a sticky
+         backdrop-filter in tiles and can strand a stale one over the content
+         below it — reported 2026-09-13 as a grey block under the header on the
+         landing hero, where a dark screenshot scrolls past. It does not
+         reproduce in Chrome at any width because it is a compositing artifact,
+         not a layout bug, and it cannot happen at all without a
+         backdrop-filter. Phones lose nothing: over a near-white page the
+         frosted and solid headers are indistinguishable. --}}
+    <header x-data="{ mobileOpen: false }" @keydown.escape.window="mobileOpen = false" class="sticky top-0 z-40 border-b border-slate-200/80 bg-white md:bg-white/80 md:backdrop-blur-xl">
         <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
             <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="Serfix home">
                 <img src="{{ asset('serfix-logo.png') }}" alt="Serfix" width="101" height="36" class="h-9 w-auto object-contain">
