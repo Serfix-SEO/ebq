@@ -165,3 +165,31 @@ and the article body.
   same HTML renders inside an admin session. A test pins both leaks.
 - Images show `prompt` and `negative_prompt`, which is the fastest way to answer
   "why is a competitor's name in this picture".
+
+## Article feedback: the verdict is not the ask (2026-09-13)
+
+`/admin/content-feedback` (`Admin\ContentFeedbackController`) and the dashboard
+feedback queue join every `content_article_feedback` row to its
+`content_rewrite_requests`, keyed `"topicId:userId"` — the pair feedback is
+unique on — in ONE query per page, never one per row.
+
+⚠️ **`content_article_feedback.comment` is a lossy proxy for what the client
+asked.** Two independent reasons, both live in prod data:
+
+- The comment is the client's **original wording**. When they accept the
+  sharpened version from the prompt enhancer, the text that actually reaches
+  the writer is `content_rewrite_requests.prompt`. Real example: comment
+  "focus on the content auto pilot…" vs prompt "Rewrite the article to focus on
+  the benefits of SEO Content Autopilot and automated on-page SEO". A prompt
+  that differs from the note is badged **"sharpened"** in the UI so the
+  difference reads as informative, not as a bug.
+- Feedback is `updateOrCreate` on (topic, user), so a **second rewrite
+  overwrites the first note**. Every prompt ever sent survives on the rewrite
+  requests (FK-free, they outlive topic deletion); only the latest survives on
+  the feedback row. The index therefore lists ALL of them, numbered.
+
+So: read the rewrite prompts, not the comment, when answering "what did they
+want". `tests/Feature/Admin/ContentFeedbackPromptsTest.php` pins both surfaces,
+the sharpened badge, the blank-prompt wording, and that a prompt never leaks
+across clients (the lookup is the pair — matching topic OR user alone is not
+enough).

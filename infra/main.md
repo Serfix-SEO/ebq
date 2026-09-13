@@ -287,6 +287,13 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-13 — Admin feedback shows the rewrite prompt, not just the verdict.**
+  Both admin feedback surfaces join `content_article_feedback` to
+  `content_rewrite_requests` on (topic, user). `comment` is a lossy proxy for the
+  ask: it holds the client's original wording (the *enhanced* prompt is what
+  reaches the writer) and `updateOrCreate` means a second rewrite overwrites the
+  first note, while every prompt survives on the requests table. Differing
+  prompts are badged "sharpened". infra/admin/README.md "Article feedback".
 - **2026-09-07 — Strict Product Mode (e-commerce catalog grounding).** E-commerce
   content plans get a mandatory Strict ("write only about my products") vs Normal
   choice: catalog scrape pipeline (`content_products`/`content_product_runs`,
