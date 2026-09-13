@@ -2469,6 +2469,28 @@ because it is self-contained.
   `lg:hidden` sibling card offers a poster + "Start interactive demo" that
   opens the walkthrough in its own tab. Previously mobile saw nothing at all.
 
+⚠️ **An imitation drifts from the thing it imitates (2026-09-13).** Because the
+closing CTA fakes the form with an anchor, it does not inherit
+`domain-form.blade.php`'s responsive shape and it lost it: shipped as a bare
+flex row, on a 390px phone the `whitespace-nowrap` button left the label a
+~60px shred. Worse, the damage was not local — **a grid item's automatic
+minimum size is its min-content width**, so the un-stackable pill stretched its
+column past the card and the card's `overflow-hidden` cropped the heading and
+paragraph too. Both columns are `min-w-0`, the pill is `flex-col … sm:flex-row`
+like the real form, and `test_the_closing_cta_pill_stacks_on_a_phone_like_the_real_form`
+pins it. **If you restyle either one, restyle both.**
+
+⚠️ **The marketing header is opaque below `md` on purpose (2026-09-13).** iOS
+Safari composites a sticky `backdrop-filter` in tiles and can strand a stale
+one over the content below — reported as a grey block under the header on the
+hero, which was a blurred frame of the dark calendar screenshot that had
+scrolled past. It does **not** reproduce in headless Chrome at any width, since
+it is a compositing artifact rather than a layout bug; the fix is removing the
+trigger (`bg-white md:bg-white/80 md:backdrop-blur-xl` in
+`components/marketing/page.blade.php`), and over a near-white page the frosted
+and solid headers are indistinguishable on a phone. Do not "restore" the
+frosted header on mobile.
+
 The design mockup that drove this rebuild carried invented proof numbers
 (87.3K → 128.6K impressions). They were **not** used: `results.blade.php` keeps
 the real Search Console figures verbatim (owner: "keep the data, enhance the
