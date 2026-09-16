@@ -287,6 +287,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-16 — Image generation can no longer fail silently.** Ideogram
+  answered 401 from 2026-09-11 and ~250 articles across 16 clients shipped
+  imageless for five days with no exception, failed job or alert — the second
+  such blackout (a tripped spend cap did the same to 91 articles on 2026-08-17).
+  `App\Support\ContentImageHealth` records every provider outcome (auth failures
+  sticky, cleared by the first success) and `ebq:failed-jobs-alert` gained a
+  line with two detectors: provider auth, and finished articles with no images.
+  infra/content-autopilot/README.md "What a blown cap actually looks like".
 - **2026-09-13 — Admin feedback shows the rewrite prompt, not just the verdict.**
   Both admin feedback surfaces join `content_article_feedback` to
   `content_rewrite_requests` on (topic, user). `comment` is a lossy proxy for the

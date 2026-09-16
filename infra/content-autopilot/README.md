@@ -1876,6 +1876,34 @@ financial loss.
   never saw images work at all. Recovery:
   `php artisan ebq:backfill-article-images` (dry run by default; refuses to run
   while the meter is exhausted, since every job would no-op and report success).
+
+  ⚠️ **It happened again, for a different reason — and there was still no alarm
+  (2026-09-11 → 2026-09-16).** Ideogram began answering **401 "Access denied.
+  Please verify your API Token is valid."** to every request; ~250 articles
+  across 16 clients shipped imageless over five days and the only trace was 685
+  `Log::warning` lines. The August incident produced the backfill command but
+  never an alarm, so this one ran just as blind, five times longer. The failure
+  is invisible *by design*: `IdeogramClient` never throws (it returns `ok:false`
+  so an article degrades to "no images" instead of failing), and the job creates
+  image rows only on success — so there is no exception, no failed job, no
+  client-visible error and nothing in `failed_jobs`. **Never assume a quiet log
+  means images are working.**
+
+  `App\Support\ContentImageHealth` + a line in `ebq:failed-jobs-alert` are the
+  alarm now, with **two** detectors because the two blackouts broke in different
+  places and neither detector would have caught the other:
+  - the client records every outcome, and an **auth** failure (401/403 or a
+    missing key) is tracked stickily — it is the only failure that never
+    self-heals, it keeps the FIRST failure's timestamp so the digest reports the
+    real length of the outage, and any successful image clears it, so a rotated
+    key silences the alarm with no admin action;
+  - the spend meter returns **before the client is ever called**, leaving no
+    provider signal at all, so the digest separately counts finished articles
+    from the last 24h with no images on plans that want them (threshold 5 — a
+    rejected render is normal, a wall of them is not).
+
+  One digest line per day per condition. Pinned by
+  `tests/Feature/Content/ContentImageOutageAlertTest.php`.
 - ⚠️ **Brand guardrails on every image** (`App\Support\ContentImageGuardrails`,
   2026-08-16). A client's hero image carried a **competitor's** signage — "Al Noor
   Medical Center" on a TMC General Clinic article. Two causes, both fixed:
