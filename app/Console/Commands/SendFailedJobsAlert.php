@@ -2,10 +2,17 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ContentArticle;
+use App\Models\ContentImage;
 use App\Models\CrawlSite;
 use App\Models\User;
+use App\Support\ContentAutopilotConfig;
+use App\Support\ContentImageHealth;
 use App\Support\FailedJobAlertBuffer;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 /**
@@ -60,6 +67,8 @@ class SendFailedJobsAlert extends Command
             }
         }
 
+        $imageLine = $this->imageHealthLine();
+
         // Collapse repeats (2026-08-26: ONE broken Hindi article re-failed on
         // every 15-min dispatcher tick → six identical digest emails). Each
         // job+exception fingerprint that already triggered a mail stays muted
@@ -92,7 +101,8 @@ class SendFailedJobsAlert extends Command
                 ? ! \Illuminate\Support\Facades\Cache::has('failed-digest:catalog:'.$run->id)
                 : \Illuminate\Support\Facades\Cache::add('failed-digest:catalog:'.$run->id, true, now()->addDays(3)));
 
-        if ($freshGroups === [] && $stuckPending->isEmpty() && $spendLine === null && $failedCatalogRuns->isEmpty()) {
+        if ($freshGroups === [] && $stuckPending->isEmpty() && $spendLine === null
+            && $failedCatalogRuns->isEmpty() && $imageLine === null) {
             $this->rememberGroups($freshGroups, $mutedGroups);
             $this->info($mutedGroups === []
                 ? 'Nothing to report.'
@@ -102,6 +112,10 @@ class SendFailedJobsAlert extends Command
         }
 
         $lines = [];
+        if ($imageLine !== null) {
+            $lines[] = $imageLine;
+            $lines[] = '';
+        }
         if ($spendLine !== null) {
             $lines[] = $spendLine;
             $lines[] = '';
@@ -183,6 +197,99 @@ class SendFailedJobsAlert extends Command
 
     /** Hours a mailed fingerprint stays muted before it may re-alert. */
     private const REALERT_HOURS = 6;
+
+    /**
+     * "Image generation is down" — the alarm that did not exist for either of
+     * the two silent blackouts (2026-08-17, 91 articles; 2026-09-11, ~250).
+     *
+     * Two independent detectors, because the two blackouts failed in different
+     * places and neither one would have caught the other:
+     *  - the PROVIDER refusing us (401/403, or no key) never reaches the
+     *    articles table until the damage is done, so ContentImageHealth
+     *    reports it the first time it happens;
+     *  - the spend meter returns BEFORE the client is ever called, so no
+     *    provider signal exists at all — only the articles themselves show it.
+     *    Hence the count of finished articles that ended up with no images.
+     *
+     * One line per day per condition (cache flag), like the spend warning: a
+     * five-day outage should nag daily, not every fifteen minutes.
+     */
+    private function imageHealthLine(): ?string
+    {
+        if (! ContentAutopilotConfig::imagesEnabled()) {
+            return null;   // deliberately off — not a fault
+        }
+
+        $auth = ContentImageHealth::authBlocked();
+
+        // Articles finished in the last day that have no image at all. Plans
+        // that turned images off are excluded — that is a client's choice, not
+        // a fault. Cheap: one indexed range scan plus a NOT EXISTS.
+        $imageless = ContentArticle::query()
+            ->where('content_articles.created_at', '>=', now()->subDay())
+            ->where('is_current', true)
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('content_images')
+                ->whereColumn('content_images.article_id', 'content_articles.id')
+                ->where('content_images.status', ContentImage::STATUS_GENERATED))
+            ->whereExists(fn ($q) => $q->select(DB::raw(1))->from('content_topics')
+                ->whereColumn('content_topics.id', 'content_articles.topic_id')
+                ->whereNotExists(fn ($p) => $p->select(DB::raw(1))->from('content_plans')
+                    ->whereColumn('content_plans.id', 'content_topics.plan_id')
+                    ->where('content_plans.images_enabled', false)))
+            ->count();
+
+        // A trickle is normal (a rejected render, a plan with none left in the
+        // budget); a wall of them is an outage.
+        $outage = $auth !== null || $imageless >= self::IMAGELESS_ALERT_THRESHOLD;
+        if (! $outage) {
+            return null;
+        }
+
+        $condition = $auth !== null ? 'auth' : 'imageless';
+        $flag = 'image-health-warned:'.now()->utc()->format('Y-m-d').':'.$condition;
+        if ($this->option('dry-run')
+            ? Cache::has($flag)
+            : ! Cache::add($flag, true, now()->addDay())) {
+            return null;   // already reported today
+        }
+
+        if ($auth !== null) {
+            $since = Carbon::parse($auth['since']);
+
+            return sprintf(
+                'IMAGE GENERATION IS DOWN — the image provider has rejected our credentials (HTTP %d) since %s (%s, %d attempts). '
+                .'Every article written since then ships with NO images and nothing fails, so this is the only warning you get. '
+                .'Fix: put a valid IDEOGRAM_API_KEY in the env on the app box, then `php artisan config:cache`. '
+                .'The alarm clears itself on the first successful image. '
+                .'Articles already written can be repaired with `php artisan ebq:backfill-article-images --since="%s"` '
+                .'(reports first; add --force to spend). %d article(s) in the last 24h have no images.',
+                (int) $auth['status'],
+                $since->diffForHumans(),
+                $since->toDateTimeString(),
+                (int) $auth['count'],
+                $since->toDateTimeString(),
+                $imageless,
+            );
+        }
+
+        $last = ContentImageHealth::lastFailure();
+
+        return sprintf(
+            'IMAGE GENERATION LOOKS DOWN — %d article(s) finished in the last 24h with no images, on plans that want them. '
+            .'Nothing fails when this happens, so check the monthly image spend cap first (a tripped meter returns before the '
+            .'provider is ever called), then the provider itself.%s '
+            .'Repair with `php artisan ebq:backfill-article-images` (reports first; add --force to spend).',
+            $imageless,
+            $last !== null ? ' Last provider error: '.$last['error'].' at '.$last['at'].'.' : '',
+        );
+    }
+
+    /**
+     * Imageless articles in 24h that mean "outage" rather than "a few renders
+     * were rejected". Well under a normal day's output (40–70 articles), well
+     * above the usual trickle of one-offs.
+     */
+    private const IMAGELESS_ALERT_THRESHOLD = 5;
 
     /**
      * Same-failure identity: job class + exception first line with ids and

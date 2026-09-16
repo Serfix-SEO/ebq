@@ -2,6 +2,7 @@
 
 namespace App\Services\Content;
 
+use App\Support\ContentImageHealth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -58,6 +59,10 @@ class IdeogramClient
     public function generate(string $prompt, array $options = []): array
     {
         if (! $this->isConfigured()) {
+            // No key at all is an auth problem by another name: a human has to
+            // put one in the env before a single image can be made again.
+            ContentImageHealth::recordFailure('ideogram_api_key_missing', 401);
+
             return ['ok' => false, 'error' => 'ideogram_api_key_missing'];
         }
 
@@ -86,6 +91,7 @@ class IdeogramClient
                 ->post(rtrim((string) config('services.ideogram.base_url'), '/').'/ideogram-'.$model.'/generate', $body);
         } catch (\Throwable $e) {
             Log::warning('ideogram.network_error', ['error' => $e->getMessage()]);
+            ContentImageHealth::recordFailure('ideogram_network_error');
 
             return ['ok' => false, 'error' => 'ideogram_network_error'];
         }
@@ -95,6 +101,11 @@ class IdeogramClient
                 'status' => $response->status(),
                 'body' => mb_substr($response->body(), 0, 500),
             ]);
+            // A warning in the log is not an alarm. Record the failure so
+            // ebq:failed-jobs-alert can say out loud that images are down —
+            // twice now a silent provider failure has shipped hundreds of
+            // imageless articles (see ContentImageHealth).
+            ContentImageHealth::recordFailure('ideogram_http_'.$response->status(), $response->status());
 
             return ['ok' => false, 'error' => 'ideogram_http_'.$response->status()];
         }
@@ -113,8 +124,14 @@ class IdeogramClient
         }
 
         if ($images === []) {
+            ContentImageHealth::recordFailure('ideogram_empty_response', $response->status());
+
             return ['ok' => false, 'error' => 'ideogram_empty_response'];
         }
+
+        // Anything that was wrong is over: a working call silences the alarm
+        // with no admin action, so a rotated token needs no follow-up.
+        ContentImageHealth::recordSuccess();
 
         return [
             'ok' => true,
