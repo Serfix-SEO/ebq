@@ -1417,6 +1417,72 @@ connect-flow tests. No real-Medusa smoke on our infra — the contract tests +
 the webhook contract's prod track record cover the driver; send a test
 article once a client installs the kit.
 
+### PHP / HTML website — downloadable kit (2026-09-18)
+
+For site owners who are **not developers**: hand-built PHP sites, static HTML
+on PHP hosting, small custom CMSes. Built for safibusinessservice.com (support
+ticket `01m2d03t4qdsg2hs7xm2j5y0w7`): a paying client on shared LiteSpeed/PHP
+8.0 hosting who asked for "a script to paste", was told three times to "use
+the custom webhook", and had nothing published for a week.
+
+**Why not a JS embed** (what they literally asked for): articles rendered in
+the browser from our domain are weak for SEO, and there is no real per-article
+URL on the client's domain to hand back — so the live link, Google Indexing
+API submit, rank tracking and social auto-share would all silently break.
+
+**Shape:** a webhook integration underneath (`config.flavor = 'php'`, like
+Laravel) — no new driver, no payload change. `PublishingSettings::FLAVOR_PHP`
+tile → `partials/content-connect/php.blade.php` (3 steps: Download · Upload ·
+Verify). The kit is `resources/snippets/php/**` zipped by
+`App\Services\Content\Publishing\PhpKitBuilder`, which **generates
+`serfix/config.php` with var_export** (never interpolation) carrying the
+secret, `site_url`, and `image_hosts` derived from the configured image disk.
+
+- ⚠️ **The secret is minted at DOWNLOAD time**, stored on a *pending*
+  webhook integration, and re-downloads **reuse** it — a kit already on the
+  client's server must keep working. `connect()` signs with the stored secret;
+  the customer never sees or types one. A download refuses to overwrite an
+  already-**connected** non-kit custom webhook (one webhook row per site).
+- Verify failures are translated (`phpKitHint`): 404 → "kit not found at that
+  address", 401 → "kit belongs to a different connection, re-download", 5xx →
+  "ask your host to make serfix/data + serfix/media writable". Stored as
+  `last_error` too, so the list never shows a raw HTTP status. A downloaded-
+  but-unverified kit reads as "Waiting for the kit", not "Needs attention".
+- The failed-verify path now restores the tab the customer was on (Laravel and
+  PHP both used to drop them onto the generic webhook form).
+
+**The kit** (plain PHP 7.4+ syntax, no framework/DB/Composer; JSON files on
+disk, `flock` around index writes, write-then-rename):
+- `serfix/receiver.php` — HMAC over the **raw** body + `hash_equals`, ±300s
+  `sent_at` window, 8 MB cap. `verify` and `test:true` deliveries run a
+  **writability probe** and never store (a non-developer cannot delete a stray
+  test post). Posts are keyed by a **16-hex id the kit mints**, not the slug:
+  an update with a changed slug renames the same post and the old slug
+  **301s** — this destination cannot produce the orphan duplicates seen on
+  serfix.io's own blog (2026-09-15/16). Replies `{ok, id, url, status}`.
+- ⚠️ **Pretty URLs are proven, never guessed.** `pretty_urls: 'auto'` — at
+  verify the receiver fetches `/articles/serfix-rewrite-check` over loopback;
+  only a working rewrite reaches index.php with that reserved slug. Otherwise
+  it reports `/articles/?post=slug`, which works on every host. A guessed
+  pretty URL that 404s would be submitted to Google and shared publicly.
+- Security: slug whitelist `^[a-z0-9]+(-[a-z0-9]+)*$` (traversal impossible,
+  not filtered); images fetched **only** from `image_hosts`, https only, 12 MB,
+  real-image MIME check; `serfix_clean_html` strips script/iframe/form/on*/
+  `javascript:` as a second line behind the signature; `serfix/.htaccess`
+  denies config/lib, `serfix/data/.htaccess` denies the JSON store.
+- `articles/index.php` — server-rendered list / single / `?sitemap=1`, title,
+  description, canonical, robots, OG, Twitter, BlogPosting + BreadcrumbList
+  JSON-LD. Optional `serfix/header.php` + `footer.php` (receive `$serfix_head`)
+  let it wear the site's own layout.
+
+Tests: `PhpPublishingKitTest` (12) **runs the kit for real** — unzips it,
+serves it with `php -S`, drives it with the real `WebhookDriver` through a
+pass-through `Http::fake` (the driver correctly refuses non-https/private
+endpoints, so only the network hop is redirected), and a second `php -S`
+stands in for image storage. `PhpKitConnectFlowTest` (11) covers the UI flow.
+Not machine-verified on PHP 7.4 (no binary here); the syntax avoids 8.x-only
+constructs and the target client runs 8.0.
+
 ### Five token-paste destinations (2026-08-10): Shopify, HubSpot, Webflow, Sanity, Wix
 
 All follow the WP-driver conventions (timeouts 20/8 verify · 45 publish · 60

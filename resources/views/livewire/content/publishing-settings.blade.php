@@ -56,8 +56,14 @@
             @if ($integrations->isNotEmpty())
                 <div class="mt-5 space-y-2.5">
                     @foreach ($integrations as $integration)
+                        @php
+                            $isKitRow = $integration->platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK
+                                && ($integration->config['flavor'] ?? null) === \App\Livewire\Content\PublishingSettings::FLAVOR_PHP;
+                            // Downloaded but not uploaded yet: a normal step, not a fault.
+                            $kitWaiting = $isKitRow && $integration->status === \App\Models\ContentIntegration::STATUS_PENDING;
+                        @endphp
                         <div class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/40" wire:key="int-{{ $integration->id }}">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl {{ $integration->isConnected() ? 'bg-success/10 text-success' : 'bg-error/10 text-error' }}">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl {{ $integration->isConnected() ? 'bg-success/10 text-success' : ($kitWaiting ? 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-300' : 'bg-error/10 text-error') }}">
                                 @if ($integration->isConnected())
                                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                                 @else
@@ -70,6 +76,8 @@
                                          connect time is what lets us name it properly here. --}}
                                     @if ($integration->platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK && ($integration->config['flavor'] ?? null) === \App\Livewire\Content\PublishingSettings::FLAVOR_LARAVEL)
                                         {{ __('Laravel') }}
+                                    @elseif ($integration->platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK && ($integration->config['flavor'] ?? null) === \App\Livewire\Content\PublishingSettings::FLAVOR_PHP)
+                                        {{ __('PHP / HTML website') }}
                                     @elseif ($integration->platform === \App\Models\ContentIntegration::PLATFORM_WEBHOOK)
                                         {{ __('Custom (webhook)') }}
                                     @else
@@ -79,11 +87,18 @@
                                 <div class="truncate text-xs text-slate-500 dark:text-slate-400">
                                     @if ($integration->isConnected())
                                         {{ __('Connected') }}@if($integration->last_verified_at) · {{ __('checked') }} {{ $integration->last_verified_at->diffForHumans() }}@endif
+                                    @elseif ($kitWaiting)
+                                        {{ __('Waiting for the kit — upload it to your website, then click Re-check.') }}
                                     @else
                                         <span class="text-error">{{ $integration->last_error ?: __('Needs attention') }}</span>
                                     @endif
                                 </div>
                             </div>
+                            @if ($isKitRow)
+                                <button type="button" wire:click="redownloadPhpKit('{{ $integration->id }}')" class="text-xs font-semibold text-slate-500 hover:text-orange-600 dark:text-slate-400">
+                                    {{ __('Download kit') }}
+                                </button>
+                            @endif
                             <button type="button" wire:click="reverify('{{ $integration->id }}')" class="text-xs font-semibold text-slate-500 hover:text-orange-600 dark:text-slate-400">
                                 {{ __('Re-check') }}
                             </button>
@@ -123,29 +138,52 @@
                      delivery path. --}}
                 @php $webhookIntegrations = $integrations->where('platform', \App\Models\ContentIntegration::PLATFORM_WEBHOOK); @endphp
                 @if ($webhookIntegrations->isNotEmpty())
+                    @php
+                        // The PHP kit checks it CAN store a test delivery but never
+                        // stores it (its owner has no way to delete one), so the
+                        // developer-facing copy about deleting the post is wrong there.
+                        $allKits = $webhookIntegrations->every(fn ($i) => ($i->config['flavor'] ?? null) === \App\Livewire\Content\PublishingSettings::FLAVOR_PHP);
+                    @endphp
                     <div class="mt-4 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                        <div class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Test your webhook') }}</div>
+                        <div class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ $allKits ? __('Test your connection') : __('Test your webhook') }}</div>
                         <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                            {{ __('Sends a sample article ("Serfix test article — safe to delete") to your endpoint with a real signature — exactly like a scheduled publish. If it shows up on your site, the integration works end to end.') }}
+                            {{ $allKits
+                                ? __('Checks that your website can receive and save articles, without publishing anything.')
+                                : __('Sends a sample article ("Serfix test article — safe to delete") to your endpoint with a real signature — exactly like a scheduled publish. If it shows up on your site, the integration works end to end.') }}
                         </p>
                         @foreach ($webhookIntegrations as $integration)
+                            @php $isKit = ($integration->config['flavor'] ?? null) === \App\Livewire\Content\PublishingSettings::FLAVOR_PHP; @endphp
                             <div class="mt-3" wire:key="whtest-{{ $integration->id }}">
                                 <div class="flex flex-wrap items-center gap-2">
+                                    @unless ($isKit)
                                     <input wire:model="testUrl" wire:keydown.enter="testWebhook('{{ $integration->id }}')" type="text"
                                         placeholder="{{ ((array) $integration->credentials)['endpoint_url'] ?? 'https://webhook.site/…' }}"
                                         class="w-full max-w-md rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                                    @endunless
                                     <button type="button" wire:click="testWebhook('{{ $integration->id }}')"
                                         class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
-                                        <span wire:loading.remove wire:target="testWebhook">{{ __('Send test article') }}</span>
+                                        <span wire:loading.remove wire:target="testWebhook">{{ $isKit ? __('Run the test') : __('Send test article') }}</span>
                                         <span wire:loading wire:target="testWebhook">{{ __('Sending…') }}</span>
                                     </button>
                                 </div>
                                 @error('testUrl') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                                @unless ($isKit)
                                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                     {{ __('Testing only — nothing about your saved integration changes. Leave blank to test your connected endpoint, or paste any https URL (like webhook.site) to inspect the exact payload we send.') }}
                                 </p>
+                                @endunless
                                 @if ($webhookTest !== null && $webhookTest['integration_id'] === $integration->id)
-                                    @if ($webhookTest['ok'] && $webhookTest['url'])
+                                    @if ($webhookTest['ok'] && $isKit)
+                                        <div class="mt-2 rounded-xl border border-success/25 bg-success/5 px-4 py-3 text-xs">
+                                            <p class="font-bold text-slate-900 dark:text-slate-100">{{ __('Your website is ready.') }}</p>
+                                            <p class="mt-1 text-slate-600 dark:text-slate-300">
+                                                {{ __('The kit can save articles. New ones will appear here:') }}
+                                                @if ($webhookTest['url'])
+                                                    <a href="{{ $webhookTest['url'] }}" target="_blank" rel="noopener" class="font-semibold text-orange-600 underline dark:text-orange-400">{{ $webhookTest['url'] }}</a>
+                                                @endif
+                                            </p>
+                                        </div>
+                                    @elseif ($webhookTest['ok'] && $webhookTest['url'])
                                         <div class="mt-2 rounded-xl border border-success/25 bg-success/5 px-4 py-3 text-xs">
                                             <p class="font-bold text-slate-900 dark:text-slate-100">{{ __('Your endpoint accepted the test article.') }}</p>
                                             <p class="mt-1 text-slate-600 dark:text-slate-300">
@@ -202,9 +240,11 @@
                         $isSanity = $platform === \App\Models\ContentIntegration::PLATFORM_SANITY;
                         $isHubSpot = $platform === \App\Models\ContentIntegration::PLATFORM_HUBSPOT;
                         $isMedusa = $platform === \App\Models\ContentIntegration::PLATFORM_MEDUSA;
-                        $isWordPress = ! $isLaravel && ! $isWebhook && ! $isShopify && ! $isWebflow && ! $isWix && ! $isSanity && ! $isHubSpot && ! $isMedusa;
+                        $isPhp = $platform === \App\Livewire\Content\PublishingSettings::FLAVOR_PHP;
+                        $isWordPress = ! $isLaravel && ! $isWebhook && ! $isShopify && ! $isWebflow && ! $isWix && ! $isSanity && ! $isHubSpot && ! $isMedusa && ! $isPhp;
                         $tiles = [
                             [\App\Models\ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD, 'WordPress', $isWordPress],
+                            [\App\Livewire\Content\PublishingSettings::FLAVOR_PHP, __('PHP / HTML website'), $isPhp],
                             [\App\Models\ContentIntegration::PLATFORM_SHOPIFY, 'Shopify', $isShopify],
                             [\App\Models\ContentIntegration::PLATFORM_WEBFLOW, 'Webflow', $isWebflow],
                             [\App\Models\ContentIntegration::PLATFORM_WIX, 'Wix', $isWix],
@@ -269,6 +309,8 @@
                         @include('partials.content-connect.hubspot')
                     @elseif ($isMedusa)
                         @include('partials.content-connect.medusa')
+                    @elseif ($isPhp)
+                        @include('partials.content-connect.php')
                     @elseif ($isWordPress)
                         <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ __('In WordPress go to Users → Profile → Application Passwords, create one named "Serfix", and paste it here. The account needs to be an Author or above.') }}</p>
                         {{-- The one-line instruction above assumes the reader already

@@ -1,0 +1,11 @@
+# Serfix publishing kit — pretty article addresses (/articles/my-post).
+# If your server ignores this file, articles still work at /articles/?post=my-post;
+# Serfix detects which form works and always links to that one.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^sitemap\.xml$ index.php?sitemap=1 [L,QSA]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^([a-z0-9-]+)/?$ index.php?post=$1 [L,QSA]
+</IfModule>
+DirectoryIndex index.php

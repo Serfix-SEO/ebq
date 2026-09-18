@@ -1,0 +1,12 @@
+# Serfix publishing kit. Only receiver.php and the media folder are meant to be
+# reached from the web; the settings file and the helper library are not.
+<FilesMatch "^(config|lib|header|footer)\.php$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+Options -Indexes

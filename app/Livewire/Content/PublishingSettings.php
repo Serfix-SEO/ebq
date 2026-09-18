@@ -6,6 +6,7 @@ use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\Website;
+use App\Services\Content\Publishing\PhpKitBuilder;
 use App\Services\Content\Publishing\ProvidesTargets;
 use App\Services\Content\Publishing\PublishDriverFactory;
 use Illuminate\Support\Facades\Auth;
@@ -36,6 +37,16 @@ class PublishingSettings extends Component
 
     /** Where serfix/content-ai-laravel mounts its receiver by default. */
     public const LARAVEL_WEBHOOK_PATH = '/serfix/content-ai/webhook';
+
+    /**
+     * A plain PHP / HTML website. Also a webhook underneath, but the customer
+     * is typically not a developer, so instead of a package to install they
+     * download a ready-made kit (PhpKitBuilder) with the secret already inside.
+     * The secret is therefore minted at DOWNLOAD time and stored on a pending
+     * integration — never shown, never copied, and still valid when they come
+     * back to click Verify after uploading.
+     */
+    public const FLAVOR_PHP = 'php';
 
     public ?string $websiteId = null;
 
@@ -134,6 +145,10 @@ class PublishingSettings extends Component
         if ($platform === self::FLAVOR_LARAVEL && trim($this->whEndpoint) === '') {
             $this->whEndpoint = $this->suggestedLaravelEndpoint();
         }
+        if ($platform === self::FLAVOR_PHP) {
+            $this->whEndpoint = (string) (((array) ($this->phpKitIntegration()?->credentials?->toArray() ?? []))['endpoint_url'] ?? '')
+                ?: $this->suggestedPhpEndpoint();
+        }
         if ($platform === \App\Models\ContentIntegration::PLATFORM_MEDUSA && trim($this->medusaSecret) === '') {
             $this->medusaSecret = $this->generatedSecret();
         }
@@ -146,6 +161,92 @@ class PublishingSettings extends Component
         return $domain === ''
             ? 'https://your-site.com'.self::LARAVEL_WEBHOOK_PATH
             : 'https://'.$domain.self::LARAVEL_WEBHOOK_PATH;
+    }
+
+    public function suggestedPhpEndpoint(): string
+    {
+        $domain = trim((string) ($this->website()?->normalized_domain ?? ''));
+
+        return ($domain === '' ? 'https://your-site.com' : 'https://'.$domain).PhpKitBuilder::RECEIVER_PATH;
+    }
+
+    /**
+     * Step 1 of the PHP flow: hand over the kit.
+     *
+     * Creates (or reuses) the webhook integration so the secret baked into the
+     * ZIP is the one we will sign with. Re-downloading reuses the stored
+     * secret, so a kit already on the customer's server keeps working.
+     */
+    public function downloadPhpKit()
+    {
+        $website = $this->website();
+        if ($website === null) {
+            return null;
+        }
+        $this->resetErrorBag();
+
+        $existing = $website->contentIntegrations()->where('platform', ContentIntegration::PLATFORM_WEBHOOK)->first();
+        $isKit = $existing !== null && ($existing->config['flavor'] ?? null) === self::FLAVOR_PHP;
+
+        // One webhook integration per website: never silently repoint a
+        // working custom webhook at a kit that is not installed yet.
+        if ($existing !== null && ! $isKit && $existing->isConnected()) {
+            $this->addError('connect', __('This website already publishes through a custom webhook. Disconnect it first to switch to the PHP kit.'));
+
+            return null;
+        }
+
+        $credentials = $isKit ? (array) ($existing->credentials?->toArray() ?? []) : [];
+        $secret = strlen((string) ($credentials['secret'] ?? '')) >= 32 ? (string) $credentials['secret'] : $this->generatedSecret();
+        $endpoint = trim($this->whEndpoint) !== '' ? trim($this->whEndpoint) : ((string) ($credentials['endpoint_url'] ?? '') ?: $this->suggestedPhpEndpoint());
+
+        $integration = ContentIntegration::query()->updateOrCreate(
+            ['website_id' => $website->id, 'platform' => ContentIntegration::PLATFORM_WEBHOOK],
+            [
+                'credentials' => ['endpoint_url' => $endpoint, 'secret' => $secret],
+                'config' => array_merge($isKit ? (array) $existing->config : [], ['flavor' => self::FLAVOR_PHP]),
+                // A kit that is already live stays live; a new one waits for Verify.
+                'status' => $isKit ? $existing->status : ContentIntegration::STATUS_PENDING,
+                'last_error' => $isKit ? $existing->last_error : null,
+            ],
+        );
+
+        return $this->kitResponse($integration);
+    }
+
+    /** "Download kit again" from the connected list. */
+    public function redownloadPhpKit(string $integrationId)
+    {
+        $integration = $this->integrationOrFail($integrationId);
+        if ($integration === null || ($integration->config['flavor'] ?? null) !== self::FLAVOR_PHP) {
+            return null;
+        }
+
+        return $this->kitResponse($integration);
+    }
+
+    private function kitResponse(ContentIntegration $integration): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $builder = app(PhpKitBuilder::class);
+        $bytes = $builder->build($integration);
+
+        return response()->streamDownload(
+            function () use ($bytes): void {
+                echo $bytes;
+            },
+            $builder->filename($integration),
+            ['Content-Type' => 'application/zip'],
+        );
+    }
+
+    private function phpKitIntegration(): ?ContentIntegration
+    {
+        $integration = $this->website()?->contentIntegrations()
+            ->where('platform', ContentIntegration::PLATFORM_WEBHOOK)->first();
+
+        return $integration !== null && ($integration->config['flavor'] ?? null) === self::FLAVOR_PHP
+            ? $integration
+            : null;
     }
 
     #[On('website-changed')]
@@ -176,9 +277,31 @@ class PublishingSettings extends Component
         }
         $this->reset('pendingTarget', 'pendingIntegrationId', 'chosenTargetId');
 
+        // Flavours (Laravel, PHP kit) are stored as plain webhooks, which
+        // rewrites $this->platform below. Remember the tab the customer is
+        // on, so a failed check leaves them looking at the same instructions.
+        $selectedTab = $this->platform;
         $config = null;
 
-        if ($this->platform === ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD) {
+        if ($this->platform === self::FLAVOR_PHP) {
+            $this->validate([
+                'whEndpoint' => 'required|url|starts_with:https://|max:600',
+            ], [
+                'whEndpoint.starts_with' => __('The kit address must start with https:// — articles are sent over the public internet.'),
+            ], ['whEndpoint' => __('kit address')]);
+
+            // The secret lives in the kit they downloaded, not in the form.
+            $kit = $this->phpKitIntegration();
+            $secret = (string) (((array) ($kit?->credentials?->toArray() ?? []))['secret'] ?? '');
+            if ($secret === '') {
+                $this->addError('connect', __('Download your kit first (step 1) — it contains the key this connection needs.'));
+
+                return;
+            }
+            $this->platform = ContentIntegration::PLATFORM_WEBHOOK;
+            $credentials = ['endpoint_url' => trim($this->whEndpoint), 'secret' => $secret];
+            $config = ['flavor' => self::FLAVOR_PHP] + $this->postStatusConfig();
+        } elseif ($this->platform === ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD) {
             $this->validate([
                 'wpSiteUrl' => 'required|string|max:255',
                 'wpUsername' => 'required|string|max:120',
@@ -305,16 +428,38 @@ class PublishingSettings extends Component
         $result = $driver?->verify($integration);
 
         if ($result === null || ! $result->ok) {
+            $message = $selectedTab === self::FLAVOR_PHP
+                ? $this->phpKitHint((string) ($result?->error ?? ''))
+                : ($result?->error ?? __('This platform is not supported yet.'));
             $integration->forceFill([
                 'status' => ContentIntegration::STATUS_ERROR,
-                'last_error' => mb_substr((string) ($result?->error ?? 'Unsupported platform.'), 0, 500),
+                'last_error' => mb_substr((string) $message, 0, 500),
             ])->save();
-            $this->addError('connect', $result?->error ?? __('This platform is not supported yet.'));
+            $this->platform = $selectedTab;
+            $this->addError('connect', $message);
 
             return;
         }
 
         $this->resolveTargets($integration, $driver);
+    }
+
+    /**
+     * The PHP kit is for people who are not developers, so a failed check is
+     * explained as what to DO, not as an HTTP status. Each case maps to the
+     * one thing that actually goes wrong at that step of an install.
+     */
+    private function phpKitHint(string $driverError): string
+    {
+        $status = preg_match('/HTTP (\d{3})/', $driverError, $m) ? (int) $m[1] : null;
+
+        return match (true) {
+            $status === 404 => __('We couldn\'t find the kit at that address. Check that the "serfix" folder is inside your website\'s main folder (the one with your home page), then try again.'),
+            $status === 401 => __('The kit on your website belongs to a different connection. Download the kit again and replace the "serfix" folder on your website.'),
+            $status !== null && $status >= 500 => __('The kit is installed but your website can\'t save files in it. Ask your hosting provider to let PHP write to the serfix/data and serfix/media folders.'),
+            $status !== null => __('Your website answered, but not the way the kit should (error :status). Download the kit again and re-upload both folders.', ['status' => $status]),
+            default => __('We couldn\'t reach your website at that address. Check that the address loads in your browser and starts with https://.'),
+        };
     }
 
     /** @return array{post_status: string} */
@@ -409,10 +554,13 @@ class PublishingSettings extends Component
         }
         $result = app(PublishDriverFactory::class)->for($integration)?->verify($integration);
         $ok = $result?->ok ?? false;
+        $error = ($integration->config['flavor'] ?? null) === self::FLAVOR_PHP
+            ? $this->phpKitHint((string) ($result?->error ?? ''))
+            : (string) ($result?->error ?? 'Verification failed.');
         $integration->forceFill([
             'status' => $ok ? ContentIntegration::STATUS_CONNECTED : ContentIntegration::STATUS_ERROR,
             'last_verified_at' => $ok ? now() : $integration->last_verified_at,
-            'last_error' => $ok ? null : mb_substr((string) ($result?->error ?? 'Verification failed.'), 0, 500),
+            'last_error' => $ok ? null : mb_substr($error, 0, 500),
         ])->save();
     }
 
@@ -504,13 +652,14 @@ class PublishingSettings extends Component
         $result = app(\App\Services\Content\Publishing\WebhookDriver::class)
             ->testDelivery($integration, $override !== '' ? $override : null);
 
+        $isKit = ($integration->config['flavor'] ?? null) === self::FLAVOR_PHP;
         $this->webhookTest = [
             'integration_id' => $integration->id,
             'ok' => $result->ok,
             'status' => $result->response['status'] ?? null,
             'url' => $result->externalUrl,
             'id' => $result->externalId ?: null,
-            'error' => $result->error,
+            'error' => ! $result->ok && $isKit ? $this->phpKitHint((string) $result->error) : $result->error,
         ];
     }
 
