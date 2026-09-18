@@ -116,6 +116,32 @@ and gate `create` on `canAddWebsite()`.
 `open-connect-sources` → modal lazy-loads the pool, saves GA/GSC onto the current
 website, fires the backfills only for **newly** connected sources, reloads the page.
 
+⚠️ **Every entry point must open THIS modal, never `google.redirect` directly
+(2026-09-18).** A content-only client (safibusinessservice.com) told us
+"analytics is connected, why no info" — each step of the path had misled them:
+- `x-content.connect-ga` / `connect-gsc` cards linked to `google.redirect` with
+  no `return`, so sign-in landed content-only users on `content.get-started`
+  (a sales page, no picker). They now dispatch `open-connect-sources` with the
+  website id, and render for the **owner only** (the modal refuses shared members).
+- `saveSources()` said a blanket "Connected!" even with GA left on "Not
+  connected". It now names exactly what is connected; nothing-selected shows
+  a hint instead of reloading; clearing both says "disconnected".
+- The property dropdown never explained a wrong login. `gaHint` now says so
+  when the login has no GA4 properties, or none whose name (letters/digits only,
+  so "Safi Business Services - GA4" matches `safibusinessservice.com`) looks
+  like the site — the client's login saw only another company's property.
+- "Connect another Google login" returned to `settings.index`, unusable in
+  content-only mode. `GoogleOAuthController` accepts `return=content.sources`
+  (allowlisted — still no open redirect): callback → `content.index` with flash
+  `open_connect_sources`, and the layout reopens the modal on `alpine:initialized`.
+- The banner promised a "full report" content-only mode doesn't have; in that
+  mode it now says what each source does (GSC = submit articles, GA = visitors
+  per article). Pinned by `tests/Feature/Content/AnalyticsConnectPathTest.php`.
+
+Still open, and the honest answer to "no info about my site": no content-only
+screen shows site-wide Search Console data at all (the Insights page in
+`CLIENT_VALUE_SURFACING_PLAN.md` is designed but parked — build only when asked).
+
 **Team invite** (`WebsiteTeam::inviteMember`): owner/admin only (Gate `update`).
 Existing user → attached to `website_user` immediately + `WebsiteAccessGrantedMail`;
 unknown email → `WebsiteInvitation::issue` + `WebsiteTeamInvitationMail`. Members get

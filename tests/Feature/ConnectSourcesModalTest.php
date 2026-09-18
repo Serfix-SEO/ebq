@@ -95,7 +95,10 @@ class ConnectSourcesModalTest extends TestCase
             ->call('open')
             ->set('gscSelection', $account->id.'|sc-domain:example.com')
             ->call('saveSources')
-            ->assertSet('saved', 'Connected! We’re pulling your data now — this page will refresh.');
+            // Only Search Console was picked, so say exactly that. This used
+            // to assert a blanket "Connected!", which is how a client came to
+            // believe Analytics was linked when it was not (2026-09-17).
+            ->assertSet('saved', 'Search Console is connected. Google Analytics is not — choose its property above if you have one. This page will refresh.');
 
         $website->refresh();
         $this->assertTrue($website->hasGsc());

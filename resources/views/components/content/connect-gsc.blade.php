@@ -7,7 +7,7 @@
     $hasGsc = $site?->hasGsc() ?? false;
 @endphp
 
-@if ($site && ! $hasGsc && \Illuminate\Support\Facades\Route::has('google.redirect'))
+@if ($site && ! $hasGsc && \Illuminate\Support\Facades\Route::has('google.redirect') && $site->user_id === auth()->id())
     <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900">
         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-slate-800">
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
@@ -16,10 +16,15 @@
             <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Connect Google Search Console') }}</p>
             <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{{ __('Connect Search Console so every new article is automatically submitted to Google for faster indexing. Until then, we can\'t submit your articles for you.') }}</p>
         </div>
-        <a href="{{ route('google.redirect') }}"
+        {{-- Opens the connect-sources picker (in the app layout). This used
+             to link straight to google.redirect with no return target, which
+             sent content-only clients through Google sign-in to the
+             get-started page — no property picker, nothing linked. --}}
+        <button type="button" x-data
+           x-on:click="window.dispatchEvent(new CustomEvent('open-connect-sources', { detail: { websiteId: @js($site->id) } }))"
            class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 hover:brightness-110">
             {{ __('Connect Search Console') }}
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-        </a>
+        </button>
     </div>
 @endif

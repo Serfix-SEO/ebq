@@ -25,6 +25,22 @@
             $missingLabel = __('Google Analytics');
             $bannerLead = __('Connect Google Analytics to unlock the full report');
         }
+        // Content-only mode has no "full report" to unlock — promising one
+        // left a client asking where their site details were (2026-09-17).
+        // Say what each source actually does here.
+        $bannerDetail = null;
+        if (! config('features.seo_platform_ui')) {
+            if (! $bannerWebsite->hasGa() && ! $bannerWebsite->hasGsc()) {
+                $bannerLead = __('Connect Google to track your articles');
+                $bannerDetail = __('Search Console lets us submit each new article to Google. Analytics shows how many visitors each article brings.');
+            } elseif (! $bannerWebsite->hasGsc()) {
+                $bannerLead = __('Connect Search Console so we can submit your articles to Google');
+                $bannerDetail = __('Until then, new articles wait for Google to find them on its own.');
+            } else {
+                $bannerLead = __('Connect Google Analytics to see visitors per article');
+                $bannerDetail = __('Once connected, the Tracker shows how many visitors each published article brings.');
+            }
+        }
     @endphp
     <div
         x-data="{ open: true }"
@@ -37,7 +53,7 @@
              2-3 words per line on phones (flex-1 alone can shrink to nothing). --}}
         <div class="min-w-0 flex-1" style="min-width: 12rem">
             <div class="font-semibold">{{ $bannerLead }}</div>
-            <div class="mt-1">{{ __('You haven’t connected') }} {{ $missingLabel }} {{ __('for') }} <span class="font-medium">{{ $bannerWebsite->domain ?: __('this website') }}</span>. {{ __('Some sections stay empty until you do.') }}</div>
+            <div class="mt-1">{{ __('You haven’t connected') }} {{ $missingLabel }} {{ __('for') }} <span class="font-medium">{{ $bannerWebsite->domain ?: __('this website') }}</span>. {{ $bannerDetail ?? __('Some sections stay empty until you do.') }}</div>
         </div>
         <div class="flex items-center gap-2">
             <button

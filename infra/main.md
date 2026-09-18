@@ -287,6 +287,15 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-18 — PHP / HTML website publish destination + analytics connect path.**
+  A downloadable kit (`resources/snippets/php/`, zipped by `PhpKitBuilder`) gives
+  non-developer PHP sites a real, signed webhook receiver + server-rendered SEO
+  pages; stable kit-minted ids make slug changes 301 instead of duplicating;
+  pretty URLs used only when proven by a loopback self-check. Separately, four
+  bugs on the GA-linking path (dead-end cards, false "Connected!", unexplained
+  wrong-login property, OAuth return to an unusable page) fixed.
+  infra/content-autopilot/README.md "PHP / HTML website"; infra/accounts/README.md
+  "Connect later".
 - **2026-09-16 — Image generation can no longer fail silently.** Ideogram
   answered 401 from 2026-09-11 and ~250 articles across 16 clients shipped
   imageless for five days with no exception, failed job or alert — the second

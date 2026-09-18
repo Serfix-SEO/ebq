@@ -228,7 +228,11 @@ class GoogleOAuthController extends Controller
         // known route names so the param can't be used as an open
         // redirect. Defaults to onboarding (the historical behavior).
         $return = (string) $request->query('return', '');
-        $allowed = ['onboarding', 'settings.integrations'];
+        // 'content.sources': the Content Autopilot connect modal. Content-only
+        // clients (SEO_PLATFORM_UI=false) cannot use Settings, and landing
+        // there after connecting a second Google login left them with no way
+        // to pick the property they had just gained access to.
+        $allowed = ['onboarding', 'settings.integrations', 'content.sources'];
         $request->session()->put('google_oauth.return', in_array($return, $allowed, true) ? $return : 'onboarding');
 
         // `access_type=offline` requests a refresh token so EBQ can keep
@@ -314,6 +318,11 @@ class GoogleOAuthController extends Controller
         // (onboarding by default, or the Settings → Integrations sources
         // manager when adding an extra source-account).
         $return = (string) $request->session()->pull('google_oauth.return', 'onboarding');
+        if ($return === 'content.sources') {
+            // Straight back into the picker: the layout reopens the connect
+            // modal on this flash, now listing the new login's properties.
+            return redirect()->route('content.index')->with('open_connect_sources', true);
+        }
         if ($return === 'settings.integrations') {
             return redirect()
                 ->route('settings.index')

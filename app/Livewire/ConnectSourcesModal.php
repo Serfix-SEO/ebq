@@ -32,6 +32,19 @@ class ConnectSourcesModal extends Component
     public string $fetchError = '';
     public string $saved = '';
 
+    /**
+     * Guidance above the GA dropdown when the list cannot contain this
+     * site's property: the login has none at all, or none that looks like
+     * this domain. The second case is the common one — the site's Analytics
+     * was set up under a different Google login (safibusinessservice.com,
+     * 2026-09-17: their login saw only another company's property) — and a
+     * bare "Not connected" option explained nothing.
+     */
+    public string $gaHint = '';
+
+    /** Where "connect another Google login" returns to (see GoogleOAuthController). */
+    public string $googleReturn = 'settings.integrations';
+
     /** @var array<int, array{id: string, name: string, account_id: int, account_label: string}> */
     public array $gaOptions = [];
 
@@ -56,8 +69,36 @@ class ConnectSourcesModal extends Component
     {
         $this->reset(['saved', 'fetchError', 'gaSelection', 'gscSelection', 'gaOptions', 'gscOptions', 'accounts', 'loaded']);
         $this->websiteId = ($websiteId !== null && $websiteId !== '') ? $websiteId : session('current_website_id');
+        $this->googleReturn = config('features.seo_platform_ui') ? 'settings.integrations' : 'content.sources';
         $this->loadPool();
         $this->loadCurrentSelections();
+        $this->gaHint = $this->gaHintFor($this->editableWebsite());
+    }
+
+    private function gaHintFor(?Website $website): string
+    {
+        if ($website === null || ! $this->hasGoogle || $website->hasGa() || $this->fetchError !== '') {
+            return '';
+        }
+        if ($this->gaOptions === []) {
+            return __('This Google login has no Google Analytics properties. If your site\'s Analytics was set up with a different Google login, connect that one below.');
+        }
+
+        $domain = strtolower((string) ($website->normalized_domain ?: $website->domain));
+        $domain = (string) preg_replace('/^www\./', '', $domain);
+        // Property names are free text ("Safi Business Services - GA4"), so
+        // compare letters and digits only: "safibusinessservicesga4" contains
+        // the domain's first label "safibusinessservice".
+        $compact = static fn (string $s): string => (string) preg_replace('/[^a-z0-9]/', '', strtolower($s));
+        $label = $compact(strtok($domain, '.') ?: $domain);
+        foreach ($this->gaOptions as $option) {
+            $name = strtolower((string) ($option['name'] ?? ''));
+            if ($domain !== '' && (str_contains($name, $domain) || (strlen($label) >= 4 && str_contains($compact($name), $label)))) {
+                return '';
+            }
+        }
+
+        return __('None of these Analytics properties looks like :domain. If its Analytics was set up with a different Google login, connect that login below — or, in Google Analytics, add this login as a Viewer on the property.', ['domain' => $domain]);
     }
 
     public function saveSources(): void
@@ -89,11 +130,28 @@ class ConnectSourcesModal extends Component
             SyncSearchConsoleData::dispatch($website->id, 365);
         }
 
-        $this->saved = 'Connected! We’re pulling your data now — this page will refresh.';
+        // Say exactly what is now connected. The old blanket "Connected!"
+        // also showed when Analytics was left on "Not connected", which is
+        // how a client came to believe Analytics was linked when only
+        // Search Console was (support ticket, 2026-09-17).
+        $ga = $website->hasGa();
+        $gsc = $website->hasGsc();
+        if (! $ga && ! $gsc && ! $hadGa && ! $hadGsc) {
+            $this->fetchError = __('Nothing is selected yet. Choose your Analytics property and/or Search Console site above.');
+
+            return;
+        }
+        $this->saved = match (true) {
+            ! $ga && ! $gsc => __('Google Analytics and Search Console are disconnected from this website. This page will refresh.'),
+            $ga && $gsc => __('Google Analytics and Search Console are connected. We’re pulling your data now — this page will refresh.'),
+            $gsc => __('Search Console is connected. Google Analytics is not — choose its property above if you have one. This page will refresh.'),
+            default => __('Google Analytics is connected. Search Console is not — choose your site above if you have one. This page will refresh.'),
+        };
 
         // Reload so the banner clears and the dashboard re-renders with the
-        // newly connected source(s) once the backfill lands.
-        $this->js('setTimeout(() => window.location.reload(), 1200)');
+        // newly connected source(s) once the backfill lands. A little longer
+        // when the message carries a "still missing" note worth reading.
+        $this->js('setTimeout(() => window.location.reload(), '.($ga && $gsc ? 1200 : 3500).')');
     }
 
     public function render()

@@ -557,6 +557,17 @@
                 {{ $slot }}
                 @auth
                     <livewire:connect-sources-modal />
+                    @if (session('open_connect_sources'))
+                        {{-- Back from connecting another Google login: reopen the
+                             picker so the property they just gained access to can
+                             be chosen. Livewire injects Alpine after this point,
+                             so the listener is in place before Alpine starts. --}}
+                        <script>
+                            document.addEventListener('alpine:initialized', function () {
+                                window.dispatchEvent(new CustomEvent('open-connect-sources'));
+                            }, { once: true });
+                        </script>
+                    @endif
                     <livewire:bug-report-modal />
                 @endauth
             </main>
