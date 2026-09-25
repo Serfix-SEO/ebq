@@ -2730,13 +2730,38 @@ Included in price — no premium gating, no client-visible cost.
    11-minute scan finished (524 products) and produced 22 topics named after
    fragrances the shop does not stock. Self-heal is unchanged — Finalize
    dispatches the planner when ready, dispatcher retries every 15 min.
+   ⚠️ **Product-path heuristic missed hyphenated segments (2026-09-25).**
+   `PRODUCT_PATHS` is exact segments (`/products/`, `/product/`, `/p/`,
+   `/item/`, `/shop/`); ergospace.ae publishes 5,000 pages at
+   `/product-detail/<slug>` (Wix default) and their scan died with
+   `no_product_pages_found` in 30s. `isProductPath()` now also accepts a
+   `product`/`products` segment plus `-`/`_` and a slug, EXCLUDING
+   listing/category/collection/search/filter names.
+   ⚠️ **A FAILED scan leaves a strict plan's planner gated** — the calendar
+   silently stops filling until someone notices. ambiancefurniture.com was
+   unreachable from our servers entirely (DNS resolves, every request fails),
+   so it was reverted to `product_mode = null` (never gates; banner returns).
+   No ops alarm covers this yet.
+   ⚠️ **`startRun()` has a 5-minute once-guard** (`catalog:run-start:{site}`
+   cache key) plus an in-flight check: calling it again inside that window
+   RETURNS THE OLD RUN instead of starting one. Two "rescans" of ergospace
+   silently no-op'd and looked like the fix had failed. `Cache::forget()` that
+   key to force a real rescan.
+   ⚠️ **Horizon workers hold old code until they finish their current job** —
+   a rescan dispatched right after a deploy can still run the pre-deploy
+   discovery. Re-run after `horizon:terminate` has actually cycled.
    ⚠️ **Open gap: strict blocks rival SHOPS, not third-party product brands.**
    `CompetitorMentionGuard::strictBlockedBrands()` is fed by competitor
    discovery, so for blisfragrance it held rival retailers ("v perfumes",
    "swiss arabian") but nothing stopped a post-catalog topic titled "Baccarat
    Rouge 540 Alternatives" — a brand absent from their 524 products. The
-   planner prompt asks for catalog-answerable topics; there is no
-   deterministic check that a title's brand tokens exist in the catalog.
+   planner prompt asks for catalog-answerable topics. Closed 2026-09-25 by
+   `CatalogBrandValidator` (one batched LLM call per planning run, judged
+   against the shop's own product names; fails open on an unusable answer, on
+   >70% of a batch flagged, and on a site with no catalog). A token/stoplist
+   rule was tried first and measured against blisfragrance's real catalog: it
+   flagged "well", "present", "comprehensive" and "gender-neutral" while still
+   missing "baccarat".
 2. All run state on `content_product_runs` rows (status pending→discovering→
    extracting→finalizing→ready|failed, live counters, `heartbeat_at`) — never
    cache-only.
