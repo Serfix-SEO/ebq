@@ -13,6 +13,7 @@ use App\Support\ContentSiteTypeProfiles;
 use App\Support\KeywordFinderLocations;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -139,6 +140,27 @@ class ContentTopicPlanner
                 ->pluck('id', 'url')->all()
             : [];
 
+        // Strict: drop ideas that NAME an outside product or brand. The rival
+        // list above only knows competitor SHOPS, so a third-party product
+        // brand ("Baccarat Rouge 540 Alternatives" at blisfragrance.com,
+        // 2026-09-25) sailed through it. One batched call, fails open.
+        $offCatalog = [];
+        if ($strict) {
+            $titles = array_map(
+                static fn ($c) => self::freshenYears(trim((string) ($c['title'] ?? ''))),
+                array_values($candidates),
+            );
+            foreach (app(\App\Services\Content\Catalog\CatalogBrandValidator::class)
+                ->offCatalogIndexes((string) $website->id, $titles) as $index) {
+                $offCatalog[$titles[$index] ?? ''] = true;
+            }
+            if ($offCatalog !== []) {
+                Log::info('content_autopilot.strict_off_catalog_titles_dropped', [
+                    'plan_id' => $plan->id, 'dropped' => count($offCatalog),
+                ]);
+            }
+        }
+
         foreach ($candidates as $candidate) {
             if (count($created) >= $count) {
                 break;
@@ -161,6 +183,10 @@ class ContentTopicPlanner
                     if (preg_match('/\b'.preg_quote($brand, '/').'\b/ui', $title.' '.$keyword)) {
                         continue 2;
                     }
+                }
+                // Names a product/brand the shop does not carry.
+                if (isset($offCatalog[$title])) {
+                    continue;
                 }
             }
             foreach ($taken as $existing) {

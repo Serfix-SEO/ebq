@@ -834,10 +834,26 @@ class ContentCalendar extends Component
         // Kept terms become confirmed keywords → the planner materializes one
         // article per term (1:1). Fail-soft: research still pending → 0 stored,
         // the step transition never blocks. Twin of the ContentWizard trait.
-        if (($plan = $this->plan()) !== null
+        $plan = $this->plan();
+        if ($plan !== null
             && app(ContentKeywordInsights::class)->confirmTerms($plan, $this->removedTerms) > 0) {
             PlanContentTopicsJob::dispatch($plan->id);
         }
+        // Site-type detection is ASYNC. When it lands after the plan row was
+        // first written (step 2 → 3), the row still has no site_type — and the
+        // step-7 product card, the only place an e-commerce client is ever
+        // asked strict-vs-normal, is gated on that row. Five of nine active
+        // e-commerce clients were therefore never asked (2026-09-25,
+        // blisfragrance.com). Sync the detected type across before the step
+        // renders. A user's own chip click is never overwritten.
+        if ($plan !== null && $plan->site_type === null
+            && ContentSiteTypeProfiles::isValid($this->siteType)) {
+            $plan->forceFill([
+                'site_type' => $this->siteType,
+                'site_type_source' => $this->siteTypeSource ?: 'auto',
+            ])->save();
+        }
+
         $this->wizardStep = 7;
     }
 
