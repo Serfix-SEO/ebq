@@ -82,6 +82,53 @@ class StrictModeGateTest extends TestCase
         $this->assertSame('gated', $this->gateVerdict($strictEmpty));
     }
 
+    /**
+     * Products stream in DURING a scan, so "some products exist" is not "the
+     * catalog is ready". blisfragrance.com (2026-09-25): a scheduled tick
+     * planned 80 seconds before the scan finished, off roughly 500 of 524
+     * products, and produced 22 topics named after fragrances the shop does
+     * not stock — the exact promise strict mode makes. While a scan runs the
+     * planner waits; FinalizeProductCatalogJob dispatches it when the catalog
+     * is complete.
+     */
+    public function test_a_strict_plan_waits_for_a_running_scan_even_with_products_already_in(): void
+    {
+        $plan = $this->plan(['product_mode' => 'strict']);
+        ContentProduct::factory()->count(3)->create(['website_id' => $plan->website_id]);
+
+        foreach (\App\Models\ContentProductRun::IN_FLIGHT as $status) {
+            $run = \App\Models\ContentProductRun::create([
+                'website_id' => $plan->website_id,
+                'status' => $status,
+                'trigger' => 'onboarding',
+            ]);
+            $this->assertSame('gated', $this->gateVerdict($plan), "a {$status} scan must hold planning");
+            $run->delete();
+        }
+
+        // Scan finished → the catalog is complete, so planning proceeds.
+        \App\Models\ContentProductRun::create([
+            'website_id' => $plan->website_id,
+            'status' => \App\Models\ContentProductRun::STATUS_READY,
+            'trigger' => 'onboarding',
+        ]);
+        $this->assertSame('ran', $this->gateVerdict($plan));
+    }
+
+    /** A scan for a DIFFERENT site must never hold this one's planning. */
+    public function test_another_sites_scan_does_not_gate_this_plan(): void
+    {
+        $plan = $this->plan(['product_mode' => 'strict']);
+        ContentProduct::factory()->create(['website_id' => $plan->website_id]);
+        \App\Models\ContentProductRun::create([
+            'website_id' => $this->plan()->website_id,
+            'status' => \App\Models\ContentProductRun::STATUS_EXTRACTING,
+            'trigger' => 'onboarding',
+        ]);
+
+        $this->assertSame('ran', $this->gateVerdict($plan));
+    }
+
     public function test_factory_default_plan_is_old_behavior(): void
     {
         // The factory ships product_mode = null — pinned so no future change

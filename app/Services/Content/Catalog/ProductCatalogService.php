@@ -52,6 +52,25 @@ class ProductCatalogService
             ->exists();
     }
 
+    /**
+     * A catalog scan is still running for this site.
+     *
+     * Products are written as the scan streams them in, so `readyFor()` turns
+     * true after the FIRST product — seconds into a scan that may take ten
+     * minutes. Planning on that sliver is planning on a near-empty catalog:
+     * blisfragrance.com (2026-09-25) had 524 products, but the planner fired
+     * partway through and produced topics named after fragrances the shop does
+     * not sell — exactly what strict mode promises never to do. Use this
+     * ALONGSIDE readyFor() wherever "the catalog is complete" is what is meant.
+     */
+    public function scanInProgress(string $websiteId): bool
+    {
+        return ContentProductRun::query()
+            ->where('website_id', $websiteId)
+            ->whereIn('status', ContentProductRun::IN_FLIGHT)
+            ->exists();
+    }
+
     public function usableCount(string $websiteId): int
     {
         return ContentProduct::query()->where('website_id', $websiteId)->usable()->count();

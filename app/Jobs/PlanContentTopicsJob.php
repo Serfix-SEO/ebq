@@ -95,8 +95,15 @@ class PlanContentTopicsJob implements ShouldQueue, ShouldBeUnique
         // plans) can ever silently stall top-ups. Self-heals the same way as
         // the profile guard: FinalizeProductCatalogJob dispatches this job the
         // moment the catalog is ready, and the dispatcher retries every 15 min.
+        // "Ready" means COMPLETE, not "has started arriving": products stream
+        // in during a scan, so readyFor() alone let a scheduled tick plan off a
+        // partial catalog (blisfragrance.com 2026-09-25 — 22 topics naming
+        // fragrances the shop does not stock, planned 80 seconds before the
+        // scan finished with 524 products).
+        $catalog = app(\App\Services\Content\Catalog\ProductCatalogService::class);
         if ($plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT
-            && ! app(\App\Services\Content\Catalog\ProductCatalogService::class)->readyFor((string) $plan->website_id)) {
+            && (! $catalog->readyFor((string) $plan->website_id)
+                || $catalog->scanInProgress((string) $plan->website_id))) {
             Log::info('content_autopilot.topics_skipped_catalog_pending', [
                 'plan_id' => $plan->id,
                 'website_id' => $plan->website_id,
