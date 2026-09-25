@@ -31,7 +31,16 @@ class ProductCatalogService
             }
         }
 
-        return false;
+        // Hyphenated product segments: /product-detail/<slug> (Wix),
+        // /product-page/<slug>, /products-detail/<slug>. The literals above are
+        // exact segments, so ergospace.ae's 5,000 /product-detail/ pages were
+        // invisible and their catalog scan reported "no product pages found"
+        // (2026-09-25). Requires something AFTER the segment, so the listing
+        // index itself is still not mistaken for a product.
+        // ...but NOT /product-listing/<category>, /product-category/<x> and
+        // friends: those are category indexes, and scanning them wastes an
+        // extraction budget on pages that carry no product of their own.
+        return preg_match('#/products?[-_](?!listing|list|category|categories|collection|collections|search|filter)[a-z]+/[^/]+#', $path) === 1;
     }
 
     /** Does any plan on this website run strict product mode? (refresh hooks gate on this) */

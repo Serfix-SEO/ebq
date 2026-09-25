@@ -513,5 +513,19 @@ class ProductCatalogRunTest extends TestCase
         $this->assertTrue($svc::isProductPath('https://x.com/p/123'));
         $this->assertFalse($svc::isProductPath('https://x.com/products/'), 'bare collection index');
         $this->assertFalse($svc::isProductPath('https://x.com/blog/why-products-matter/extra'));
+
+        // Hyphenated product segments. ergospace.ae (2026-09-25) publishes
+        // 5,000 pages at /product-detail/<slug>; the exact-segment list missed
+        // every one and their scan reported "no product pages found".
+        $this->assertTrue($svc::isProductPath('https://x.com/product-detail/white-desk-uae-es019309'));
+        $this->assertTrue($svc::isProductPath('https://x.com/product-page/blue-chair'));
+        $this->assertTrue($svc::isProductPath('https://x.com/products-detail/lamp-22'));
+        $this->assertTrue($svc::isProductPath('https://x.com/product_detail/lamp-22'));
+
+        // Still needs something after the segment, so listings are not products.
+        $this->assertFalse($svc::isProductPath('https://x.com/product-detail/'), 'bare detail index');
+        $this->assertFalse($svc::isProductPath('https://x.com/product-listing'), 'listing page, no slug');
+        $this->assertFalse($svc::isProductPath('https://x.com/product-listing/office-desks'), 'category index, not a product');
+        $this->assertFalse($svc::isProductPath('https://x.com/product-category/chairs'), 'category index, not a product');
     }
 }
