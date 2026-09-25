@@ -2722,6 +2722,21 @@ Included in price — no premium gating, no client-visible cost.
    ([PlanContentTopicsJob.php](../../app/Jobs/PlanContentTopicsJob.php),
    `topics_skipped_catalog_pending`). Null mode ≡ old behavior, pinned by
    `StrictModeGateTest`.
+   ⚠️ **"Catalog ready" means COMPLETE, not "products have started arriving"
+   (2026-09-25).** `readyFor()` is true after the FIRST usable product, and
+   products are written as the scan streams them in — so the gate must ALSO
+   check `ProductCatalogService::scanInProgress()` (any `ContentProductRun`
+   in `IN_FLIGHT`). blisfragrance.com: a scheduled tick planned 80s before an
+   11-minute scan finished (524 products) and produced 22 topics named after
+   fragrances the shop does not stock. Self-heal is unchanged — Finalize
+   dispatches the planner when ready, dispatcher retries every 15 min.
+   ⚠️ **Open gap: strict blocks rival SHOPS, not third-party product brands.**
+   `CompetitorMentionGuard::strictBlockedBrands()` is fed by competitor
+   discovery, so for blisfragrance it held rival retailers ("v perfumes",
+   "swiss arabian") but nothing stopped a post-catalog topic titled "Baccarat
+   Rouge 540 Alternatives" — a brand absent from their 524 products. The
+   planner prompt asks for catalog-answerable topics; there is no
+   deterministic check that a title's brand tokens exist in the catalog.
 2. All run state on `content_product_runs` rows (status pending→discovering→
    extracting→finalizing→ready|failed, live counters, `heartbeat_at`) — never
    cache-only.
