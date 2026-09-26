@@ -97,6 +97,19 @@ class SendFailedJobsAlert extends Command
             ->where('finished_at', '>', now()->subDay())
             ->latest('finished_at')
             ->get()
+            // Only a site whose MOST RECENT scan failed still has a problem.
+            // A fixed site kept being reported for another 24h: ergospace.ae
+            // failed twice on 2026-09-25, was fixed, re-scanned successfully
+            // minutes later, and the digest still told the owner to go and
+            // check the shop (2026-09-26). Chasing a resolved alert is how an
+            // alarm stops being believed.
+            ->filter(function ($run) {
+                $latestId = \App\Models\ContentProductRun::query()
+                    ->where('website_id', $run->website_id)
+                    ->max('id');
+
+                return (string) $latestId === (string) $run->id;
+            })
             ->filter(fn ($run) => $this->option('dry-run')
                 ? ! \Illuminate\Support\Facades\Cache::has('failed-digest:catalog:'.$run->id)
                 : \Illuminate\Support\Facades\Cache::add('failed-digest:catalog:'.$run->id, true, now()->addDays(3)));

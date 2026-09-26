@@ -164,6 +164,69 @@ class FailedJobsAlertTest extends TestCase
         Mail::assertSent(FailedJobsDigestMail::class, fn (FailedJobsDigestMail $m) => $m->stuckSiteCount === 1);
     }
 
+    /** @return \App\Models\ContentProductRun */
+    private function catalogRun(string $websiteId, string $status)
+    {
+        return \App\Models\ContentProductRun::create([
+            'website_id' => $websiteId,
+            'status' => $status,
+            'trigger' => 'support',
+            'started_at' => now()->subMinutes(10),
+            'finished_at' => now()->subMinutes(9),
+            'error' => $status === \App\Models\ContentProductRun::STATUS_FAILED ? 'no_product_pages_found' : null,
+        ]);
+    }
+
+    /** A shop whose catalog scan is still broken is worth an email. */
+    public function test_a_sites_latest_failed_catalog_scan_is_reported(): void
+    {
+        Mail::fake();
+        User::factory()->create(['is_admin' => true]);
+        // The factory derives normalized_domain itself, so read it back
+        // rather than asserting on a value it never stored.
+        $website = \App\Models\Website::factory()->for(User::factory())->create();
+        $this->catalogRun($website->id, \App\Models\ContentProductRun::STATUS_FAILED);
+
+        $this->artisan('ebq:failed-jobs-alert')->assertSuccessful();
+
+        Mail::assertSent(FailedJobsDigestMail::class, fn (FailedJobsDigestMail $m) => str_contains($m->body, $website->normalized_domain)
+            && str_contains($m->body, 'no_product_pages_found'));
+    }
+
+    /**
+     * ...but one that has since scanned successfully is not. ergospace.ae
+     * failed twice on 2026-09-25, was fixed, re-scanned fine minutes later,
+     * and the digest still told the owner to go and check the shop the next
+     * morning (2026-09-26). Chasing a resolved alert is how an alarm stops
+     * being believed.
+     */
+    public function test_a_failure_a_later_scan_resolved_is_not_reported(): void
+    {
+        Mail::fake();
+        User::factory()->create(['is_admin' => true]);
+        $website = \App\Models\Website::factory()->for(User::factory())->create();
+        $this->catalogRun($website->id, \App\Models\ContentProductRun::STATUS_FAILED);
+        $this->catalogRun($website->id, \App\Models\ContentProductRun::STATUS_READY);
+
+        $this->artisan('ebq:failed-jobs-alert')->assertSuccessful();
+
+        Mail::assertNothingSent();
+    }
+
+    /** A rescan already running counts as "being handled" too. */
+    public function test_a_failure_with_a_rescan_in_flight_is_not_reported(): void
+    {
+        Mail::fake();
+        User::factory()->create(['is_admin' => true]);
+        $website = \App\Models\Website::factory()->for(User::factory())->create();
+        $this->catalogRun($website->id, \App\Models\ContentProductRun::STATUS_FAILED);
+        $this->catalogRun($website->id, \App\Models\ContentProductRun::STATUS_EXTRACTING);
+
+        $this->artisan('ebq:failed-jobs-alert')->assertSuccessful();
+
+        Mail::assertNothingSent();
+    }
+
     public function test_fresh_pending_site_is_not_flagged(): void
     {
         Mail::fake();
