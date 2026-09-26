@@ -56,9 +56,12 @@ class ArticleEditorTest extends TestCase
     }
 
     /**
-     * The edit button sits ABOVE the article, not only in the side column.
-     * That column renders after the whole article on a phone, so clients
-     * could not find it and asked support how to edit (owner 2026-09-26).
+     * The primary edit button lives in the PAGE HEADER, beside the title.
+     * It used to sit only in the side column, which renders after the whole
+     * article on a phone; moving it just above the article body was still
+     * missed on desktop, where two "Connect…" banners, the export card and
+     * the feedback row push it down among louder orange buttons. Clients
+     * asked support where it was twice (owner 2026-09-26).
      */
     public function test_edit_is_offered_above_the_article(): void
     {
@@ -67,22 +70,36 @@ class ArticleEditorTest extends TestCase
         $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])->html();
 
         $editAt = strpos($html, 'wire:click="startEditing"');
+        $titleAt = strpos($html, (string) $topic->title);
+        $exportAt = strpos($html, 'Take it elsewhere');
         $articleAt = strpos($html, 'class="ca-preview');
+
         $this->assertNotFalse($editAt);
         $this->assertNotFalse($articleAt);
-        $this->assertLessThan($articleAt, $editAt, 'the first edit control must come before the article body');
+        $this->assertLessThan($articleAt, $editAt, 'edit must come before the article body');
+        // ...and before everything that used to bury it: the export card, the
+        // feedback row and the SEO kit all sit between the header and the
+        // article on desktop.
+        $this->assertLessThan($exportAt, $editAt, 'edit must sit in the header, above the export card');
+        $this->assertGreaterThan($titleAt, $editAt, 'edit belongs beside the title, not above it');
         $this->assertStringContainsString('Edit article', $html);
     }
 
-    /** In edit mode the bar is gone — the editor has its own toolbar. */
-    public function test_the_edit_bar_is_not_shown_while_already_editing(): void
+    /** In edit mode the header button is gone — the editor has its own toolbar. */
+    public function test_the_header_edit_button_is_hidden_while_already_editing(): void
     {
         [$user, , , $topic] = $this->reviewable();
 
-        $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])
-            ->call('startEditing')->html();
+        $component = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id]);
+        // Capture BEFORE the call — the Testable is mutated in place.
+        $beforeHtml = $component->html();
+        $editing = $component->call('startEditing')->html();
 
-        $this->assertStringNotContainsString('Change the wording, headings or images', $html);
+        $this->assertGreaterThan(
+            substr_count($editing, 'wire:click="startEditing"'),
+            substr_count($beforeHtml, 'wire:click="startEditing"'),
+            'entering the editor must drop an edit button, not keep offering it',
+        );
     }
 
     public function test_editing_mode_shows_live_checks(): void

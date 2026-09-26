@@ -24,9 +24,26 @@
                 @if ($topic?->scheduled_for) · {{ __('planned for :date', ['date' => $topic->scheduled_for->translatedFormat('M j, Y')]) }} @endif
             </p>
         </div>
-        @if ($presentation)
-            <span class="rounded-full bg-{{ $presentation['color'] }}-100 px-2.5 py-1 text-xs font-semibold text-{{ $presentation['color'] }}-700">{{ $presentation['label'] }}</span>
-        @endif
+        <div class="flex shrink-0 items-center gap-3">
+            @if ($presentation)
+                <span class="rounded-full bg-{{ $presentation['color'] }}-100 px-2.5 py-1 text-xs font-semibold text-{{ $presentation['color'] }}-700">{{ $presentation['label'] }}</span>
+            @endif
+            {{-- Primary action, in the page header. Below this point the page
+                 can carry two full-width "Connect…" banners, the export card
+                 and the feedback row, so an Edit button further down competes
+                 with louder orange buttons and gets missed — clients kept
+                 asking support where it was (owner 2026-09-26, twice). The
+                 header is the one spot that is always on screen first. --}}
+            @if ($topic && $article && ! $generating && ! $editing)
+                <button wire:click="startEditing" wire:loading.attr="disabled" wire:target="startEditing"
+                        class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-orange-700 disabled:opacity-70">
+                    <svg wire:loading.remove wire:target="startEditing" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/></svg>
+                    <svg wire:loading wire:target="startEditing" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                    <span wire:loading.remove wire:target="startEditing">{{ __('Edit article') }}</span>
+                    <span wire:loading wire:target="startEditing">{{ __('Opening editor…') }}</span>
+                </button>
+            @endif
+        </div>
     </div>
 
     {{-- Right under the header: this was missed at the bottom of the sidebar.
@@ -676,26 +693,6 @@
                     </div>
                 @endif
                 @if (! $editing)
-                    {{-- Edit, right where the article starts. It used to live
-                         only in the left action stack: on a phone that column
-                         renders AFTER the whole article, so "how do I edit
-                         this?" became a routine support question (owner
-                         2026-09-26). Same wire:click and loading states as the
-                         sidebar button — startEditing pulls the editor bundle,
-                         so a click with no feedback reads as dead. --}}
-                    <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-                        <div class="min-w-0">
-                            <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ __('Your article') }}</p>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Change the wording, headings or images before it goes live.') }}</p>
-                        </div>
-                        <button wire:click="startEditing" wire:loading.attr="disabled" wire:target="startEditing"
-                                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-orange-700 disabled:opacity-70">
-                            <svg wire:loading.remove wire:target="startEditing" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/></svg>
-                            <svg wire:loading wire:target="startEditing" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                            <span wire:loading.remove wire:target="startEditing">{{ __('Edit article') }}</span>
-                            <span wire:loading wire:target="startEditing">{{ __('Opening editor…') }}</span>
-                        </button>
-                    </div>
                     <article dir="auto" class="ca-preview prose prose-slate max-w-none rounded-xl border border-slate-200 bg-white p-6 sm:p-8 dark:border-slate-800 dark:bg-slate-900 dark:prose-invert">
                         <h1>{{ $article->h1 }}</h1>
                         {!! $previewHtml !!}
