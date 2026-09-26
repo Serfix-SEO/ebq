@@ -295,6 +295,41 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   `register_post_meta(show_in_rest)` in `Ebq_Meta_Fields::KEYS`. Tests:
   `ArticleEditorTest` (save persists overrides, focus-override drives audit),
   `ContentPublishingTest` (WP meta + webhook payload mapping).
+  **2026-09-26 — "Listen" (browser text-to-speech):** a header button reads the
+  finished article aloud with the Web Speech API, as a review aid — the
+  client's own device speaks, so there is NO provider, key, cost, storage,
+  queue job or publishing change (a paid mp3-per-article version was scoped
+  and deliberately set aside). Entrypoint `resources/js/article-speech.js`
+  (added to `vite.config.js` input, loaded from the review page's existing
+  `@assets @vite` block), partial
+  `resources/views/livewire/content/partials/article-speech.blade.php`.
+  Landmines it already works around, all worth keeping:
+  - ⚠️ **Read `article.ca-preview`, never `.ca-preview`** — the TipTap mount
+    carries the SAME class (`editor.js`), so a bare selector reads the editor
+    surface instead of the article.
+  - ⚠️ **Alpine registration timing** — Livewire starts Alpine during page
+    parse, BEFORE a deferred ES module runs, so `alpine:init` alone can miss.
+    Copies `editor.js`: register on every hook, idempotent flag, plus a
+    re-init pass for elements Alpine already walked and failed on.
+  - ⚠️ **One utterance per BLOCK, not per article** — Chrome silently cuts
+    long utterances off after ~15s; per-block also gives progress, the
+    highlight and a resume point.
+  - ⚠️ **Safari's `pause()`/`resume()` are unreliable** — Pause is
+    cancel-and-remember, Resume re-speaks from that block. No UA sniffing.
+  - ⚠️ **The engine belongs to the TAB** and keeps talking after the article is
+    gone — cancelled on stop, `livewire:navigated`, `beforeunload`, `pagehide`
+    and Alpine `destroy()`.
+  - ⚠️ `content_plans.language` holds a code ("ar") OR a full name ("Arabic")
+    depending on which screen saved it; `ArticleReview::speechLanguage()`
+    normalises both (same split `ContentKeywordInsights` works around).
+  - ⚠️ Adding a second header button overflowed 390px into a sideways scroll
+    (measured 431px) — the header action row wraps, and Listen is ordered
+    AFTER Edit so Listen is what drops to line two.
+  Tests: placement/language/absence in `ArticleEditorTest`; the JS itself in
+  `tests/fixtures/speech/speech-check.mjs`, which runs the real built bundle in
+  headless Chrome against a stubbed speech engine (`npm run build` first).
+  There is no JS test framework in this repo and headless Chrome has no voices,
+  so stubbing is the only honest assertion available.
   **2026-07-25 — full WYSIWYG editor (TipTap):** the body editor was upgraded
   from a bare `contenteditable` + deprecated `document.execCommand` to a proper
   ProseMirror/**TipTap v3** editor. Toolbar: H2/H3/H4, bold/italic/underline/

@@ -287,6 +287,13 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-26 — "Listen": articles read aloud in the browser.** A header
+  button on the article review page speaks the finished article via the Web
+  Speech API — review aid only, no provider, key, cost, stored audio or
+  publishing change. `resources/js/article-speech.js` + a header partial;
+  behaviour checked by `tests/fixtures/speech/speech-check.mjs` (real built
+  bundle, headless Chrome, stubbed engine — no JS test framework exists here).
+  infra/content-autopilot/README.md "Listen (browser text-to-speech)".
 - **2026-09-18 — PHP / HTML website publish destination + analytics connect path.**
   A downloadable kit (`resources/snippets/php/`, zipped by `PhpKitBuilder`) gives
   non-developer PHP sites a real, signed webhook receiver + server-rendered SEO
