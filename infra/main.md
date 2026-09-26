@@ -287,6 +287,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-26 — AI Visibility (AEO phase 1).** A new `/content/ai-visibility`
+  page answers "can the AI answer engines read you, and are they coming?" from
+  signals that cost nothing: robots.txt evaluated **per AI agent** (the
+  `RobotsTxtParser` bot-token argument no caller had ever used — a site can
+  welcome Googlebot and `Disallow: /` GPTBot), `/llms.txt` presence, AI-crawler
+  hits reported by our plugin/kit, and AI-referral sessions that were already
+  sitting in `analytics_data`. ChatGPT/Gemini citation share is deliberately NOT
+  claimed — no scrapeable query URL exists. Ingest upserts (never adds) because
+  reporters re-send unconfirmed days; a site that stops reporting raises a
+  digest line rather than reading as "the crawlers left".
+  infra/content-autopilot/README.md "AI Visibility"; plan in AEO_PLAN.md.
 - **2026-09-26 — Clients can author their own topics.** `TopicComposer`: an idea in
   plain words becomes 3 SEO-shaped topics (planner's own prompt context, then its own
   brand/catalog/dedupe gates), ranked by winnability; picking one adds it to a free

@@ -716,6 +716,77 @@ add one to a free publish day or swap it in for a planned article.
   inheritance, month-full), `ClientTopicComposerFlowTest` (6 — add, swap, written
   article refused, cross-tenant refused, copy, rendering).
 
+### AI Visibility — AEO phase 1 (2026-09-26)
+
+`/content/ai-visibility` (`App\Livewire\Content\AiVisibility`) answers three
+questions with three different kinds of evidence, and the page is built so the
+three are never confused with each other.
+
+**What is honestly measurable at zero new spend.** ChatGPT and Gemini have no
+scrapeable query URL — there is no page to fetch — so we cannot claim "you were
+cited in ChatGPT" without those vendors' APIs. What we ship instead:
+
+| Signal | Source | Cost |
+|---|---|---|
+| Which AI agents robots.txt admits | live fetch + `RobotsTxtParser` | 1 request/site/week |
+| Whether an `/llms.txt` exists | live fetch | 1 request/site/week |
+| Which AI crawlers actually fetched pages | the client's own site, via our plugin/kit | 0 |
+| People arriving from an AI answer | `analytics_data.source`, **already synced daily** | 0 |
+
+- **`RobotsTxtParser::isBlocked($txt, $path, $tokens)` has always taken a bot
+  token list; every caller before this passed `['googlebot']`.** That is the
+  whole trap the feature exists for: a site can welcome Googlebot and
+  `Disallow: /` GPTBot, and nothing in the product could see it
+  (`AeoReadinessTest::test_a_site_that_welcomes_google_can_still_block_the_ai_crawlers`).
+- **`App\Support\Aeo\AiAgents` is the single vocabulary** — robots token, UA
+  needles, referral hostname, engine, and `kind` (training / search / user).
+  Two entries have `crawls => false`: **Google-Extended and Applebot-Extended
+  are policy tokens that never send a request**, so the UI shows "—" for them
+  rather than "never seen", which would read as a fault.
+- **UNKNOWN is load-bearing.** A robots.txt we could not fetch records
+  `unknown` per agent and the robots checks **drop out of the score** (weights
+  renormalize, the `ContentSeoScorer:373` trick) — a client is never marked
+  down for our failed request, and is never told "allowed" on a guess. A 404,
+  by contrast, is a complete answer: no robots.txt means nothing is blocked.
+- **Ingest is idempotent by upsert, not by addition.** Both reporters keep
+  their buffer until we confirm OK, so the same day arrives repeatedly;
+  `AeoIngestController` takes `max(existing, incoming)` per (site, bot, day).
+  Adding would double-count every retry. Future-dated and >90-day-old days are
+  refused, and the reporter sends a raw User-Agent — **we** map it to an agent,
+  so an old plugin can never write an id we do not know (unknown ones are
+  logged as `aeo.unknown_agent_reported`, which is how the list grows).
+- Two doors, because the reporters authenticate differently: the WP plugin has
+  a Sanctum website token (`POST /api/v1/aeo/bot-hits`); **the PHP kit never had
+  a token**, only the HMAC secret in its `config.php`, so it signs the raw body
+  (`POST /api/v1/aeo/kit/bot-hits`, `X-Serfix-Kit` + `X-Serfix-Signature`).
+- **Kit side (`SERFIX_KIT_VERSION` 1.0.0 → 1.1.0):** `serfix_note_ai_visit()`
+  counts AI agents only (human traffic returns on the first line; no IP, no UA
+  stored), `serfix_report_ai_hits_after_response()` posts at most every 6h
+  **after `fastcgi_finish_request()`** so no visitor waits for it, and
+  `serfix_write_llms_txt()` refreshes `/llms.txt` on every delivery.
+  ⚠️ **Existing installs keep working but report nothing** — the new config
+  keys (`integration_id`, `ai_report_url`) only exist in a re-downloaded kit.
+  Checked by `tests/fixtures/php-kit/aeo-kit-check.php` (runs the real kit file
+  against a throwaway install; the Laravel suite cannot reach PHP-7.4 kit code).
+- **The silent-failure mode is a site that stops reporting** — a dead WP cron
+  looks exactly like "the AI crawlers lost interest". `AeoSignalReader` marks a
+  site `stale` after 3 days and `ebq:failed-jobs-alert` gained
+  `aeoIngestLine()` (one line per site per week). Same reasoning as
+  `imageHealthLine()` after the two image blackouts.
+- Weekly sweep: `ebq:aeo-audit` (Tuesday 06:40, `--website=` for one site) →
+  `AuditAeoReadinessJob` (`ShouldBeUnique`, `Queues::SYNC`).
+- Tables: `content_aeo_bot_hits` (unique site+bot+day), `content_aeo_audits`
+  (history, never overwritten). **No table for referrals** — `analytics_data`
+  has had per-source GA4 sessions all along; production already held 1,110
+  `chatgpt.com` sessions across 7 sites before a line of this shipped.
+- Tests: `tests/Feature/Aeo/` (24 — ingest auth/idempotency/tenancy, robots
+  verdicts, page states) plus the kit fixture.
+- **Not built yet:** the WordPress plugin's logger + `/llms.txt` route (separate
+  repo, own release; clone `class-ebq-404-tracker.php`, which already buffers,
+  matches UAs, drains on cron and only clears on a confirmed OK). Phases 2
+  (answer-shaped articles, full JSON-LD, author entity) and 3 (brand-recall
+  probes, visibility score history) are specified in repo-root `AEO_PLAN.md`.
+
 ### reviseCurrentArticle (context refresh, 2026-08-20)
 
 `ContentArticleProducer::reviseCurrentArticle($topic, $maxPasses = 2)` — re-runs the
