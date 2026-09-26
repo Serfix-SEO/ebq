@@ -55,6 +55,36 @@ class ArticleEditorTest extends TestCase
         return [$user, $website, $plan, $topic, $article];
     }
 
+    /**
+     * The edit button sits ABOVE the article, not only in the side column.
+     * That column renders after the whole article on a phone, so clients
+     * could not find it and asked support how to edit (owner 2026-09-26).
+     */
+    public function test_edit_is_offered_above_the_article(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+
+        $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])->html();
+
+        $editAt = strpos($html, 'wire:click="startEditing"');
+        $articleAt = strpos($html, 'class="ca-preview');
+        $this->assertNotFalse($editAt);
+        $this->assertNotFalse($articleAt);
+        $this->assertLessThan($articleAt, $editAt, 'the first edit control must come before the article body');
+        $this->assertStringContainsString('Edit article', $html);
+    }
+
+    /** In edit mode the bar is gone — the editor has its own toolbar. */
+    public function test_the_edit_bar_is_not_shown_while_already_editing(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+
+        $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')->html();
+
+        $this->assertStringNotContainsString('Change the wording, headings or images', $html);
+    }
+
     public function test_editing_mode_shows_live_checks(): void
     {
         [$user, , , $topic] = $this->reviewable();
