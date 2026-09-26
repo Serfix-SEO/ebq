@@ -296,8 +296,8 @@ known gaps were flagged during the sweep:
   sitting in `analytics_data`. ChatGPT/Gemini citation share is deliberately NOT
   claimed — no scrapeable query URL exists. Ingest upserts (never adds) because
   reporters re-send unconfirmed days; a site that stops reporting raises a
-  digest line rather than reading as "the crawlers left". **WP plugin v2.1.0**
-  ships the site side: `EBQ_Ai_Bot_Logger` (a clone of the 404 tracker's
+  digest line rather than reading as "the crawlers left". **WP plugin v2.1.0** (published
+  2026-09-26) ships the site side: `EBQ_Ai_Bot_Logger` (a clone of the 404 tracker's
   buffer/drain/only-clear-on-OK shape) and `EBQ_Llms_Txt`. **Paid-only with a
   teaser:** free signups get a fixed sample report, loudly labelled, behind the
   \$1 first-month CTA (`hasPaidContentAccess()` — the free article trial does

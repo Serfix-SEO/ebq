@@ -823,10 +823,9 @@ cited in ChatGPT" without those vendors' APIs. What we ship instead:
   kit fixture. ⚠️ Assert teaser leakage on **view data, not HTML**: an SVG full
   of coordinates contains almost any 3-digit number by accident (`555.85` as a
   hit-band x position failed a `assertDontSee('555')` that was otherwise right).
-- **WordPress side: built in plugin v2.1.0** (`EBQ_Ai_Bot_Logger`,
-  `EBQ_Llms_Txt` — see infra/wordpress-plugin/plugin-features.md). ⚠️ The zip is
-  built and committed in the plugin repo but **the release is not published** —
-  publishing pushes an auto-update to every install and is an owner decision.
+- **WordPress side: plugin v2.1.0, published 2026-09-26** (`EBQ_Ai_Bot_Logger`,
+  `EBQ_Llms_Txt` — see infra/wordpress-plugin/plugin-features.md). Stable
+  channel; 2.0.22 auto-rolled back by `PluginReleaseResolver::markPublished()`.
   Phases 2
   (answer-shaped articles, full JSON-LD, author entity) and 3 (brand-recall
   probes, visibility score history) are specified in repo-root `AEO_PLAN.md`.

@@ -159,6 +159,18 @@ which AI agents a site *allows*, but not which ones actually *came*.
   same Sanctum website-token group as `report-404s`.
 - Tests: `tests/ai-visibility-check.php` in the plugin repo — drives the real
   classes against WordPress stubs (that repo has no PHPUnit harness).
+- **Published 2026-09-26 as 2.1.0 (stable).** Release rows live in
+  `plugin_releases`; publishing copies the zip to `public/downloads/ebq-seo.zip`
+  and `markPublished()` rolls back the previous row. Installs learn about it
+  from `GET /wordpress/plugin/version`, which feeds WordPress's **native update
+  flow** — so a site takes it automatically only if it has auto-updates on for
+  this plugin; otherwise it is an "update available" prompt. Global kill-switch:
+  Setting `plugin.updates_enabled` (admin → Plugin Releases). Previous zip kept
+  at `/root/ebq-seo-2.0.22-backup.zip` on box D, and the admin has a rollback
+  action. ⚠️ Packaging without an uploaded zip calls
+  `WordPressPluginSourceService::syncVersionAndPackage()`, which builds from
+  `base_path('ebq-wordpress-plugin')` **on the server** — that checkout is not
+  updated by a deploy, so always upload the zip built from the plugin repo.
 
 ## Migration from Yoast / RankMath
 
