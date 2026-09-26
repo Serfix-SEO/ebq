@@ -14,7 +14,7 @@
 if (defined('SERFIX_KIT_VERSION')) {
     return;
 }
-define('SERFIX_KIT_VERSION', '1.0.0');
+define('SERFIX_KIT_VERSION', '1.1.0');
 
 /** Slug reserved for the pretty-URL self-check; no article may use it. */
 define('SERFIX_REWRITE_CHECK_SLUG', 'serfix-rewrite-check');
@@ -437,3 +437,241 @@ function serfix_localize_images($html, $postId)
 
     return array($html, $first);
 }
+
+// ── AI crawler logging (AI Visibility) ─────────────────────────────────
+//
+// When ChatGPT, Perplexity, Claude or another answer engine fetches one of
+// your articles, we count it here and report the daily totals back to Serfix,
+// so your AI Visibility page can show who is actually reading your site.
+//
+// Nothing about your visitors is recorded: no IP address, no user agent
+// string, no personal data — only a per-day count per known AI crawler.
+
+/**
+ * The AI crawlers we count, as lowercase fragments of the User-Agent header.
+ * Serfix keeps the authoritative list; this copy only has to be good enough to
+ * bucket a visit, and unknown agents are reported back so the list can grow.
+ */
+function serfix_ai_agents()
+{
+    return array(
+        'gptbot', 'oai-searchbot', 'chatgpt-user', 'perplexitybot', 'perplexity-user',
+        'claudebot', 'claude-searchbot', 'claude-user', 'anthropic-ai', 'ccbot',
+        'bytespider', 'meta-externalagent', 'amazonbot', 'mistralai-user',
+    );
+}
+
+/** The AI crawler behind this request, or '' for a human (or any other bot). */
+function serfix_ai_agent_for_request()
+{
+    $ua = isset($_SERVER['HTTP_USER_AGENT']) ? strtolower((string) $_SERVER['HTTP_USER_AGENT']) : '';
+    if ($ua === '') {
+        return '';
+    }
+    $best = '';
+    foreach (serfix_ai_agents() as $needle) {
+        // Longest match wins so "claude-searchbot" is not read as "claudebot".
+        if (strpos($ua, $needle) !== false && strlen($needle) > strlen($best)) {
+            $best = $needle;
+        }
+    }
+
+    return $best;
+}
+
+/**
+ * Count one AI-crawler visit. Called on every article page view; returns
+ * immediately for human traffic, which is almost every request.
+ *
+ * Failures are swallowed on purpose: a counter must never be able to break
+ * the page a real visitor is waiting for.
+ */
+function serfix_note_ai_visit($path)
+{
+    $agent = serfix_ai_agent_for_request();
+    if ($agent === '') {
+        return;
+    }
+
+    $file = serfix_data_dir().'/ai-hits.json';
+    $handle = serfix_lock();
+    try {
+        $buffer = serfix_read_json($file);
+        if (! is_array($buffer)) {
+            $buffer = array();
+        }
+        $day = gmdate('Y-m-d');
+        $key = $day.'|'.$agent;
+        if (! isset($buffer[$key]) || ! is_array($buffer[$key])) {
+            $buffer[$key] = array('date' => $day, 'bot' => $agent, 'hits' => 0, 'paths' => array());
+        }
+        $buffer[$key]['hits']++;
+        $path = substr((string) $path, 0, 300);
+        if ($path !== '' && ! in_array($path, $buffer[$key]['paths'], true) && count($buffer[$key]['paths']) < 200) {
+            $buffer[$key]['paths'][] = $path;
+        }
+        // Keep the file small and forget anything Serfix will refuse anyway
+        // (older than 90 days).
+        $cutoff = gmdate('Y-m-d', time() - 90 * 86400);
+        foreach (array_keys($buffer) as $k) {
+            if (isset($buffer[$k]['date']) && $buffer[$k]['date'] < $cutoff) {
+                unset($buffer[$k]);
+            }
+        }
+        serfix_write_json_atomic($file, $buffer);
+    } catch (Exception $e) {
+        // ignore
+    }
+    serfix_unlock($handle);
+}
+
+/**
+ * Send the buffered counts to Serfix, at most once every six hours.
+ *
+ * Called after the page has already been delivered to the visitor (see
+ * serfix_report_ai_hits_after_response), so the request it rides on is never
+ * slowed down by it. The buffer is cleared only on a confirmed OK — if Serfix
+ * is unreachable the counts wait for the next attempt rather than vanishing.
+ */
+function serfix_report_ai_hits()
+{
+    $endpoint = (string) serfix_cfg('ai_report_url', '');
+    $integration = (string) serfix_cfg('integration_id', '');
+    $secret = (string) serfix_cfg('secret', '');
+    if ($endpoint === '' || $integration === '' || strlen($secret) < 32) {
+        return;
+    }
+
+    $stampFile = serfix_data_dir().'/.ai-report-at';
+    $last = is_file($stampFile) ? (int) @file_get_contents($stampFile) : 0;
+    if ($last > time() - 6 * 3600) {
+        return;
+    }
+    @file_put_contents($stampFile, (string) time());   // stamp first: a failing
+    // endpoint must not make every request retry for six hours.
+
+    $buffer = serfix_read_json(serfix_data_dir().'/ai-hits.json');
+    if (! is_array($buffer) || $buffer === array()) {
+        return;
+    }
+
+    $days = array();
+    foreach ($buffer as $row) {
+        if (! is_array($row) || empty($row['bot'])) {
+            continue;
+        }
+        $days[] = array(
+            'date' => (string) $row['date'],
+            'bot' => (string) $row['bot'],
+            'hits' => (int) $row['hits'],
+            'pages' => isset($row['paths']) ? count((array) $row['paths']) : 0,
+            'sample_path' => isset($row['paths'][0]) ? (string) $row['paths'][0] : '',
+        );
+        if (count($days) >= 400) {
+            break;
+        }
+    }
+    if ($days === array()) {
+        return;
+    }
+
+    $body = json_encode(array('days' => $days));
+    $context = stream_context_create(array('http' => array(
+        'method' => 'POST',
+        'timeout' => 10,
+        'ignore_errors' => true,
+        'header' => "Content-Type: application/json\r\n"
+            ."Accept: application/json\r\n"
+            .'X-Serfix-Kit: '.$integration."\r\n"
+            .'X-Serfix-Signature: sha256='.hash_hmac('sha256', $body, $secret)."\r\n",
+        'content' => $body,
+    )));
+    $response = @file_get_contents($endpoint, false, $context);
+    $decoded = is_string($response) ? json_decode($response, true) : null;
+
+    if (is_array($decoded) && ! empty($decoded['ok'])) {
+        // Reported and acknowledged — drop only the days we actually sent.
+        $handle = serfix_lock();
+        $current = serfix_read_json(serfix_data_dir().'/ai-hits.json');
+        if (is_array($current)) {
+            foreach ($days as $sent) {
+                $key = $sent['date'].'|'.$sent['bot'];
+                if (isset($current[$key]) && (int) $current[$key]['hits'] <= $sent['hits']) {
+                    unset($current[$key]);
+                }
+            }
+            serfix_write_json_atomic(serfix_data_dir().'/ai-hits.json', $current);
+        }
+        serfix_unlock($handle);
+    }
+}
+
+/**
+ * Report after the visitor already has their page.
+ *
+ * On FPM that is literal — fastcgi_finish_request() closes the connection and
+ * the rest runs with nobody waiting. Elsewhere it runs at shutdown, which is
+ * still after the last byte of HTML.
+ */
+function serfix_report_ai_hits_after_response()
+{
+    register_shutdown_function(function () {
+        if (function_exists('fastcgi_finish_request')) {
+            @fastcgi_finish_request();
+        }
+        serfix_report_ai_hits();
+    });
+}
+
+/**
+ * Write /llms.txt — a plain-text map of this site for AI answer engines,
+ * the way robots.txt is a map for search crawlers.
+ *
+ * Written next to the kit (the web root of the site in a standard install).
+ * Returns false when the directory is not writable, which is normal on locked
+ * down hosts and simply means the client installs the file by hand.
+ */
+function serfix_write_llms_txt()
+{
+    $root = dirname(__DIR__);
+    $name = (string) serfix_cfg('site_name', '');
+    $blog = serfix_blog_url();
+
+    $lines = array('# '.($name !== '' ? $name : serfix_site_url()), '');
+    $lines[] = '> Articles published by '.($name !== '' ? $name : 'this site').'.';
+    $lines[] = '';
+    $lines[] = '## Articles';
+
+    $published = array();
+    foreach (serfix_index() as $summary) {
+        if (($summary['status'] ?? '') !== 'published') {
+            continue;
+        }
+        $published[] = $summary;
+    }
+    // Newest first, and capped — llms.txt is a map, not an archive.
+    usort($published, function ($a, $b) {
+        return strcmp((string) ($b['published_at'] ?? ''), (string) ($a['published_at'] ?? ''));
+    });
+
+    foreach (array_slice($published, 0, 200) as $summary) {
+        $title = trim((string) ($summary['title'] ?? ''));
+        $slug = (string) ($summary['slug'] ?? '');
+        if ($title === '' || $slug === '') {
+            continue;
+        }
+        $line = '- ['.$title.']('.serfix_post_url($slug).')';
+        $description = trim((string) ($summary['excerpt'] ?? ''));
+        if ($description !== '') {
+            $line .= ': '.$description;
+        }
+        $lines[] = $line;
+    }
+    $lines[] = '';
+    $lines[] = '## Index';
+    $lines[] = '- [All articles]('.$blog.')';
+    $lines[] = '';
+
+    return @file_put_contents($root.'/llms.txt', implode("\n", $lines)) !== false;
+}
+

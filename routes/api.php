@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AeoIngestController;
 use App\Http\Controllers\Api\V1\AiToolController;
 use App\Http\Controllers\Api\V1\AiWriterPromptController;
 use App\Http\Controllers\Api\V1\PluginCrawlController;
@@ -67,6 +68,11 @@ Route::prefix('v1')->group(function (): void {
             ->name('api.v1.posts.entity-coverage');
         Route::post('/posts/report-404s', [PluginInsightsController::class, 'report404s'])
             ->name('api.v1.posts.report-404s');
+        // AI Visibility: the plugin's daily batch of "which AI crawler fetched
+        // how many pages". Idempotent — a reporter that could not confirm
+        // delivery re-sends the same day (see AeoIngestController).
+        Route::post('/aeo/bot-hits', [AeoIngestController::class, 'botHits'])
+            ->name('api.v1.aeo.bot-hits');
         Route::get('/redirect-suggestions', [PluginInsightsController::class, 'redirectSuggestions'])
             ->name('api.v1.redirect-suggestions.index');
         Route::post('/redirect-suggestions/{id}/decide', [PluginInsightsController::class, 'decideRedirectSuggestion'])
@@ -222,4 +228,12 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/ai/brand-voice', [AiToolController::class, 'brandVoiceDestroy'])->name('ai.brand-voice.destroy');
         });
     });
+
+    // The PHP kit reports AI-crawler hits too, but it never had a token — only
+    // the HMAC secret we minted into its config.php. It signs the raw body the
+    // same way our deliveries to it are signed, and the controller verifies
+    // against that integration's stored secret.
+    Route::post('/aeo/kit/bot-hits', [AeoIngestController::class, 'kitBotHits'])
+        ->middleware('throttle:60,1')
+        ->name('api.v1.aeo.kit.bot-hits');
 });

@@ -200,9 +200,15 @@ if (! serfix_write_json_atomic(serfix_data_dir().'/index.json', $index)) {
 }
 serfix_unlock($lock);
 
+// Refresh /llms.txt — the plain-text map AI answer engines look for. Best
+// effort: on a host where the web root is not writable this simply returns
+// false and the client installs the file themselves.
+$serfix_llms = serfix_write_llms_txt();
+
 serfix_reply(200, array(
     'ok' => true,
     'id' => $id,
     'url' => serfix_post_url($slug),
     'status' => $status,
+    'llms_txt' => $serfix_llms,
 ));

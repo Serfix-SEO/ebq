@@ -398,6 +398,10 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
         // Site Health, pulled out of the hidden SEO platform (2026-08-16): the
         // crawl-driven health score + issue queue for the current website.
         Route::view('/content/site-health', 'content.site-health')->middleware(['feature:content', 'content.access'])->name('content.site-health');
+        // AI Visibility (AEO, 2026-09-26): which AI answer engines may read the
+        // site, which of their crawlers actually came, and how many people
+        // arrive from an AI answer.
+        Route::view('/content/ai-visibility', 'content.ai-visibility')->middleware(['feature:content', 'content.access'])->name('content.ai-visibility');
         Route::get('/content/tracker/{keyword}', fn (string $keyword) => view('content.keyword-history', ['keywordId' => $keyword]))
             ->middleware(['feature:content', 'content.access'])
             ->name('content.keyword-history');

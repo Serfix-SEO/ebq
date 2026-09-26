@@ -70,6 +70,10 @@ Schedule::command('ebq:sync-content-performance')->dailyAt('05:10')->withoutOver
 // SERP position" next to the GSC average. Per-keyword staleness is 7d, so this
 // is genuinely once a week per keyword.
 Schedule::command('ebq:check-tracked-serp')->weeklyOn(1, '06:20')->withoutOverlapping();
+// AI Visibility readiness: can the answer engines read this site (robots.txt
+// per AI agent, llms.txt, structured-data coverage). Two tiny fetches per site.
+// Tuesday, so it does not pile onto Monday's SERP refresh.
+Schedule::command('ebq:aeo-audit')->weeklyOn(2, '06:40')->withoutOverlapping();
 
 // DataForSEO keyword-gap accumulation — DISABLED 2026-07-20. The keyword gap went
 // back to the self-hosted keyword server (1 competitor, see ContentKeywordInsights

@@ -67,6 +67,12 @@ if ($serfix_slug !== '') {
     }
 }
 
+// AI Visibility: count answer-engine crawlers and report the daily totals to
+// Serfix after this page has been delivered. Human traffic returns instantly
+// and nothing about a visitor is stored — see serfix_note_ai_visit().
+serfix_note_ai_visit(isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '');
+serfix_report_ai_hits_after_response();
+
 // ── <head> tags ────────────────────────────────────────────────────────
 function serfix_head_tags(array $tags)
 {

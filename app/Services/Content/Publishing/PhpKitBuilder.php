@@ -87,6 +87,11 @@ class PhpKitBuilder
 
         $values = [
             'secret' => $secret,
+            // AI Visibility: where the kit reports which AI crawlers fetched
+            // the site, and who it reports as. The same secret signs it, so
+            // the kit still holds exactly one credential.
+            'integration_id' => (string) $integration->id,
+            'ai_report_url' => route('api.v1.aeo.kit.bot-hits'),
             'site_url' => $domain !== '' ? 'https://'.$domain : '',
             'site_name' => $domain,
             'blog_path' => self::BLOG_PATH,
@@ -103,7 +108,7 @@ class PhpKitBuilder
             ." *\n"
             ." * 'secret' proves each article really came from Serfix. Keep this file\n"
             ." * private and do not copy it to another website — download a separate kit\n"
-            ." * for each site. Generated ".now()->toDateString().".\n"
+            .' * for each site. Generated '.now()->toDateString().".\n"
             ." */\n"
             .'return '.var_export($values, true).";\n";
     }

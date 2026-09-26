@@ -2,10 +2,16 @@
 
 namespace App\Console\Commands;
 
+use App\Mail\FailedJobsDigestMail;
+use App\Models\ContentAeoBotHit;
 use App\Models\ContentArticle;
 use App\Models\ContentImage;
+use App\Models\ContentProductRun;
 use App\Models\CrawlSite;
 use App\Models\User;
+use App\Models\Website;
+use App\Services\Content\Aeo\AeoSignalReader;
+use App\Services\Reports\DataForSeoSpendMeter;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentImageHealth;
 use App\Support\FailedJobAlertBuffer;
@@ -52,11 +58,11 @@ class SendFailedJobsAlert extends Command
         // cap). Runs every 15 min, so a cache flag limits each threshold to
         // ONE digest line per day. Admin-only — clients never see spend state.
         $spendLine = null;
-        $meter = app(\App\Services\Reports\DataForSeoSpendMeter::class);
+        $meter = app(DataForSeoSpendMeter::class);
         if ($meter->nearCap()) {
             $threshold = $meter->exhausted() ? '100' : '80';
             $flag = 'dfs-spend-warned:'.now()->utc()->format('Y-m-d').':'.$threshold;
-            if (\Illuminate\Support\Facades\Cache::add($flag, true, now()->addDay())) {
+            if (Cache::add($flag, true, now()->addDay())) {
                 $spendLine = sprintf(
                     'DataForSEO spend: $%.2f of the $%.2f monthly cap%s',
                     $meter->spent(), $meter->cap(),
@@ -68,6 +74,7 @@ class SendFailedJobsAlert extends Command
         }
 
         $imageLine = $this->imageHealthLine();
+        $aeoLine = $this->aeoIngestLine();
 
         // Collapse repeats (2026-08-26: ONE broken Hindi article re-failed on
         // every 15-min dispatcher tick → six identical digest emails). Each
@@ -78,7 +85,7 @@ class SendFailedJobsAlert extends Command
         $freshGroups = [];
         $mutedGroups = [];
         foreach (collect($failures)->groupBy(fn ($f) => $this->fingerprint($f)) as $fp => $rows) {
-            $cached = \Illuminate\Support\Facades\Cache::get('failed-digest:fp:'.$fp);
+            $cached = Cache::get('failed-digest:fp:'.$fp);
             $muted = is_array($cached)
                 && (now()->timestamp - (int) ($cached['mailed_at'] ?? 0)) < self::REALERT_HOURS * 3600;
             $group = [
@@ -92,8 +99,8 @@ class SendFailedJobsAlert extends Command
         // Strict Product Mode: failed catalog runs on strict plans mean a
         // client is blocked on their progress screen — surface within a day.
         // One digest line per run (cache flag), so a stuck run doesn't repeat.
-        $failedCatalogRuns = \App\Models\ContentProductRun::query()
-            ->where('status', \App\Models\ContentProductRun::STATUS_FAILED)
+        $failedCatalogRuns = ContentProductRun::query()
+            ->where('status', ContentProductRun::STATUS_FAILED)
             ->where('finished_at', '>', now()->subDay())
             ->latest('finished_at')
             ->get()
@@ -104,18 +111,18 @@ class SendFailedJobsAlert extends Command
             // check the shop (2026-09-26). Chasing a resolved alert is how an
             // alarm stops being believed.
             ->filter(function ($run) {
-                $latestId = \App\Models\ContentProductRun::query()
+                $latestId = ContentProductRun::query()
                     ->where('website_id', $run->website_id)
                     ->max('id');
 
                 return (string) $latestId === (string) $run->id;
             })
             ->filter(fn ($run) => $this->option('dry-run')
-                ? ! \Illuminate\Support\Facades\Cache::has('failed-digest:catalog:'.$run->id)
-                : \Illuminate\Support\Facades\Cache::add('failed-digest:catalog:'.$run->id, true, now()->addDays(3)));
+                ? ! Cache::has('failed-digest:catalog:'.$run->id)
+                : Cache::add('failed-digest:catalog:'.$run->id, true, now()->addDays(3)));
 
         if ($freshGroups === [] && $stuckPending->isEmpty() && $spendLine === null
-            && $failedCatalogRuns->isEmpty() && $imageLine === null) {
+            && $failedCatalogRuns->isEmpty() && $imageLine === null && $aeoLine === null) {
             $this->rememberGroups($freshGroups, $mutedGroups);
             $this->info($mutedGroups === []
                 ? 'Nothing to report.'
@@ -127,6 +134,10 @@ class SendFailedJobsAlert extends Command
         $lines = [];
         if ($imageLine !== null) {
             $lines[] = $imageLine;
+            $lines[] = '';
+        }
+        if ($aeoLine !== null) {
+            $lines[] = $aeoLine;
             $lines[] = '';
         }
         if ($spendLine !== null) {
@@ -174,7 +185,7 @@ class SendFailedJobsAlert extends Command
             $lines[] = '';
             $lines[] = $failedCatalogRuns->count().' product catalog run(s) failed in the last 24h:';
             foreach ($failedCatalogRuns as $run) {
-                $domain = \App\Models\Website::query()->find($run->website_id)?->normalized_domain ?? $run->website_id;
+                $domain = Website::query()->find($run->website_id)?->normalized_domain ?? $run->website_id;
                 $lines[] = '  '.$domain.' — '.($run->error ?? '?').' (trigger='.$run->trigger.')';
             }
             $lines[] = 'Re-scan from /admin/clients (Product catalog card) after checking the shop.';
@@ -197,7 +208,7 @@ class SendFailedJobsAlert extends Command
             return self::SUCCESS;
         }
 
-        Mail::to($admins->all())->send(new \App\Mail\FailedJobsDigestMail(
+        Mail::to($admins->all())->send(new FailedJobsDigestMail(
             $body,
             count($failures),
             $stuckPending->count(),
@@ -227,6 +238,52 @@ class SendFailedJobsAlert extends Command
      * One line per day per condition (cache flag), like the spend warning: a
      * five-day outage should nag daily, not every fifteen minutes.
      */
+    /**
+     * AI Visibility ingest health: a site that WAS reporting AI-crawler hits
+     * and has gone quiet.
+     *
+     * Almost always a dead WordPress cron or an uninstalled plugin, and the
+     * failure is invisible by construction — no job fails, no exception is
+     * thrown, the page simply stops gaining data and starts implying the AI
+     * crawlers lost interest. That is exactly the shape of the two multi-day
+     * blackouts this digest already guards against.
+     */
+    private function aeoIngestLine(): ?string
+    {
+        $cutoff = now()->subDays(AeoSignalReader::STALE_AFTER_DAYS)->startOfDay();
+
+        $silent = ContentAeoBotHit::query()
+            ->select('website_id', DB::raw('MAX(hit_on) as last_report'))
+            ->groupBy('website_id')
+            ->havingRaw('MAX(hit_on) < ?', [$cutoff->toDateString()])
+            ->get();
+
+        if ($silent->isEmpty()) {
+            return null;
+        }
+
+        // One line per site per week — a site that stays uninstalled must not
+        // re-report every fifteen minutes.
+        $fresh = $silent->filter(fn ($row) => $this->option('dry-run')
+            ? ! Cache::has('failed-digest:aeo:'.$row->website_id)
+            : Cache::add('failed-digest:aeo:'.$row->website_id, true, now()->addWeek()));
+
+        if ($fresh->isEmpty()) {
+            return null;
+        }
+
+        $names = Website::query()
+            ->whereIn('id', $fresh->pluck('website_id'))
+            ->pluck('domain', 'id');
+
+        $detail = $fresh->take(5)
+            ->map(fn ($row) => ($names[$row->website_id] ?? $row->website_id).' (last '.$row->last_report.')')
+            ->implode(', ');
+
+        return 'AI VISIBILITY: '.$fresh->count().' site(s) stopped reporting AI-crawler hits — '.$detail
+            .'. Usually a dead WP cron or a removed plugin; the AI Visibility page will look like the crawlers left.';
+    }
+
     private function imageHealthLine(): ?string
     {
         if (! ContentAutopilotConfig::imagesEnabled()) {
@@ -325,14 +382,14 @@ class SendFailedJobsAlert extends Command
     private function rememberGroups(array $freshGroups, array $mutedGroups): void
     {
         foreach ($freshGroups as $g) {
-            \Illuminate\Support\Facades\Cache::put('failed-digest:fp:'.$g['fp'], [
+            Cache::put('failed-digest:fp:'.$g['fp'], [
                 'mailed_at' => now()->timestamp,
                 'count' => $g['prior'] + $g['rows']->count(),
             ], now()->addDay());
         }
         foreach ($mutedGroups as $g) {
-            $cached = \Illuminate\Support\Facades\Cache::get('failed-digest:fp:'.$g['fp']) ?? ['mailed_at' => now()->timestamp];
-            \Illuminate\Support\Facades\Cache::put('failed-digest:fp:'.$g['fp'], [
+            $cached = Cache::get('failed-digest:fp:'.$g['fp']) ?? ['mailed_at' => now()->timestamp];
+            Cache::put('failed-digest:fp:'.$g['fp'], [
                 'mailed_at' => (int) ($cached['mailed_at'] ?? now()->timestamp),
                 'count' => $g['prior'] + $g['rows']->count(),
             ], now()->addDay());
