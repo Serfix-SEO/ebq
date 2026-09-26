@@ -99,6 +99,28 @@ class ArticleEditorTest extends TestCase
         $this->assertLessThan(strpos($html, 'class="ca-preview'), strpos($html, 'articleSpeech'));
     }
 
+    /**
+     * The controls you need WHILE it reads must stay reachable. Reading
+     * auto-scrolls the page to follow along, which carried the header
+     * controls off screen and left no way to pause (owner 2026-09-26).
+     */
+    public function test_the_playing_controls_are_pinned_to_the_viewport(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+
+        $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])->html();
+
+        $barAt = strpos($html, 'fixed inset-x-0 bottom-0');
+        $this->assertNotFalse($barAt, 'the playing controls need a viewport-pinned bar');
+
+        // Pause / Stop / speed live in that bar, not back up in the header.
+        foreach (['Pause', 'Resume', 'Stop reading', 'Reading speed'] as $control) {
+            $this->assertGreaterThan($barAt, strpos($html, $control), "{$control} must sit inside the pinned bar");
+        }
+        // ...and the header keeps only the idle button.
+        $this->assertLessThan($barAt, strpos($html, '>'.__('Listen')));
+    }
+
     /** The voice follows the plan's language, not the browser's. */
     public function test_listen_carries_the_plans_language(): void
     {
