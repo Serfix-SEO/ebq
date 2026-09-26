@@ -12,24 +12,25 @@
  * Exits non-zero on the first failed expectation.
  */
 import { spawn } from 'node:child_process';
-import { writeFileSync, readdirSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const assetDir = 'public/build/assets';
-const bundle = readdirSync(assetDir)
-    .filter(f => f.startsWith('article-speech-') && f.endsWith('.js'))
-    .sort()
-    .pop();
-if (! bundle) {
-    console.error('No built article-speech bundle. Run `npm run build` first.');
+// Read the Vite manifest, never the directory listing: public/build keeps
+// every old hashed asset on purpose (emptyOutDir is false), so picking by
+// filename order silently loads a STALE bundle — which is exactly what made
+// this check report failures against code that had already been fixed.
+const manifest = JSON.parse(readFileSync('public/build/manifest.json', 'utf8'));
+const entry = manifest['resources/js/article-speech.js'];
+if (! entry?.file) {
+    console.error('article-speech is not in public/build/manifest.json. Run `npm run build` first.');
     process.exit(1);
 }
-const bundlePath = `${process.cwd()}/${assetDir}/${bundle}`;
+const bundlePath = `${process.cwd()}/public/build/${entry.file}`;
 
 const harness = join(tmpdir(), `speech-harness-${process.pid}.html`);
 writeFileSync(harness, `<!doctype html><html><head><meta charset="utf-8"></head><body>
-<div id="ctl" data-lang="ar"></div>
+<div id="ctl" data-lang="ar" data-lang-label="Arabic" data-no-voice="No :language voice." data-failed="It stopped."></div>
 <article class="ca-preview">
   <h1>Best Oud Perfume</h1>
   <p>First paragraph about oud.</p>
@@ -66,50 +67,78 @@ writeFileSync(harness, `<!doctype html><html><head><meta charset="utf-8"></head>
   const factory = window.__factories?.articleSpeech;
   if (! factory) { window.__speechResult = { error: 'component never registered' }; }
   else {
-    const c = factory();
-    c.$root = document.getElementById('ctl');
-    c.init();
-    c.listen();
-    const first = window.__spoken[0] ?? {};
-    const before = window.__cancels;
-    c.setRate('1.5');
-    const rate = (window.__spoken.at(-1) ?? {}).rate;
-    c.stop();
-    // A device with no voice for this language: say so, do not fake playing.
-    window.__voices = [{ name: 'Fake English', lang: 'en-US' }];
-    const noVoice = factory();
-    noVoice.$root = document.getElementById('ctl');
-    noVoice.init();
-    const spokenBefore = window.__spoken.length;
-    noVoice.listen();
-    // Capture NOW — the failure scenario below speaks, and measuring after it
-    // would count its utterances against this one.
-    const noVoiceStayedSilent = window.__spoken.length === spokenBefore;
+    const ctl = document.getElementById('ctl');
+    const art = document.querySelector('article');
 
-    // The engine gives up mid-article: surface it rather than freeze.
-    window.__voices = [{ name: 'Fake Arabic', lang: 'ar-SA' }];
-    window.__forceError = 'synthesis-failed';
-    const failing = factory();
-    failing.$root = document.getElementById('ctl');
-    failing.init();
-    failing.listen();
-    window.__forceError = null;
+    // Each scenario is self-contained: its own article text, plan hint and
+    // voice list. Sharing them let one scenario's leftovers decide the next
+    // one's outcome, which produced confident nonsense.
+    const run = ({ html, lang = 'ar', label = 'Arabic', voices, error = null, after = null }) => {
+      art.innerHTML = html;
+      ctl.dataset.lang = lang;
+      ctl.dataset.langLabel = label;
+      window.__voices = voices;
+      window.__forceError = error;
+      window.__spoken = [];
+      window.__cancels = 0;
+      const c = factory();
+      c.$root = ctl;
+      c.init();
+      c.listen();
+      const out = {
+        lang: c.lang,
+        voice: window.__spoken[0]?.voice ?? null,
+        spoken: window.__spoken.map(u => u.text),
+        blocks: c.total,
+        problem: c.problem,
+        message: c.message,
+        playing: c.speaking,
+      };
+      if (after) after(c, out);
+      c.stop();
+      window.__forceError = null;
 
-    window.__speechResult = {
-      supported: c.supported,
-      blocks: c.total,
-      spoken: window.__spoken.slice(0, 5).map(s => s.text),
-      lang: first.lang,
-      voice: first.voice,
-      rate,
-      cancelled: window.__cancels > before,
-      highlightCleared: document.querySelectorAll('.ca-speaking').length === 0,
-      noVoiceProblem: noVoice.problem,
-      noVoiceStayedSilent,
-      noVoicePretendedToPlay: noVoice.speaking,
-      failureProblem: failing.problem,
-      failureStoppedPlaying: failing.speaking,
+      return out;
     };
+
+    const bothVoices = [{ name: 'Fake Arabic', lang: 'ar-SA' }, { name: 'Fake English', lang: 'en-US' }];
+    const structureHtml = '<h1>Best Oud Perfume</h1><p>First paragraph about oud.</p><p>   </p>'
+      + '<h2>What to look for</h2><ul><li>Concentration matters.</li></ul>'
+      + '<figure><figcaption>A caption.</figcaption></figure>';
+
+    // 1. Structure + controls. English words on an Arabic-plan site: the
+    //    reported bug — the words must decide, not the site setting.
+    const structure = run({
+      html: structureHtml,
+      voices: bothVoices,
+      after: (c, out) => {
+        c.setRate('1.5');
+        out.rate = window.__spoken.at(-1)?.rate;
+        const before = window.__cancels;
+        c.stop();
+        out.cancelled = window.__cancels > before;
+        out.highlightCleared = document.querySelectorAll('.ca-speaking').length === 0;
+      },
+    });
+
+    // 2. Arabic words on the same Arabic-plan site.
+    const arabic = run({ html: '<p>أسماء فري فاير للشباب</p><p>نسخ ولصق للأسماء</p>', voices: bothVoices });
+
+    // 3. Latin script with a Latin plan language: characters cannot tell
+    //    French from English, so the plan's language must win.
+    const french = run({
+      html: '<p>Bonjour, ceci est un article en francais.</p>',
+      lang: 'fr', label: 'French',
+      voices: [{ name: 'Fake French', lang: 'fr-FR' }, { name: 'Fake English', lang: 'en-US' }],
+    });
+
+    // 4. Arabic article on a device with only an English voice.
+    const noVoice = run({ html: '<p>أسماء فري فاير للشباب</p>', voices: [{ name: 'Fake English', lang: 'en-US' }] });
+
+    // 5. The engine gives up mid-article.
+    const failing = run({ html: '<p>أسماء فري فاير للشباب</p>', voices: bothVoices, error: 'synthesis-failed' });
+
+    window.__speechResult = { structure, arabic, french, noVoice, failing, supported: true };
   }
 </script>
 </body></html>`);
@@ -165,24 +194,31 @@ const expect = (label, actual, wanted) => {
 };
 
 expect('speech is supported', got.supported, true);
-// The empty <p> is skipped and the <ul> is not read on top of its <li>.
-expect('blocks read', got.blocks, 5);
-expect('read in document order', got.spoken, [
+// Blocks: the empty <p> is skipped and the <ul> is not read on top of its <li>.
+expect('blocks read', got.structure.blocks, 5);
+expect('read in document order', got.structure.spoken, [
     'Best Oud Perfume', 'First paragraph about oud.', 'What to look for',
     'Concentration matters.', 'A caption.',
 ]);
-expect('speaks the article language', got.lang, 'ar');
-expect('picks a matching voice', got.voice, 'Fake Arabic');
-expect('speed change applies', got.rate, 1.5);
-expect('stop cancels the engine', got.cancelled, true);
-expect('stop clears the highlight', got.highlightCleared, true);
-// No voice for the article's language (Arabic article, English-only device).
-expect('missing voice is reported', got.noVoiceProblem, 'no-voice');
-expect('missing voice speaks nothing', got.noVoiceStayedSilent, true);
-expect('missing voice does not fake playing', got.noVoicePretendedToPlay, false);
+expect('speed change applies', got.structure.rate, 1.5);
+expect('stop cancels the engine', got.structure.cancelled, true);
+expect('stop clears the highlight', got.structure.highlightCleared, true);
+
+// The article's own words pick the voice, not the site-wide plan setting.
+expect('English article on an Arabic plan reads English', [got.structure.lang, got.structure.voice], ['en', 'Fake English']);
+expect('Arabic article reads Arabic', [got.arabic.lang, got.arabic.voice], ['ar', 'Fake Arabic']);
+expect('French plan keeps French for Latin text', [got.french.lang, got.french.voice], ['fr', 'Fake French']);
+
+// A device with no voice for the language: say so, do not fake playing.
+expect('missing voice is reported', got.noVoice.problem, 'no-voice');
+expect('missing voice names the language', got.noVoice.message, 'No Arabic voice.');
+expect('missing voice speaks nothing', got.noVoice.spoken, []);
+expect('missing voice does not fake playing', got.noVoice.playing, false);
+
 // The engine refuses mid-article.
-expect('engine failure is reported', got.failureProblem, 'failed');
-expect('engine failure stops the player', got.failureStoppedPlaying, false);
+expect('engine failure is reported', got.failing.problem, 'failed');
+expect('engine failure explains itself', got.failing.message, 'It stopped.');
+expect('engine failure stops the player', got.failing.playing, false);
 
 if (failures.length) {
     console.error(`\n${failures.length} failed:\n  ${failures.join('\n  ')}`);

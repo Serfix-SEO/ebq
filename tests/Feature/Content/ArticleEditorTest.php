@@ -153,18 +153,23 @@ class ArticleEditorTest extends TestCase
      * silence (Arabic article, English-only desktop — owner 2026-09-26), so
      * the page now carries an explanation naming the language.
      */
-    public function test_a_missing_device_voice_is_explained_in_the_clients_language(): void
+    public function test_a_missing_device_voice_is_explained_with_the_detected_language(): void
     {
         [$user, , $plan, $topic] = $this->reviewable();
         $plan->forceFill(['language' => 'ar'])->save();
 
         $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])->html();
 
-        $this->assertStringContainsString("problem === 'no-voice'", $html);
-        $this->assertStringContainsString('no Arabic voice installed', $html);
-        // ...and a second message for an engine that simply gives up.
-        $this->assertStringContainsString("problem === 'failed'", $html);
-        $this->assertStringContainsString('stopped reading this article', $html);
+        // The sentences are passed as TEMPLATES: the component fills in the
+        // language it actually detected in the article, which is not always
+        // the plan's (namesforfreefire.com is set to Arabic, but 39 of its 40
+        // articles are English — 2026-09-26).
+        $this->assertStringContainsString('data-no-voice="Your device has no :language voice installed', $html);
+        $this->assertStringContainsString('data-failed="Your browser stopped reading this article', $html);
+        $this->assertStringContainsString('x-text="message"', $html);
+        // The plan language still travels as the hint for same-script languages.
+        $this->assertStringContainsString('data-lang="ar"', $html);
+        $this->assertStringContainsString('data-lang-label="Arabic"', $html);
     }
 
     /** The label reads as a person would name it, from either column form. */

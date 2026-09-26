@@ -8,8 +8,18 @@
      stays the obvious one. Behaviour lives in resources/js/article-speech.js;
      x-cloak keeps the whole control hidden until Alpine has decided whether
      the browser supports speech at all. --}}
+{{-- data-lang is only a HINT. The component decides the real language from
+     the article's own text, because the plan's language is site-wide and
+     often disagrees with the article in front of you (namesforfreefire.com is
+     set to Arabic; 39 of its 40 articles are English). The plan still settles
+     languages that share a script, which no character count can tell apart.
+     The two messages are passed as translated TEMPLATES so the component can
+     drop the detected language name into them. --}}
 <div x-data="articleSpeech" x-cloak x-show="supported"
      data-lang="{{ $speechLanguage ?? 'en' }}"
+     data-lang-label="{{ $speechLanguageLabel ?? 'English' }}"
+     data-no-voice="{{ __('Your device has no :language voice installed, so it can\'t read this article aloud.') }}"
+     data-failed="{{ __('Your browser stopped reading this article. Try again, or open it in a different browser.') }}"
      class="flex items-center gap-1.5">
 
     {{-- Idle --}}
@@ -25,15 +35,10 @@
          (Arabic article, desktop with English voices only, 2026-09-26).
          Saying so is the honest thing; the client can then install a voice,
          switch device, or just read it. --}}
-    <p x-show="problem === 'no-voice'" x-cloak
+    <p x-show="problem !== ''" x-cloak
        class="max-w-xs text-xs leading-snug text-amber-700 dark:text-amber-300">
-        {{ __('Your device has no :language voice installed, so it can\'t read this article aloud.', ['language' => $speechLanguageLabel ?? 'English']) }}
-        <span class="text-slate-500 dark:text-slate-400">{{ __('Adding one in your device\'s language or speech settings usually fixes it.') }}</span>
-    </p>
-
-    <p x-show="problem === 'failed'" x-cloak
-       class="max-w-xs text-xs leading-snug text-amber-700 dark:text-amber-300">
-        {{ __('Your browser stopped reading this article. Try again, or open it in a different browser.') }}
+        <span x-text="message"></span>
+        <span x-show="problem === 'no-voice'" class="text-slate-500 dark:text-slate-400">{{ __('Adding one in your device\'s language or speech settings usually fixes it.') }}</span>
     </p>
     {{-- While it reads, the page auto-scrolls to follow along — which carried
          these controls off screen, so there was no way to pause without

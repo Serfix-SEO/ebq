@@ -14,6 +14,25 @@
 /** Blocks worth reading, in document order. Images and code are skipped. */
 const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, li, blockquote, figcaption, th, td';
 
+/**
+ * Scripts we can recognise from the text itself, with the language a voice
+ * should use for each. Latin is deliberately absent: it is shared by dozens of
+ * languages, so for Latin text the plan's own language is the better answer.
+ */
+const SCRIPTS = [
+    { code: 'ar', label: 'Arabic', re: /\p{Script=Arabic}/gu },
+    { code: 'he', label: 'Hebrew', re: /\p{Script=Hebrew}/gu },
+    { code: 'el', label: 'Greek', re: /\p{Script=Greek}/gu },
+    { code: 'ru', label: 'Russian', re: /\p{Script=Cyrillic}/gu },
+    { code: 'hi', label: 'Hindi', re: /\p{Script=Devanagari}/gu },
+    { code: 'th', label: 'Thai', re: /\p{Script=Thai}/gu },
+    { code: 'ja', label: 'Japanese', re: /[\p{Script=Hiragana}\p{Script=Katakana}]/gu },
+    { code: 'ko', label: 'Korean', re: /\p{Script=Hangul}/gu },
+    { code: 'zh', label: 'Chinese', re: /\p{Script=Han}/gu },
+];
+
+const LATIN = /\p{Script=Latin}/gu;
+
 /** Chrome stops speaking long runs unless poked; harmless elsewhere. */
 const KEEPALIVE_MS = 10000;
 
@@ -27,6 +46,10 @@ export function articleSpeech() {
         rate: 1,
         /** '' | 'no-voice' | 'failed' — why nothing is being read. */
         problem: '',
+        /** The language actually being spoken, and its name for messages. */
+        lang: 'en',
+        langLabel: 'English',
+        message: '',
         blocks: [],
         keepalive: null,
 
@@ -73,8 +96,50 @@ export function articleSpeech() {
          * ("ar" matches "ar-AE") keeps regional variants usable; with no
          * match we say nothing about it and let the browser pick.
          */
+        /**
+         * Which language is this article actually written in?
+         *
+         * The plan's language is a SITE-WIDE setting and routinely disagrees
+         * with the article in front of you: namesforfreefire.com is set to
+         * Arabic, but 39 of its 40 articles are English (2026-09-26), so
+         * trusting the plan had an Arabic voice reading English text. The
+         * script the words are written in is direct evidence, so it wins;
+         * the plan only decides between languages that SHARE a script
+         * (French vs German vs English are all Latin, and no amount of
+         * character counting tells those apart).
+         */
+        detectLanguage(text) {
+            const sample = (text || '').slice(0, 4000);
+            const planLang = (this.$root.dataset.lang || 'en').toLowerCase();
+            const planLabel = this.$root.dataset.langLabel || 'English';
+            const latin = (sample.match(LATIN) || []).length;
+
+            let best = null;
+            let bestCount = 0;
+            for (const script of SCRIPTS) {
+                const count = (sample.match(script.re) || []).length;
+                if (count > bestCount) {
+                    best = script;
+                    bestCount = count;
+                }
+            }
+
+            // Non-Latin script wins outright when it dominates the text.
+            if (best && bestCount > latin) {
+                return best.code === planLang.split(/[-_]/)[0]
+                    ? { lang: planLang, label: planLabel }
+                    : { lang: best.code, label: best.label };
+            }
+
+            // Latin text: keep the plan's language when it is itself written
+            // in Latin, otherwise fall back to English.
+            const planIsNonLatin = SCRIPTS.some(s => s.code === planLang.split(/[-_]/)[0]);
+
+            return planIsNonLatin ? { lang: 'en', label: 'English' } : { lang: planLang, label: planLabel };
+        },
+
         pickVoice() {
-            const want = (this.$root.dataset.lang || 'en').toLowerCase().split(/[-_]/)[0];
+            const want = (this.lang || 'en').toLowerCase().split(/[-_]/)[0];
             if (! this.voices?.length) {
                 this.warmVoices();
             }
@@ -104,11 +169,16 @@ export function articleSpeech() {
                 return;
             }
             this.problem = '';
+            this.message = '';
             this.blocks = this.collect();
             this.total = this.blocks.length;
             if (this.total === 0) {
                 return;
             }
+
+            const detected = this.detectLanguage(this.blocks.map(b => b.text).join(' '));
+            this.lang = detected.lang;
+            this.langLabel = detected.label;
 
             // A device with no voice for this language cannot read it: the
             // engine refuses the text and the player would sit there claiming
@@ -118,6 +188,7 @@ export function articleSpeech() {
             // when the list is empty we try anyway and let onerror catch it.
             if (this.voices?.length && ! this.pickVoice()) {
                 this.problem = 'no-voice';
+                this.message = (this.$root.dataset.noVoice || '').replace(':language', this.langLabel);
 
                 return;
             }
@@ -138,7 +209,7 @@ export function articleSpeech() {
             this.paused = false;
 
             const voice = this.pickVoice();
-            const lang = this.$root.dataset.lang || 'en';
+            const lang = this.lang || 'en';
 
             this.blocks.slice(start).forEach((block, offset) => {
                 const utterance = new SpeechSynthesisUtterance(block.text);
@@ -180,9 +251,11 @@ export function articleSpeech() {
                 return;
             }
             this.stop();
-            this.problem = (code === 'language-unavailable' || code === 'voice-unavailable')
-                ? 'no-voice'
-                : 'failed';
+            const missing = code === 'language-unavailable' || code === 'voice-unavailable';
+            this.problem = missing ? 'no-voice' : 'failed';
+            this.message = missing
+                ? (this.$root.dataset.noVoice || '').replace(':language', this.langLabel)
+                : (this.$root.dataset.failed || '');
         },
 
         pause() {
