@@ -10,7 +10,7 @@
     "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-KRB_9jKe.css",
+    "file": "assets/app-DGVMal-n.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -29,6 +29,12 @@
     "dynamicImports": [
       "resources/js/bug-report-capture.js"
     ]
+  },
+  "resources/js/article-speech.js": {
+    "file": "assets/article-speech-Bxqgxp1B.js",
+    "name": "article-speech",
+    "src": "resources/js/article-speech.js",
+    "isEntry": true
   },
   "resources/js/bug-report-capture.js": {
     "file": "assets/bug-report-capture-B6d61wBD.js",

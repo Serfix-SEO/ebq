@@ -1225,6 +1225,40 @@ class ArticleReview extends Component
 
     // ── labels ──────────────────────────────────────────────────────────
 
+    /**
+     * Language tag for the browser's speech voice.
+     *
+     * `content_plans.language` holds EITHER a code ("en", "ar") or a full name
+     * ("English", "Arabic") depending on which screen last saved it — the
+     * wizard writes codes, the settings select writes names (same split
+     * ContentKeywordInsights normalises before calling the keyword server).
+     * Only the primary subtag matters here: the voice picker matches on it, so
+     * "en" happily selects en-GB or en-US, whichever the device has.
+     */
+    public static function speechLanguage(?string $planLanguage): string
+    {
+        $raw = mb_strtolower(trim((string) $planLanguage));
+        if ($raw === '') {
+            return 'en';
+        }
+
+        $byName = [
+            'english' => 'en', 'arabic' => 'ar', 'french' => 'fr', 'german' => 'de',
+            'spanish' => 'es', 'portuguese' => 'pt', 'italian' => 'it', 'dutch' => 'nl',
+            'turkish' => 'tr', 'russian' => 'ru', 'hindi' => 'hi', 'urdu' => 'ur',
+            'chinese' => 'zh', 'japanese' => 'ja', 'korean' => 'ko', 'danish' => 'da',
+            'finnish' => 'fi', 'czech' => 'cs', 'polish' => 'pl', 'swedish' => 'sv',
+            'norwegian' => 'nb', 'romanian' => 'ro', 'indonesian' => 'id', 'malay' => 'ms',
+            'persian' => 'fa', 'farsi' => 'fa', 'hebrew' => 'he', 'greek' => 'el',
+            'ukrainian' => 'uk', 'vietnamese' => 'vi', 'thai' => 'th',
+        ];
+        if (isset($byName[$raw])) {
+            return $byName[$raw];
+        }
+
+        return preg_match('/^[a-z]{2}(-[a-z]{2,4})?$/i', $raw) === 1 ? $raw : 'en';
+    }
+
     /** Plain-language labels for scorer issue codes (client-safe copy). */
     public static function issueLabel(string $code): string
     {
@@ -1607,6 +1641,8 @@ class ArticleReview extends Component
                 ?->contentIntegrations()->where('status', ContentIntegration::STATUS_CONNECTED)->exists(),
             'presentation' => $topic ? ContentCalendar::statusPresentation($topic->status) : null,
             'articleProducts' => $this->articleProducts($topic),
+            // Which voice the browser should read the article in.
+            'speechLanguage' => self::speechLanguage($topic?->plan?->language),
         ]);
     }
 }

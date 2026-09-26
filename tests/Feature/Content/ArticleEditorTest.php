@@ -85,6 +85,67 @@ class ArticleEditorTest extends TestCase
         $this->assertStringContainsString('Edit article', $html);
     }
 
+    // ── Listen (browser text-to-speech) ────────────────────────────────
+
+    public function test_listen_is_offered_in_the_header_for_a_finished_article(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+
+        $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])->html();
+
+        $this->assertStringContainsString('x-data="articleSpeech"', $html);
+        $this->assertStringContainsString('Listen', $html);
+        // Before the article, like Edit — the header is what people see first.
+        $this->assertLessThan(strpos($html, 'class="ca-preview'), strpos($html, 'articleSpeech'));
+    }
+
+    /** The voice follows the plan's language, not the browser's. */
+    public function test_listen_carries_the_plans_language(): void
+    {
+        [$user, , $plan, $topic] = $this->reviewable();
+        $plan->forceFill(['language' => 'Arabic'])->save();
+
+        $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])->html();
+
+        $this->assertStringContainsString('data-lang="ar"', $html);
+    }
+
+    /**
+     * The language column holds a code from the wizard but a full name from
+     * the settings select, so both have to normalise (the same split
+     * ContentKeywordInsights handles before calling the keyword server).
+     */
+    public function test_the_speech_language_normalises_codes_and_names(): void
+    {
+        foreach ([
+            'en' => 'en', 'English' => 'en', 'ARABIC' => 'ar', 'ar' => 'ar',
+            'fr-CA' => 'fr-ca', 'Klingon' => 'en', '' => 'en', null => 'en',
+        ] as $stored => $expected) {
+            $this->assertSame($expected, ArticleReview::speechLanguage((string) $stored), "stored: {$stored}");
+        }
+    }
+
+    public function test_listen_is_absent_while_editing(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+
+        $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])
+            ->call('startEditing')->html();
+
+        $this->assertStringNotContainsString('x-data="articleSpeech"', $html);
+    }
+
+    /** Nothing to read aloud while the article is still being written. */
+    public function test_listen_is_absent_while_the_article_is_generating(): void
+    {
+        [$user, , , $topic] = $this->reviewable();
+        $topic->forceFill(['status' => \App\Models\ContentTopic::STATUS_WRITING])->save();
+
+        $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])->html();
+
+        $this->assertStringNotContainsString('x-data="articleSpeech"', $html);
+    }
+
     /** In edit mode the header button is gone — the editor has its own toolbar. */
     public function test_the_header_edit_button_is_hidden_while_already_editing(): void
     {

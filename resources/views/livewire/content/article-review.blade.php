@@ -7,7 +7,7 @@
          click does NOT execute, so tiptapEditor would never register. @assets loads
          it once and persists across wire:navigate. --}}
     @assets
-        @vite('resources/js/editor.js')
+        @vite(['resources/js/editor.js', 'resources/js/article-speech.js'])
     @endassets
 
     <x-content.connect-integration />
@@ -24,7 +24,11 @@
                 @if ($topic?->scheduled_for) · {{ __('planned for :date', ['date' => $topic->scheduled_for->translatedFormat('M j, Y')]) }} @endif
             </p>
         </div>
-        <div class="flex shrink-0 items-center gap-3">
+        {{-- flex-wrap, and NOT shrink-0 as a group: chip + Listen + Edit is
+             wider than a 390px phone, and a rigid group pushed the page into
+             a horizontal scroll (measured at 431px). The buttons keep their
+             own shrink-0 so they never squash; the row wraps instead. --}}
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             @if ($presentation)
                 <span class="rounded-full bg-{{ $presentation['color'] }}-100 px-2.5 py-1 text-xs font-semibold text-{{ $presentation['color'] }}-700">{{ $presentation['label'] }}</span>
             @endif
@@ -42,6 +46,7 @@
                     <span wire:loading.remove wire:target="startEditing">{{ __('Edit article') }}</span>
                     <span wire:loading wire:target="startEditing">{{ __('Opening editor…') }}</span>
                 </button>
+                @include('livewire.content.partials.article-speech')
             @endif
         </div>
     </div>
@@ -972,6 +977,12 @@
                  HTML as <nav class="content-toc">; scoped so it never bleeds). --}}
             <style>
                 .ca-preview { scroll-behavior: smooth; }
+                /* The block being read aloud (resources/js/article-speech.js).
+                   A tinted band rather than a background swap, so it stays
+                   legible over figures, tables and dark mode alike. */
+                .ca-preview .ca-speaking { background: rgba(249,115,22,.12); box-shadow: inset 3px 0 0 #f97316; border-radius: .25rem; }
+                .dark .ca-preview .ca-speaking { background: rgba(249,115,22,.18); }
+                @media (prefers-reduced-motion: reduce) { .ca-preview { scroll-behavior: auto; } }
                 .ca-preview .content-toc { margin: 0 0 1.75rem; padding: 1rem 1.25rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; background: #f8fafc; }
                 .ca-preview .content-toc__title { margin: 0 0 .5rem; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; }
                 .ca-preview .content-toc ul { margin: 0; padding: 0; list-style: none; }
