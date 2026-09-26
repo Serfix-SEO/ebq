@@ -331,6 +331,19 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
     speed / progress sit in a viewport-pinned bar (`fixed inset-x-0 bottom-0`,
     `pointer-events-none` strip + `pointer-events-auto` pill, bottom padding
     via `env(safe-area-inset-bottom)`); the header keeps only idle Listen.
+  - ⚠️ **A device without a voice for the article's language cannot read it,
+    and the engine fails SILENTLY.** An Arabic article on an English-only
+    desktop produced a player claiming to play, frozen on paragraph one
+    (namesforfreefire.com, 2026-09-26). iOS/macOS generally ship Arabic
+    voices; Windows/Linux usually need a language pack — so the same article
+    reads on a phone and is silent on a desktop. Handled two ways: an upfront
+    check (only when `getVoices()` is populated — some platforms fill it late
+    and speech works anyway) and `utterance.onerror` as the safety net, which
+    maps `language-unavailable`/`voice-unavailable` to the same message.
+    ⚠️ Our OWN `cancel()` from pause/stop fires `onerror` with
+    `interrupted`/`canceled` — never treat those as failures.
+    This does NOT make Arabic readable where no voice exists; only generated
+    audio (the deferred paid option) would.
   - ⚠️ QA note: a **full-page screenshot places `fixed` elements
     unpredictably** (they are not where they appear on screen). Measure
     `getBoundingClientRect()` + computed position over CDP instead of
