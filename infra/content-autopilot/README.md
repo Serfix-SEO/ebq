@@ -823,6 +823,26 @@ cited in ChatGPT" without those vendors' APIs. What we ship instead:
   kit fixture. ⚠️ Assert teaser leakage on **view data, not HTML**: an SVG full
   of coordinates contains almost any 3-digit number by accident (`555.85` as a
   hit-band x position failed a `assertDontSee('555')` that was otherwise right).
+- **Proven end to end on a live site (2026-09-26, pubgnamegenerator.net).** The
+  install self-updated 2.0.22 → 2.1.0 from our own `plugin.zip`, served
+  `/llms.txt`, and reported real crawler activity: ClaudeBot 14, PerplexityBot 5,
+  OAI-SearchBot 2 and **Bytespider 2 — genuine ByteDance traffic nobody
+  simulated**. Human requests were not counted. Two things cost hours and are
+  worth knowing:
+  - **The site's plugin token had been dead since 18 July**, 401ing on every
+    hourly call for two months, and nothing watched for it. Feature flags fail
+    open, so the plugin kept working and nobody noticed. Worth an alarm of its
+    own: a connected install whose calls are all 401.
+  - **WP-Cron on managed hosts is not traffic-driven.** Hostinger runs a system
+    cron (~:12 past the hour); direct `wp-cron.php` pokes did nothing, so the
+    batch only flushes on the host's schedule. Expect **up to an hour** between
+    a crawler visit and the data appearing — say so in support rather than
+    chasing a bug. WP Crontrol is the fastest way to confirm
+    `ebq_send_ai_bot_batch` exists and force it.
+  - The host also **429s GPTBot at the edge** while allowing ClaudeBot and
+    PerplexityBot, so that agent can never appear in this site's data whatever
+    robots.txt says. Our readiness check reads robots.txt only and would call it
+    "allowed" — detecting edge blocks needs a fetch *as* each agent (not built).
 - **WordPress side: plugin v2.1.0, published 2026-09-26** (`EBQ_Ai_Bot_Logger`,
   `EBQ_Llms_Txt` — see infra/wordpress-plugin/plugin-features.md). Stable
   channel; 2.0.22 auto-rolled back by `PluginReleaseResolver::markPublished()`.
