@@ -446,15 +446,25 @@
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                 </button>
             </div>
-            <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                @foreach (['grid' => __('Calendar'), 'list' => __('List')] as $mode => $modeLabel)
-                    <button wire:click="$set('view', '{{ $mode }}')"
-                        class="rounded-lg px-4 py-1.5 text-sm font-semibold transition {{ $view === $mode ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}">
-                        {{ $modeLabel }}
-                    </button>
-                @endforeach
+            <div class="flex flex-wrap items-center gap-3">
+                {{-- The client's own idea, turned into a real topic with keywords
+                     (App\Services\Content\TopicComposer). --}}
+                <button wire:click="openComposer" class="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-700 transition hover:bg-orange-600 hover:text-white dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300 dark:hover:bg-orange-600 dark:hover:text-white">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    {{ __('Add your own topic') }}
+                </button>
+                <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    @foreach (['grid' => __('Calendar'), 'list' => __('List')] as $mode => $modeLabel)
+                        <button wire:click="$set('view', '{{ $mode }}')"
+                            class="rounded-lg px-4 py-1.5 text-sm font-semibold transition {{ $view === $mode ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}">
+                            {{ $modeLabel }}
+                        </button>
+                    @endforeach
+                </div>
             </div>
         </div>
+
+        @include('livewire.content.partials.topic-composer')
 
         {{-- Publish-window hint so clients aren't confused about when things go live. --}}
         <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
@@ -651,7 +661,9 @@
                                             {{ $rowImages }} {{ __('images') }}
                                         </span>
                                     @endif
-                                    @if ($topic->source && ! in_array($topic->source, ['manual', 'llm'], true))
+                                    @if ($topic->source === \App\Services\Content\TopicComposer::SOURCE)
+                                        <span class="rounded-full bg-orange-50 px-2 py-px font-medium text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ __('Your idea') }}</span>
+                                    @elseif ($topic->source && ! in_array($topic->source, ['manual', 'llm'], true))
                                         <span class="rounded-full bg-slate-100 px-2 py-px font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ __('From search demand') }}</span>
                                     @endif
                                 </div>
@@ -709,7 +721,13 @@
                                     {{ __('Republish') }}
                                 </button>
                             @endif
-                            @if (in_array($topic->status, ['suggested', 'approved', 'ready'], true))
+                            {{-- Only the statuses skip() actually accepts: it
+                                 refuses 'ready', so offering Skip there was a
+                                 button that silently did nothing. A written
+                                 article is changed from Review (rewrite), not
+                                 thrown away here. --}}
+                            @if (! $inFlight && in_array($topic->status, ['suggested', 'approved', 'failed'], true))
+                                <button wire:click="openComposer('{{ $topic->id }}')" class="text-sm font-medium text-orange-600 hover:text-orange-700">{{ __('Write something else') }}</button>
                                 <button wire:click="skip('{{ $topic->id }}')" class="text-sm text-slate-400 hover:text-slate-600">{{ __('Skip') }}</button>
                             @endif
                             </div>

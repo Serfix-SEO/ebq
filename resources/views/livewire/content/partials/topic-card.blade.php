@@ -97,6 +97,12 @@
                 </button>
             @endif
             @if ($canWrite)
+                {{-- Swap this topic for one the client asks for; the
+                     replacement keeps this card's publish date. --}}
+                <button type="button" draggable="false" wire:click="openComposer('{{ $topic->id }}')" title="{{ __('Write something else') }}"
+                        class="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-slate-400 hover:text-orange-600 sm:p-0.5">
+                    <svg class="h-4 w-4 sm:h-3.5 sm:w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356m-4.992 4.992l3.181-3.183a8.25 8.25 0 00-13.803 3.7M4.031 9.865v4.99m0 0h4.99m-4.99 0l3.181 3.183a8.25 8.25 0 0013.803-3.7"/></svg>
+                </button>
                 <button wire:click="writeNow('{{ $topic->id }}')" wire:loading.attr="disabled" wire:target="writeNow('{{ $topic->id }}')"
                         class="inline-flex shrink-0 items-center gap-1 rounded-md bg-orange-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-orange-700 sm:gap-0.5 sm:px-1.5 sm:py-0.5 sm:text-[10px]" title="{{ __('Write now') }}">
                     <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>

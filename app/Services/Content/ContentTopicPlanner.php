@@ -412,7 +412,8 @@ class ContentTopicPlanner
      *
      * @return list<string>
      */
-    private function existingPageTitles(Website $website): array
+    /** Public: TopicComposer dedupes against the same corpus. */
+    public function existingPageTitles(Website $website): array
     {
         try {
             $crawlSiteId = $website->crawl_site_id;
@@ -525,10 +526,22 @@ class ContentTopicPlanner
     // ── LLM ideation ────────────────────────────────────────────────────
 
     /** @return list<array<string,mixed>> */
-    private function ideate(ContentPlan $plan, Website $website, array $gscSignals, array $existingTitles, int $count): array
+    /**
+     * Everything the model needs to know about this client before it proposes
+     * titles: what they sell, the market, the site-type article mix, their own
+     * search demand, the keyword gap, pages that already exist — and, for a
+     * strict plan, the real catalog with its ABSOLUTE BRAND RULE.
+     *
+     * Public because the client's own "write about this" box (TopicComposer)
+     * must reason from the SAME context. Two copies of the brand rule is how a
+     * strict client eventually gets handed an off-catalog topic.
+     *
+     * @param  list<array{query: string, impressions: int, position: float}>  $gscSignals
+     * @param  list<string>  $existingTitles
+     * @return array<string, string>
+     */
+    public function promptContext(ContentPlan $plan, Website $website, array $gscSignals = [], array $existingTitles = []): array
     {
-        $model = ContentAutopilotConfig::modelFor('ideate');
-
         $offerings = (array) ($plan->offerings ?? []);
         $sell = implode('; ', array_slice((array) ($offerings['sell'] ?? []), 0, 10));
         $dontSell = implode('; ', array_slice((array) ($offerings['dont_sell'] ?? []), 0, 10));
@@ -621,6 +634,36 @@ class ContentTopicPlanner
                 $productContractField = ', "product_urls": ["..."]';
             }
         }
+
+
+        return [
+            'sell' => $sell,
+            'dontSell' => $dontSell,
+            'gscBlock' => $gscBlock,
+            'titlesBlock' => $titlesBlock,
+            'gapBlock' => $gapBlock,
+            'marketBlock' => $marketBlock,
+            'typeBlock' => $typeBlock,
+            'catalogBlock' => $catalogBlock,
+            'productContractField' => $productContractField,
+            'directivesBlock' => $plan->promptAddendumBlock(),
+            'language' => $language,
+            'domain' => $domain,
+            'today' => $today,
+            'currentYear' => (string) $currentYear,
+        ];
+    }
+
+    private function ideate(ContentPlan $plan, Website $website, array $gscSignals, array $existingTitles, int $count): array
+    {
+        $model = ContentAutopilotConfig::modelFor('ideate');
+
+        $ctx = $this->promptContext($plan, $website, $gscSignals, $existingTitles);
+        [$sell, $dontSell, $gscBlock, $titlesBlock, $gapBlock, $marketBlock, $typeBlock, $catalogBlock, $productContractField, $language, $domain, $today, $currentYear] = [
+            $ctx['sell'], $ctx['dontSell'], $ctx['gscBlock'], $ctx['titlesBlock'], $ctx['gapBlock'],
+            $ctx['marketBlock'], $ctx['typeBlock'], $ctx['catalogBlock'], $ctx['productContractField'],
+            $ctx['language'], $ctx['domain'], $ctx['today'], $ctx['currentYear'],
+        ];
 
         $system = 'You are an SEO content strategist. Respond with valid JSON only.';
         $directivesBlock = $plan->promptAddendumBlock();
@@ -805,7 +848,8 @@ class ContentTopicPlanner
     }
 
     /** Token-overlap title similarity (same heuristic as the scorer). */
-    private function similarity(string $a, string $b): float
+    /** Public: TopicComposer dedupes client-authored titles by the same rule. */
+    public function similarity(string $a, string $b): float
     {
         $tokens = static function (string $s): array {
             $words = preg_split('/[^a-z0-9]+/', mb_strtolower($s), -1, PREG_SPLIT_NO_EMPTY) ?: [];

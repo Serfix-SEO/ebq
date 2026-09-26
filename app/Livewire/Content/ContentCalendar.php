@@ -14,6 +14,7 @@ use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
 use App\Models\ContentProduct;
 use App\Models\ContentProductRun;
+use App\Models\ContentPublication;
 use App\Models\ContentTopic;
 use App\Models\Website;
 use App\Services\Content\Catalog\ProductCatalogService;
@@ -22,7 +23,9 @@ use App\Services\Content\CompetitorMentionGuard;
 use App\Services\Content\ContentEntitlements;
 use App\Services\Content\ContentKeywordInsights;
 use App\Services\Content\ContentSetupInsights;
+use App\Services\Content\ContentTopicPlanner;
 use App\Services\Content\SiteProfileExtractor;
+use App\Services\Content\TopicComposer;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentImageStyles;
 use App\Support\ContentSiteTypeProfiles;
@@ -119,12 +122,25 @@ class ContentCalendar extends Component
     /** Competitor-mention guard: add-a-blocked-term input. */
     public string $newBlockedTerm = '';
 
-    // Inline add-topic form (calendar)
-    public bool $showAddTopic = false;
+    // "Write about this instead" — the topic composer (calendar).
+    public bool $composerOpen = false;
 
-    public string $newTitle = '';
+    /** The client's idea, in their own words. */
+    public string $composerIdea = '';
 
-    public string $newKeyword = '';
+    /** Topic being replaced, or null when adding to a free date. */
+    public ?string $composerReplacing = null;
+
+    /** @var list<array<string, mixed>> Suggestions to choose between. */
+    public array $composerSuggestions = [];
+
+    /** @var list<string> Free publish dates (add mode only). */
+    public array $composerDates = [];
+
+    public ?string $composerDate = null;
+
+    /** Client-safe explanation when we cannot offer anything. */
+    public string $composerNotice = '';
 
     /** Article-structure toggles surfaced in the wizard (step 3). */
     public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true, 'featured_image' => true];
@@ -875,7 +891,7 @@ class ContentCalendar extends Component
         $topic->update(['status' => ContentTopic::STATUS_SKIPPED]);
         // The removed topic's date must not become a hole — the next planned
         // article takes its place (brigid 2026-08-21).
-        app(\App\Services\Content\ContentTopicPlanner::class)->fillVacatedDate($plan, $topic->scheduled_for);
+        app(ContentTopicPlanner::class)->fillVacatedDate($plan, $topic->scheduled_for);
     }
 
     /**
@@ -892,7 +908,7 @@ class ContentCalendar extends Component
     private function requiresProductChoice(?ContentPlan $plan): bool
     {
         return $plan !== null
-            && in_array($plan->site_type, [\App\Support\ContentSiteTypeProfiles::BRAND, \App\Support\ContentSiteTypeProfiles::RESELLER], true)
+            && in_array($plan->site_type, [ContentSiteTypeProfiles::BRAND, ContentSiteTypeProfiles::RESELLER], true)
             && $plan->product_mode === null;
     }
 
@@ -1048,7 +1064,7 @@ class ContentCalendar extends Component
             if ($product !== null) {
                 $detail = [
                     'product' => $product,
-                    'topics' => \App\Models\ContentTopic::query()
+                    'topics' => ContentTopic::query()
                         ->whereHas('products', fn ($q) => $q->whereKey($product->id))
                         ->where('plan_id', $plan->id)
                         ->orderByDesc('scheduled_for')
@@ -1163,7 +1179,7 @@ class ContentCalendar extends Component
             // Skipping frees the date for the next planned article instead of
             // leaving a silent hole in the calendar (brigid 2026-08-21).
             if (($plan = $topic->plan) !== null) {
-                app(\App\Services\Content\ContentTopicPlanner::class)->fillVacatedDate($plan, $topic->scheduled_for);
+                app(ContentTopicPlanner::class)->fillVacatedDate($plan, $topic->scheduled_for);
             }
         }
     }
@@ -1365,9 +1381,9 @@ class ContentCalendar extends Component
             return;
         }
 
-        \App\Models\ContentPublication::query()
+        ContentPublication::query()
             ->where('article_id', $topic->currentArticle->id)
-            ->update(['status' => \App\Models\ContentPublication::STATUS_QUEUED]);
+            ->update(['status' => ContentPublication::STATUS_QUEUED]);
 
         $topic->enterStage(ContentTopic::STATUS_PUBLISHING);
         PublishContentArticleJob::dispatch($topic->id);
@@ -1433,52 +1449,109 @@ class ContentCalendar extends Component
             ->exists();
     }
 
-    public function addTopic(): void
+    // ── Topic composer: "write about this instead" ──────────────────────
+
+    /**
+     * Open the composer, either to replace a planned topic or to add one.
+     *
+     * Replacing is free (the new topic inherits the slot); adding takes one of
+     * the month's remaining publish days, so the date list is what the planner
+     * itself would schedule — if it is empty the month is full and we say so.
+     */
+    public function openComposer(?string $topicId = null): void
     {
         $plan = $this->activePlan();
         if ($plan === null) {
             return;
         }
-        $this->validate([
-            'newTitle' => 'required|string|min:8|max:300',
-            'newKeyword' => 'required|string|min:2|max:200',
-        ], [], ['newTitle' => __('title'), 'newKeyword' => __('keyword')]);
 
-        $plan->topics()->create([
-            'website_id' => $this->websiteId,
-            'title' => $this->newTitle,
-            'target_keyword' => mb_strtolower(trim($this->newKeyword)),
-            'source' => 'manual',
-            'status' => ContentTopic::STATUS_APPROVED,
-            'scheduled_for' => now()->addDays(2)->startOfDay(),
-        ]);
+        $topic = $topicId !== null ? $this->topicOrFail($topicId) : null;
+        if ($topicId !== null && ! $this->isReplaceable($topic)) {
+            return;
+        }
 
-        $this->reset('newTitle', 'newKeyword', 'showAddTopic');
+        $this->reset('composerIdea', 'composerSuggestions', 'composerNotice', 'composerDate');
+        $this->composerReplacing = $topic?->id;
+        $this->composerDates = $topic !== null ? [] : array_slice(app(TopicComposer::class)->availableDates($plan), 0, 12);
+        $this->composerDate = $this->composerDates[0] ?? null;
+        $this->composerOpen = true;
     }
 
-    /** Create a topic from the inline form AND start writing it immediately. */
-    public function addAndWriteTopic(): void
+    public function closeComposer(): void
+    {
+        $this->reset('composerOpen', 'composerIdea', 'composerReplacing', 'composerSuggestions', 'composerDates', 'composerDate', 'composerNotice');
+    }
+
+    /** Turn the typed idea into article topics to choose between. */
+    public function suggestTopics(): void
     {
         $plan = $this->activePlan();
         if ($plan === null) {
             return;
         }
         $this->validate([
-            'newTitle' => 'required|string|min:8|max:300',
-            'newKeyword' => 'required|string|min:2|max:200',
-        ], [], ['newTitle' => __('title'), 'newKeyword' => __('keyword')]);
+            'composerIdea' => 'required|string|min:3|max:300',
+        ], [], ['composerIdea' => __('idea')]);
 
-        $topic = $plan->topics()->create([
-            'website_id' => $this->websiteId,
-            'title' => $this->newTitle,
-            'target_keyword' => mb_strtolower(trim($this->newKeyword)),
-            'source' => 'manual',
-            'status' => ContentTopic::STATUS_APPROVED,
-            'scheduled_for' => now()->startOfDay(),
-        ]);
+        $this->composerNotice = '';
+        $result = app(TopicComposer::class)->suggest($plan, $this->composerIdea);
+        $this->composerSuggestions = $result['suggestions'];
 
-        $this->reset('newTitle', 'newKeyword', 'showAddTopic');
-        $this->writeNow($topic->id);
+        if (! $result['ok']) {
+            $this->composerNotice = self::composerNoticeFor((string) $result['reason']);
+        }
+    }
+
+    /** Put the chosen suggestion on the calendar. */
+    public function useSuggestion(int $index): void
+    {
+        $plan = $this->activePlan();
+        $choice = $this->composerSuggestions[$index] ?? null;
+        if ($plan === null || ! is_array($choice)) {
+            return;
+        }
+
+        $replacing = $this->composerReplacing !== null ? $this->topicOrFail($this->composerReplacing) : null;
+        if ($this->composerReplacing !== null && ! $this->isReplaceable($replacing)) {
+            $this->composerNotice = __('That article has already started, so it can\'t be swapped out.');
+
+            return;
+        }
+
+        $topic = app(TopicComposer::class)->create($plan, $choice, $replacing, $replacing === null ? $this->composerDate : null);
+        if ($topic === null) {
+            // Most often the chosen date was taken while the modal was open.
+            $this->composerNotice = __('We couldn\'t add that one. Pick another date or try a different idea.');
+            $this->composerDates = array_slice(app(TopicComposer::class)->availableDates($plan), 0, 12);
+
+            return;
+        }
+
+        session()->flash('content-status', $replacing !== null
+            ? __('Swapped in ":title". We\'ll write it on the same date.', ['title' => $topic->title])
+            : __('Added ":title" to your calendar.', ['title' => $topic->title]));
+        $this->closeComposer();
+    }
+
+    /** Only a topic that has not started writing can be swapped out. */
+    private function isReplaceable(?ContentTopic $topic): bool
+    {
+        return $topic !== null && in_array($topic->status, [
+            ContentTopic::STATUS_SUGGESTED, ContentTopic::STATUS_APPROVED,
+            ContentTopic::STATUS_SCHEDULED, ContentTopic::STATUS_FAILED,
+        ], true);
+    }
+
+    /** Client-safe copy for a composer refusal — never the internal reason. */
+    public static function composerNoticeFor(string $reason): string
+    {
+        return match ($reason) {
+            'say_more' => __('Tell us a little more — even a few words about the subject helps.'),
+            'slow_down' => __('That\'s a lot of ideas in one hour. Try again in a little while.'),
+            'not_in_catalog' => __('We couldn\'t match that to products in your catalog. Try an idea closer to what you sell.'),
+            'too_similar' => __('That\'s very close to something already on your calendar. Try a different angle.'),
+            default => __('We couldn\'t turn that into an article idea. Try describing it a different way.'),
+        };
     }
 
     // ── Presentation helpers ────────────────────────────────────────────
