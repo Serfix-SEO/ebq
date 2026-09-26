@@ -18,6 +18,23 @@
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"/></svg>
         {{ __('Listen') }}
     </button>
+
+    {{-- Why nothing is being read. A device with no voice for this language
+         cannot speak it, and the engine simply refuses — which used to leave
+         a player bar claiming to play, in silence, stuck on paragraph one
+         (Arabic article, desktop with English voices only, 2026-09-26).
+         Saying so is the honest thing; the client can then install a voice,
+         switch device, or just read it. --}}
+    <p x-show="problem === 'no-voice'" x-cloak
+       class="max-w-xs text-xs leading-snug text-amber-700 dark:text-amber-300">
+        {{ __('Your device has no :language voice installed, so it can\'t read this article aloud.', ['language' => $speechLanguageLabel ?? 'English']) }}
+        <span class="text-slate-500 dark:text-slate-400">{{ __('Adding one in your device\'s language or speech settings usually fixes it.') }}</span>
+    </p>
+
+    <p x-show="problem === 'failed'" x-cloak
+       class="max-w-xs text-xs leading-snug text-amber-700 dark:text-amber-300">
+        {{ __('Your browser stopped reading this article. Try again, or open it in a different browser.') }}
+    </p>
     {{-- While it reads, the page auto-scrolls to follow along — which carried
          these controls off screen, so there was no way to pause without
          scrolling back up (owner 2026-09-26). The playing controls therefore

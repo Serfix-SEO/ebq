@@ -25,6 +25,8 @@ export function articleSpeech() {
         index: 0,
         total: 0,
         rate: 1,
+        /** '' | 'no-voice' | 'failed' — why nothing is being read. */
+        problem: '',
         blocks: [],
         keepalive: null,
 
@@ -101,11 +103,25 @@ export function articleSpeech() {
             if (! this.supported) {
                 return;
             }
+            this.problem = '';
             this.blocks = this.collect();
             this.total = this.blocks.length;
             if (this.total === 0) {
                 return;
             }
+
+            // A device with no voice for this language cannot read it: the
+            // engine refuses the text and the player would sit there claiming
+            // to play, silently, forever (Arabic article on a desktop with
+            // English voices only — owner 2026-09-26). Say so instead of
+            // starting. Only trustworthy when voices are actually loaded;
+            // when the list is empty we try anyway and let onerror catch it.
+            if (this.voices?.length && ! this.pickVoice()) {
+                this.problem = 'no-voice';
+
+                return;
+            }
+
             this.index = 0;
             this.speakFrom(0);
         },
@@ -138,6 +154,7 @@ export function articleSpeech() {
                 if (start + offset === this.blocks.length - 1) {
                     utterance.onend = () => this.stop();
                 }
+                utterance.onerror = (event) => this.fail(event?.error);
                 window.speechSynthesis.speak(utterance);
             });
 
@@ -150,6 +167,24 @@ export function articleSpeech() {
          * simply speaks again from the block we had reached. Correct in every
          * browser, and no user-agent sniffing.
          */
+        /**
+         * The engine gave up. Without this the UI kept showing "playing" and a
+         * frozen progress counter while nothing came out of the speakers,
+         * which is indistinguishable from the feature being broken.
+         *
+         * 'interrupted'/'canceled' are OUR OWN cancel() calls from pause and
+         * stop — never an error to report.
+         */
+        fail(code) {
+            if (code === 'interrupted' || code === 'canceled') {
+                return;
+            }
+            this.stop();
+            this.problem = (code === 'language-unavailable' || code === 'voice-unavailable')
+                ? 'no-voice'
+                : 'failed';
+        },
+
         pause() {
             if (! this.speaking) {
                 return;

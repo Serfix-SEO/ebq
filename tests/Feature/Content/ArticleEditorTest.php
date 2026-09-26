@@ -147,6 +147,35 @@ class ArticleEditorTest extends TestCase
         }
     }
 
+    /**
+     * A device with no voice for the article's language cannot read it. The
+     * player used to claim it was playing and freeze on paragraph one, in
+     * silence (Arabic article, English-only desktop — owner 2026-09-26), so
+     * the page now carries an explanation naming the language.
+     */
+    public function test_a_missing_device_voice_is_explained_in_the_clients_language(): void
+    {
+        [$user, , $plan, $topic] = $this->reviewable();
+        $plan->forceFill(['language' => 'ar'])->save();
+
+        $html = Livewire::actingAs($user)->test(ArticleReview::class, ['topicId' => $topic->id])->html();
+
+        $this->assertStringContainsString("problem === 'no-voice'", $html);
+        $this->assertStringContainsString('no Arabic voice installed', $html);
+        // ...and a second message for an engine that simply gives up.
+        $this->assertStringContainsString("problem === 'failed'", $html);
+        $this->assertStringContainsString('stopped reading this article', $html);
+    }
+
+    /** The label reads as a person would name it, from either column form. */
+    public function test_the_language_label_handles_codes_and_names(): void
+    {
+        foreach (['ar' => 'Arabic', 'Arabic' => 'Arabic', 'en' => 'English', '' => 'English',
+            'french' => 'French', 'xx' => 'XX'] as $stored => $expected) {
+            $this->assertSame($expected, ArticleReview::speechLanguageLabel((string) $stored), "stored: {$stored}");
+        }
+    }
+
     public function test_listen_is_absent_while_editing(): void
     {
         [$user, , , $topic] = $this->reviewable();

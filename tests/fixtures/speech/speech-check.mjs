@@ -41,11 +41,17 @@ writeFileSync(harness, `<!doctype html><html><head><meta charset="utf-8"></head>
 <script>
   window.__spoken = []; window.__cancels = 0;
   window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+  window.__voices = [{ name: 'Fake Arabic', lang: 'ar-SA' }, { name: 'Fake English', lang: 'en-US' }];
+  window.__forceError = null;
   const stub = {
-    speak(u) { window.__spoken.push({ text: u.text, lang: u.lang, rate: u.rate, voice: u.voice?.name ?? null }); if (u.onstart) u.onstart(); },
+    speak(u) {
+      window.__spoken.push({ text: u.text, lang: u.lang, rate: u.rate, voice: u.voice?.name ?? null });
+      if (window.__forceError) { if (u.onerror) u.onerror({ error: window.__forceError }); return; }
+      if (u.onstart) u.onstart();
+    },
     cancel() { window.__cancels++; },
     pause() {}, resume() {},
-    getVoices: () => [{ name: 'Fake Arabic', lang: 'ar-SA' }, { name: 'Fake English', lang: 'en-US' }],
+    getVoices: () => window.__voices,
     addEventListener() {},
   };
   // Chrome exposes speechSynthesis as a READ-ONLY accessor on Window, so a
@@ -69,6 +75,26 @@ writeFileSync(harness, `<!doctype html><html><head><meta charset="utf-8"></head>
     c.setRate('1.5');
     const rate = (window.__spoken.at(-1) ?? {}).rate;
     c.stop();
+    // A device with no voice for this language: say so, do not fake playing.
+    window.__voices = [{ name: 'Fake English', lang: 'en-US' }];
+    const noVoice = factory();
+    noVoice.$root = document.getElementById('ctl');
+    noVoice.init();
+    const spokenBefore = window.__spoken.length;
+    noVoice.listen();
+    // Capture NOW — the failure scenario below speaks, and measuring after it
+    // would count its utterances against this one.
+    const noVoiceStayedSilent = window.__spoken.length === spokenBefore;
+
+    // The engine gives up mid-article: surface it rather than freeze.
+    window.__voices = [{ name: 'Fake Arabic', lang: 'ar-SA' }];
+    window.__forceError = 'synthesis-failed';
+    const failing = factory();
+    failing.$root = document.getElementById('ctl');
+    failing.init();
+    failing.listen();
+    window.__forceError = null;
+
     window.__speechResult = {
       supported: c.supported,
       blocks: c.total,
@@ -78,6 +104,11 @@ writeFileSync(harness, `<!doctype html><html><head><meta charset="utf-8"></head>
       rate,
       cancelled: window.__cancels > before,
       highlightCleared: document.querySelectorAll('.ca-speaking').length === 0,
+      noVoiceProblem: noVoice.problem,
+      noVoiceStayedSilent,
+      noVoicePretendedToPlay: noVoice.speaking,
+      failureProblem: failing.problem,
+      failureStoppedPlaying: failing.speaking,
     };
   }
 </script>
@@ -145,6 +176,13 @@ expect('picks a matching voice', got.voice, 'Fake Arabic');
 expect('speed change applies', got.rate, 1.5);
 expect('stop cancels the engine', got.cancelled, true);
 expect('stop clears the highlight', got.highlightCleared, true);
+// No voice for the article's language (Arabic article, English-only device).
+expect('missing voice is reported', got.noVoiceProblem, 'no-voice');
+expect('missing voice speaks nothing', got.noVoiceStayedSilent, true);
+expect('missing voice does not fake playing', got.noVoicePretendedToPlay, false);
+// The engine refuses mid-article.
+expect('engine failure is reported', got.failureProblem, 'failed');
+expect('engine failure stops the player', got.failureStoppedPlaying, false);
 
 if (failures.length) {
     console.error(`\n${failures.length} failed:\n  ${failures.join('\n  ')}`);

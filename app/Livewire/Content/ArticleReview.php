@@ -1259,6 +1259,36 @@ class ArticleReview extends Component
         return preg_match('/^[a-z]{2}(-[a-z]{2,4})?$/i', $raw) === 1 ? $raw : 'en';
     }
 
+    /**
+     * The article's language as a person would name it ("Arabic"), for the
+     * "your device has no X voice" message. Same column quirk as
+     * {@see speechLanguage()}: it may already hold the name, or a code.
+     */
+    public static function speechLanguageLabel(?string $planLanguage): string
+    {
+        $raw = trim((string) $planLanguage);
+        if ($raw === '') {
+            return 'English';
+        }
+        // Already a name ("Arabic", "English") — use it as the client wrote it.
+        if (mb_strlen($raw) > 3) {
+            return mb_convert_case($raw, MB_CASE_TITLE, 'UTF-8');
+        }
+
+        $names = [
+            'en' => 'English', 'ar' => 'Arabic', 'fr' => 'French', 'de' => 'German',
+            'es' => 'Spanish', 'pt' => 'Portuguese', 'it' => 'Italian', 'nl' => 'Dutch',
+            'tr' => 'Turkish', 'ru' => 'Russian', 'hi' => 'Hindi', 'ur' => 'Urdu',
+            'zh' => 'Chinese', 'ja' => 'Japanese', 'ko' => 'Korean', 'da' => 'Danish',
+            'fi' => 'Finnish', 'cs' => 'Czech', 'pl' => 'Polish', 'sv' => 'Swedish',
+            'nb' => 'Norwegian', 'ro' => 'Romanian', 'id' => 'Indonesian', 'ms' => 'Malay',
+            'fa' => 'Persian', 'he' => 'Hebrew', 'el' => 'Greek', 'uk' => 'Ukrainian',
+            'vi' => 'Vietnamese', 'th' => 'Thai',
+        ];
+
+        return $names[mb_strtolower($raw)] ?? mb_strtoupper($raw);
+    }
+
     /** Plain-language labels for scorer issue codes (client-safe copy). */
     public static function issueLabel(string $code): string
     {
@@ -1643,6 +1673,7 @@ class ArticleReview extends Component
             'articleProducts' => $this->articleProducts($topic),
             // Which voice the browser should read the article in.
             'speechLanguage' => self::speechLanguage($topic?->plan?->language),
+            'speechLanguageLabel' => self::speechLanguageLabel($topic?->plan?->language),
         ]);
     }
 }
