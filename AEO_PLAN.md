@@ -113,8 +113,12 @@ The truth-only phase. No LLM calls, no scraping, nothing that can lie.
 alarm, PHP kit 1.1.0 (hit logging, post-response reporting, llms.txt), and
 24 tests in `tests/Feature/Aeo/` plus `tests/fixtures/php-kit/aeo-kit-check.php`.
 
-**Still open in this phase:** the WordPress plugin's own logger and `/llms.txt`
-route — separate repo, separate release. Clone `class-ebq-404-tracker.php`.
+**WordPress plugin v2.1.0** (separate repo) adds `EBQ_Ai_Bot_Logger` and
+`EBQ_Llms_Txt`, verified by `tests/ai-visibility-check.php` there and by a live
+round-trip against the deployed endpoint.
+
+**Still open in this phase:** publishing the plugin release — that pushes an
+auto-update to every installed site, so it is the owner's call, not ours.
 
 **Client-visible:** new `/content/aeo` page with an AEO readiness score, a
 per-bot access table (allowed / blocked / never seen), a "who crawled you"

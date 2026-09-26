@@ -781,9 +781,11 @@ cited in ChatGPT" without those vendors' APIs. What we ship instead:
   `chatgpt.com` sessions across 7 sites before a line of this shipped.
 - Tests: `tests/Feature/Aeo/` (24 — ingest auth/idempotency/tenancy, robots
   verdicts, page states) plus the kit fixture.
-- **Not built yet:** the WordPress plugin's logger + `/llms.txt` route (separate
-  repo, own release; clone `class-ebq-404-tracker.php`, which already buffers,
-  matches UAs, drains on cron and only clears on a confirmed OK). Phases 2
+- **WordPress side: built in plugin v2.1.0** (`EBQ_Ai_Bot_Logger`,
+  `EBQ_Llms_Txt` — see infra/wordpress-plugin/plugin-features.md). ⚠️ The zip is
+  built and committed in the plugin repo but **the release is not published** —
+  publishing pushes an auto-update to every install and is an owner decision.
+  Phases 2
   (answer-shaped articles, full JSON-LD, author entity) and 3 (brand-recall
   probes, visibility score history) are specified in repo-root `AEO_PLAN.md`.
 

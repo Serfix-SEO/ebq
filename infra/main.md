@@ -296,8 +296,11 @@ known gaps were flagged during the sweep:
   sitting in `analytics_data`. ChatGPT/Gemini citation share is deliberately NOT
   claimed — no scrapeable query URL exists. Ingest upserts (never adds) because
   reporters re-send unconfirmed days; a site that stops reporting raises a
-  digest line rather than reading as "the crawlers left".
-  infra/content-autopilot/README.md "AI Visibility"; plan in AEO_PLAN.md.
+  digest line rather than reading as "the crawlers left". **WP plugin v2.1.0**
+  ships the site side: `EBQ_Ai_Bot_Logger` (a clone of the 404 tracker's
+  buffer/drain/only-clear-on-OK shape) and `EBQ_Llms_Txt`.
+  infra/content-autopilot/README.md "AI Visibility";
+  infra/wordpress-plugin/plugin-features.md "AI Visibility"; plan in AEO_PLAN.md.
 - **2026-09-26 — Clients can author their own topics.** `TopicComposer`: an idea in
   plain words becomes 3 SEO-shaped topics (planner's own prompt context, then its own
   brand/catalog/dedupe gates), ranked by winnability; picking one adds it to a free
