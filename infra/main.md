@@ -287,6 +287,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-26 — Clients can author their own topics.** `TopicComposer`: an idea in
+  plain words becomes 3 SEO-shaped topics (planner's own prompt context, then its own
+  brand/catalog/dedupe gates), ranked by winnability; picking one adds it to a free
+  publish day or **swaps it in for a planned article, inheriting its date** so a swap
+  is free. Gates re-run at create, so the browser cannot bypass them; topics are never
+  hard-deleted (that would reset `usageForWebsite()`). Replaces the dead
+  `addTopic()`/`addAndWriteTopic()` path and fixes Skip being offered on `ready` cards
+  where `skip()` refuses. infra/content-autopilot/README.md "Client-authored topics".
 - **2026-09-26 — "Listen": articles read aloud in the browser.** A header
   button on the article review page speaks the finished article via the Web
   Speech API — review aid only, no provider, key, cost, stored audio or

@@ -653,6 +653,69 @@ re-dates into the past; ready/in-flight/published topics never move. Brigid
 2026-08-21: client ✗-ed the first four wizard suggestions and the first article
 silently slid from "today" to the 25th. Tests: `ContentScheduleReflowTest` (4).
 
+### Client-authored topics — "write about this instead" (2026-09-26)
+
+`App\Services\Content\TopicComposer` + calendar UI: a client types an idea in
+their own words, gets 3 properly-formed topics to choose between, and can either
+add one to a free publish day or swap it in for a planned article.
+
+- **Why suggest-then-pick, not free text:** the dead `addTopic()`/`addAndWriteTopic()`
+  pair it replaces created a bare title+keyword — no secondary keywords, no intent,
+  no volume, **no products pivot (a strict-mode bypass)**, no dedupe and no date
+  validation (it could double-book a day and exceed the monthly cap). A vague idea
+  also makes a weak article; the LLM turns it into something searchable first.
+- **`suggest($plan, $idea)`** — one ideate-class call built from
+  `ContentTopicPlanner::promptContext()` (the SAME context `ideate()` uses:
+  sell/don't-sell, site-type mix, directives, and in strict mode the catalog block
+  with its ABSOLUTE BRAND RULE), charged `ContentLlmSpendMeter::EST_IDEATE_USD`,
+  rate-limited 20/hour per plan. Then **every deterministic gate the planner
+  applies**: `strictBlockedBrands()` word-boundary drop, `CatalogBrandValidator::
+  offCatalogIndexes()` (indices into the FILTERED title list — candidates are
+  normalized before the call so they line up), strict-mode `TopicProductMatcher`
+  ≥1 product, exact target_keyword dedupe and `similarity() >= 0.75` against
+  planned + existing page titles. All-refused returns a reason code, never an
+  empty list that reads as a glitch.
+- **Ranked by winnability, not volume** (`KeywordWinnability::score()` vs the
+  site's own DA, volume only breaking ties) — the house rule that a small site
+  gains nothing from a head term it cannot rank for.
+- **Volume may legitimately be unknown.** `KeywordMetricsService::metricsOrQueue()`
+  returns only already-cached rows and queues a fetch, so a phrase nobody has
+  looked up has `volume => null` on first ask; the modal says "checking search
+  volume" rather than inventing a number.
+- **The LLM catalog brand check runs at suggestion time only** (`deepCheck`);
+  re-asking on pick would pay for a second call and could flip its verdict on a
+  title the client was just offered. The deterministic gates run both times.
+- **`create($plan, $choice, $replacing, $date)`** re-runs the gates and uses
+  **their** output, not the posted payload — a hand-crafted `useSuggestion` call
+  cannot plant a rival-brand or off-catalog topic (`test_a_tampered_choice_is_
+  refused_at_creation`). Writes the planner's full field set with
+  `source = TopicComposer::SOURCE` ('client', badged "Your idea"), attaches the
+  products pivot (featured = cited catalog URLs, mentioned = matcher picks) and
+  dispatches `RefineTopicSecondaryKeywordsJob`.
+- **Replacing is free, adding is not.** A replacement inherits the replaced
+  topic's `scheduled_for` + `position` and marks it `skipped` with
+  `meta.replaced_by` (the supersede pattern `materializeConfirmedTopics()` already
+  uses), so a swap adds nothing to the month. A new topic must take a date from
+  `availableDates()` — **which returns `Y-m-d` strings, not Carbon** — and that is
+  what enforces publish days, one article per day and the monthly cap; it is
+  re-validated on submit because the browser chose it.
+- ⚠️ **Never hard-delete a topic.** `usageForWebsite()` counts articles per
+  website, so deleting a row that already produced one would reset that client's
+  monthly count — the loophole the `content_generations` ledger closed. Removal
+  stays `skip()` + `fillVacatedDate()`.
+- **Fixed while here:** the calendar offered **Skip on a `ready` card, which
+  `skip()` refuses** — a button that silently did nothing. Skip now renders only
+  for suggested/approved/failed (what `skip()` accepts); a written article is
+  changed from Review (rewrite), not thrown away.
+- UI: `resources/views/livewire/content/partials/topic-composer.blade.php`,
+  included from the calendar; actions `openComposer`/`suggestTopics`/
+  `useSuggestion`/`closeComposer` on `ContentCalendar`. Refusal reasons are mapped
+  to client copy by `ContentCalendar::composerNoticeFor()` — reason codes never
+  reach the client. Row actions live in **List view** (grid cells are compact).
+- Tests: `TopicComposerTest` (13 — ranking, dedupe, strict drops, tamper, slot
+  inheritance, month-full), `ClientTopicComposerFlowTest` (6 — add, swap, written
+  article refused, cross-tenant refused, copy, rendering).
+
 ### reviseCurrentArticle (context refresh, 2026-08-20)
 
 `ContentArticleProducer::reviseCurrentArticle($topic, $maxPasses = 2)` — re-runs the
