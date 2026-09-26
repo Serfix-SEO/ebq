@@ -98,10 +98,14 @@
             @endif
             @if ($canWrite)
                 {{-- Swap this topic for one the client asks for; the
-                     replacement keeps this card's publish date. --}}
-                <button type="button" draggable="false" wire:click="openComposer('{{ $topic->id }}')" title="{{ __('Write something else') }}"
-                        class="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-slate-400 hover:text-orange-600 sm:p-0.5">
-                    <svg class="h-4 w-4 sm:h-3.5 sm:w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356m-4.992 4.992l3.181-3.183a8.25 8.25 0 00-13.803 3.7M4.031 9.865v4.99m0 0h4.99m-4.99 0l3.181 3.183a8.25 8.25 0 0013.803-3.7"/></svg>
+                     replacement keeps this card's publish date. Carries the
+                     word "Swap": icon-only, it read as Republish (owner
+                     2026-09-26), and the circular-arrows glyph is literally
+                     what the Republish button uses further down this card. --}}
+                <button type="button" draggable="false" wire:click="openComposer('{{ $topic->id }}')" title="{{ __('Write a different topic on this day') }}"
+                        class="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-bold text-slate-500 hover:border-orange-300 hover:text-orange-600 sm:gap-0.5 sm:px-1.5 sm:py-0.5 sm:text-[10px] dark:border-slate-600 dark:text-slate-300 dark:hover:border-orange-500/50 dark:hover:text-orange-400">
+                    <svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+                    {{ __('Swap') }}
                 </button>
                 <button wire:click="writeNow('{{ $topic->id }}')" wire:loading.attr="disabled" wire:target="writeNow('{{ $topic->id }}')"
                         class="inline-flex shrink-0 items-center gap-1 rounded-md bg-orange-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-orange-700 sm:gap-0.5 sm:px-1.5 sm:py-0.5 sm:text-[10px]" title="{{ __('Write now') }}">
