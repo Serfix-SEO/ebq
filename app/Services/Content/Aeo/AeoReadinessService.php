@@ -53,7 +53,7 @@ class AeoReadinessService
         [$robotsTxt, $robotsFetched] = $this->fetch($origin.'/robots.txt');
         $robotsAi = $this->robotsVerdicts($robotsTxt, $robotsFetched);
         [$llmsBody, $llmsFetched] = $this->fetch($origin.'/llms.txt');
-        $llmsPresent = $llmsFetched && trim((string) $llmsBody) !== '';
+        $llmsPresent = $llmsFetched && $this->looksLikeLlmsTxt($llmsBody);
         $coverage = $this->schemaCoverage($website);
 
         $breakdown = $this->breakdown($robotsAi, $robotsFetched, $llmsPresent, $coverage);
@@ -234,6 +234,31 @@ class AeoReadinessService
         ));
 
         return (int) round($earned / $total * 100);
+    }
+
+    /**
+     * Is this actually an llms.txt, or a soft 404?
+     *
+     * Plenty of sites answer 200 with their homepage for any unknown path, so
+     * "we got a 200" is not evidence a file exists. Telling a client they have
+     * an llms.txt when they do not is the kind of false credit that makes the
+     * whole page untrustworthy, so anything that smells like an HTML document
+     * is treated as absent.
+     */
+    private function looksLikeLlmsTxt(?string $body): bool
+    {
+        $body = trim((string) $body);
+        if ($body === '' || mb_strlen($body) < 8) {
+            return false;
+        }
+        $head = mb_strtolower(mb_substr($body, 0, 400));
+        foreach (['<!doctype', '<html', '<head', '<body', '<script', '<div'] as $marker) {
+            if (str_contains($head, $marker)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @return array{0: ?string, 1: bool} [body, fetched] */

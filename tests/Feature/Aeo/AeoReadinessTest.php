@@ -121,6 +121,16 @@ class AeoReadinessTest extends TestCase
         $this->assertGreaterThan($without->readiness_score, $with->readiness_score);
     }
 
+    public function test_a_soft_404_is_not_counted_as_an_llms_file(): void
+    {
+        // Plenty of hosts answer 200 with the homepage for any unknown path.
+        $html = "<!DOCTYPE html>\n<html><head><title>Not found</title></head><body>Nope</body></html>";
+        $audit = (new AeoReadinessService($this->fetcher("User-agent: *\nAllow: /", $html)))->audit($this->site());
+
+        $this->assertFalse($audit->llms_txt_present);
+        $this->assertNull($audit->llms_txt_url);
+    }
+
     public function test_policy_only_tokens_are_marked_as_never_crawling(): void
     {
         // Google-Extended and Applebot-Extended only ever appear in robots.txt;
