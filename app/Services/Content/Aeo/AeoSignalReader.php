@@ -62,14 +62,23 @@ class AeoSignalReader
         }
         arsort($engines);
 
+        // Zero-fill: only days with visits come back from the query, and a line
+        // drawn straight from one of those to the next silently turns a quiet
+        // fortnight into a gentle slope. Every day in the window gets a point.
+        $series = [];
+        $cursor = now()->subDays($days)->startOfDay();
+        $end = now()->startOfDay();
+        while ($cursor->lte($end)) {
+            $key = $cursor->toDateString();
+            $series[] = ['date' => $key, 'sessions' => (int) ($byDate[$key] ?? 0)];
+            $cursor->addDay();
+        }
+
         return [
             'connected' => true,
             'total' => $total,
             'engines' => $engines,
-            'series' => array_map(
-                static fn (string $date, int $sessions): array => ['date' => $date, 'sessions' => $sessions],
-                array_keys($byDate), array_values($byDate)
-            ),
+            'series' => $series,
         ];
     }
 

@@ -10,6 +10,8 @@ use App\Models\ContentAeoBotHit;
 use App\Models\ContentPlan;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Content\ContentEntitlements;
+use App\Support\Aeo\AeoSampleData;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -100,11 +102,22 @@ class AiVisibilityTeaserTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        Livewire::test(AiVisibility::class)
-            ->assertDontSee('777')
-            ->assertDontSee('555')
-            ->assertDontSee('>41<', false)
-            ->assertSee('74');   // the sample's readiness score
+        // Asserted on the view data, not the rendered HTML: an SVG full of
+        // coordinates will contain almost any three-digit number by accident
+        // (555.85 turned up as a hit-band x position), and a test that fails on
+        // a pixel coincidence teaches us to ignore it.
+        $view = Livewire::test(AiVisibility::class);
+
+        $this->assertTrue($view->viewData('sample'));
+        $this->assertSame(AeoSampleData::referrals()['total'], $view->viewData('referrals')['total']);
+        $this->assertSame(AeoSampleData::crawlerHits()['total'], $view->viewData('hits')['total']);
+        $this->assertSame(AeoSampleData::audit()->readiness_score, $view->viewData('audit')->readiness_score);
+
+        // None of the three carries anything belonging to this website.
+        $this->assertNotSame(777, $view->viewData('hits')['total']);
+        $this->assertSame(0, collect($view->viewData('referrals')['series'])
+            ->where('sessions', 555)->count(), 'the real 555-session day must not appear');
+        $this->assertNull($view->viewData('audit')->getKey(), 'the sample audit is never a stored row');
     }
 
     public function test_a_free_signup_cannot_trigger_a_real_check(): void
@@ -134,7 +147,7 @@ class AiVisibilityTeaserTest extends TestCase
 
     public function test_a_subscriber_counts_as_paid_and_the_free_article_trial_does_not(): void
     {
-        $entitlements = app(\App\Services\Content\ContentEntitlements::class);
+        $entitlements = app(ContentEntitlements::class);
 
         $trialOnly = User::factory()->create([
             'content_trial_started_at' => now(), 'content_trial_ends_at' => now()->addDays(5),

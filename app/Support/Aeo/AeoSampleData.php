@@ -97,14 +97,15 @@ class AeoSampleData
     /** AI referral sessions, in the shape AeoSignalReader::referrals() returns. */
     public static function referrals(int $days = 90): array
     {
+        // Daily and zero-filled, exactly like the real reader returns, so the
+        // teaser's chart cannot look different from the one they are buying.
+        // Fixed pattern, no rand() — see the class docblock.
+        $shape = [0, 1, 2, 1, 3, 2, 4, 2, 0, 3, 5, 4, 6, 3, 5, 7, 4, 6, 8, 5, 7, 9, 6, 8, 4, 7, 10, 6, 9, 11];
         $series = [];
-        // A gently rising line built from a fixed pattern — no rand(), so the
-        // chart is identical on every load.
-        $shape = [3, 5, 4, 7, 6, 9, 8, 11, 9, 13, 12, 16, 14, 18, 17, 21];
-        for ($i = $days; $i >= 0; $i -= 6) {
+        for ($i = $days; $i >= 0; $i--) {
             $series[] = [
                 'date' => now()->subDays($i)->toDateString(),
-                'sessions' => $shape[(($days - $i) / 6) % count($shape)],
+                'sessions' => $shape[($days - $i) % count($shape)],
             ];
         }
 

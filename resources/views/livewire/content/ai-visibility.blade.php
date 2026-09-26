@@ -232,21 +232,118 @@
                     </div>
 
                     @php
+                        // Geometry in PHP, interaction in Alpine — same division as
+                        // keyword-rank-history. preserveAspectRatio is NOT used here:
+                        // stretching the viewBox would squash the axis text with it.
                         $series = $referrals['series'];
-                        $maxS = max(1, max(array_column($series, 'sessions') ?: [1]));
-                        $W = 720; $H = 120; $PAD = 6;
-                        $step = count($series) > 1 ? ($W - 2 * $PAD) / (count($series) - 1) : 0;
+                        $maxRaw = max(array_column($series, 'sessions') ?: [0]);
+                        // Round the top gridline up to something a person would
+                        // choose, so the y labels read 0 / 6 / 12 rather than 0 / 5.5 / 11.
+                        $stepSize = $maxRaw <= 4 ? 1 : ($maxRaw <= 20 ? 2 : ($maxRaw <= 60 ? 5 : ($maxRaw <= 200 ? 20 : 50)));
+                        $maxS = max($stepSize * 2, (int) (ceil(max(1, $maxRaw) / ($stepSize * 2)) * $stepSize * 2));
+
+                        $W = 720; $H = 200;
+                        $PADL = 40; $PADR = 12; $PADT = 12; $PADB = 26;
+                        $plotW = $W - $PADL - $PADR;
+                        $plotH = $H - $PADT - $PADB;
+                        $n = count($series);
+                        $step = $n > 1 ? $plotW / ($n - 1) : 0;
+                        $x = fn (int $i): float => round($PADL + $i * $step, 2);
+                        $y = fn (int $v): float => round($PADT + $plotH - ($v / max(1, $maxS)) * $plotH, 2);
+
                         $pts = [];
+                        $hover = [];   // what the tooltip reads, in percentages of the box
                         foreach ($series as $i => $p) {
-                            $pts[] = round($PAD + $i * $step, 1).','.round($H - $PAD - ($p['sessions'] / $maxS) * ($H - 2 * $PAD), 1);
+                            $pts[] = $x($i).','.$y((int) $p['sessions']);
+                            $hover[] = [
+                                'l' => round($x($i) / $W * 100, 3),
+                                't' => round($y((int) $p['sessions']) / $H * 100, 3),
+                                'd' => \Illuminate\Support\Carbon::parse($p['date'])->translatedFormat('D, M j'),
+                                'v' => (int) $p['sessions'],
+                            ];
                         }
+                        // Three y labels (0, half, top) and five dates — more than that
+                        // is unreadable at this width. The x positions are named
+                        // explicitly rather than stepped, because a step plus a forced
+                        // last label printed two dates on top of each other.
+                        $yTicks = [0, (int) ($maxS / 2), $maxS];
+                        $xTicks = array_values(array_unique(array_map(
+                            static fn (float $f): int => (int) round(($n - 1) * $f),
+                            [0, 0.25, 0.5, 0.75, 1]
+                        )));
                     @endphp
-                    @if (count($pts) > 1)
-                        <svg viewBox="0 0 {{ $W }} {{ $H }}" class="mt-4 w-full" preserveAspectRatio="none" role="img"
-                             aria-label="{{ __('Visits from AI answers over the last 90 days') }}">
-                            <polyline points="{{ implode(' ', $pts) }}" fill="none" stroke="rgb(249 115 22)" stroke-width="2.5"
-                                      stroke-linejoin="round" stroke-linecap="round"></polyline>
-                        </svg>
+                    @if ($n > 1)
+                        {{-- Hover is Alpine, not a chart library: one invisible full-height
+                             band per day sets the index, and a positioned div reads the
+                             pre-computed point. Keeps the page free of a JS dependency and
+                             of any runtime maths that could disagree with the drawn line. --}}
+                        {{-- The payload goes through Blade's escaping, so quotes and
+                             apostrophes become entities and a translated date can never
+                             close the attribute early. The browser decodes them before
+                             Alpine parses it. --}}
+                        {{-- overflow-x-auto because the chart keeps a 520px floor: below
+                             that the axis text is unreadable, and letting the SVG stretch
+                             the card instead would give the whole page a sideways scroll
+                             on a phone. --}}
+                        <div class="relative mt-4 overflow-x-auto"
+                             x-data='{
+                                i: null,
+                                pts: {{ json_encode($hover) }},
+                                padl: {{ $PADL }}, step: {{ round($step, 4) }}, h: {{ $H }},
+                                cx() { return this.i === null ? 0 : this.padl + this.i * this.step },
+                                cy() { return this.i === null ? 0 : this.pts[this.i].t * this.h / 100 },
+                             }'>
+                            <svg viewBox="0 0 {{ $W }} {{ $H }}" class="w-full" style="min-width: 520px;" role="img"
+                                 aria-label="{{ __('Visits from AI answers, day by day') }}">
+                                {{-- y gridlines + counts --}}
+                                @foreach ($yTicks as $tick)
+                                    @php $gy = $y((int) $tick); @endphp
+                                    <line x1="{{ $PADL }}" y1="{{ $gy }}" x2="{{ $W - $PADR }}" y2="{{ $gy }}"
+                                          stroke="currentColor" stroke-width="1" class="text-slate-200 dark:text-slate-700"></line>
+                                    <text x="{{ $PADL - 8 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11"
+                                          fill="currentColor" class="text-slate-400 dark:text-slate-500">{{ $tick }}</text>
+                                @endforeach
+
+                                {{-- x dates. The end labels anchor inward so neither runs
+                                     off the edge of the plot. --}}
+                                @foreach ($xTicks as $i)
+                                    <text x="{{ $x($i) }}" y="{{ $H - 8 }}" font-size="11"
+                                          text-anchor="{{ $i === 0 ? 'start' : ($i === $n - 1 ? 'end' : 'middle') }}"
+                                          fill="currentColor" class="text-slate-400 dark:text-slate-500">{{ \Illuminate\Support\Carbon::parse($series[$i]['date'])->translatedFormat('M j') }}</text>
+                                @endforeach
+
+                                <polyline points="{{ implode(' ', $pts) }}" fill="none" stroke="rgb(249 115 22)" stroke-width="2.5"
+                                          stroke-linejoin="round" stroke-linecap="round"></polyline>
+
+                                {{-- Guide line + dot for the hovered day. NOT a <template x-if>:
+                                     a <template> inside an <svg> is parsed as an unknown SVG
+                                     element with no .content to clone, so Alpine throws on it.
+                                     x-show toggles display, which SVG honours, and the cx()/cy()
+                                     helpers return 0 rather than dereferencing pts[null]. --}}
+                                <g x-show="i !== null" x-cloak>
+                                    <line :x1="cx()" y1="{{ $PADT }}" :x2="cx()" y2="{{ $PADT + $plotH }}"
+                                          stroke="currentColor" stroke-width="1" class="text-slate-300 dark:text-slate-600"></line>
+                                    <circle :cx="cx()" :cy="cy()" r="4"
+                                            fill="rgb(249 115 22)" stroke="#fff" stroke-width="1.5"></circle>
+                                </g>
+
+                                {{-- invisible hit bands, one per day --}}
+                                @foreach ($series as $i => $p)
+                                    <rect x="{{ round($x($i) - $step / 2, 2) }}" y="{{ $PADT }}"
+                                          width="{{ round(max($step, 1), 2) }}" height="{{ $plotH }}"
+                                          fill="transparent" x-on:mouseenter="i = {{ $i }}" x-on:mouseleave="i = null"></rect>
+                                @endforeach
+                            </svg>
+
+                            <div x-show="i !== null" x-cloak
+                                 class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg dark:bg-slate-700"
+                                 {{-- Clamped: a point at the top of the plot would otherwise
+                                      push the tooltip above the scroller and get clipped. --}}
+                                 :style="`left: ${pts[i]?.l}%; top: ${Math.max(14, (pts[i]?.t ?? 0) - 2)}%`">
+                                <span x-text="pts[i]?.d"></span>
+                                <span class="ms-1 text-orange-300" x-text="`${pts[i]?.v} ${pts[i]?.v === 1 ? '{{ __('visit') }}' : '{{ __('visits') }}'}`"></span>
+                            </div>
+                        </div>
                     @endif
                 @endif
             @endunless

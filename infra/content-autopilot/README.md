@@ -801,8 +801,28 @@ cited in ChatGPT" without those vendors' APIs. What we ship instead:
     made for a page nobody is being shown. Ingest stays open: a plugin/kit on a
     free account still reports, at no cost to us, so the real history is already
     there the moment they upgrade.
-- Tests: `tests/Feature/Aeo/` (32 — ingest auth/idempotency/tenancy, robots
-  verdicts, page states, teaser gating) plus the kit fixture.
+- **The referral chart has axes and a hover readout (2026-09-26).** Two traps
+  found building it, both worth remembering for the next SVG chart here:
+  - **`<template x-if>` does not work inside an `<svg>`.** The parser treats it
+    as an unknown SVG element with no `.content`, and Alpine throws
+    `cannot read properties of undefined (reading 'cloneNode')` on every mouse
+    move. Use `x-show` on a `<g>` (SVG honours `display:none`) and guard the
+    bindings — `cx()`/`cy()` return 0 rather than dereferencing `pts[null]`.
+  - **The series must be zero-filled** (`AeoSignalReader::referrals()`): only
+    days with visits come back from `analytics_data`, and a line drawn straight
+    between them turns a silent fortnight into a gentle slope.
+  - Hover is one invisible full-height `<rect>` per day setting an index, plus
+    an absolutely-positioned div reading a pre-computed point list — no chart
+    library, and no runtime maths that could disagree with the drawn line. The
+    payload goes through Blade escaping so a translated date can never close
+    the single-quoted `x-data` attribute. Tooltip `top` is clamped, and the
+    chart sits in an `overflow-x-auto` scroller with a 520px floor so a phone
+    scrolls the chart rather than the whole page.
+- Tests: `tests/Feature/Aeo/` (34 — ingest auth/idempotency/tenancy, robots
+  verdicts, page states, teaser gating, zero-fill + axis/hover markup) plus the
+  kit fixture. ⚠️ Assert teaser leakage on **view data, not HTML**: an SVG full
+  of coordinates contains almost any 3-digit number by accident (`555.85` as a
+  hit-band x position failed a `assertDontSee('555')` that was otherwise right).
 - **WordPress side: built in plugin v2.1.0** (`EBQ_Ai_Bot_Logger`,
   `EBQ_Llms_Txt` — see infra/wordpress-plugin/plugin-features.md). ⚠️ The zip is
   built and committed in the plugin repo but **the release is not published** —

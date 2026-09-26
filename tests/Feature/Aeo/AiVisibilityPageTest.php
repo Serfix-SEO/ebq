@@ -123,6 +123,51 @@ class AiVisibilityPageTest extends TestCase
         $this->assertSame(['ChatGPT' => 30, 'Perplexity' => 4], $referrals['engines']);
     }
 
+    public function test_the_referral_series_is_zero_filled_so_the_chart_cannot_flatter_a_gap(): void
+    {
+        [, $website] = $this->fixture(['ga_property_id' => '12345']);
+        // Two visits, 30 days apart. Drawn from the raw rows, the line would
+        // slope gently across a month of silence.
+        foreach ([2, 32] as $daysAgo) {
+            DB::table('analytics_data')->insert([
+                'id' => (string) Str::ulid(),
+                'website_id' => $website->id, 'date' => now()->subDays($daysAgo)->toDateString(),
+                'source' => 'chatgpt.com', 'users' => 9, 'sessions' => 9, 'bounce_rate' => 10,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $series = app(AeoSignalReader::class)->referrals($website, 90)['series'];
+
+        $this->assertCount(91, $series, 'one point per day in the window, inclusive');
+        $this->assertSame(89, collect($series)->where('sessions', 0)->count());
+        $this->assertSame(2, collect($series)->where('sessions', 9)->count());
+        $this->assertSame(now()->subDays(90)->toDateString(), $series[0]['date']);
+        $this->assertSame(now()->toDateString(), end($series)['date']);
+    }
+
+    public function test_the_chart_carries_axis_numbers_and_hover_values(): void
+    {
+        [, $website] = $this->fixture(['ga_property_id' => '12345']);
+        DB::table('analytics_data')->insert([
+            'id' => (string) Str::ulid(),
+            'website_id' => $website->id, 'date' => now()->subDays(3)->toDateString(),
+            'source' => 'perplexity.ai', 'users' => 7, 'sessions' => 7, 'bounce_rate' => 10,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $html = Livewire::test(AiVisibility::class)->html();
+
+        // y axis rounded to a readable top (7 visits → 0 / 4 / 8), x dates, and
+        // the per-day values the hover reads.
+        $this->assertStringContainsString('>8</text>', $html);
+        $this->assertStringContainsString('>4</text>', $html);
+        $this->assertStringContainsString('>0</text>', $html);
+        $this->assertStringContainsString(now()->subDays(3)->translatedFormat('D, M j'), $html, 'the hovered day label');
+        $this->assertStringContainsString('x-on:mouseenter', $html, 'per-day hit bands');
+        $this->assertStringContainsString('&quot;v&quot;:7', $html, 'the hover payload carries the real count');
+    }
+
     public function test_without_analytics_the_page_offers_to_connect_instead_of_claiming_zero(): void
     {
         [, $website] = $this->fixture(['ga_property_id' => '']);
