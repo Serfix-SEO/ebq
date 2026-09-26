@@ -322,6 +322,22 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   - ⚠️ `content_plans.language` holds a code ("ar") OR a full name ("Arabic")
     depending on which screen saved it; `ArticleReview::speechLanguage()`
     normalises both (same split `ContentKeywordInsights` works around).
+  - ⚠️ **The PLAN's language is site-wide and often wrong for the article in
+    front of you.** namesforfreefire.com is set to Arabic, yet 39 of its 40
+    articles are English (2026-09-26) — so an Arabic voice was reading English
+    text, and that was the COMMON case there. The component now detects the
+    script of the text it is about to read and that wins; the plan only
+    settles languages sharing a script (nothing in the characters separates
+    French from English). Latin text on a non-Latin plan falls back to
+    English. Messages are passed to the component as translated templates
+    with a `:language` placeholder so they name the DETECTED language.
+  - ⚠️ `tests/fixtures/speech/speech-check.mjs` must read
+    `public/build/manifest.json` to find the bundle. `public/build` keeps every
+    old hashed asset on purpose (`emptyOutDir: false`), so picking by filename
+    order tests a STALE build — it reported failures against already-fixed
+    code. Its scenarios must also each set their own text/voices: sharing them
+    let one scenario inherit the previous one's state and "pass" for the wrong
+    reason.
   - ⚠️ Adding a second header button overflowed 390px into a sideways scroll
     (measured 431px) — the header action row wraps, and Listen is ordered
     AFTER Edit so Listen is what drops to line two.
