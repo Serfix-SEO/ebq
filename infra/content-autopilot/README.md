@@ -325,6 +325,17 @@ Sidebar has a "Content" group with two pages, both backed by the SAME
   - ⚠️ Adding a second header button overflowed 390px into a sideways scroll
     (measured 431px) — the header action row wraps, and Listen is ordered
     AFTER Edit so Listen is what drops to line two.
+  - ⚠️ **Playing controls must NOT live in the header.** Reading auto-scrolls
+    the page to follow the current block, which carries the header off screen
+    — there was then no way to pause without scrolling back up. Pause / Stop /
+    speed / progress sit in a viewport-pinned bar (`fixed inset-x-0 bottom-0`,
+    `pointer-events-none` strip + `pointer-events-auto` pill, bottom padding
+    via `env(safe-area-inset-bottom)`); the header keeps only idle Listen.
+  - ⚠️ QA note: a **full-page screenshot places `fixed` elements
+    unpredictably** (they are not where they appear on screen). Measure
+    `getBoundingClientRect()` + computed position over CDP instead of
+    trusting the capture — that is how the pinned bar was verified at 390px
+    (778–844 of an 844-tall viewport).
   Tests: placement/language/absence in `ArticleEditorTest`; the JS itself in
   `tests/fixtures/speech/speech-check.mjs`, which runs the real built bundle in
   headless Chrome against a stubbed speech engine (`npm run build` first).
