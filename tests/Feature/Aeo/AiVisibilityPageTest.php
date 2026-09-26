@@ -36,9 +36,10 @@ class AiVisibilityPageTest extends TestCase
     /** @return array{User, Website} */
     private function fixture(array $websiteAttrs = []): array
     {
-        $user = User::factory()->create([
-            'content_trial_started_at' => now(), 'content_trial_ends_at' => now()->addDays(5),
-        ]);
+        // Comped = a paid account for gating purposes. The page shows real data
+        // only to paying clients; the free-signup sample path is covered by
+        // AiVisibilityTeaserTest.
+        $user = User::factory()->create(['content_comp_sites' => 1]);
         $website = Website::factory()->for($user)->create($websiteAttrs);
         ContentPlan::factory()->create(['website_id' => $website->id, 'status' => ContentPlan::STATUS_ACTIVE]);
         $this->actingAs($user)->withSession(['current_website_id' => $website->id]);

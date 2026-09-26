@@ -2,6 +2,8 @@
 
 namespace App\Services\Content;
 
+use App\Livewire\Content\AiVisibility;
+use App\Models\ContentGeneration;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
 use App\Models\User;
@@ -76,6 +78,23 @@ class ContentEntitlements
         return $this->hasContentSubscription($user)
             || $this->onContentTrial($user)
             || $this->compSites($user) > 0;
+    }
+
+    /**
+     * Has this user ever paid us — the $1 first month counts, the free signup
+     * trial does not.
+     *
+     * Deliberately NOT `hasContentAccess()`. That one includes the free trial,
+     * which is the right gate for "can you generate an article" (the trial's
+     * whole point) and the wrong gate for a feature we buy data for on the
+     * client's behalf. A comped account counts as paid: someone decided to
+     * give them the product.
+     *
+     * @see AiVisibility — the first surface to use this
+     */
+    public function hasPaidContentAccess(User $user): bool
+    {
+        return $this->hasContentSubscription($user) || $this->compSites($user) > 0;
     }
 
     /** Access AND this specific website occupies a covered slot. */
@@ -321,7 +340,7 @@ class ContentEntitlements
      */
     public function ledgerCount(User $user, Carbon $since): int
     {
-        return \App\Models\ContentGeneration::query()
+        return ContentGeneration::query()
             ->where('user_id', $user->id)
             ->where('created_at', '>=', $since)
             ->count();

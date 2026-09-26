@@ -16,7 +16,11 @@ Decisions taken with the owner before planning:
    Serper, DeepSeek/Mistral, self-hosted Firecrawl, GSC + GA4, our WP plugin,
    our PHP kit.
 3. **Included in Content Autopilot**, no new billing; capacity capped
-   internally through `ContentAutopilotConfig` settings.
+   internally through `ContentAutopilotConfig` settings. **Revised 2026-09-26:**
+   it is included for *paying* clients (the \$1 first month counts) and acts as
+   a teaser for free signups, who see a clearly-labelled sample report and the
+   \$1 CTA. Free accounts are never checked — no outbound request is spent on a
+   page they are not being shown.
 4. **Brand-level AND article-level**, rolled into one visibility score.
 5. Its own `/content/aeo` page; one author + organization entity per site;
    bot-hit logging in both the WP plugin and the PHP kit; the Google

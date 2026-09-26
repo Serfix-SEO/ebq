@@ -779,8 +779,30 @@ cited in ChatGPT" without those vendors' APIs. What we ship instead:
   (history, never overwritten). **No table for referrals** — `analytics_data`
   has had per-source GA4 sessions all along; production already held 1,110
   `chatgpt.com` sessions across 7 sites before a line of this shipped.
-- Tests: `tests/Feature/Aeo/` (24 — ingest auth/idempotency/tenancy, robots
-  verdicts, page states) plus the kit fixture.
+- **Paid-only, with a worked example in front of it (2026-09-26).** The gate is
+  the new `ContentEntitlements::hasPaidContentAccess()` — subscription or comp,
+  deliberately **not** `hasContentAccess()`, because that includes the free
+  article trial and this feature spends outbound requests on the client's
+  behalf. The \$1 first month makes someone paid, so the teaser converts into
+  the real page immediately.
+  - A free signup gets a complete example report from `App\Support\Aeo\AeoSampleData`
+    with a full-width banner in the page's largest type ("This is sample data —
+    not your website"), a `SAMPLE` chip on every panel, and the \$1 CTA at both
+    ends of the page.
+  - **The teaser never reads the visitor's own data** — not their audit, hits or
+    analytics. A real number under a "sample" label would be a lie in the other
+    direction, and a sample built from real data would leak what they are being
+    asked to pay for. Pinned by
+    `AiVisibilityTeaserTest::test_the_sample_never_shows_the_free_users_own_numbers`.
+  - The sample is **fixed, never randomised** — a report that changes between
+    refreshes reads as live data, which is the confusion the banner exists to
+    prevent (`test_the_sample_is_identical_on_every_load`).
+  - `recheck()` and `ebq:aeo-audit` both skip unpaid accounts, so no request is
+    made for a page nobody is being shown. Ingest stays open: a plugin/kit on a
+    free account still reports, at no cost to us, so the real history is already
+    there the moment they upgrade.
+- Tests: `tests/Feature/Aeo/` (32 — ingest auth/idempotency/tenancy, robots
+  verdicts, page states, teaser gating) plus the kit fixture.
 - **WordPress side: built in plugin v2.1.0** (`EBQ_Ai_Bot_Logger`,
   `EBQ_Llms_Txt` — see infra/wordpress-plugin/plugin-features.md). ⚠️ The zip is
   built and committed in the plugin repo but **the release is not published** —

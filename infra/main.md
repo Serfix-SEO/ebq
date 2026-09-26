@@ -298,7 +298,10 @@ known gaps were flagged during the sweep:
   reporters re-send unconfirmed days; a site that stops reporting raises a
   digest line rather than reading as "the crawlers left". **WP plugin v2.1.0**
   ships the site side: `EBQ_Ai_Bot_Logger` (a clone of the 404 tracker's
-  buffer/drain/only-clear-on-OK shape) and `EBQ_Llms_Txt`.
+  buffer/drain/only-clear-on-OK shape) and `EBQ_Llms_Txt`. **Paid-only with a
+  teaser:** free signups get a fixed sample report, loudly labelled, behind the
+  \$1 first-month CTA (`hasPaidContentAccess()` — the free article trial does
+  not open it), and their own data is neither shown nor fetched.
   infra/content-autopilot/README.md "AI Visibility";
   infra/wordpress-plugin/plugin-features.md "AI Visibility"; plan in AEO_PLAN.md.
 - **2026-09-26 — Clients can author their own topics.** `TopicComposer`: an idea in

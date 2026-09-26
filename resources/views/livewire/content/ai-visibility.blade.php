@@ -10,6 +10,31 @@
      no chart library, and every utility class here already exists in the
      committed Tailwind build. --}}
 <div class="space-y-5">
+    {{-- The teaser. Free signups see a complete example report, and the one
+         thing that must never happen is a client mistaking it for their own
+         site — so this says so at the top in the largest type on the page, and
+         every panel below repeats it in a chip. The numbers themselves come
+         from AeoSampleData and touch nothing belonging to this account. --}}
+    @if ($sample)
+        <div class="overflow-hidden rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-white shadow-sm dark:border-orange-700 dark:from-orange-950/60 dark:to-slate-900">
+            <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6">
+                <div class="min-w-0 flex-1">
+                    <p class="text-2xl font-extrabold leading-tight tracking-tight text-orange-700 sm:text-3xl dark:text-orange-300">
+                        {{ __('This is sample data — not your website') }}
+                    </p>
+                    <p class="mt-2 text-base font-medium text-slate-700 sm:text-lg dark:text-slate-200">
+                        {{ __('Every number below is an example. Start your trial for $:p to see which AI engines can read your site, which ones actually crawl it, and how many people reach you from an AI answer.', ['p' => \App\Support\ContentAutopilotConfig::displayPrice('first_month')]) }}
+                    </p>
+                </div>
+                <a href="{{ $checkoutUrl }}"
+                   class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-orange-600 px-6 py-4 text-base font-extrabold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700 sm:text-lg">
+                    {{ __('Start for $:p', ['p' => \App\Support\ContentAutopilotConfig::displayPrice('first_month')]) }}
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                </a>
+            </div>
+        </div>
+    @endif
+
     @if ($website === null)
         <div class="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
             {{ __('Add a website to see how AI answer engines treat it.') }}
@@ -19,7 +44,10 @@
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="min-w-0">
-                    <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">{{ __('Can AI answer engines read your site?') }}</h2>
+                    <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">
+                        {{ __('Can AI answer engines read your site?') }}
+                        @if ($sample)<span class="ms-1.5 rounded-full bg-orange-100 px-2 py-0.5 align-middle text-xs font-extrabold uppercase tracking-wide text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ __('Sample') }}</span>@endif
+                    </h2>
                     <p class="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
                         {{ __('ChatGPT, Perplexity, Claude and Gemini each use their own crawler. Blocking one keeps you out of its answers, whatever your Google ranking says.') }}
                     </p>
@@ -44,10 +72,12 @@
                         <div class="text-xs text-slate-500 dark:text-slate-400">
                             <p class="font-semibold text-slate-700 dark:text-slate-200">{{ __('AI readiness') }}</p>
                             <p class="mt-0.5">{{ __('Checked :when', ['when' => $audit->checked_at?->diffForHumans()]) }}</p>
-                            <button wire:click="recheck" wire:loading.attr="disabled" wire:target="recheck"
-                                    class="mt-1 font-semibold text-orange-600 hover:text-orange-700 disabled:opacity-50">
-                                {{ $checkQueued ? __('Checking…') : __('Check again') }}
-                            </button>
+                            @unless ($sample)
+                                <button wire:click="recheck" wire:loading.attr="disabled" wire:target="recheck"
+                                        class="mt-1 font-semibold text-orange-600 hover:text-orange-700 disabled:opacity-50">
+                                    {{ $checkQueued ? __('Checking…') : __('Check again') }}
+                                </button>
+                            @endunless
                         </div>
                     </div>
                 @endif
@@ -88,7 +118,10 @@
         {{-- ── Per-agent access + activity ─────────────────────────── --}}
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3 dark:border-slate-800">
-                <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">{{ __('AI crawlers') }}</h2>
+                <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">
+                    {{ __('AI crawlers') }}
+                    @if ($sample)<span class="ms-1.5 rounded-full bg-orange-100 px-2 py-0.5 align-middle text-xs font-extrabold uppercase tracking-wide text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ __('Sample') }}</span>@endif
+                </h2>
                 @if ($hits['instrumented'] && $hits['stale'])
                     <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                         {{ __('Reporting paused — last report :date', ['date' => $hits['last_report']]) }}
@@ -166,7 +199,10 @@
         {{-- ── Visits from AI answers ──────────────────────────────── --}}
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">{{ __('Visits from AI answers') }}</h2>
+                <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">
+                    {{ __('Visits from AI answers') }}
+                    @if ($sample)<span class="ms-1.5 rounded-full bg-orange-100 px-2 py-0.5 align-middle text-xs font-extrabold uppercase tracking-wide text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ __('Sample') }}</span>@endif
+                </h2>
                 @if ($referrals['connected'])
                     <span class="text-xs text-slate-500 dark:text-slate-400">{{ __('Last 90 days') }}</span>
                 @endif
@@ -215,5 +251,15 @@
                 @endif
             @endunless
         </div>
+
+        @if ($sample)
+            <div class="rounded-2xl border-2 border-orange-300 bg-orange-50 p-5 text-center dark:border-orange-700 dark:bg-orange-950/50">
+                <p class="text-xl font-extrabold text-orange-700 sm:text-2xl dark:text-orange-300">{{ __('That was an example. Want to see yours?') }}</p>
+                <a href="{{ $checkoutUrl }}"
+                   class="mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-6 py-3.5 text-base font-extrabold text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700">
+                    {{ __('Start for $:p', ['p' => \App\Support\ContentAutopilotConfig::displayPrice('first_month')]) }}
+                </a>
+            </div>
+        @endif
     @endif
 </div>

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\Content\AuditAeoReadinessJob;
 use App\Models\ContentPlan;
 use App\Models\Website;
+use App\Services\Content\ContentEntitlements;
 use Illuminate\Console\Command;
 
 /**
@@ -36,19 +37,43 @@ class AuditAeoReadiness extends Command
         }
 
         $queued = 0;
+        $skipped = 0;
+        $entitlements = app(ContentEntitlements::class);
+        $paidByUser = [];   // one Stripe check per owner, not per website
+
         ContentPlan::query()
             ->whereNotNull('billing_covered_at')
             ->whereNotNull('website_id')
             ->select('website_id')
             ->distinct()
-            ->chunkById(100, function ($plans) use (&$queued): void {
-                foreach ($plans as $plan) {
-                    AuditAeoReadinessJob::dispatch((string) $plan->website_id);
+            ->chunkById(100, function ($plans) use (&$queued, &$skipped, &$paidByUser, $entitlements): void {
+                $websites = Website::query()
+                    ->whereIn('id', $plans->pluck('website_id'))
+                    ->with('owner')
+                    ->get();
+
+                foreach ($websites as $website) {
+                    $owner = $website->owner;
+                    if ($owner === null) {
+                        $skipped++;
+
+                        continue;
+                    }
+                    // Paid only. A free signup sees the sample report, so
+                    // checking their site would spend requests on a page they
+                    // are not being shown.
+                    $paid = $paidByUser[$owner->id] ??= $entitlements->hasPaidContentAccess($owner);
+                    if (! $paid) {
+                        $skipped++;
+
+                        continue;
+                    }
+                    AuditAeoReadinessJob::dispatch((string) $website->id);
                     $queued++;
                 }
             }, 'website_id');
 
-        $this->info("Queued {$queued} AI-readiness checks.");
+        $this->info("Queued {$queued} AI-readiness checks ({$skipped} skipped — not on a paid plan).");
 
         return self::SUCCESS;
     }

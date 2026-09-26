@@ -116,6 +116,50 @@ survive an EBQ outage. The `redirects` flag gates the admin UI + 404 cron, not t
 core serving. Auto-redirect recomputes the pre-trash permalink because
 `get_permalink()` already carries the `__trashed` suffix when the transition fires.
 
+## AI Visibility — AI crawler logging + llms.txt (v2.1.0, 2026-09-26)
+
+| Class | Role | Key hooks |
+|---|---|---|
+| `EBQ_Ai_Bot_Logger` | count AI answer-engine crawlers per bot per UTC day → hourly cron ships totals to Serfix | `template_redirect@99`, cron `ebq_send_ai_bot_batch` |
+| `EBQ_Llms_Txt` | serve `/llms.txt` built from published, indexable content | `init` (rewrite), `parse_request@1`, `template_redirect`, `save_post` |
+
+This is the site-side half of Serfix's AI Visibility page
+(`infra/content-autopilot/README.md` "AI Visibility"); without it we can say
+which AI agents a site *allows*, but not which ones actually *came*.
+
+- `EBQ_Ai_Bot_Logger` is deliberately `EBQ_404_Tracker` with a different match
+  list — non-autoloaded option `ebq_ai_bot_buffer` (≤120 day+bot buckets, ≤50
+  sample paths each), hourly drain, **buffer cleared only on a confirmed OK**.
+  It ships whole days including today's partial count; Serfix upserts on
+  (website, bot, day) taking `max()`, so re-sending a growing day is expected
+  and cannot double-count. On clear it drops only the days it sent, and only
+  when the stored count has not grown past what was acknowledged — a hit that
+  lands mid-request is kept.
+- **Privacy is structural, not a policy note:** human traffic returns on the
+  first line of `capture()` (before any option read), and nothing is stored for
+  it. No IP, no UA string, no path for anything but a matched crawler. 404s are
+  skipped — a bot on a dead URL says nothing about the site and would inflate
+  the numbers a client reads.
+- UA matching is longest-needle-wins, so `claude-searchbot` is never read as
+  `claudebot`; the two are different products with different consequences.
+  Serfix maps whatever we send onto its own vocabulary (`App\Support\Aeo\AiAgents`)
+  and logs unknown agents rather than storing them, so **the bot list can grow
+  server-side without a plugin release**.
+- `EBQ_Llms_Txt` copies `EBQ_Sitemap`'s belt-and-braces serving: a rewrite rule
+  **plus** a direct `REQUEST_URI` interception at `parse_request@1`, so it works
+  with plain permalinks, a stale rewrite cache, or another plugin's rules
+  winning. A real `llms.txt` on disk still wins — the web server answers before
+  PHP, which is correct. Body cached 12h in a transient, flushed on save/delete.
+  noindex'd posts are excluded via the same meta query the sitemap uses.
+- Both classes gate on the `content_autopilot` feature flag and **add no hooks
+  at all** when it is off. `EBQ_Ai_Bot_Logger::unschedule()` runs on
+  deactivation. A version change sets `ebq_flush_rewrites_pending`, which is
+  what installs the `^llms\.txt$` rule on upgrade without re-activation.
+- Endpoint: `POST /api/v1/aeo/bot-hits` (`AeoIngestController::botHits`), the
+  same Sanctum website-token group as `report-404s`.
+- Tests: `tests/ai-visibility-check.php` in the plugin repo — drives the real
+  classes against WordPress stubs (that repo has no PHPUnit harness).
+
 ## Migration from Yoast / RankMath
 
 `EBQ_Migration` (`class-ebq-migration.php`) is a batched orchestrator: an abstract
