@@ -311,9 +311,11 @@ known gaps were flagged during the sweep:
   the graph as a `serfixSchema` document field instead; Wix cannot carry it at
   all. One test per destination pins each answer
   (`tests/Feature/Content/AeoSchemaDeliveryTest.php`).
-  Still open: the plugin's `Person` node is the WordPress account, not our
-  author entity, so a client who sets an author will see the byline and the
-  JSON-LD disagree.
+  The WordPress author node followed in plugin **2.1.1**: Serfix sends
+  `_ebq_author` and the plugin builds its Person from it, with the Article's
+  `author` reference routed through one `author_id()` so the node and the
+  reference to it cannot disagree — overriding one without the other ships a
+  dangling `@id`, which drops the author entirely.
 - **2026-09-27 — A WordPress install with a dead token now raises an alarm.**
   `PluginAuthHealth` + `plugin_auth_failures` remembers rejected calls from our
   own plugin, attributed via the site URL in its User-Agent (a rejected request

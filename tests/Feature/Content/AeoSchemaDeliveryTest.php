@@ -3,6 +3,7 @@
 namespace Tests\Feature\Content;
 
 use App\Jobs\PublishContentArticleJob;
+use App\Models\ContentAuthor;
 use App\Models\ContentIntegration;
 use App\Models\ContentTopic;
 use App\Models\Website;
@@ -208,6 +209,57 @@ class AeoSchemaDeliveryTest extends PublishDriverTestCase
             return ! empty($article['schema_json'])
                 && ! str_contains((string) ($article['html'] ?? ''), 'ld+json');
         });
+    }
+
+    public function test_wordpress_is_told_who_the_author_is(): void
+    {
+        // The plugin's own Person node is built from the WordPress account that
+        // received the post — the integration's login. Without this meta the
+        // page's structured data credits that account while the visible byline
+        // names the real author.
+        Http::fake(['*' => Http::response(['id' => 321, 'link' => 'https://client-blog.com/a/', 'status' => 'publish'], 201)]);
+        [, $website] = $this->scheduledArticle(['html' => self::ARTICLE_HTML]);
+        ContentAuthor::query()->create([
+            'website_id' => $website->id,
+            'name' => 'Sara Malik',
+            'role' => 'Head Perfumer',
+            'bio' => 'Twelve years blending oud.',
+            'credentials' => 'IFRA certified',
+            'same_as' => ['https://linkedin.com/in/saramalik', 'not a url'],
+        ]);
+
+        $this->publish($website, ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD, [
+            'site_url' => 'https://client-blog.com', 'username' => 'admin', 'app_password' => 'abcd efgh',
+        ], ['seo_plugin' => true]);
+
+        Http::assertSent(function (Request $r): bool {
+            $author = $r->data()['meta']['_ebq_author'] ?? null;
+            if (! is_string($author)) {
+                return false;
+            }
+            $decoded = json_decode($author, true);
+
+            return ($decoded['name'] ?? null) === 'Sara Malik'
+                && ($decoded['job_title'] ?? null) === 'Head Perfumer'
+                && ($decoded['knows_about'] ?? null) === 'IFRA certified'
+                // Only real URLs survive: sameAs is a claim an engine follows.
+                && ($decoded['same_as'] ?? []) === ['https://linkedin.com/in/saramalik']
+                && ($decoded['url'] ?? null) === 'https://linkedin.com/in/saramalik';
+        });
+    }
+
+    public function test_wordpress_is_sent_no_author_when_the_client_named_none(): void
+    {
+        // Never invented: no author record means the plugin keeps its own
+        // behaviour rather than being handed an empty entity.
+        Http::fake(['*' => Http::response(['id' => 321, 'link' => 'https://client-blog.com/a/', 'status' => 'publish'], 201)]);
+        [, $website] = $this->scheduledArticle(['html' => self::ARTICLE_HTML]);
+
+        $this->publish($website, ContentIntegration::PLATFORM_WORDPRESS_APP_PASSWORD, [
+            'site_url' => 'https://client-blog.com', 'username' => 'admin', 'app_password' => 'abcd efgh',
+        ], ['seo_plugin' => true]);
+
+        $this->assertNoBodyContains('_ebq_author');
     }
 
     public function test_wordpress_is_left_to_the_plugins_own_graph(): void

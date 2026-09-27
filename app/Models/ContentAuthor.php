@@ -58,6 +58,45 @@ class ContentAuthor extends Model
         ));
     }
 
+    /**
+     * The author as the WordPress plugin stores it, under `_ebq_author`.
+     *
+     * The plugin cannot read this table, and its own Person node is built from
+     * the WordPress ACCOUNT that received the post — an admin login, on every
+     * install we push to — so without this the page's structured data credited
+     * someone the reader never sees. Field names are the plugin's
+     * (EBQ_Meta_Fields::sanitize_author); the properties they become are the
+     * same ones `ArticleSchemaGraph::person()` emits everywhere else, so one
+     * author describes one entity on every destination.
+     *
+     * @return array<string, mixed>
+     */
+    public function pluginPayload(): array
+    {
+        $payload = ['name' => (string) $this->name];
+
+        foreach ([
+            'job_title' => $this->role,
+            'description' => $this->bio,
+            'knows_about' => $this->credentials,
+            'image' => $this->avatar_url,
+        ] as $key => $value) {
+            if (filled($value)) {
+                $payload[$key] = (string) $value;
+            }
+        }
+
+        $sameAs = $this->sameAsUrls();
+        if ($sameAs !== []) {
+            $payload['same_as'] = $sameAs;
+            // The first profile link doubles as the Person's own url — the page
+            // an engine can follow to corroborate that the person exists.
+            $payload['url'] = $sameAs[0];
+        }
+
+        return $payload;
+    }
+
     /** One line for the byline: "Sara Malik, Head Perfumer". */
     public function byline(): string
     {

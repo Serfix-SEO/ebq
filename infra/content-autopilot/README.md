@@ -918,14 +918,19 @@ side is also what the original design asked for
   ⚠️ Still unverified, and it needs a real account per platform: whether
   Shopify, Webflow and HubSpot keep a `<script>` inside post content. Shopify's
   article body sanitiser is the likeliest to strip it. Record the answer here.
-- **The WordPress `Person` is the WP account, not our author entity.** The live
-  page's Person node is built from `post_author` (`person_node()` in
-  class-ebq-schema-output.php:216) — on pubgnamegenerator.net that is
-  `hamzaajaz251`. Harmless today (`content_authors` is empty fleet-wide), but as
-  soon as a client sets a real author the visible byline and the JSON-LD will
-  disagree, which undercuts the exact E-E-A-T signal phase 2 exists for. Fix
-  needs either the driver to send the author through `_ebq_schemas` or a plugin
-  change; not done.
+- **The WordPress author node — fixed in plugin 2.1.1.** The plugin's auto
+  Person was built from `post_author`, which for a pushed post is the
+  integration's login (an admin on every install), so the live graph on
+  pubgnamegenerator.net said `hamzaajaz251` while the byline named the real
+  author. `WordPressAppPasswordDriver::seoMeta()` now sends `_ebq_author` (from
+  `ContentAuthor::pluginPayload()`, the same fields `ArticleSchemaGraph::person()`
+  maps) and the plugin prefers it. ⚠️ The Article's `author` reference goes
+  through the plugin's single `author_id()`: overriding the Person while leaving
+  the old hardcoded reference would have shipped a **dangling `@id`**, which
+  makes consumers drop the author entirely — worse than the wrong name. With no
+  author anywhere the `author` key is now omitted instead of pointing at a node
+  that was never emitted. Older installs ignore the unregistered meta key, so
+  sending it is safe before they update.
 - **Rule behaviour on real articles** (40 current articles, re-scored read-only
   2026-09-27): 40–83, median 64, 12 distinct values — the rubric discriminates.
   `answer_first` passes 7/40 and `cited_claims` 12/40 on pre-phase-2 articles,

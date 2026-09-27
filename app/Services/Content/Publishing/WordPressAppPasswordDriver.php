@@ -211,6 +211,20 @@ class WordPressAppPasswordDriver implements PublishDriver
             $meta['_ebq_schemas'] = $schema;
         }
 
+        // The author entity. The plugin's own Person node is built from the
+        // WordPress account that received the post — the integration's login,
+        // so an admin on every install — which credited the wrong person in the
+        // page's structured data while the visible byline named the real one.
+        // Plugin 2.1.1+ prefers this meta and points the Article's `author` at
+        // it; older installs ignore an unregistered key, so sending it is safe.
+        $author = $topic !== null ? \App\Models\ContentAuthor::defaultFor((string) $topic->website_id) : null;
+        if ($author !== null) {
+            $meta['_ebq_author'] = (string) json_encode(
+                $author->pluginPayload(),
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+            );
+        }
+
         return $meta;
     }
 
