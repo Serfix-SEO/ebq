@@ -193,7 +193,7 @@ because those are different claims.
 
 ---
 
-## Phase 2 — "Make every article the answer"
+## Phase 2 — "Make every article the answer" ✅ SHIPPED 2026-09-27
 
 The phase that improves output for every client immediately, with no probes.
 
@@ -249,7 +249,7 @@ invented person.
 
 ---
 
-## Phase 3 — "Are you the answer?"
+## Phase 3 — "Are you the answer?" ✅ SHIPPED 2026-09-27
 
 **Client-visible:** the visibility score with history — "named in 6 of 25 buyer
 questions, up from 3" — the list of questions where a competitor is named

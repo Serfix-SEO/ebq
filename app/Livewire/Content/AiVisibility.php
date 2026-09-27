@@ -4,10 +4,15 @@ namespace App\Livewire\Content;
 
 use App\Jobs\Content\AuditAeoReadinessJob;
 use App\Models\ContentAeoAudit;
+use App\Models\ContentAeoQuestion;
+use App\Models\ContentAeoScore;
 use App\Models\ContentIntegration;
+use App\Models\ContentPlan;
 use App\Models\Website;
 use App\Services\Content\Aeo\AeoSignalReader;
+use App\Services\Content\Aeo\AeoVisibilityScorer;
 use App\Services\Content\ContentEntitlements;
+use App\Services\Content\TopicComposer;
 use App\Support\Aeo\AeoSampleData;
 use App\Support\Aeo\AiAgents;
 use Illuminate\Support\Facades\Auth;
@@ -44,6 +49,9 @@ class AiVisibility extends Component
     /** Set for this request only, after the client asks for a fresh check. */
     public bool $checkQueued = false;
 
+    /** Set after a gap is turned into an article, for the confirmation line. */
+    public string $answeredQuestion = '';
+
     public function mount(): void
     {
         $this->websiteId = session('current_website_id')
@@ -73,6 +81,53 @@ class AiVisibility extends Component
         }
         AuditAeoReadinessJob::dispatch((string) $website->id);
         $this->checkQueued = true;
+    }
+
+    /**
+     * Turn "the model recommends someone else for this" into an article.
+     *
+     * This is the point of the whole page: a visibility report that only
+     * reports is a bill without a remedy. The question goes through the same
+     * TopicComposer the calendar uses, so it gets the same keyword research,
+     * brand gates and scheduling as anything else we write — no second path
+     * that could bypass them.
+     */
+    public function answerQuestion(string $questionId): void
+    {
+        $website = $this->website();
+        $plan = $website === null
+            ? null
+            : ContentPlan::query()->where('website_id', $website->id)->first();
+        if ($website === null || $plan === null || ! $this->paid()) {
+            return;
+        }
+
+        $question = ContentAeoQuestion::query()
+            ->where('website_id', $website->id)
+            ->whereKey($questionId)
+            ->first();
+        if ($question === null) {
+            return;
+        }
+
+        $composer = app(TopicComposer::class);
+        $result = $composer->suggest($plan, (string) $question->question);
+        $choice = $result['suggestions'][0] ?? null;
+        if ($choice === null) {
+            $this->answeredQuestion = __('We couldn\'t turn that question into an article. Try adding it from the calendar instead.');
+
+            return;
+        }
+
+        $topic = $composer->create($plan, $choice);
+        if ($topic === null) {
+            $this->answeredQuestion = __('Your calendar is full this month, so there was no free day to publish it on.');
+
+            return;
+        }
+
+        $question->forceFill(['topic_id' => $topic->id])->save();
+        $this->answeredQuestion = __('Added ":title" to your calendar.', ['title' => $topic->title]);
     }
 
     /** Paying (or comped) — the \$1 first month counts, the free trial does not. */
@@ -140,6 +195,7 @@ class AiVisibility extends Component
         if ($website === null) {
             return view('livewire.content.ai-visibility', [
                 'website' => null, 'audit' => null, 'agents' => [], 'sample' => false,
+                'visibility' => null, 'history' => [], 'gaps' => [],
                 'hits' => ['instrumented' => false, 'stale' => false, 'last_report' => null, 'total' => 0, 'bots' => []],
                 'referrals' => ['connected' => false, 'total' => 0, 'engines' => [], 'series' => []],
                 'canInstrument' => false, 'checkoutUrl' => $this->checkoutUrl(),
@@ -159,8 +215,23 @@ class AiVisibility extends Component
                 'referrals' => AeoSampleData::referrals(),
                 'canInstrument' => false,
                 'checkoutUrl' => $this->checkoutUrl(),
+                'visibility' => AeoSampleData::visibility(),
+                'history' => AeoSampleData::history(),
+                'gaps' => AeoSampleData::gaps(),
             ]);
         }
+
+        $visibility = app(AeoVisibilityScorer::class)->score($website);
+        $history = ContentAeoScore::query()
+            ->where('website_id', $website->id)
+            ->where('scored_on', '>=', now()->subDays(180)->toDateString())
+            ->orderBy('scored_on')
+            ->get(['scored_on', 'score'])
+            ->map(fn (ContentAeoScore $s): array => [
+                'date' => $s->scored_on->toDateString(),
+                'score' => (int) $s->score,
+            ])->all();
+        $gaps = app(AeoVisibilityScorer::class)->gaps($website);
 
         $audit = $reader->latestAudit($website);
         $hits = $reader->crawlerHits($website);
@@ -172,6 +243,9 @@ class AiVisibility extends Component
             'agents' => $this->agentRows($audit, $hits),
             'hits' => $hits,
             'referrals' => $reader->referrals($website),
+            'visibility' => $visibility,
+            'history' => $history,
+            'gaps' => $gaps,
             // Only the platforms we ship code for can report crawler hits;
             // everywhere else the panel must say so instead of nagging.
             'canInstrument' => ContentIntegration::query()

@@ -94,6 +94,55 @@ class AeoSampleData
         ];
     }
 
+    /** The visibility score, in the shape AeoVisibilityScorer::score() returns. */
+    public static function visibility(): array
+    {
+        return [
+            'score' => 61,
+            'components' => [
+                'crawler_access' => ['value' => 0.74, 'weight' => 25, 'detail' => __(':n AI crawler visits in the last 30 days', ['n' => 230])],
+                'ai_referrals' => ['value' => 0.55, 'weight' => 25, 'detail' => __(':n visits from AI answers in 30 days', ['n' => 22])],
+                'brand_recall' => ['value' => 0.48, 'weight' => 35, 'detail' => __('Named in :hit of :total answers', ['hit' => 6, 'total' => 25])],
+            ],
+            'signals_used' => ['crawler_access', 'ai_referrals', 'brand_recall'],
+            'missing' => ['ai_overview'],
+        ];
+    }
+
+    /** A rising score line — fixed, like everything else in the sample. */
+    public static function history(): array
+    {
+        $shape = [38, 41, 39, 44, 47, 46, 52, 55, 54, 58, 61];
+        $out = [];
+        foreach ($shape as $i => $score) {
+            $out[] = [
+                'date' => now()->subWeeks(count($shape) - 1 - $i)->toDateString(),
+                'score' => $score,
+            ];
+        }
+
+        return $out;
+    }
+
+    /** Questions where a competitor is named instead — the sample's call to action. */
+    public static function gaps(): array
+    {
+        return [
+            [
+                'question_id' => 'sample-1',
+                'question' => __('Best oud perfume for hot weather'),
+                'topic_id' => null,
+                'competitors' => ['Ajmal', 'Swiss Arabian', 'Rasasi'],
+            ],
+            [
+                'question_id' => 'sample-2',
+                'question' => __('Which perfume lasts longest in humidity?'),
+                'topic_id' => null,
+                'competitors' => ['Lattafa', 'Ajmal'],
+            ],
+        ];
+    }
+
     /** AI referral sessions, in the shape AeoSignalReader::referrals() returns. */
     public static function referrals(int $days = 90): array
     {

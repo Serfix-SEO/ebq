@@ -40,6 +40,125 @@
             {{ __('Add a website to see how AI answer engines treat it.') }}
         </div>
     @else
+        {{-- ── The headline: are the AI answers finding you? ───────────
+             One number from the signals we actually have. A missing signal
+             drops out of the weighting instead of scoring zero — telling a
+             client they are failing at something we cannot see would be the
+             same dishonesty as inventing the number — and the page names which
+             signals were used. --}}
+        @if ($visibility !== null && $visibility['signals_used'] !== [])
+            @php
+                $vs = (int) $visibility['score'];
+                $vsRing = $vs >= 70 ? 'rgb(5 150 105)' : ($vs >= 40 ? 'rgb(245 158 11)' : 'rgb(239 68 68)');
+                $circ = 2 * M_PI * 34;
+            @endphp
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-start gap-5">
+                    <div class="relative h-20 w-20 shrink-0">
+                        <svg viewBox="0 0 80 80" class="h-20 w-20 -rotate-90">
+                            <circle cx="40" cy="40" r="34" fill="none" stroke="currentColor" stroke-width="8" class="text-slate-100 dark:text-slate-800"></circle>
+                            <circle cx="40" cy="40" r="34" fill="none" stroke="{{ $vsRing }}" stroke-width="8" stroke-linecap="round"
+                                    stroke-dasharray="{{ round($circ, 1) }}" stroke-dashoffset="{{ round($circ * (1 - $vs / 100), 1) }}"></circle>
+                        </svg>
+                        <span class="absolute inset-0 flex items-center justify-center text-lg font-extrabold text-slate-900 dark:text-slate-100">{{ $vs }}</span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">
+                            {{ __('AI visibility') }}
+                            @if ($sample)<span class="ms-1.5 rounded-full bg-orange-100 px-2 py-0.5 align-middle text-xs font-extrabold uppercase tracking-wide text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ __('Sample') }}</span>@endif
+                        </h2>
+                        <div class="mt-2 space-y-1.5">
+                            @foreach ($visibility['components'] as $key => $component)
+                                <div wire:key="vc-{{ $key }}" class="flex items-center gap-3 text-sm">
+                                    <span class="w-40 shrink-0 text-slate-600 dark:text-slate-300">
+                                        {{ match ($key) {
+                                            'crawler_access' => __('The engines can read you'),
+                                            'ai_referrals' => __('People arrive from AI'),
+                                            'brand_recall' => __('The models name you'),
+                                            default => __('Google AI Overviews'),
+                                        } }}
+                                    </span>
+                                    <span class="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                                        <span class="block h-2 rounded-full bg-orange-500" style="width: {{ round($component['value'] * 100) }}%"></span>
+                                    </span>
+                                    <span class="w-52 shrink-0 text-right text-xs text-slate-500 dark:text-slate-400">{{ $component['detail'] }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                        @if (! empty($visibility['missing']))
+                            <p class="mt-2 text-xs text-slate-400 dark:text-slate-500">
+                                {{ __('Scored from the signals we can see. Not counted: :list.', [
+                                    'list' => collect($visibility['missing'])->map(fn ($m) => match ($m) {
+                                        'crawler_access' => __('crawler access'),
+                                        'ai_referrals' => __('visits from AI'),
+                                        'brand_recall' => __('model answers'),
+                                        default => __('Google AI Overviews'),
+                                    })->implode(', '),
+                                ]) }}
+                            </p>
+                        @endif
+                    </div>
+                </div>
+
+                @php
+                    $hist = collect($history)->values();
+                @endphp
+                @if ($hist->count() > 1)
+                    @php
+                        $W = 720; $H = 90; $PAD = 8;
+                        $step = ($W - 2 * $PAD) / max(1, $hist->count() - 1);
+                        $pts = $hist->map(fn ($h, $i) => round($PAD + $i * $step, 1).','.round($H - $PAD - ($h['score'] / 100) * ($H - 2 * $PAD), 1))->implode(' ');
+                    @endphp
+                    <svg viewBox="0 0 {{ $W }} {{ $H }}" class="mt-4 w-full" role="img" aria-label="{{ __('AI visibility over time') }}">
+                        <polyline points="{{ $pts }}" fill="none" stroke="rgb(249 115 22)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>
+                    </svg>
+                    <p class="text-xs text-slate-400 dark:text-slate-500">{{ __('Since :date', ['date' => \Illuminate\Support\Carbon::parse($hist->first()['date'])->translatedFormat('M j')]) }}</p>
+                @endif
+            </div>
+        @endif
+
+        {{-- ── Where a competitor is named instead of you ───────────────
+             The reason this page is not just a report: each gap becomes an
+             article through the same composer the calendar uses. --}}
+        @if (! empty($gaps))
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">
+                    {{ __('Questions where someone else gets recommended') }}
+                    @if ($sample)<span class="ms-1.5 rounded-full bg-orange-100 px-2 py-0.5 align-middle text-xs font-extrabold uppercase tracking-wide text-orange-700 dark:bg-orange-950 dark:text-orange-300">{{ __('Sample') }}</span>@endif
+                </h2>
+                <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                    {{ __('We asked the models these questions. They named other businesses and not you.') }}
+                </p>
+
+                @if ($answeredQuestion !== '')
+                    <p class="mt-3 rounded-xl bg-success/10 px-3 py-2 text-sm text-success">{{ $answeredQuestion }}</p>
+                @endif
+
+                <div class="mt-4 space-y-3">
+                    @foreach ($gaps as $gap)
+                        <div wire:key="gap-{{ $gap['question_id'] }}" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-3 dark:border-slate-800">
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $gap['question'] }}</p>
+                                @if (! empty($gap['competitors']))
+                                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                        {{ __('Named instead: :list', ['list' => implode(', ', array_slice($gap['competitors'], 0, 3))]) }}
+                                    </p>
+                                @endif
+                            </div>
+                            @if ($gap['topic_id'])
+                                <span class="shrink-0 text-xs font-semibold text-slate-400 dark:text-slate-500">{{ __('Article planned') }}</span>
+                            @elseif (! $sample)
+                                <button wire:click="answerQuestion('{{ $gap['question_id'] }}')" wire:loading.attr="disabled" wire:target="answerQuestion"
+                                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 transition hover:bg-orange-600 hover:text-white disabled:opacity-50 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300 dark:hover:bg-orange-600 dark:hover:text-white">
+                                    {{ __('Write the answer') }}
+                                </button>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         {{-- ── Readiness ───────────────────────────────────────────── --}}
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-wrap items-start justify-between gap-4">

@@ -287,6 +287,19 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-27 — AEO phases 2 and 3: write to be quoted, then measure whether
+  you are.** A second `AeoScorer` (never folded into the SEO score — the publish
+  floor gates on that one) rewards answer-first openings, question headings and
+  self-contained sections, the last being the most common reason a good article
+  cannot be quoted. Articles gained a real author entity — no author means no
+  Person node and no byline, never an invented one — and one `ArticleSchemaGraph`
+  replaced three disagreeing half-implementations that all credited
+  "Organization: <bare domain>". Phase 3 asks DeepSeek/Mistral the buyer's
+  questions with no browsing and records who gets named; deterministic PHP
+  decides the match, failed probes are excluded rather than counted as misses,
+  and a question nobody names you for becomes a one-click article through the
+  existing composer. ~$0.004/site/week.
+  infra/content-autopilot/README.md "AEO phase 2"/"AEO phase 3"; AEO_PLAN.md.
 - **2026-09-27 — A WordPress install with a dead token now raises an alarm.**
   `PluginAuthHealth` + `plugin_auth_failures` remembers rejected calls from our
   own plugin, attributed via the site URL in its User-Agent (a rejected request

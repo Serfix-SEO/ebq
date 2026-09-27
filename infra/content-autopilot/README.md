@@ -850,6 +850,102 @@ cited in ChatGPT" without those vendors' APIs. What we ship instead:
   (answer-shaped articles, full JSON-LD, author entity) and 3 (brand-recall
   probes, visibility score history) are specified in repo-root `AEO_PLAN.md`.
 
+### AEO phase 2 — answer-shaped articles + the author entity (2026-09-27)
+
+**Why a second score and not more weight on the first.** The publish floor
+gates on `seo_score` (`ContentArticleProducer:322`); adding ~24 points of new
+weight to `ContentSeoScorer` would have dropped every site's score overnight
+and started failing articles that were fine the day before. Two numbers side by
+side is also what the original design asked for
+(`docs/architecture/30-simulation.md:281`).
+
+- `App\Services\Content\Aeo\AeoScorer` — pure, `VERSION`, one `$add()`
+  closure, fix messages written as revision instructions (same shape as its
+  sibling, so the existing revise loop consumes them with no new loop).
+  Rules and what each is really for:
+  | code | w | why |
+  |---|---|---|
+  | `answer_first` | 10 | a passage a model can quote without reading on |
+  | `answer_after_question` | 8 | a question heading answered only by a list is unquotable |
+  | `self_contained_sections` | 8 | **the big one** — a section opening "It also…" is meaningless once lifted out |
+  | `question_headings` | 6 | headings as the reader's own question |
+  | `entity_definition` | 5 | "X is …" in the first two paragraphs |
+  | `cited_claims` | 5 | a number with a named source in the same sentence |
+  | `structured_block` | 4 | table/list where the content is list-shaped |
+  | `byline_or_date` | 4 | satisfied deterministically from the author entity |
+  | `scannable_paragraphs` | 3 | a wall of text has no passage to quote |
+- ⚠️ **Length alone cannot tell an answer from throat-clearing** — a 62-word
+  ramble fits the same window as a 32-word answer. `openingAnswer()` therefore
+  also requires the subject in the paragraph's FIRST sentence.
+- ⚠️ **Checks that cannot fail must not be credited.** An empty article scored
+  36 before applicability gating (no sections ⇒ no dangling openers ⇒ "pass").
+  Under `MIN_BODY_WORDS` it returns 0 with a single `no_article` issue.
+- `answerEngineRules()` puts the same rules in the writing prompt, so drafts
+  arrive in shape rather than being revised into it.
+- **The author entity** (`content_authors`, one per website + org fields on
+  `content_plans`): name, role, bio, credentials, photo, profile links. Feeds a
+  Person node, the byline, and at last gives `ContentPlan::toggle('author_box')`
+  something to do — it had been dead since it was added. **Nothing is invented:**
+  no author ⇒ no Person node, no byline, and the toggle refuses to switch on.
+  The box is built deterministically in the producer, never asked of the model.
+- `App\Services\Content\Aeo\ArticleSchemaGraph` replaces three disagreeing
+  half-implementations (FAQPage→WordPress only; the PHP kit's own BlogPosting;
+  `ArticleReview::seoKit()`'s copy-paste Article that **no driver published**),
+  all of which set `author` to `Organization: <bare domain>`. One `@graph`,
+  nodes linked by `@id`, stored on `content_articles.schema_json` at publish so
+  a republish ships exactly what was audited.
+- Delivery: WordPress keeps `_ebq_schemas` (the plugin builds its own graph —
+  two Article nodes would be worse than one); the generic webhook payload gains
+  `schema_json`; head-less platforms (Shopify, Webflow, Wix, HubSpot, Sanity,
+  Medusa) get an inline `<script>` appended **in memory only**, so the stored
+  article is never re-scored or double-appended. ⚠️ Whether each platform keeps
+  a `<script>` in post content is **unverified** — Shopify's sanitiser is the
+  likely one to strip it. Confirm on a real account and record it here.
+- HowTo is emitted only for a real procedure (intent in the title AND ≥3
+  ordered steps); overreaching is how structured data gets ignored.
+
+### AEO phase 3 — does the model name you? (2026-09-27)
+
+**What this measures, precisely.** The model answers from memory, with no
+browsing. That is NOT citation share in ChatGPT — nobody can measure that
+without the vendor's API — it is whether the model *knows* the client, which
+decides every answer given without retrieval. The UI says so in those words.
+
+- **The model never decides whether the client was mentioned.** It returns a
+  list of businesses in recommendation order; deterministic PHP matches it
+  against the brand token, the registered name and the domain
+  (`BrandRecallProbe::isOurs`, ≥4 chars so a short name cannot match half the
+  list). Asking an LLM "were you mentioned?" invites an agreeable answer that
+  flatters client and product at once.
+- **`ok`/`error` are columns, not a silent gap.** A failed probe is excluded
+  from the recall rate rather than counted as "not mentioned" — otherwise a
+  provider outage reads as a visibility collapse. `RunAeoProbesJob` refuses to
+  write a score at all when most probes failed, so the trend line never shows a
+  cliff that is really our outage.
+- Scoring (`AeoVisibilityScorer`): crawler access 25 · AI referrals 25 · brand
+  recall 35 · AI Overview 15, **renormalized over the signals present**. Recall
+  is a 4-week rolling rate (model answers move week to week), and rank ≤3 is
+  worth more than being buried eighth — being named last is not a recommendation.
+- Questions come free: GSC question queries → the `people_also_ask` lists
+  already sitting unused on every topic's brief → offerings ("Best X in AE") →
+  one LLM pass only for the shortfall.
+- **The loop:** a question no engine answered with the client becomes a one-click
+  article through `TopicComposer::create()` — the same gates and scheduling as
+  anything else, never a second creation path.
+- Cost: ~$0.0002/probe on DeepSeek, metered at $0.001 so the estimate errs high.
+  25 questions weekly ≈ $0.004/site/week. `ebq:aeo-probe` Wednesdays, paid sites
+  only; kill switch `content.aeo.probes_enabled`.
+- Failing probes raise a digest line once a day when failures are the majority.
+- ⚠️ **`'date'` casts serialise as datetimes**, so `updateOrCreate` looks up
+  `2026-09-27` against a stored `2026-09-27 00:00:00`, misses its own row and
+  trips the unique key. Both probe models pin `date:Y-m-d`.
+- ⚠️ A service that builds its own LLM client cannot be tested —
+  `BrandRecallProbe` takes an optional injected `LlmClient` (the
+  `CatalogBrandValidator` shape) and only falls back to the factory.
+- Tests: `tests/Unit/AeoScorerTest` (9), `tests/Feature/Content/ArticleSchemaGraphTest` (6),
+  `AeoAuthorAndSchemaTest` (4), `tests/Feature/Aeo/BrandRecallProbeTest` (7),
+  `AeoVisibilityScoreTest` (8).
+
 ### reviseCurrentArticle (context refresh, 2026-08-20)
 
 `ContentArticleProducer::reviseCurrentArticle($topic, $maxPasses = 2)` — re-runs the

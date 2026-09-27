@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Mail\FailedJobsDigestMail;
 use App\Models\ContentAeoBotHit;
+use App\Models\ContentAeoRun;
 use App\Models\ContentArticle;
 use App\Models\ContentImage;
 use App\Models\ContentProductRun;
@@ -77,6 +78,7 @@ class SendFailedJobsAlert extends Command
         $imageLine = $this->imageHealthLine();
         $aeoLine = $this->aeoIngestLine();
         $pluginAuthLine = $this->pluginAuthLine();
+        $probeLine = $this->aeoProbeLine();
 
         // Collapse repeats (2026-08-26: ONE broken Hindi article re-failed on
         // every 15-min dispatcher tick → six identical digest emails). Each
@@ -125,7 +127,7 @@ class SendFailedJobsAlert extends Command
 
         if ($freshGroups === [] && $stuckPending->isEmpty() && $spendLine === null
             && $failedCatalogRuns->isEmpty() && $imageLine === null && $aeoLine === null
-            && $pluginAuthLine === null) {
+            && $pluginAuthLine === null && $probeLine === null) {
             $this->rememberGroups($freshGroups, $mutedGroups);
             $this->info($mutedGroups === []
                 ? 'Nothing to report.'
@@ -145,6 +147,10 @@ class SendFailedJobsAlert extends Command
         }
         if ($pluginAuthLine !== null) {
             $lines[] = $pluginAuthLine;
+            $lines[] = '';
+        }
+        if ($probeLine !== null) {
+            $lines[] = $probeLine;
             $lines[] = '';
         }
         if ($spendLine !== null) {
@@ -245,6 +251,39 @@ class SendFailedJobsAlert extends Command
      * One line per day per condition (cache flag), like the spend warning: a
      * five-day outage should nag daily, not every fifteen minutes.
      */
+    /**
+     * AI-visibility probes failing quietly.
+     *
+     * A probe that cannot reach the model writes ok=false rather than throwing,
+     * so nothing fails and nothing alerts — the client's visibility history
+     * simply stops gaining points and starts looking like a decline. Same
+     * shape as the two blackouts this digest already guards (Ideogram 401,
+     * DeepSeek 402), so it gets the same treatment.
+     */
+    private function aeoProbeLine(): ?string
+    {
+        if (! ContentAutopilotConfig::aeoProbesEnabled()) {
+            return null;   // switched off deliberately, not broken
+        }
+
+        $since = now()->subDay();
+        $failed = ContentAeoRun::query()->where('created_at', '>', $since)->where('ok', false)->count();
+        $total = ContentAeoRun::query()->where('created_at', '>', $since)->count();
+
+        // Only shout when failure is the norm — the odd refusal is the model
+        // being the model, not an outage.
+        if ($total < 5 || $failed <= $total / 2) {
+            return null;
+        }
+        if (! $this->option('dry-run') && ! Cache::add('failed-digest:aeo-probe', true, now()->addDay())) {
+            return null;
+        }
+
+        return 'AI VISIBILITY PROBES: '.$failed.' of '.$total.' model answers failed in the last day — '
+            .'the provider is refusing or returning unusable JSON. Client visibility scores will stall and '
+            .'read as a decline until it recovers.';
+    }
+
     /**
      * WordPress installs that keep being turned away.
      *

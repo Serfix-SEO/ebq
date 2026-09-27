@@ -74,6 +74,9 @@ Schedule::command('ebq:check-tracked-serp')->weeklyOn(1, '06:20')->withoutOverla
 // per AI agent, llms.txt, structured-data coverage). Two tiny fetches per site.
 // Tuesday, so it does not pile onto Monday's SERP refresh.
 Schedule::command('ebq:aeo-audit')->weeklyOn(2, '06:40')->withoutOverlapping();
+// AI Visibility probes: ask the models this week's buyer questions and score
+// each paying site. Wednesday, after the readiness audit has refreshed.
+Schedule::command('ebq:aeo-probe')->weeklyOn(3, '07:10')->withoutOverlapping();
 
 // DataForSEO keyword-gap accumulation — DISABLED 2026-07-20. The keyword gap went
 // back to the self-hosted keyword server (1 competitor, see ContentKeywordInsights

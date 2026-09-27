@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Setting;
+use Carbon\CarbonInterface;
 
 /**
  * Admin-tunable Content Autopilot knobs, stored in the `settings` table
@@ -181,7 +182,7 @@ class ContentAutopilotConfig
      * 01:00–04:00 and 06:00–10:00 UTC. Everything else is off-peak (half
      * price). Evaluated in UTC EXPLICITLY — never the app/plan timezone.
      */
-    public static function isDeepSeekOffPeak(?\Carbon\CarbonInterface $at = null): bool
+    public static function isDeepSeekOffPeak(?CarbonInterface $at = null): bool
     {
         $hour = ($at?->copy() ?? now())->utc()->hour;
 
@@ -267,7 +268,7 @@ class ContentAutopilotConfig
     }
 
     /** The cap for one specific calendar month: base scaled by its day count. */
-    public static function monthlyArticlesFor(\Carbon\CarbonInterface $month): int
+    public static function monthlyArticlesFor(CarbonInterface $month): int
     {
         return max(1, (int) round(self::monthlyArticlesPerWebsite() * $month->daysInMonth / 30));
     }
@@ -314,6 +315,34 @@ class ContentAutopilotConfig
     public static function giantSignalsEnabled(): bool
     {
         return (bool) self::setting('content.giant_signals.enabled', true);
+    }
+
+    /** How many buyer questions we watch per website (the row count is the meter). */
+    public static function aeoQuestions(): int
+    {
+        return max(1, (int) self::setting('content.aeo.questions', 25));
+    }
+
+    /** Trial sites get a taste — enough to see the shape, not enough to cost anything. */
+    public static function trialAeoQuestions(): int
+    {
+        return max(0, (int) self::setting('content.aeo.trial_questions', 5));
+    }
+
+    /**
+     * Charged per probe call. Deliberately above the real cost (~$0.0002 on
+     * DeepSeek) so the monthly meter over-estimates rather than under-estimates
+     * this feature — the one direction that cannot surprise us.
+     */
+    public static function aeoProbeCostUsd(): float
+    {
+        return (float) self::setting('content.aeo.probe_cost_usd', 0.001);
+    }
+
+    /** Kill switch for the weekly probe sweep, flippable without a deploy. */
+    public static function aeoProbesEnabled(): bool
+    {
+        return (bool) self::setting('content.aeo.probes_enabled', true);
     }
 
     /** Crawl page cap for content-only users (feeds the pipeline, not the dashboard). */
