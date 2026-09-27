@@ -119,14 +119,30 @@ install on the public version endpoint.
 `pubgnamegenerator.net` Serfix website (owner malihaider19967@gmail.com). Use it to QA
 plugin releases against real crawl data. Provided 2026-07-10 explicitly for testing.
 
+- Hosting: Hostinger shared — `45.130.228.166`, LiteSpeed (`platform: hostinger`),
+  confirmed 2026-09-27. **Not one of our boxes**; A is `138.199.217.239`, B is
+  `178.105.218.22`, D is `49.12.86.167`.
 - SSH (Hostinger shared): `ssh -p 65002 u913932807@195.35.62.145` — password in
   project memory (`wp-test-install-creds`), **not in this repo**.
+  ⚠️ **The stored SSH password has been refused since 2026-09-27** (rotated
+  again); wp-admin still works, so use the curl route below.
   WP root: `~/domains/pubgnamegenerator.net/public_html` (wp-cli available as `wp`).
-  Same account also hosts capcutmodapk.app, gbwhatsapp.app, namesforfreefire.com, etc. —
-  **touch only pubgnamegenerator.net**.
+  Other sites on that account — **touch only pubgnamegenerator.net**. Note the
+  neighbours are not a fixed list and several have moved since 2026-07-10:
+  `namesforfreefire.com` is now on a **Hetzner** box (`178.104.232.51`,
+  `*.clients.your-server.de`, nginx/1.24.0 Ubuntu) and is a **webhook/PHP-kit**
+  destination, not WordPress — nothing in a plugin release reaches it;
+  `capcutmodapk.app` sits behind Cloudflare; `gbwhatsapp.app` is still Hostinger
+  (`92.113.23.249`) and is the orphaned install in `plugin_auth_failures`.
+  Re-check a site's host before assuming it shares this account.
 - wp-admin: `https://pubgnamegenerator.net/wp-login.php`, user `hamzaajaz251@gmail.com` —
   password in project memory (`wp-test-install-creds`).
 - Install a build: `scp -P 65002 ebq-seo.zip u913932807@…:/tmp/` then
   `cd ~/domains/pubgnamegenerator.net/public_html && wp plugin install /tmp/ebq-seo.zip --force`.
+  **Without SSH** (the current situation): log in to wp-admin with a cookie jar,
+  GET `/wp-admin/admin.php?page=ebq-hq-plugin-update` (force-checks on load, shows
+  installed vs latest, carries `_wpnonce`), then POST
+  `action=ebq_plugin_update&_wpnonce=<nonce>` to `/wp-admin/admin-post.php`. This
+  is how 2.1.1 was installed on 2026-09-27.
 - Pre-existing noise: wp-cli prints a warning about a broken `pubg-name-generator`
   plugin folder — unrelated to ebq-seo, ignore.
