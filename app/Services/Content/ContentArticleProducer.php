@@ -4,14 +4,21 @@ namespace App\Services\Content;
 
 use App\Exceptions\QuotaExceededException;
 use App\Models\ContentArticle;
+use App\Models\ContentAuthor;
+use App\Models\ContentImage;
 use App\Models\ContentPlan;
+use App\Models\ContentProduct;
 use App\Models\ContentTopic;
 use App\Models\Website;
 use App\Services\AiContentBriefService;
 use App\Services\AiWriterService;
+use App\Services\Content\Aeo\AeoScorer;
+use App\Services\Content\Catalog\TopicProductMatcher;
 use App\Services\Llm\LlmClientFactory;
+use App\Support\Content\InternalLinkCandidates;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentSiteTypeProfiles;
+use App\Support\UnicodeText;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -401,6 +408,49 @@ class ContentArticleProducer
         }
 
         return $html;
+    }
+
+    /** The named author this website publishes under, or null when unset. */
+    private function authorNameFor(ContentTopic $topic): ?string
+    {
+        $websiteId = (string) $topic->website_id;
+
+        return $websiteId === ''
+            ? null
+            : ContentAuthor::defaultFor($websiteId)?->name;
+    }
+
+    /**
+     * The author box, built here rather than asked of the model.
+     *
+     * A byline is a fact about the client, not a piece of writing: asking an
+     * LLM for one invites it to invent a person, and every article would carry
+     * a slightly different version of the same name. This appends the real
+     * entity when the client has set one and switched the box on — which is
+     * what finally gives ContentPlan's `author_box` toggle something to do
+     * after sitting dead since it was added.
+     */
+    private function authorBoxHtml(ContentTopic $topic, ContentPlan $plan): string
+    {
+        if (! $plan->toggle('author_box')) {
+            return '';
+        }
+        $author = ContentAuthor::defaultFor((string) $topic->website_id);
+        if ($author === null) {
+            return '';
+        }
+
+        $parts = ['<p><strong>'.e($author->byline()).'</strong>'];
+        if (filled($author->credentials)) {
+            $parts[] = ' — '.e((string) $author->credentials);
+        }
+        $parts[] = '</p>';
+        if (filled($author->bio)) {
+            $parts[] = '<p>'.e((string) $author->bio).'</p>';
+        }
+        $parts[] = '<p>'.e(__('Reviewed :date', ['date' => now()->translatedFormat('F Y')])).'</p>';
+
+        return '<div class="ca-author-box">'.implode('', $parts).'</div>';
     }
 
     /**
@@ -961,7 +1011,7 @@ class ContentArticleProducer
         }
 
         $ids = array_filter(array_map(static fn ($p) => $p['id'] ?? null, $selection));
-        $images = \App\Models\ContentProduct::query()
+        $images = ContentProduct::query()
             ->whereIn('id', $ids)
             ->whereNotNull('image_url')
             ->pluck('image_url', 'id');
@@ -1380,7 +1430,7 @@ class ContentArticleProducer
 
         // Images follow the crown (see ContentArticle::storeVersion) — the
         // rejected candidate took them when it was stored; hand them back.
-        \App\Models\ContentImage::query()
+        ContentImage::query()
             ->whereIn('article_id', ContentArticle::query()
                 ->where('topic_id', $article->topic_id)
                 ->whereKeyNot($article->getKey())
@@ -1405,6 +1455,14 @@ class ContentArticleProducer
             (string) ($attributes['h1'] ?? ''),
             (bool) (($context['toggles'] ?? [])['toc'] ?? false),
         );
+        if (($authorPlan = $topic->plan) !== null) {
+            $box = $this->authorBoxHtml($topic, $authorPlan);
+            // Idempotent: revisions re-run this path, and two author boxes on
+            // one article would be worse than none.
+            if ($box !== '' && ! str_contains((string) $attributes['html'], 'ca-author-box')) {
+                $attributes['html'] = (string) $attributes['html'].$box;
+            }
+        }
         $html = (string) $attributes['html'];
         $guard = app(CompetitorMentionGuard::class);
         $guardPlan = $topic->plan;
@@ -1432,10 +1490,21 @@ class ContentArticleProducer
             $context
         );
 
+        // Answer readiness is a SEPARATE number: the publish floor gates on
+        // seo_score, so folding these checks in there would fail articles that
+        // were fine yesterday (see AeoScorer's docblock).
+        $aeo = app(AeoScorer::class)->score(
+            $html,
+            (string) ($attributes['h1'] ?? ''),
+            $context + ['author_name' => $this->authorNameFor($topic)],
+        );
+
         return ContentArticle::storeVersion($topic, $attributes + [
-            'word_count' => \App\Support\UnicodeText::wordCount(trim(strip_tags($html))),
+            'word_count' => UnicodeText::wordCount(trim(strip_tags($html))),
             'seo_score' => $result['score'],
             'seo_issues' => $result['issues'],
+            'aeo_score' => $aeo['score'],
+            'aeo_issues' => $aeo['issues'],
             'style_issues' => $styleIssues,
         ]);
     }
@@ -1466,10 +1535,14 @@ class ContentArticleProducer
         $issues = array_merge(
             $styleMessages,
             array_map(static fn ($i) => (string) ($i['message'] ?? ''), (array) $article->seo_issues),
+            // Answer-readiness fixes are written as instructions for exactly
+            // this loop — a question heading with no answer under it, a section
+            // that starts with "It also...", a missing opening answer.
+            array_map(static fn ($i) => (string) ($i['message'] ?? ''), (array) $article->aeo_issues),
         );
         $issueList = implode("\n- ", array_unique(array_filter($issues)));
 
-        $currentWords = \App\Support\UnicodeText::wordCount(trim(strip_tags((string) $article->html)));
+        $currentWords = UnicodeText::wordCount(trim(strip_tags((string) $article->html)));
         // With a client request, "fix ONLY the listed problems" must not win:
         // deepseek took the conservative reading and returned near-identical
         // HTML (pubg 2026-08-23: "+17 chars" for "add name examples"). The
@@ -1506,7 +1579,7 @@ class ContentArticleProducer
             : "INTERNAL PAGES YOU MAY LINK TO (use 2-3 naturally, exact URLs only):\n"
                 .implode("\n", array_map(static fn ($p) => $p['url'].' — '.($p['title'] ?: '(untitled)'), $linkTargets))
                 ."\nANCHOR RULE: anchor text MUST describe the TARGET page using words from that page's title. "
-                ."Never attach an anchor about one product or topic to a link pointing at a different page. "
+                .'Never attach an anchor about one product or topic to a link pointing at a different page. '
                 ."If no listed page fits a sentence naturally, use fewer links.\n\n";
 
         // Strict Product Mode: same stored selection as the draft — revise
@@ -1566,7 +1639,7 @@ class ContentArticleProducer
     /** The site context the scorer verifies against (built once per run). */
     private function scorerContext(ContentTopic $topic, ContentPlan $plan, Website $website): array
     {
-        $link = \App\Support\Content\InternalLinkCandidates::build(
+        $link = InternalLinkCandidates::build(
             $website->crawl_site_id,
             $topic->target_keyword.' '.$topic->title,
         );
@@ -1597,7 +1670,7 @@ class ContentArticleProducer
                 ? array_values((array) data_get($topic->meta, 'products', []))
                 : [],
             'catalog_urls' => $plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT
-                ? \App\Models\ContentProduct::query()->where('website_id', $website->id)
+                ? ContentProduct::query()->where('website_id', $website->id)
                     ->usable()->pluck('url')->all()
                 : [],
         ];
@@ -1666,7 +1739,7 @@ class ContentArticleProducer
             $rules[] = $productBlock;
         }
 
-        return implode("\n", array_merge($rules, $this->onPageSeoRules($topic)))
+        return implode("\n", array_merge($rules, $this->onPageSeoRules($topic), $this->answerEngineRules($topic)))
             ."\n".$this->humanizer->promptRules();
     }
 
@@ -1723,23 +1796,23 @@ class ContentArticleProducer
 
         $products = $topic->products()->get()
             ->sortByDesc(fn ($p) => $p->pivot->role === 'featured' ? 1 : 0)
-            ->filter(fn ($p) => $p->status === \App\Models\ContentProduct::STATUS_ACTIVE && ! $p->is_excluded);
+            ->filter(fn ($p) => $p->status === ContentProduct::STATUS_ACTIVE && ! $p->is_excluded);
         if ($products->isEmpty()) {
-            $products = app(\App\Services\Content\Catalog\TopicProductMatcher::class)
+            $products = app(TopicProductMatcher::class)
                 ->match((string) $topic->website_id, $topic->title.' '.$topic->target_keyword, 8);
         }
         // Out-of-stock never gets FEATURED billing; keep at most 8, min viable 1.
         $candidates = $products
-            ->reject(fn ($p) => $p->availability === \App\Models\ContentProduct::AVAILABILITY_OUT_OF_STOCK)
+            ->reject(fn ($p) => $p->availability === ContentProduct::AVAILABILITY_OUT_OF_STOCK)
             ->take(8)->values();
 
         // Pre-flight: never hand the writer a product URL that 404s. A dead
         // URL also self-heals the catalog (marked gone, off future selections).
         $dead = app(LinkVerifier::class)->deadSet($candidates->map(fn ($p) => (string) $p->url)->all());
         if ($dead !== []) {
-            \App\Models\ContentProduct::query()
+            ContentProduct::query()
                 ->whereIn('id', $candidates->filter(fn ($p) => isset($dead[(string) $p->url]))->map(fn ($p) => (string) $p->id)->all())
-                ->update(['status' => \App\Models\ContentProduct::STATUS_GONE]);
+                ->update(['status' => ContentProduct::STATUS_GONE]);
         }
 
         $selection = $candidates
@@ -1835,6 +1908,35 @@ class ContentArticleProducer
      *
      * @return list<string>
      */
+    /**
+     * Answer-engine rules — the prevention layer for {@see AeoScorer}.
+     *
+     * Every line here mirrors a check the scorer runs, so a draft that follows
+     * them needs no revise round. They are about retrieval, not ranking: a
+     * model lifts a PASSAGE out of the page and reuses it, so each passage has
+     * to survive being quoted alone. That is why the "never open a section with
+     * It/This/They" rule matters more than it looks — it is the single most
+     * common reason a well-written article cannot be quoted.
+     *
+     * @return list<string>
+     */
+    private function answerEngineRules(ContentTopic $topic): array
+    {
+        $title = trim((string) $topic->title) !== '' ? trim((string) $topic->title) : trim((string) $topic->target_keyword);
+
+        return [
+            'ANSWER-ENGINE RULES — people increasingly read this through an AI assistant that quotes one passage, not the whole page:',
+            '- FIRST paragraph: answer "'.$title.'" directly, in 15-60 words, naming the subject in the first sentence. No scene-setting, no history, no "in today\'s world".',
+            '- Write at least a quarter of the H2/H3 headings as the question a reader would actually type.',
+            '- Under EVERY question heading, put one short paragraph that answers it before any list or table.',
+            '- Never start a section with "It", "This", "That", "They", "However" or "Also" — name the subject again, because the reader may arrive at that section with no context.',
+            '- Define the subject plainly in the first two paragraphs: one sentence of the form "X is ...".',
+            '- Support at least one number or claim with a named source in the same sentence, and link it.',
+            '- Use a table or list where the content is genuinely list-shaped (steps, options, specs).',
+            '- Keep paragraphs to 2-4 sentences: a wall of text has no passage to quote.',
+        ];
+    }
+
     private function onPageSeoRules(ContentTopic $topic): array
     {
         $kw = trim((string) $topic->target_keyword);

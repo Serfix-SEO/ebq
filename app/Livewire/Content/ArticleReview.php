@@ -3,11 +3,8 @@
 namespace App\Livewire\Content;
 
 use App\Jobs\CheckTrackedKeywordSerpJob;
+use App\Jobs\Content\CleanBlockedTermsJob;
 use App\Jobs\Content\RewriteArticleJob;
-use App\Models\ContentRewriteRequest;
-use App\Services\Content\ContentArticleProducer;
-use App\Services\Content\RewriteCredits;
-use App\Services\Content\RewritePromptEnhancer;
 use App\Jobs\GenerateInlineImageJob;
 use App\Jobs\ProduceContentArticleJob;
 use App\Jobs\PublishContentArticleJob;
@@ -15,11 +12,15 @@ use App\Models\ContentArticle;
 use App\Models\ContentArticleFeedback;
 use App\Models\ContentImage;
 use App\Models\ContentIntegration;
+use App\Models\ContentPlan;
+use App\Models\ContentProduct;
 use App\Models\ContentPublication;
+use App\Models\ContentRewriteRequest;
 use App\Models\ContentTopic;
 use App\Models\ContentTrackedKeyword;
 use App\Services\AiToolRunner;
 use App\Services\Content\CompetitorMentionGuard;
+use App\Services\Content\ContentArticleProducer;
 use App\Services\Content\ContentEntitlements;
 use App\Services\Content\ContentKeywordTracker;
 use App\Services\Content\ContentLlmSpendMeter;
@@ -28,10 +29,16 @@ use App\Services\Content\HumanizerService;
 use App\Services\Content\IdeogramClient;
 use App\Services\Content\IdeogramSpendMeter;
 use App\Services\Content\KeywordTrackerQuota;
+use App\Services\Content\RewriteCredits;
+use App\Services\Content\RewritePromptEnhancer;
+use App\Support\Content\InternalLinkCandidates;
 use App\Support\ContentAutopilotConfig;
+use App\Support\UnicodeText;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -743,7 +750,7 @@ class ArticleReview extends Component
             'outline' => $article->outline,
             'html' => $clean,
             'markdown' => $article->markdown,
-            'word_count' => \App\Support\UnicodeText::wordCount($text),
+            'word_count' => UnicodeText::wordCount($text),
             'seo_score' => $result['score'],
             'seo_issues' => $result['issues'],
             'style_issues' => $result['style_issues'],
@@ -832,10 +839,10 @@ class ArticleReview extends Component
             }
             // Strict Product Mode: an edit must not INTRODUCE a product link
             // that is not in the catalog (invented product URLs 404).
-            if ($plan->product_mode === \App\Models\ContentPlan::PRODUCT_MODE_STRICT
+            if ($plan->product_mode === ContentPlan::PRODUCT_MODE_STRICT
                 && preg_match_all('/<a\b[^>]*href="([^"]+)"/i', $replacement, $m)) {
                 $catalog = array_flip(array_map(fn ($u) => rtrim(mb_strtolower((string) $u), '/'),
-                    \App\Models\ContentProduct::query()->where('website_id', $topic->website_id)->usable()->pluck('url')->all()));
+                    ContentProduct::query()->where('website_id', $topic->website_id)->usable()->pluck('url')->all()));
                 $host = mb_strtolower((string) ($topic->website?->domain ?? ''));
                 foreach ($m[1] as $href) {
                     $h = strtolower((string) (parse_url($href, PHP_URL_HOST) ?: ''));
@@ -918,7 +925,7 @@ class ArticleReview extends Component
             return null;
         }
         // Paid API call — a loop of clicks must not run to the global cap.
-        if (! \Illuminate\Support\Facades\RateLimiter::attempt('inline-image:'.$topic->id, 10, fn () => true, 3600)) {
+        if (! RateLimiter::attempt('inline-image:'.$topic->id, 10, fn () => true, 3600)) {
             $this->dispatch('ai-edit-failed', message: __('Too many image generations — try again in a little while.'));
 
             return null;
@@ -967,7 +974,7 @@ class ArticleReview extends Component
 
         $regenCount = (int) (((array) $image->params)['regen_count'] ?? 0);
         if ($regenCount >= 3
-            || ! \Illuminate\Support\Facades\RateLimiter::attempt('image-regen:'.$topic->id, 10, fn () => true, 3600)) {
+            || ! RateLimiter::attempt('image-regen:'.$topic->id, 10, fn () => true, 3600)) {
             $this->dispatch('ai-edit-failed', message: __('You\'ve reached the regeneration limit for this image.'));
 
             return null;
@@ -1100,7 +1107,7 @@ class ArticleReview extends Component
         if (! $flagged) {
             return;
         }
-        \App\Jobs\Content\CleanBlockedTermsJob::dispatch($topic->id);
+        CleanBlockedTermsJob::dispatch($topic->id);
         session()->flash('review-status', __('Removing the blocked mentions — the cleaned article will be sent to your site in a few minutes.'));
     }
 
@@ -1191,7 +1198,7 @@ class ArticleReview extends Component
     {
         $plan = $topic->plan;
         $website = $topic->website;
-        $link = \App\Support\Content\InternalLinkCandidates::build(
+        $link = InternalLinkCandidates::build(
             $website?->crawl_site_id,
             $topic->target_keyword.' '.$topic->title,
         );
@@ -1214,11 +1221,11 @@ class ArticleReview extends Component
             ],
             'cta_url' => (string) ($plan?->cta_url ?? ''),
             'language' => (string) ($plan?->language ?: 'en'),
-            'products' => $plan?->product_mode === \App\Models\ContentPlan::PRODUCT_MODE_STRICT
+            'products' => $plan?->product_mode === ContentPlan::PRODUCT_MODE_STRICT
                 ? array_values((array) data_get($topic->meta, 'products', []))
                 : [],
-            'catalog_urls' => $plan?->product_mode === \App\Models\ContentPlan::PRODUCT_MODE_STRICT
-                ? \App\Models\ContentProduct::query()->where('website_id', $topic->website_id)->usable()->pluck('url')->all()
+            'catalog_urls' => $plan?->product_mode === ContentPlan::PRODUCT_MODE_STRICT
+                ? ContentProduct::query()->where('website_id', $topic->website_id)->usable()->pluck('url')->all()
                 : [],
         ];
     }
@@ -1290,6 +1297,29 @@ class ArticleReview extends Component
     }
 
     /** Plain-language labels for scorer issue codes (client-safe copy). */
+    /**
+     * Plain-language name for an answer-readiness check.
+     *
+     * Client-copy rule: no jargon, no internal codes. "Self-contained sections"
+     * means nothing to a client; "each section makes sense on its own" does.
+     */
+    public static function aeoLabel(string $code): string
+    {
+        return match ($code) {
+            'answer_first' => __('Answers the question up front'),
+            'answer_after_question' => __('Every question has an answer under it'),
+            'question_headings' => __('Headings are written as real questions'),
+            'self_contained_sections' => __('Each section makes sense on its own'),
+            'entity_definition' => __('Explains the subject plainly'),
+            'cited_claims' => __('Facts backed by a named source'),
+            'structured_block' => __('Has a table or list where it helps'),
+            'byline_or_date' => __('Shows who wrote it and when'),
+            'scannable_paragraphs' => __('Short, quotable paragraphs'),
+            'no_article' => __('Not enough text to judge yet'),
+            default => __('Answer readiness'),
+        };
+    }
+
     public static function issueLabel(string $code): string
     {
         return match ($code) {
@@ -1529,13 +1559,13 @@ class ArticleReview extends Component
      * stored selection in topic.meta, joined with the live catalog rows for
      * thumbnails) — shown as a sidebar card on the article detail page.
      */
-    private function articleProducts(?ContentTopic $topic): \Illuminate\Support\Collection
+    private function articleProducts(?ContentTopic $topic): Collection
     {
         $selection = array_values((array) data_get($topic?->meta, 'products', []));
-        if ($selection === [] || $topic?->plan?->product_mode !== \App\Models\ContentPlan::PRODUCT_MODE_STRICT) {
+        if ($selection === [] || $topic?->plan?->product_mode !== ContentPlan::PRODUCT_MODE_STRICT) {
             return collect();
         }
-        $rows = \App\Models\ContentProduct::query()
+        $rows = ContentProduct::query()
             ->whereIn('id', array_filter(array_map(static fn ($p) => $p['id'] ?? null, $selection)))
             ->get(['id', 'image_url', 'status'])
             ->keyBy('id');
@@ -1592,6 +1622,16 @@ class ArticleReview extends Component
             ->pluck('code')
             ->map(fn ($code) => self::issueLabel((string) $code))
             ->unique()
+            ->values();
+
+        // Answer readiness — a second number, never folded into the first.
+        // Ranking and being quotable are different jobs, and the publish floor
+        // gates on the SEO score alone (see AeoScorer).
+        $aeoIssues = collect((array) ($article?->aeo_issues ?? []))
+            ->map(fn ($i) => [
+                'label' => self::aeoLabel((string) ($i['code'] ?? '')),
+                'message' => (string) ($i['message'] ?? ''),
+            ])
             ->values();
 
         // The main image is ALWAYS generated (it becomes the WP featured
@@ -1664,6 +1704,8 @@ class ArticleReview extends Component
             'rewritePacks' => ContentAutopilotConfig::rewritePacks(),
             'previewHtml' => $this->sanitize((string) ($previewingVersion?->html ?? $article?->html ?? '')),
             'issueLabels' => $issueLabels,
+            'aeoScore' => (int) ($article?->aeo_score ?? 0),
+            'aeoIssues' => $aeoIssues,
             'traffic' => $topic ? self::trafficWorth($topic) : null,
             // Bare host for the Google snippet preview breadcrumb (no scheme/www).
             'siteHost' => preg_replace('#^www\.#', '', mb_strtolower((string) preg_replace('#^https?://#', '', (string) ($topic?->website?->domain ?? '')))),

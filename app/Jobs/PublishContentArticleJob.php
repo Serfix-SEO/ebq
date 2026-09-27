@@ -74,6 +74,30 @@ class PublishContentArticleJob implements ShouldQueue
         $this->onConnection('redis-long');
     }
 
+    /**
+     * Platforms where we cannot reach the page's <head>, so the JSON-LD has to
+     * travel inside the body instead.
+     *
+     * WordPress is absent on purpose: the Serfix plugin already builds its own
+     * @graph from the _ebq_* meta we send, and a second Article node on the
+     * same page is worse than one. ⚠️ Whether each of these platforms keeps a
+     * <script> tag in post content has to be confirmed per platform on a real
+     * account — Shopify's article body sanitiser is the one most likely to
+     * strip it — and the answer recorded in
+     * infra/content-autopilot/README.md rather than assumed.
+     */
+    private static function needsInlineSchema(string $platform): bool
+    {
+        return in_array($platform, [
+            ContentIntegration::PLATFORM_SHOPIFY,
+            ContentIntegration::PLATFORM_WEBFLOW,
+            ContentIntegration::PLATFORM_WIX,
+            ContentIntegration::PLATFORM_HUBSPOT,
+            ContentIntegration::PLATFORM_SANITY,
+            ContentIntegration::PLATFORM_MEDUSA,
+        ], true);
+    }
+
     public function uniqueId(): string
     {
         return $this->topicId;
@@ -141,10 +165,32 @@ class PublishContentArticleJob implements ShouldQueue
         $transientFailed = 0;
         $liveUrl = null;
 
+        // The structured description of this article, built once. Stored on the
+        // article so a later republish ships exactly what was audited rather
+        // than rebuilding it from whatever the page looks like then.
+        $graphBuilder = app(\App\Services\Content\Aeo\ArticleSchemaGraph::class);
+        $graph = $graphBuilder->build($article, $topic);
+        if ($graph !== [] && $article->schema_json !== $graph) {
+            $article->forceFill(['schema_json' => $graph])->save();
+        }
+
         foreach ($integrations as $integration) {
             $driver = $drivers->for($integration);
             if ($driver === null) {
                 continue; // platform not yet supported (plugin/shopify)
+            }
+
+            // Platforms where we do not own the <head> get the JSON-LD inline
+            // in the body instead — valid, and the only lever available there.
+            // WordPress is excluded: the plugin already emits its own graph
+            // from _ebq_* meta, and two Article nodes on one page is worse
+            // than one. The append is in-memory only, so the stored article is
+            // never re-scored or re-appended with a script tag.
+            $payloadArticle = $article;
+            if ($graph !== [] && self::needsInlineSchema($integration->platform)) {
+                $payloadArticle = clone $article;
+                $payloadArticle->html = (string) $article->html
+                    .$graphBuilder->script($article, $topic);
             }
 
             // Carry the external post id forward across article VERSIONS: when
@@ -172,7 +218,7 @@ class PublishContentArticleJob implements ShouldQueue
                 // re-send as an update over the stored external_id. Failure is
                 // non-fatal: the post stays live with its previous content.
                 if ($this->forceUpdate && $publication->external_id) {
-                    $result = $driver->update($article, $integration, (string) $publication->external_id);
+                    $result = $driver->update($payloadArticle, $integration, (string) $publication->external_id);
                     if ($result->ok) {
                         $publication->forceFill([
                             'external_url' => $result->externalUrl ? mb_substr($result->externalUrl, 0, 600) : $publication->external_url,
@@ -198,8 +244,8 @@ class PublishContentArticleJob implements ShouldQueue
             ])->save();
 
             $result = $publication->external_id
-                ? $driver->update($article, $integration, (string) $publication->external_id)
-                : $driver->publish($article, $integration);
+                ? $driver->update($payloadArticle, $integration, (string) $publication->external_id)
+                : $driver->publish($payloadArticle, $integration);
 
             if ($result->ok) {
                 $publication->forceFill([

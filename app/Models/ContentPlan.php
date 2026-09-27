@@ -43,6 +43,7 @@ class ContentPlan extends Model
             'publish_days' => 'array',
             'toggles' => 'array',
             'offerings' => 'array',
+            'org_same_as' => 'array',
             'competitor_overrides' => 'array',
             'competitor_guard' => 'array',
             'internal_urls' => 'array',

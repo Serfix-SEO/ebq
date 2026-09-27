@@ -24,6 +24,8 @@ class ContentArticle extends Model
         return [
             'outline' => 'array',
             'seo_issues' => 'array',
+            'aeo_issues' => 'array',
+            'schema_json' => 'array',
             'style_issues' => 'array',
             'generation_meta' => 'array',
             'is_current' => 'boolean',

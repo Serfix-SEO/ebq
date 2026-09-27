@@ -484,6 +484,51 @@
                         @endif
                     </div>
 
+                    {{-- Answer readiness — deliberately a SECOND number beside
+                         content quality, not folded into it. Ranking well and
+                         being quotable by an AI assistant are different jobs:
+                         an assistant lifts one passage out of the page, so what
+                         matters is whether each passage survives being quoted
+                         alone. Shown to every client; it costs nothing to
+                         compute and it is the same scorer the writer follows. --}}
+                    @if ($aeoScore > 0 || $aeoIssues->isNotEmpty())
+                        <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                            <div class="flex items-center gap-4">
+                                @include('reports.charts.ring', [
+                                    'value' => (float) $aeoScore,
+                                    'display' => (int) $aeoScore,
+                                    'label' => __('AI answer readiness'),
+                                    'color' => $aeoScore >= 85 ? '#059669' : ($aeoScore >= 60 ? '#F26419' : '#e11d48'),
+                                    'size' => 84,
+                                ])
+                                <div class="min-w-0">
+                                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ __('AI answer readiness') }}</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                                        {{ __('How easily ChatGPT, Perplexity or Gemini can quote this article when someone asks about it.') }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if ($aeoIssues->isEmpty())
+                                <p class="mt-4 rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
+                                    {{ __('This article is shaped the way answer engines quote.') }}
+                                </p>
+                            @else
+                                <ul class="mt-4 space-y-2">
+                                    @foreach ($aeoIssues as $issue)
+                                        <li wire:key="aeo-{{ $loop->index }}" class="flex items-start gap-2 text-sm">
+                                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M12 9v3.75m0 3.75h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                                            <span class="min-w-0">
+                                                <span class="font-medium text-slate-800 dark:text-slate-100">{{ $issue['label'] }}</span>
+                                                <span class="block text-xs text-slate-500 dark:text-slate-400">{{ $issue['message'] }}</span>
+                                            </span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    @endif
+
                     {{-- Targeted SEO: the keyphrases this article is optimized for
                          (article focus override falls back to the topic target). --}}
                     @php

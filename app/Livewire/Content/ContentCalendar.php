@@ -9,6 +9,7 @@ use App\Jobs\PlanContentTopicsJob;
 use App\Jobs\PrepareContentKeywordInsightsJob;
 use App\Jobs\ProduceContentArticleJob;
 use App\Jobs\PublishContentArticleJob;
+use App\Models\ContentAuthor;
 use App\Models\ContentImage;
 use App\Models\ContentIntegration;
 use App\Models\ContentPlan;
@@ -142,6 +143,30 @@ class ContentCalendar extends Component
     /** Client-safe explanation when we cannot offer anything. */
     public string $composerNotice = '';
 
+    // Author + organisation (AEO): the entity an answer engine can cite.
+    // AI answers name people and companies, not domains — every JSON-LD author
+    // we emitted before this was "Organization: <bare domain>".
+    public string $authorName = '';
+
+    public string $authorRole = '';
+
+    public string $authorBio = '';
+
+    public string $authorCredentials = '';
+
+    public string $authorAvatarUrl = '';
+
+    /** One profile URL per line — schema.org sameAs. */
+    public string $authorSameAs = '';
+
+    public bool $authorBoxEnabled = false;
+
+    public string $orgLegalName = '';
+
+    public string $orgLogoUrl = '';
+
+    public string $orgSameAs = '';
+
     /** Article-structure toggles surfaced in the wizard (step 3). */
     public array $structureToggles = ['key_takeaways' => true, 'toc' => true, 'faq' => true, 'featured_image' => true];
 
@@ -242,6 +267,18 @@ class ContentCalendar extends Component
                 'faq' => $existing->toggle('faq'),
                 'featured_image' => $existing->toggle('featured_image'),
             ];
+            $this->authorBoxEnabled = $existing->toggle('author_box');
+            $this->orgLegalName = (string) ($existing->org_legal_name ?? '');
+            $this->orgLogoUrl = (string) ($existing->org_logo_url ?? '');
+            $this->orgSameAs = implode("\n", (array) ($existing->org_same_as ?? []));
+            if (($author = ContentAuthor::defaultFor((string) $existing->website_id)) !== null) {
+                $this->authorName = (string) $author->name;
+                $this->authorRole = (string) ($author->role ?? '');
+                $this->authorBio = (string) ($author->bio ?? '');
+                $this->authorCredentials = (string) ($author->credentials ?? '');
+                $this->authorAvatarUrl = (string) ($author->avatar_url ?? '');
+                $this->authorSameAs = implode("\n", (array) ($author->same_as ?? []));
+            }
             $this->imagesEnabled = $existing->images_enabled === null ? true : (bool) $existing->images_enabled;
             $this->imageStyle = ContentImageStyles::isValid($existing->image_style)
                 ? (string) $existing->image_style
@@ -1096,6 +1133,57 @@ class ContentCalendar extends Component
      * (competitor discovery, keyword research, topic ideation) — those belong
      * to the first-run wizard, not to routine settings edits.
      */
+    /**
+     * Persist the author entity, or remove it when the client clears the name.
+     *
+     * Nothing here is inferred: an empty name means no Person node in the
+     * schema and no byline on the article, because attributing an article to
+     * someone who does not exist is worse than attributing it to nobody.
+     */
+    private function saveAuthor(ContentPlan $plan): void
+    {
+        $websiteId = (string) $plan->website_id;
+        $name = trim($this->authorName);
+
+        if ($name === '') {
+            ContentAuthor::query()->where('website_id', $websiteId)->delete();
+
+            return;
+        }
+
+        ContentAuthor::query()->updateOrCreate(
+            ['website_id' => $websiteId],
+            [
+                'name' => mb_substr($name, 0, 255),
+                'role' => trim($this->authorRole) !== '' ? mb_substr(trim($this->authorRole), 0, 160) : null,
+                'bio' => trim($this->authorBio) !== '' ? mb_substr(trim($this->authorBio), 0, 1000) : null,
+                'credentials' => trim($this->authorCredentials) !== '' ? mb_substr(trim($this->authorCredentials), 0, 300) : null,
+                'avatar_url' => $this->validUrl($this->authorAvatarUrl),
+                'same_as' => $this->urlLines($this->authorSameAs),
+                'is_default' => true,
+            ]
+        );
+    }
+
+    /** A URL we would be willing to publish, or null. */
+    private function validUrl(string $value): ?string
+    {
+        $value = trim($value);
+
+        return $value !== '' && filter_var($value, FILTER_VALIDATE_URL) !== false
+            ? mb_substr($value, 0, 600)
+            : null;
+    }
+
+    /** @return list<string> one URL per line, junk dropped rather than stored */
+    private function urlLines(string $value): array
+    {
+        return array_values(array_slice(array_filter(
+            array_map('trim', preg_split('/[\r\n,]+/', $value) ?: []),
+            static fn (string $u): bool => $u !== '' && filter_var($u, FILTER_VALIDATE_URL) !== false
+        ), 0, 8));
+    }
+
     public function saveSettings(): void
     {
         $plan = $this->plan();
@@ -1112,6 +1200,9 @@ class ContentCalendar extends Component
             'key_takeaways' => (bool) ($this->structureToggles['key_takeaways'] ?? true),
             'toc' => (bool) ($this->structureToggles['toc'] ?? true),
             'faq' => (bool) ($this->structureToggles['faq'] ?? true),
+            // Only meaningful with a real author: the box renders the entity,
+            // never an invented byline.
+            'author_box' => $this->authorBoxEnabled && trim($this->authorName) !== '',
         ]);
 
         $plan->update([
@@ -1136,7 +1227,12 @@ class ContentCalendar extends Component
                 ? $this->imageStyle
                 : ContentImageStyles::default(),
             'toggles' => $toggles,
+            'org_legal_name' => trim($this->orgLegalName) !== '' ? mb_substr(trim($this->orgLegalName), 0, 255) : null,
+            'org_logo_url' => $this->validUrl($this->orgLogoUrl),
+            'org_same_as' => $this->urlLines($this->orgSameAs),
         ]);
+
+        $this->saveAuthor($plan);
 
         session()->flash('content-status', __('Your content settings have been saved.'));
         // Nudge the browser back to the top so the success banner is seen.

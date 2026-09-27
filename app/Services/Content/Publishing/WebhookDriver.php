@@ -158,6 +158,9 @@ class WebhookDriver implements PublishDriver
                 'h1' => (string) $article->h1,
                 'slug' => (string) $article->slug,
                 'html' => (string) $article->html,
+                // The structured description, so a receiver can render it in
+                // its own <head> rather than parsing the body for it.
+                'schema_json' => $article->schema_json,
                 'markdown' => (string) ($article->markdown ?? ''),
                 'meta_title' => (string) ($article->meta_title ?? ''),
                 'meta_description' => (string) ($article->meta_description ?? ''),

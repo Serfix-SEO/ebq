@@ -51,6 +51,18 @@ class ContentArticleSchema
     }
 
     /**
+     * The parsed FAQ pairs, for callers that build their own node shape
+     * (the @graph builder needs Question/Answer, the plugin meta needs the
+     * template contract). One parser, two consumers.
+     *
+     * @return list<array{question:string, answer:string}>
+     */
+    public function faqPairs(string $html): array
+    {
+        return $this->faqQuestions($html);
+    }
+
+    /**
      * Extract question/answer pairs from the article's FAQ section: the H2
      * whose text (or id) marks the FAQ, followed by H3 questions each with the
      * flowing content up to the next H3/H2 as its answer.
