@@ -174,6 +174,18 @@ class SanityDriver implements ProvidesTargets, PublishDriver
             'body' => $body,
             'publishedAt' => now()->toIso8601String(),
         ];
+        // The answer-engine graph, for a frontend that wants to emit it. Sanity
+        // is headless: we cannot reach the rendered <head>, and the body is
+        // Portable Text so a <script> cannot ride along in it (see
+        // PublishContentArticleJob::needsInlineSchema). A JSON string on the
+        // document is the only honest delivery — the client's developer renders
+        // it, and a Studio that has not declared the field simply ignores it.
+        if (! empty($article->schema_json)) {
+            $document['serfixSchema'] = (string) json_encode(
+                $article->schema_json,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+            );
+        }
         if ($featuredAssetId !== null) {
             $mainImage = [
                 '_type' => 'image',

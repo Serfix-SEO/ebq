@@ -103,6 +103,16 @@ class HtmlBlockParser
                 $rows = $this->tableRows($node);
 
                 return $rows === [] ? [] : [new TableBlock($rows)];
+            case 'script':
+            case 'style':
+            case 'noscript':
+            case 'template':
+                // Code, never content. The `default` branch below turns an
+                // unknown element into its visible text, which for a JSON-LD
+                // <script> means dumping the whole graph into the article as a
+                // paragraph the reader sees — caught on the Wix/Sanity path
+                // when publish started appending inline schema.
+                return [];
             case 'div':
             case 'section':
             case 'article':

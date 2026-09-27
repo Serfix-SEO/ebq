@@ -20,6 +20,23 @@ class HtmlBlockParserTest extends TestCase
         return (new HtmlBlockParser)->parse($html);
     }
 
+    public function test_script_and_style_tags_are_dropped_rather_than_shown_as_text(): void
+    {
+        // The `default` branch renders an unknown element as its visible text,
+        // which for the JSON-LD we now append on publish meant a paragraph of
+        // raw schema at the foot of every Wix and Sanity article.
+        $html = '<p>Real body.</p>'
+            .'<script type="application/ld+json">{"@context":"https://schema.org"}</script>'
+            .'<style>.x{color:red}</style>'
+            .'<noscript>Enable JS</noscript>';
+
+        $blocks = (new HtmlBlockParser)->parse($html);
+
+        $this->assertCount(1, $blocks);
+        $this->assertInstanceOf(Paragraph::class, $blocks[0]);
+        $this->assertStringNotContainsString('schema.org', json_encode($blocks));
+    }
+
     public function test_fixture_produces_the_expected_block_sequence(): void
     {
         $types = array_map(fn ($b) => get_class($b), $this->blocks());

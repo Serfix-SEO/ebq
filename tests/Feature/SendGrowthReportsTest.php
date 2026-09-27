@@ -20,7 +20,12 @@ class SendGrowthReportsTest extends TestCase
         Mail::fake();
 
         $owner = User::factory()->create();
-        $websites = Website::factory()->count(2)->create(['user_id' => $owner->id]);
+        // Explicit domains: the factory's faker domain is not unique, and two
+        // random collisions for one owner trip the (user_id, domain) unique key
+        // — a flake that only shows up in a full-suite run.
+        $websites = collect(['one.example', 'two.example'])->map(
+            fn (string $domain): Website => Website::factory()->create(['user_id' => $owner->id, 'domain' => $domain])
+        );
 
         $safeDate = Carbon::now()->subDays(5)->toDateString();
         foreach ($websites as $website) {

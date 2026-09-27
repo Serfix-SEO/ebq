@@ -300,6 +300,20 @@ known gaps were flagged during the sweep:
   and a question nobody names you for becomes a one-click article through the
   existing composer. ~$0.004/site/week.
   infra/content-autopilot/README.md "AEO phase 2"/"AEO phase 3"; AEO_PLAN.md.
+- **2026-09-27 — The per-destination schema check found a client-visible bug.**
+  Verifying "does the graph actually reach each platform" (the item phase 2 left
+  open) showed that appending an inline `<script>` to the body is wrong for Wix
+  and Sanity: both take a block model, and `HtmlBlockParser`'s `default` branch
+  rendered the JSON-LD as a **visible paragraph** at the foot of the article.
+  The parser now drops `script`/`style`/`noscript`/`template` — a converter must
+  never show code as content — and inline schema is limited to the three
+  destinations with a raw-HTML body (Shopify, Webflow, HubSpot). Sanity carries
+  the graph as a `serfixSchema` document field instead; Wix cannot carry it at
+  all. One test per destination pins each answer
+  (`tests/Feature/Content/AeoSchemaDeliveryTest.php`).
+  Still open: the plugin's `Person` node is the WordPress account, not our
+  author entity, so a client who sets an author will see the byline and the
+  JSON-LD disagree.
 - **2026-09-27 — A WordPress install with a dead token now raises an alarm.**
   `PluginAuthHealth` + `plugin_auth_failures` remembers rejected calls from our
   own plugin, attributed via the site URL in its User-Agent (a rejected request

@@ -75,26 +75,33 @@ class PublishContentArticleJob implements ShouldQueue
     }
 
     /**
-     * Platforms where we cannot reach the page's <head>, so the JSON-LD has to
-     * travel inside the body instead.
+     * Platforms where we cannot reach the page's <head> AND the body we send is
+     * stored as raw HTML, so the JSON-LD can travel inside it.
      *
-     * WordPress is absent on purpose: the Serfix plugin already builds its own
-     * @graph from the _ebq_* meta we send, and a second Article node on the
-     * same page is worse than one. ⚠️ Whether each of these platforms keeps a
-     * <script> tag in post content has to be confirmed per platform on a real
-     * account — Shopify's article body sanitiser is the one most likely to
-     * strip it — and the answer recorded in
-     * infra/content-autopilot/README.md rather than assumed.
+     * Deliberately excluded, each for a different reason:
+     *  - WordPress: the Serfix plugin already builds a @graph from the _ebq_*
+     *    meta we send, and two Article nodes on one page is worse than one.
+     *  - Webhook / Medusa: the payload carries `schema_json` as its own field
+     *    (WebhookDriver:163), so appending it to the html would ship the graph
+     *    twice and invite the receiver to render both.
+     *  - Wix / Sanity: these take a BLOCK MODEL, not HTML — the body is run
+     *    through HtmlBlockParser first. A <script> there is not markup that
+     *    survives, it is content, and before HtmlBlockParser learned to skip
+     *    script tags it became a paragraph of raw JSON at the foot of the
+     *    article. The graph simply cannot be delivered to those two, and
+     *    pretending otherwise puts garbage on the client's page.
+     *
+     * ⚠️ For the three that remain, whether the platform's own sanitiser keeps
+     * a <script> in post content still has to be confirmed on a real account —
+     * Shopify's article body sanitiser is the likeliest to strip it — and the
+     * answer recorded in infra/content-autopilot/README.md rather than assumed.
      */
     private static function needsInlineSchema(string $platform): bool
     {
         return in_array($platform, [
             ContentIntegration::PLATFORM_SHOPIFY,
             ContentIntegration::PLATFORM_WEBFLOW,
-            ContentIntegration::PLATFORM_WIX,
             ContentIntegration::PLATFORM_HUBSPOT,
-            ContentIntegration::PLATFORM_SANITY,
-            ContentIntegration::PLATFORM_MEDUSA,
         ], true);
     }
 

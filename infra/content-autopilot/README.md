@@ -894,13 +894,46 @@ side is also what the original design asked for
   all of which set `author` to `Organization: <bare domain>`. One `@graph`,
   nodes linked by `@id`, stored on `content_articles.schema_json` at publish so
   a republish ships exactly what was audited.
-- Delivery: WordPress keeps `_ebq_schemas` (the plugin builds its own graph —
-  two Article nodes would be worse than one); the generic webhook payload gains
-  `schema_json`; head-less platforms (Shopify, Webflow, Wix, HubSpot, Sanity,
-  Medusa) get an inline `<script>` appended **in memory only**, so the stored
-  article is never re-scored or double-appended. ⚠️ Whether each platform keeps
-  a `<script>` in post content is **unverified** — Shopify's sanitiser is the
-  likely one to strip it. Confirm on a real account and record it here.
+- **Delivery, verified per destination** (2026-09-27,
+  `tests/Feature/Content/AeoSchemaDeliveryTest.php` — one test per platform):
+
+  | Destination | How the graph travels | Verified |
+  |---|---|---|
+  | WordPress (plugin) | `_ebq_schemas` meta; the plugin builds the page graph itself (`class-ebq-schema-output.php`) | ✅ live page emits one valid `@graph`: WebSite, Organization, WebPage, ImageObject, BreadcrumbList, Person, FAQPage, Article |
+  | Shopify / Webflow / HubSpot | inline `<script>` appended to the raw-HTML body, **in memory only** | ✅ reaches the payload; ⚠️ platform sanitiser still unverified |
+  | Webhook / Medusa | `schema_json` as its own payload field | ✅ field present, html left clean |
+  | Sanity | `serfixSchema` (JSON string) on the document | ✅ field present, Portable Text body clean |
+  | Wix | **not deliverable** | ✅ asserted absent — nothing to strip |
+
+  ⚠️ **Wix and Sanity take a block model, not HTML.** Appending a `<script>`
+  there is not markup that survives: `HtmlBlockParser`'s `default` branch turned
+  unknown elements into their visible text, so the whole JSON-LD graph rendered
+  as a **paragraph the reader sees** at the foot of every Wix and Sanity
+  article. Two fixes, both needed: the parser now drops `script`/`style`/
+  `noscript`/`template` outright (a converter must never show code as content),
+  and `needsInlineSchema()` is narrowed to the three destinations whose body
+  field is genuinely raw HTML. Sanity, being headless, instead carries the graph
+  as `serfixSchema` for the client's own frontend to emit; Wix has no field for
+  it and gets nothing, which is the honest outcome.
+  ⚠️ Still unverified, and it needs a real account per platform: whether
+  Shopify, Webflow and HubSpot keep a `<script>` inside post content. Shopify's
+  article body sanitiser is the likeliest to strip it. Record the answer here.
+- **The WordPress `Person` is the WP account, not our author entity.** The live
+  page's Person node is built from `post_author` (`person_node()` in
+  class-ebq-schema-output.php:216) — on pubgnamegenerator.net that is
+  `hamzaajaz251`. Harmless today (`content_authors` is empty fleet-wide), but as
+  soon as a client sets a real author the visible byline and the JSON-LD will
+  disagree, which undercuts the exact E-E-A-T signal phase 2 exists for. Fix
+  needs either the driver to send the author through `_ebq_schemas` or a plugin
+  change; not done.
+- **Rule behaviour on real articles** (40 current articles, re-scored read-only
+  2026-09-27): 40–83, median 64, 12 distinct values — the rubric discriminates.
+  `answer_first` passes 7/40 and `cited_claims` 12/40 on pre-phase-2 articles,
+  which is what `answerEngineRules()` exists to change going forward.
+  `byline_or_date` fails until an author is set. **AEO issues never trigger a
+  revision on their own** — the loop condition stays
+  `seo_score < target || hasStyleIssue` (`ContentArticleProducer:231`), so this
+  added no spend; AEO fixes ride along on revisions that were happening anyway.
 - HowTo is emitted only for a real procedure (intent in the title AND ≥3
   ordered steps); overreaching is how structured data gets ignored.
 
