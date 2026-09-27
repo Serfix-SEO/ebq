@@ -926,6 +926,14 @@ decides every answer given without retrieval. The UI says so in those words.
   recall 35 · AI Overview 15, **renormalized over the signals present**. Recall
   is a 4-week rolling rate (model answers move week to week), and rank ≤3 is
   worth more than being buried eighth — being named last is not a recommendation.
+- ⚠️ **A question the model answers without naming ANY business is not a
+  signal.** Found by running it on production: pubgnamegenerator.net's Search
+  Console questions ("best name for pubg") have no business answer, and 20 of
+  25 model answers named nobody. Counting those would have scored that client
+  0% recall for questions nobody can win, and offered 10 "gaps" with no
+  competitor to take them from. They are now excluded from the recall
+  denominator (brand_recall renormalizes away entirely if none remain) and a
+  gap requires a competitor to actually be named.
 - Questions come free: GSC question queries → the `people_also_ask` lists
   already sitting unused on every topic's brief → offerings ("Best X in AE") →
   one LLM pass only for the shortfall.

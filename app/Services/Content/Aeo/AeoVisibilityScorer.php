@@ -152,10 +152,19 @@ class AeoVisibilityScorer
             ->where('ok', true)
             ->where('ran_on', '>=', now()->subDays(28)->toDateString())
             ->whereIn('engine', [ContentAeoRun::ENGINE_DEEPSEEK, ContentAeoRun::ENGINE_MISTRAL])
-            ->get(['mentioned', 'mention_rank']);
+            ->get(['mentioned', 'mention_rank', 'competitors']);
+
+        // Questions where the model named NOBODY are not a measure of this
+        // client's visibility — nobody is being recommended, so "you were not
+        // named" says nothing. Found on production: 20 of 25 answers for a
+        // free-tool site named no business at all, which would have scored
+        // that client 0% recall for questions that have no business answer.
+        $runs = $runs->reject(
+            fn (ContentAeoRun $run): bool => ! $run->mentioned && empty($run->competitors)
+        )->values();
 
         if ($runs->isEmpty()) {
-            return null;
+            return null;   // renormalizes away rather than reporting a false zero
         }
 
         $asked = $runs->count();
@@ -214,6 +223,16 @@ class AeoVisibilityScorer
             if ($runs->contains(fn (ContentAeoRun $r): bool => (bool) $r->mentioned)) {
                 continue;
             }
+            // And somebody ELSE has to be winning it. A question the model
+            // answers without naming any business is not a gap — there is no
+            // recommendation to take, and offering to "write the answer" for
+            // it would send the client after nothing.
+            $named = array_values(array_unique(array_merge(
+                ...$runs->map(fn (ContentAeoRun $r): array => (array) ($r->competitors ?? []))->all()
+            )));
+            if ($named === []) {
+                continue;
+            }
             $question = $questions[$questionId] ?? null;
             if ($question === null) {
                 continue;
@@ -222,9 +241,7 @@ class AeoVisibilityScorer
                 'question_id' => (string) $questionId,
                 'question' => (string) $question->question,
                 'topic_id' => $question->topic_id ? (string) $question->topic_id : null,
-                'competitors' => array_values(array_unique(array_merge(
-                    ...$runs->map(fn (ContentAeoRun $r): array => (array) ($r->competitors ?? []))->all()
-                ))),
+                'competitors' => $named,
             ];
         }
 

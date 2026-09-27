@@ -130,6 +130,61 @@ class AeoVisibilityScoreTest extends TestCase
         $this->assertStringContainsString('2 of 2', $recall['detail']);
     }
 
+    public function test_questions_the_model_answers_without_naming_anyone_are_not_counted(): void
+    {
+        // Found on production: a free-tool site whose Search Console questions
+        // ("best name for pubg") have no business answer at all. 20 of 25
+        // model answers named nobody, which would have scored the client 0%
+        // recall for questions nobody could win.
+        $website = $this->site();
+        $this->audit($website);
+
+        foreach (range(1, 4) as $i) {
+            $q = ContentAeoQuestion::create([
+                'website_id' => $website->id, 'question' => 'Generic '.$i, 'normalized_question' => 'generic '.$i,
+            ]);
+            ContentAeoRun::create([
+                'question_id' => $q->id, 'website_id' => $website->id,
+                'ran_on' => now()->toDateString(), 'engine' => ContentAeoRun::ENGINE_DEEPSEEK,
+                'mentioned' => false, 'competitors' => [], 'ok' => true,
+            ]);
+        }
+
+        $result = app(AeoVisibilityScorer::class)->score($website);
+
+        // No measurable recall at all — dropped from the weighting rather than
+        // reported as a failure the client cannot act on.
+        $this->assertNotContains('brand_recall', $result['signals_used']);
+        $this->assertContains('brand_recall', $result['missing']);
+        $this->assertSame([], app(AeoVisibilityScorer::class)->gaps($website), 'nobody is winning these, so there is nothing to chase');
+    }
+
+    public function test_a_gap_needs_someone_else_to_be_winning_it(): void
+    {
+        $website = $this->site();
+        $noOne = ContentAeoQuestion::create([
+            'website_id' => $website->id, 'question' => 'Nobody wins this', 'normalized_question' => 'nobody wins this',
+        ]);
+        ContentAeoRun::create([
+            'question_id' => $noOne->id, 'website_id' => $website->id,
+            'ran_on' => now()->toDateString(), 'engine' => ContentAeoRun::ENGINE_DEEPSEEK,
+            'mentioned' => false, 'competitors' => [], 'ok' => true,
+        ]);
+        $lost = ContentAeoQuestion::create([
+            'website_id' => $website->id, 'question' => 'Someone else wins this', 'normalized_question' => 'someone else wins this',
+        ]);
+        ContentAeoRun::create([
+            'question_id' => $lost->id, 'website_id' => $website->id,
+            'ran_on' => now()->toDateString(), 'engine' => ContentAeoRun::ENGINE_DEEPSEEK,
+            'mentioned' => false, 'competitors' => ['Ajmal'], 'ok' => true,
+        ]);
+
+        $gaps = app(AeoVisibilityScorer::class)->gaps($website);
+
+        $this->assertCount(1, $gaps);
+        $this->assertSame('Someone else wins this', $gaps[0]['question']);
+    }
+
     public function test_nothing_measurable_records_no_score_rather_than_a_zero(): void
     {
         $website = $this->site(['ga_property_id' => '']);
