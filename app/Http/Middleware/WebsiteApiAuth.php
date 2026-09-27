@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Models\Website;
 use App\Services\ClientActivityLogger;
+use App\Support\PluginAuthHealth;
+use App\Support\ShardContext;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -22,17 +24,28 @@ class WebsiteApiAuth
      */
     public function handle(Request $request, Closure $next, ?string $ability = null): Response
     {
+        // A WordPress install whose token has died keeps calling hourly and
+        // fails silently — the plugin degrades gracefully, so nobody notices
+        // (pubgnamegenerator.net did it for two months). Every 401 from our own
+        // plugin is remembered against the site named in its User-Agent, which
+        // is the only identifier a rejected request carries.
         $bearer = $request->bearerToken();
         if (! $bearer) {
+            PluginAuthHealth::recordFailure($request->userAgent());
+
             return response()->json(['error' => 'missing_token'], 401);
         }
 
         $accessToken = PersonalAccessToken::findToken($bearer);
         if (! $accessToken) {
+            PluginAuthHealth::recordFailure($request->userAgent());
+
             return response()->json(['error' => 'invalid_token'], 401);
         }
 
         if ($accessToken->expires_at && $accessToken->expires_at->isPast()) {
+            PluginAuthHealth::recordFailure($request->userAgent());
+
             return response()->json(['error' => 'expired_token'], 401);
         }
 
@@ -47,12 +60,15 @@ class WebsiteApiAuth
 
         $accessToken->forceFill(['last_used_at' => now()])->save();
 
+        // Authenticated, so any recorded failure run for this site is over.
+        PluginAuthHealth::recordSuccess((string) $tokenable->id);
+
         $request->attributes->set('api_website', $tokenable);
         $request->attributes->set('api_token', $accessToken);
 
         // Sharding: route this API request to the node(s) hosting the token's
         // website data (no-op until the website carries a node anchor).
-        app(\App\Support\ShardContext::class)->forWebsite((string) $tokenable->id);
+        app(ShardContext::class)->forWebsite((string) $tokenable->id);
         app(ClientActivityLogger::class)->log(
             'plugin.api_request',
             userId: (string) $tokenable->user_id,

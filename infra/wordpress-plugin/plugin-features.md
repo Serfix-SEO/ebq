@@ -116,6 +116,40 @@ survive an EBQ outage. The `redirects` flag gates the admin UI + 404 cron, not t
 core serving. Auto-redirect recomputes the pre-trash permalink because
 `get_permalink()` already carries the `__trashed` suffix when the transition fires.
 
+## Dead-token alarm (2026-09-27)
+
+`App\Support\PluginAuthHealth` + two columns on `website_plugin_installs`
+(`auth_failing_since`, `last_auth_failure_at`).
+
+**Why:** a dead token is the quietest failure the platform has. The plugin
+degrades gracefully — feature flags fail open, pages still render — so the
+client sees a working plugin while every hourly call 401s into an access log
+nobody reads. pubgnamegenerator.net did exactly that from **2026-07-18 to
+2026-09-26** (two months), and everything the plugin feeds us — 404 batches,
+AI-crawler hits, heartbeats — silently stopped. It surfaced only during
+unrelated QA.
+
+- **Attribution is the hard part:** a 401 has no authenticated website. The
+  plugin's own User-Agent carries its home URL (`Serfix-SEO-WP/2.1.0;
+  https://example.com`, older builds `EBQ-SEO-WP/…`), which is enough to find
+  the Website. We only ever match sites **we already know**, so a forged header
+  cannot invent one or flag a stranger's domain
+  (`PluginAuthHealthTest::test_a_stranger_cannot_flag_someone_elses_site`).
+- `WebsiteApiAuth` records on all three 401 paths (missing / invalid / expired)
+  and clears on the first successful authentication. Both sides are throttled
+  to one write per hour per site via `Cache::add`, so the hot success path
+  costs nothing and a rejected request never becomes a 500 (all writes are
+  wrapped and fail silent).
+- `auth_failing_since` is set **once per run of failures**, never bumped — the
+  digest reports "63d", which is the number that makes the problem obvious.
+- Alarm threshold: failing **>24h** (so a reconnect in progress is not flagged)
+  **and** a failure within the last day (a site that stopped calling entirely —
+  plugin removed, site gone — is not worth chasing). One digest line per site
+  per week.
+- Recovery is client-side: they reconnect from the plugin's Serfix settings
+  page. Support note: the fastest check is `website_plugin_installs` for the
+  site, not the access log.
+
 ## AI Visibility — AI crawler logging + llms.txt (v2.1.0, 2026-09-26)
 
 | Class | Role | Key hooks |

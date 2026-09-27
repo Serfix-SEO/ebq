@@ -15,6 +15,7 @@ use App\Services\Reports\DataForSeoSpendMeter;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentImageHealth;
 use App\Support\FailedJobAlertBuffer;
+use App\Support\PluginAuthHealth;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -75,6 +76,7 @@ class SendFailedJobsAlert extends Command
 
         $imageLine = $this->imageHealthLine();
         $aeoLine = $this->aeoIngestLine();
+        $pluginAuthLine = $this->pluginAuthLine();
 
         // Collapse repeats (2026-08-26: ONE broken Hindi article re-failed on
         // every 15-min dispatcher tick → six identical digest emails). Each
@@ -122,7 +124,8 @@ class SendFailedJobsAlert extends Command
                 : Cache::add('failed-digest:catalog:'.$run->id, true, now()->addDays(3)));
 
         if ($freshGroups === [] && $stuckPending->isEmpty() && $spendLine === null
-            && $failedCatalogRuns->isEmpty() && $imageLine === null && $aeoLine === null) {
+            && $failedCatalogRuns->isEmpty() && $imageLine === null && $aeoLine === null
+            && $pluginAuthLine === null) {
             $this->rememberGroups($freshGroups, $mutedGroups);
             $this->info($mutedGroups === []
                 ? 'Nothing to report.'
@@ -138,6 +141,10 @@ class SendFailedJobsAlert extends Command
         }
         if ($aeoLine !== null) {
             $lines[] = $aeoLine;
+            $lines[] = '';
+        }
+        if ($pluginAuthLine !== null) {
+            $lines[] = $pluginAuthLine;
             $lines[] = '';
         }
         if ($spendLine !== null) {
@@ -238,6 +245,43 @@ class SendFailedJobsAlert extends Command
      * One line per day per condition (cache flag), like the spend warning: a
      * five-day outage should nag daily, not every fifteen minutes.
      */
+    /**
+     * WordPress installs whose token has died.
+     *
+     * The quietest failure we have: the plugin degrades gracefully, so a site
+     * can 401 on every hourly call for months while the client sees a plugin
+     * that looks fine and we see nothing at all — pubgnamegenerator.net did
+     * exactly that from 2026-07-18 to 2026-09-26. Everything the plugin feeds
+     * us (404 batches, AI-crawler hits, heartbeats) silently stops.
+     */
+    private function pluginAuthLine(): ?string
+    {
+        $failing = PluginAuthHealth::failingInstalls();
+        if ($failing->isEmpty()) {
+            return null;
+        }
+
+        // One line per site per week — a client who never reconnects must not
+        // re-report every fifteen minutes.
+        $fresh = $failing->filter(fn ($install) => $this->option('dry-run')
+            ? ! Cache::has('failed-digest:plugin-auth:'.$install->website_id)
+            : Cache::add('failed-digest:plugin-auth:'.$install->website_id, true, now()->addWeek()));
+
+        if ($fresh->isEmpty()) {
+            return null;
+        }
+
+        $detail = $fresh->take(5)->map(function ($install) {
+            $days = max(1, (int) $install->auth_failing_since->diffInDays(now()));
+
+            return ($install->website?->domain ?? $install->site_url ?? $install->website_id).' ('.$days.'d)';
+        })->implode(', ');
+
+        return 'PLUGIN AUTH: '.$fresh->count().' WordPress install(s) have been rejected on every API call — '
+            .$detail.'. Their token is dead or revoked; the plugin keeps working locally so the client will not '
+            .'report it. They must reconnect from the plugin\'s Serfix settings page.';
+    }
+
     /**
      * AI Visibility ingest health: a site that WAS reporting AI-crawler hits
      * and has gone quiet.

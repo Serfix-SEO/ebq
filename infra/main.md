@@ -287,6 +287,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-27 — A WordPress install with a dead token now raises an alarm.**
+  `PluginAuthHealth` remembers 401s from our own plugin, attributed via the site
+  URL in its User-Agent (a rejected request carries no website), and
+  `ebq:failed-jobs-alert` reports any install failing >24h with how many days it
+  has been broken. Found because pubgnamegenerator.net had 401'd on every hourly
+  call since 2026-07-18 — two months of silence, because the plugin degrades
+  gracefully and nobody reads access logs.
+  infra/wordpress-plugin/plugin-features.md "Dead-token alarm".
 - **2026-09-26 — AI Visibility (AEO phase 1).** A new `/content/ai-visibility`
   page answers "can the AI answer engines read you, and are they coming?" from
   signals that cost nothing: robots.txt evaluated **per AI agent** (the
