@@ -72,7 +72,9 @@ prints installed vs latest plus a `_wpnonce`), then POST `action=ebq_plugin_upda
 with that nonce to `admin-post.php`. It answered "Plugin updated successfully",
 installed 2.1.1. A `ContentAuthor` was then created for that site and one live
 article re-sent with `forceUpdate: true`; the live page's `Person` changed from
-`hamzaajaz251` to the named author with every `@id` reference resolving.
+`hamzaajaz251` to the named author with every `@id` reference resolving. The six
+most recent posts have since been re-sent and verified; **the site has 62 live
+posts**, so 56 still carry the WordPress account until they are republished.
 
 ## Earlier state (2026-07-11)
 
