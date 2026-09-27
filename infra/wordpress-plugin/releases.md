@@ -64,6 +64,16 @@ Not yet released, sitting uncommitted in the plugin repo: setup-wizard
 (`src/setup/*`) and readability (`src/sidebar/analysis/readability.js`) work.
 `build/` does not contain it, so it is not in 2.1.1.
 
+**QA install updated and the fix verified end to end (2026-09-27).** SSH to
+pubgnamegenerator.net is still refusing the stored password, so the update went
+through wp-admin over curl: log in at `wp-login.php`, GET
+`/wp-admin/admin.php?page=ebq-hq-plugin-update` (it force-checks on load and
+prints installed vs latest plus a `_wpnonce`), then POST `action=ebq_plugin_update`
+with that nonce to `admin-post.php`. It answered "Plugin updated successfully",
+installed 2.1.1. A `ContentAuthor` was then created for that site and one live
+article re-sent with `forceUpdate: true`; the live page's `Person` changed from
+`hamzaajaz251` to the named author with every `@id` reference resolving.
+
 ## Earlier state (2026-07-11)
 
 **v2.0.10 was the published `stable` release; v2.0.13 built, installed on the

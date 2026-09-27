@@ -931,6 +931,16 @@ side is also what the original design asked for
   author anywhere the `author` key is now omitted instead of pointing at a node
   that was never emitted. Older installs ignore the unregistered meta key, so
   sending it is safe before they update.
+  **Verified live on pubgnamegenerator.net (2026-09-27, plugin 2.1.1):** the
+  republished article's `Person` reads `Hamza Ajaz` (was `hamzaajaz251`), the
+  `Article.author.@id` resolves to that node, and all 10 `@id` references in the
+  8-node graph resolve — no dangling reference.
+  ⚠️ **The author only reaches a post when that post is next published or
+  republished**, because `_ebq_author` is post meta. Articles already live keep
+  the WordPress account in their graph until re-sent — confirmed on two
+  untouched posts on the same site, which still read `hamzaajaz251`. Setting an
+  author is therefore not retroactive; a site that wants its back catalogue
+  attributed needs those articles republished.
 - **Rule behaviour on real articles** (40 current articles, re-scored read-only
   2026-09-27): 40–83, median 64, 12 distinct values — the rubric discriminates.
   `answer_first` passes 7/40 and `cited_claims` 12/40 on pre-phase-2 articles,
