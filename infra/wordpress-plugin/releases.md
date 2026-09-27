@@ -12,10 +12,62 @@ that public path. Installs poll `GET /wordpress/plugin/version` (public, unauthe
 to learn the latest version + download URL, and the WP native update flow pulls the ZIP
 from `GET /wordpress/plugin.zip`.
 
-## Current state (2026-07-11)
+## Publishing a release — two landmines (2026-09-27)
 
-**v2.0.10 is the published `stable` release; v2.0.13 is built, installed on the
-QA install, and awaiting publish** (ZIP at `ebq-wordpress-plugin/ebq-seo.zip`;
+Both bit during the 2.1.1 publish; read before shipping the next one.
+
+1. **Build the ZIP from a clean checkout, and verify it against `HEAD`.**
+   `npm run dist` packages the working tree, so any uncommitted edit is baked
+   into the release. Proven: the published **2.1.0** ZIP contained a
+   `class-ebq-plugin-update-page.php` fix that had never been committed, so the
+   repository did not describe what was running on installs — and a 2.1.1 built
+   from a clean checkout would have silently reverted it (now committed). Build
+   in a throwaway worktree and diff every shipped file:
+
+       git worktree add -q --detach /tmp/plugin-clean HEAD
+       ln -s <repo>/node_modules /tmp/plugin-clean/node_modules
+       (cd /tmp/plugin-clean && node scripts/make-dist.cjs)   # build/ is committed; no webpack run needed
+       unzip -p ebq-seo.zip ebq-seo/<path> | md5sum   vs   git show HEAD:<path> | md5sum
+
+   `src/` is excluded by `.distignore`, so only `build/` (committed) and PHP ship.
+
+2. **Never let production repackage from its own plugin checkout.**
+   `WordPressPluginSourceService::syncVersionAndPackage()` runs
+   `ebq:package-plugin`, which zips `base_path('ebq-wordpress-plugin')` **on the
+   production box**. That checkout is at **v2.0.15 with a dozen local
+   modifications** (verified 2026-09-27) and its `ebq-seo.php` still says
+   2.0.22, so any publish that goes through the packaging path — the admin UI
+   with no ZIP attached, or a *scheduled* release via
+   `PluginReleaseResolver::publishScheduled()` — would ship 2.0.15 code labelled
+   with the new version number. **Always attach the ZIP** (admin UI
+   `publish_mode=now` with a file, which calls `promoteUploadedZipToPublic()`
+   instead). Uploaded ZIPs live on `disk('local')`, whose root is
+   `storage/app/private`, so the real path is
+   `storage/app/private/plugin-releases/ebq-seo-<version>-<channel>.zip` —
+   the stray copies in `storage/app/plugin-releases/` are ignored by the app.
+
+   Verify after publishing:
+
+       curl -s https://serfix.io/wordpress/plugin/version
+       curl -sL 'https://serfix.io/wordpress/plugin.zip?channel=stable' | md5sum   # must equal the built ZIP
+
+## Current state (2026-09-27)
+
+**v2.1.1 is the published `stable` release** (published 2026-09-27 11:02 UTC
+from the uploaded ZIP; update channel verified byte-identical to the build).
+It carries the author-entity fix: Serfix sends `_ebq_author` and the plugin
+builds its Person node from it, with the Article's `author` reference routed
+through one `author_id()` so the node and the reference cannot disagree. 2.1.0
+is `rolled_back` as usual — `markPublished()` demotes the previous row.
+
+Not yet released, sitting uncommitted in the plugin repo: setup-wizard
+(`src/setup/*`) and readability (`src/sidebar/analysis/readability.js`) work.
+`build/` does not contain it, so it is not in 2.1.1.
+
+## Earlier state (2026-07-11)
+
+**v2.0.10 was the published `stable` release; v2.0.13 built, installed on the
+QA install, awaiting publish** (ZIP at `ebq-wordpress-plugin/ebq-seo.zip`;
 2.0.11/2.0.12 were never published — 2.0.13 supersedes them). **2.0.13** carries
 the wizard full-input-coverage UI (H1/LSI/volume cards below) — split from
 2.0.12 because two different bundles had shipped under the 2.0.12 version
