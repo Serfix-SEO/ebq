@@ -2,43 +2,64 @@
 
 namespace App\Support;
 
+use App\Models\PluginAuthFailure;
 use App\Models\Website;
-use App\Models\WebsitePluginInstall;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Remembers WordPress installs whose API calls keep coming back 401.
+ * Remembers WordPress installs whose API calls keep being rejected.
  *
  * The problem this exists for: a dead token is the quietest failure the
- * platform has. The plugin keeps rendering, feature flags fail open, no
- * exception is thrown and no job fails — the site simply stops exchanging data
- * with us. pubgnamegenerator.net did exactly that for two months
- * (2026-07-18 → 2026-09-26) and we only found out while testing something else.
+ * platform has. The plugin degrades gracefully — feature flags fail open,
+ * pages still render — so the client sees a working plugin while every hourly
+ * call is turned away into an access log nobody reads.
  *
- * Attribution is the awkward part: a 401 has no authenticated website, so there
- * is nothing to key on. The plugin's own User-Agent carries its home URL
- * ("Serfix-SEO-WP/2.1.0; https://example.com"), which is enough to find the
- * Website — and we only ever match sites we already know, so a forged header
- * cannot invent one.
+ * Two shapes, both seen on production (2026-09-27 scan):
+ *
+ *   - **token_rejected (401)** — no such token. Usually because the website was
+ *     deleted on our side and its tokens cascaded away. gbwhatsapp.app has been
+ *     posting every half hour on plugin v1.0.5 against an account that no
+ *     longer exists; the logs only go back 14 days and it fails in all of them.
+ *   - **website_missing (403)** — the token row survived but its website did
+ *     not, so Sanctum resolves a tokenable of null. simcardairportbali.com did
+ *     this for six days before the client gave up and removed the plugin.
+ *
+ * Keyed by HOST, never by website: the installs worth chasing are precisely the
+ * ones we can no longer attribute to a customer. The host comes from the
+ * plugin's own User-Agent, which is the only identifier a rejected request
+ * carries, and it is never trusted for anything but this bookkeeping.
  */
 class PluginAuthHealth
 {
     /** Below this, a failure is just a reconnect in progress. */
     public const ALARM_AFTER_HOURS = 24;
 
-    /** One write per site per hour is plenty for an hourly heartbeat. */
+    /** One write per host per hour is plenty for an hourly heartbeat. */
     private const THROTTLE_SECONDS = 3600;
 
     /**
-     * Record that a request from this plugin install failed to authenticate.
+     * Ceiling on actively-failing hosts we will track.
      *
-     * Deliberately cheap and silent: throttled to one DB write per site per
-     * hour, matches only existing websites, and never throws — this runs on a
-     * rejected request and must not turn a 401 into a 500.
+     * The host comes from a header, so anyone can claim one. The throttle caps
+     * a single host to one row an hour, but not the number of distinct hosts a
+     * script could invent. This bounds the table; real life is a handful of
+     * installs, so hitting it means someone is playing, not that we are missing
+     * customers.
      */
-    public static function recordFailure(?string $userAgent): void
+    private const MAX_TRACKED_HOSTS = 500;
+
+    /** Rows quiet this long are history — the digest already ignores them. */
+    private const PRUNE_AFTER_DAYS = 30;
+
+    /**
+     * Record that a request from one of our plugin installs was rejected.
+     *
+     * Deliberately cheap and silent: throttled, and never throws — this runs on
+     * an already-failing request and must not turn a 401 into a 500.
+     */
+    public static function recordFailure(?string $userAgent, string $reason = PluginAuthFailure::REASON_TOKEN_REJECTED): void
     {
         $host = self::hostFromUserAgent($userAgent);
         if ($host === null) {
@@ -49,27 +70,36 @@ class PluginAuthHealth
         }
 
         try {
+            // A website is a bonus, not a requirement. When it is missing, the
+            // row still gets written — that is the case worth alarming on.
             $website = Website::query()
                 ->where('normalized_domain', $host)
                 ->orWhere('domain', $host)
                 ->first();
-            if ($website === null) {
+
+            $row = PluginAuthFailure::query()->firstOrNew(['host' => $host]);
+            if (! $row->exists && self::tracked() >= self::MAX_TRACKED_HOSTS) {
+                Log::warning('plugin.auth_health_capped', ['host' => $host, 'tracked' => self::MAX_TRACKED_HOSTS]);
+
                 return;
             }
-
-            $install = WebsitePluginInstall::query()->firstOrNew(['website_id' => $website->id]);
-            $install->last_auth_failure_at = now();
-            // Only the FIRST failure of a run sets the start, so the digest can
-            // say how long this has been broken rather than "since a minute ago"
-            // on every hourly retry.
-            $install->auth_failing_since ??= now();
-            $install->site_url ??= 'https://'.$host;
-            $install->save();
+            $row->website_id = $website?->id;
+            $row->site_url ??= 'https://'.$host;
+            $row->plugin_version = self::versionFromUserAgent($userAgent) ?? $row->plugin_version;
+            $row->reason = $reason;
+            // Set once per run of failures, never bumped: "failing for 63 days"
+            // is the number that makes the problem obvious, and a per-request
+            // reset would make a months-old outage look a minute old.
+            $row->first_seen_at ??= now();
+            $row->last_seen_at = now();
+            $row->failures = (int) $row->failures + 1;
+            $row->save();
 
             Log::info('plugin.auth_failing', [
-                'website_id' => $website->id,
                 'host' => $host,
-                'since' => $install->auth_failing_since?->toDateTimeString(),
+                'reason' => $reason,
+                'website_id' => $website?->id,
+                'since' => $row->first_seen_at?->toDateTimeString(),
             ]);
         } catch (\Throwable $e) {
             Log::debug('plugin.auth_health_write_failed', ['error' => mb_substr($e->getMessage(), 0, 120)]);
@@ -79,43 +109,61 @@ class PluginAuthHealth
     /**
      * A request authenticated, so whatever was wrong is fixed.
      *
-     * Guarded by its own hourly cache key so the success path — which every
-     * healthy install hits constantly — does not pay for a query per request.
+     * Guarded by its own hourly key so the success path — which every healthy
+     * install hits constantly — does not pay for a query per request.
      */
-    public static function recordSuccess(string $websiteId): void
+    public static function recordSuccess(Website $website): void
     {
-        if (! Cache::add('plugin-auth-ok:'.$websiteId, true, self::THROTTLE_SECONDS)) {
+        if (! Cache::add('plugin-auth-ok:'.$website->id, true, self::THROTTLE_SECONDS)) {
             return;
         }
 
         try {
-            WebsitePluginInstall::query()
-                ->where('website_id', $websiteId)
-                ->whereNotNull('auth_failing_since')
-                ->update(['auth_failing_since' => null, 'last_auth_failure_at' => null]);
+            $host = strtolower((string) ($website->normalized_domain ?: $website->domain));
+            PluginAuthFailure::query()
+                ->where('website_id', $website->id)
+                ->orWhere('host', $host)
+                ->delete();
         } catch (\Throwable $e) {
             Log::debug('plugin.auth_health_clear_failed', ['error' => mb_substr($e->getMessage(), 0, 120)]);
         }
     }
 
+    private static function tracked(): int
+    {
+        return PluginAuthFailure::query()->where('last_seen_at', '>', now()->subDays(self::PRUNE_AFTER_DAYS))->count();
+    }
+
     /**
-     * Installs that have been failing long enough to be a real fault rather
-     * than a reconnect, and that are still trying.
+     * Forget installs that stopped calling a month ago — they were uninstalled,
+     * and keeping them would slowly turn this into a graveyard.
+     */
+    public static function prune(): int
+    {
+        try {
+            return PluginAuthFailure::query()->where('last_seen_at', '<', now()->subDays(self::PRUNE_AFTER_DAYS))->delete();
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
+     * Installs failing long enough to be a real fault rather than a reconnect,
+     * and still calling.
      *
-     * "Still trying" matters: a site that stopped calling altogether (plugin
-     * removed, site gone) is not something to chase, so the last failure must
-     * be recent.
+     * "Still calling" matters: an install that stopped altogether has been
+     * removed, and chasing it wastes the reader's attention — which is how an
+     * alarm stops being believed.
      *
-     * @return Collection<int, WebsitePluginInstall>
+     * @return Collection<int, PluginAuthFailure>
      */
     public static function failingInstalls(): Collection
     {
-        return WebsitePluginInstall::query()
+        return PluginAuthFailure::query()
             ->with('website:id,domain,user_id')
-            ->whereNotNull('auth_failing_since')
-            ->where('auth_failing_since', '<', now()->subHours(self::ALARM_AFTER_HOURS))
-            ->where('last_auth_failure_at', '>', now()->subDay())
-            ->orderBy('auth_failing_since')
+            ->where('first_seen_at', '<', now()->subHours(self::ALARM_AFTER_HOURS))
+            ->where('last_seen_at', '>', now()->subDay())
+            ->orderBy('first_seen_at')
             ->get();
     }
 
@@ -125,7 +173,8 @@ class PluginAuthHealth
      *
      * The UA is set by EBQ_Api_Client::request():
      *   "Serfix-SEO-WP/2.1.0; https://example.com"
-     * Older builds used the EBQ name, which still exists in the wild.
+     * Older builds used the EBQ name and are still in the wild — gbwhatsapp.app
+     * is running 1.0.5 — so both are matched.
      */
     public static function hostFromUserAgent(?string $userAgent): ?string
     {
@@ -141,5 +190,15 @@ class PluginAuthHealth
         $host = preg_replace('/^www\./', '', $host) ?? $host;
 
         return $host !== '' ? $host : null;
+    }
+
+    /** The plugin build that is calling, so the digest can say "still on 1.0.5". */
+    public static function versionFromUserAgent(?string $userAgent): ?string
+    {
+        if (preg_match('#^(?:Serfix|EBQ)-SEO-WP/([0-9][0-9A-Za-z.\-]*)#i', trim((string) $userAgent), $m) !== 1) {
+            return null;
+        }
+
+        return mb_substr($m[1], 0, 40);
     }
 }

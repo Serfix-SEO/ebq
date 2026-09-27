@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\PluginAuthFailure;
 use App\Models\Website;
 use App\Services\ClientActivityLogger;
 use App\Support\PluginAuthHealth;
@@ -51,6 +52,13 @@ class WebsiteApiAuth
 
         $tokenable = $accessToken->tokenable;
         if (! $tokenable instanceof Website) {
+            // The token row outlived its website: deleting a site cascades its
+            // tokens, but a token can survive that race and then resolve to
+            // nothing. It answers 403 rather than 401, and is just as broken —
+            // simcardairportbali.com did this for six days before the client
+            // gave up and removed the plugin.
+            PluginAuthHealth::recordFailure($request->userAgent(), PluginAuthFailure::REASON_WEBSITE_MISSING);
+
             return response()->json(['error' => 'invalid_tokenable'], 403);
         }
 
@@ -61,7 +69,7 @@ class WebsiteApiAuth
         $accessToken->forceFill(['last_used_at' => now()])->save();
 
         // Authenticated, so any recorded failure run for this site is over.
-        PluginAuthHealth::recordSuccess((string) $tokenable->id);
+        PluginAuthHealth::recordSuccess($tokenable);
 
         $request->attributes->set('api_website', $tokenable);
         $request->attributes->set('api_token', $accessToken);

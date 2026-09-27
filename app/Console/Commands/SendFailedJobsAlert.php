@@ -246,13 +246,18 @@ class SendFailedJobsAlert extends Command
      * five-day outage should nag daily, not every fifteen minutes.
      */
     /**
-     * WordPress installs whose token has died.
+     * WordPress installs that keep being turned away.
      *
      * The quietest failure we have: the plugin degrades gracefully, so a site
-     * can 401 on every hourly call for months while the client sees a plugin
-     * that looks fine and we see nothing at all — pubgnamegenerator.net did
-     * exactly that from 2026-07-18 to 2026-09-26. Everything the plugin feeds
-     * us (404 batches, AI-crawler hits, heartbeats) silently stops.
+     * can be rejected on every hourly call for months while the client sees a
+     * plugin that looks fine and we see nothing — pubgnamegenerator.net did it
+     * from 2026-07-18 to 2026-09-26. Everything the plugin feeds us (404
+     * batches, AI-crawler hits, heartbeats) silently stops.
+     *
+     * Two different conversations, so the line separates them: a site we still
+     * have needs the client to reconnect, while a site we no longer have is
+     * someone running our plugin against a deleted account — they need to
+     * uninstall it, and until they do they will hammer us forever.
      */
     private function pluginAuthLine(): ?string
     {
@@ -261,25 +266,39 @@ class SendFailedJobsAlert extends Command
             return null;
         }
 
-        // One line per site per week — a client who never reconnects must not
+        // One line per host per week — a client who never reconnects must not
         // re-report every fifteen minutes.
-        $fresh = $failing->filter(fn ($install) => $this->option('dry-run')
-            ? ! Cache::has('failed-digest:plugin-auth:'.$install->website_id)
-            : Cache::add('failed-digest:plugin-auth:'.$install->website_id, true, now()->addWeek()));
+        $fresh = $failing->filter(fn ($row) => $this->option('dry-run')
+            ? ! Cache::has('failed-digest:plugin-auth:'.$row->host)
+            : Cache::add('failed-digest:plugin-auth:'.$row->host, true, now()->addWeek()));
 
         if ($fresh->isEmpty()) {
             return null;
         }
 
-        $detail = $fresh->take(5)->map(function ($install) {
-            $days = max(1, (int) $install->auth_failing_since->diffInDays(now()));
+        $describe = fn ($row) => sprintf(
+            '%s (%dd, %d calls%s)',
+            $row->host,
+            $row->failingDays(),
+            $row->failures,
+            $row->plugin_version !== null ? ', plugin '.$row->plugin_version : ''
+        );
 
-            return ($install->website?->domain ?? $install->site_url ?? $install->website_id).' ('.$days.'d)';
-        })->implode(', ');
+        $known = $fresh->reject(fn ($row) => $row->isOrphan());
+        $orphans = $fresh->filter(fn ($row) => $row->isOrphan());
 
-        return 'PLUGIN AUTH: '.$fresh->count().' WordPress install(s) have been rejected on every API call — '
-            .$detail.'. Their token is dead or revoked; the plugin keeps working locally so the client will not '
-            .'report it. They must reconnect from the plugin\'s Serfix settings page.';
+        $parts = [];
+        if ($known->isNotEmpty()) {
+            $parts[] = 'needs a reconnect from the plugin\'s Serfix settings page: '
+                .$known->take(5)->map($describe)->implode(', ');
+        }
+        if ($orphans->isNotEmpty()) {
+            $parts[] = 'running our plugin against an account that no longer exists (they should uninstall it; '
+                .'until they do it keeps calling): '.$orphans->take(5)->map($describe)->implode(', ');
+        }
+
+        return 'PLUGIN AUTH: '.$fresh->count().' WordPress install(s) rejected on every API call — '
+            .implode('. Also ', $parts).'.';
     }
 
     /**

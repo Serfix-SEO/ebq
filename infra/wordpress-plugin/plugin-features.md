@@ -118,37 +118,51 @@ core serving. Auto-redirect recomputes the pre-trash permalink because
 
 ## Dead-token alarm (2026-09-27)
 
-`App\Support\PluginAuthHealth` + two columns on `website_plugin_installs`
-(`auth_failing_since`, `last_auth_failure_at`).
+`App\Support\PluginAuthHealth` + table `plugin_auth_failures`.
 
 **Why:** a dead token is the quietest failure the platform has. The plugin
 degrades gracefully — feature flags fail open, pages still render — so the
-client sees a working plugin while every hourly call 401s into an access log
-nobody reads. pubgnamegenerator.net did exactly that from **2026-07-18 to
-2026-09-26** (two months), and everything the plugin feeds us — 404 batches,
-AI-crawler hits, heartbeats — silently stopped. It surfaced only during
+client sees a working plugin while every hourly call is turned away into an
+access log nobody reads. pubgnamegenerator.net did exactly that from
+**2026-07-18 to 2026-09-26**; everything the plugin feeds us (404 batches,
+AI-crawler hits, heartbeats) silently stopped, and it surfaced only during
 unrelated QA.
 
-- **Attribution is the hard part:** a 401 has no authenticated website. The
-  plugin's own User-Agent carries its home URL (`Serfix-SEO-WP/2.1.0;
-  https://example.com`, older builds `EBQ-SEO-WP/…`), which is enough to find
-  the Website. We only ever match sites **we already know**, so a forged header
-  cannot invent one or flag a stranger's domain
-  (`PluginAuthHealthTest::test_a_stranger_cannot_flag_someone_elses_site`).
-- `WebsiteApiAuth` records on all three 401 paths (missing / invalid / expired)
-  and clears on the first successful authentication. Both sides are throttled
-  to one write per hour per site via `Cache::add`, so the hot success path
-  costs nothing and a rejected request never becomes a 500 (all writes are
-  wrapped and fail silent).
-- `auth_failing_since` is set **once per run of failures**, never bumped — the
-  digest reports "63d", which is the number that makes the problem obvious.
-- Alarm threshold: failing **>24h** (so a reconnect in progress is not flagged)
-  **and** a failure within the last day (a site that stopped calling entirely —
-  plugin removed, site gone — is not worth chasing). One digest line per site
+**Keyed by host, not by website — this is the load-bearing decision.** The
+first cut of this alarm stored the state on `website_plugin_installs` and could
+only remember a failure for a site we still had. The production log scan showed
+the opposite is the normal case:
+
+| Site | Shape | Evidence |
+|---|---|---|
+| gbwhatsapp.app | **401**, no Website row at all | plugin **v1.0.5**, every ~30 min, all 14 days of retained logs |
+| simcardairportbali.com | **403** `invalid_tokenable` — token row outlived its website | 208 calls over 6 days, then the client uninstalled |
+| pubgnamegenerator.net | 401, Website row intact, token dead | 309 calls over the retained window |
+
+So `website_id` is nullable and `nullOnDelete`: a row with no website means
+*someone is running our plugin against an account that no longer exists*, which
+is a different instruction (uninstall) from *your token needs reconnecting*.
+The digest says both separately.
+
+- `WebsiteApiAuth` records on all three 401 paths **and** on the 403
+  `invalid_tokenable` path. `insufficient_ability` is deliberately NOT recorded
+  — that is a scope mistake, not a dead install.
+- Attribution comes from the plugin's own User-Agent
+  (`Serfix-SEO-WP/2.1.0; https://example.com`, older builds `EBQ-SEO-WP/…`),
+  the only identifier a rejected request carries. The version is stored too, so
+  the digest can say "still on 1.0.5".
+- `first_seen_at` is set once per run and never bumped: "63d" is the number that
+  makes the problem obvious.
+- ⚠️ **The host comes from a header, so anyone can claim one.** Writes are
+  throttled to one per host per hour, new hosts stop being tracked past
+  `MAX_TRACKED_HOSTS` (500 active), and rows quiet for 30 days are pruned by the
+  digest run. Hitting the cap means someone is playing, not that we are missing
+  customers.
+- Alarm threshold: failing **>24h** (a reconnect in progress is not a fault)
+  **and** still calling within the last day (an install that stopped has been
+  removed; chasing it is how an alarm stops being believed). One line per host
   per week.
-- Recovery is client-side: they reconnect from the plugin's Serfix settings
-  page. Support note: the fastest check is `website_plugin_installs` for the
-  site, not the access log.
+- Support: check `plugin_auth_failures` for the host, not the access log.
 
 ## AI Visibility — AI crawler logging + llms.txt (v2.1.0, 2026-09-26)
 

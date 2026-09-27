@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Console\Commands\SendFailedJobsAlert;
 use App\Mail\FailedJobsDigestMail;
+use App\Models\PluginAuthFailure;
 use App\Models\User;
 use App\Models\Website;
-use App\Models\WebsitePluginInstall;
 use App\Support\PluginAuthHealth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -47,20 +47,56 @@ class PluginAuthHealthTest extends TestCase
             ->getJson('/api/v1/website-features')
             ->assertUnauthorized();
 
-        $install = WebsitePluginInstall::where('website_id', $website->id)->first();
-        $this->assertNotNull($install, 'the 401 should be attributed to the site named in the UA');
-        $this->assertNotNull($install->auth_failing_since);
-        $this->assertNotNull($install->last_auth_failure_at);
+        $row = PluginAuthFailure::where('host', 'example.com')->first();
+        $this->assertNotNull($row, 'the 401 should be attributed to the site named in the UA');
+        $this->assertSame($website->id, $row->website_id);
+        $this->assertSame(PluginAuthFailure::REASON_TOKEN_REJECTED, $row->reason);
+        $this->assertSame('2.1.0', $row->plugin_version);
+        $this->assertSame(1, $row->failures);
+    }
+
+    public function test_an_install_whose_website_was_deleted_is_still_recorded(): void
+    {
+        // The shape the first version of this alarm was blind to, and the one
+        // production actually has: gbwhatsapp.app posts every half hour on
+        // plugin 1.0.5 against an account that no longer exists.
+        $this->withHeaders(['User-Agent' => 'EBQ-SEO-WP/1.0.5; https://gbwhatsapp.app'])
+            ->withToken('long-dead')
+            ->getJson('/api/v1/website-features')
+            ->assertUnauthorized();
+
+        $row = PluginAuthFailure::where('host', 'gbwhatsapp.app')->first();
+        $this->assertNotNull($row, 'an install with no website of ours is exactly what we want to hear about');
+        $this->assertNull($row->website_id);
+        $this->assertTrue($row->isOrphan());
+        $this->assertSame('1.0.5', $row->plugin_version);
+    }
+
+    public function test_a_surviving_token_whose_website_is_gone_is_recorded_too(): void
+    {
+        // Sanctum resolves a tokenable of null, so this answers 403 rather than
+        // 401 — equally broken (simcardairportbali.com, six days of it).
+        $website = $this->site('gone.test');
+        $token = $website->createToken('test', ['read:insights'])->plainTextToken;
+        $website->forceDelete();
+
+        $this->withHeaders(['User-Agent' => 'Serfix-SEO-WP/2.1.0; https://gone.test'])
+            ->withToken($token)
+            ->getJson('/api/v1/website-features')
+            ->assertForbidden();
+
+        $row = PluginAuthFailure::where('host', 'gone.test')->first();
+        $this->assertNotNull($row);
+        $this->assertSame(PluginAuthFailure::REASON_WEBSITE_MISSING, $row->reason);
     }
 
     public function test_repeated_failures_keep_the_original_start_time(): void
     {
         $website = $this->site();
         $started = now()->subDays(9);
-        WebsitePluginInstall::create([
-            'website_id' => $website->id,
-            'auth_failing_since' => $started,
-            'last_auth_failure_at' => $started,
+        PluginAuthFailure::create([
+            'host' => 'example.com', 'website_id' => $website->id,
+            'first_seen_at' => $started, 'last_seen_at' => $started, 'failures' => 40,
         ]);
 
         $this->unthrottle();
@@ -69,20 +105,21 @@ class PluginAuthHealthTest extends TestCase
             ->getJson('/api/v1/website-features')
             ->assertUnauthorized();
 
-        $install = WebsitePluginInstall::where('website_id', $website->id)->first();
+        $row = PluginAuthFailure::where('host', 'example.com')->first();
         // "Failing for 9 days" is the whole point — a per-request reset would
         // make a two-month outage look like it started a minute ago.
-        $this->assertSame($started->toDateString(), $install->auth_failing_since->toDateString());
-        $this->assertTrue($install->last_auth_failure_at->isToday());
+        $this->assertSame($started->toDateString(), $row->first_seen_at->toDateString());
+        $this->assertTrue($row->last_seen_at->isToday());
+        $this->assertSame(41, $row->failures);
+        $this->assertSame(9, $row->failingDays());
     }
 
     public function test_a_successful_call_clears_the_failure(): void
     {
         $website = $this->site();
-        WebsitePluginInstall::create([
-            'website_id' => $website->id,
-            'auth_failing_since' => now()->subDays(30),
-            'last_auth_failure_at' => now()->subHour(),
+        PluginAuthFailure::create([
+            'host' => 'example.com', 'website_id' => $website->id,
+            'first_seen_at' => now()->subDays(30), 'last_seen_at' => now()->subHour(), 'failures' => 700,
         ]);
         $token = $website->createToken('test', ['read:insights'])->plainTextToken;
 
@@ -92,9 +129,7 @@ class PluginAuthHealthTest extends TestCase
             ->getJson('/api/v1/website-features')
             ->assertOk();
 
-        $install = WebsitePluginInstall::where('website_id', $website->id)->first();
-        $this->assertNull($install->auth_failing_since);
-        $this->assertNull($install->last_auth_failure_at);
+        $this->assertSame(0, PluginAuthFailure::count(), 'a reconnect ends the run');
     }
 
     public function test_a_stranger_cannot_flag_someone_elses_site(): void
@@ -107,7 +142,7 @@ class PluginAuthHealthTest extends TestCase
             ->getJson('/api/v1/website-features')
             ->assertUnauthorized();
 
-        $this->assertSame(0, WebsitePluginInstall::count());
+        $this->assertSame(0, PluginAuthFailure::count());
 
         // Our plugin's UA, but a site we have never heard of.
         $this->unthrottle();
@@ -116,7 +151,8 @@ class PluginAuthHealthTest extends TestCase
             ->getJson('/api/v1/website-features')
             ->assertUnauthorized();
 
-        $this->assertSame(0, WebsitePluginInstall::count(), 'we only ever match websites we already know');
+        $this->assertSame(1, PluginAuthFailure::count(), 'an unknown site is recorded, just without a website link');
+        $this->assertTrue(PluginAuthFailure::first()->isOrphan());
     }
 
     public function test_the_user_agent_parser_handles_the_shapes_in_the_wild(): void
@@ -131,11 +167,10 @@ class PluginAuthHealthTest extends TestCase
 
     public function test_a_brief_failure_is_not_alarmed(): void
     {
-        $website = $this->site();
-        WebsitePluginInstall::create([
-            'website_id' => $website->id,
-            'auth_failing_since' => now()->subHours(2),   // mid-reconnect
-            'last_auth_failure_at' => now(),
+        PluginAuthFailure::create([
+            'host' => 'example.com',
+            'first_seen_at' => now()->subHours(2),   // mid-reconnect
+            'last_seen_at' => now(), 'failures' => 2,
         ]);
 
         $this->assertCount(0, PluginAuthHealth::failingInstalls());
@@ -143,14 +178,29 @@ class PluginAuthHealthTest extends TestCase
 
     public function test_a_site_that_stopped_calling_is_not_chased(): void
     {
-        $website = $this->site();
-        WebsitePluginInstall::create([
-            'website_id' => $website->id,
-            'auth_failing_since' => now()->subDays(40),
-            'last_auth_failure_at' => now()->subDays(10),   // plugin removed, site gone
+        PluginAuthFailure::create([
+            'host' => 'quiet.test',
+            'first_seen_at' => now()->subDays(40),
+            'last_seen_at' => now()->subDays(10),   // plugin removed
+            'failures' => 300,
         ]);
 
         $this->assertCount(0, PluginAuthHealth::failingInstalls(), 'nothing to chase if it stopped trying');
+    }
+
+    public function test_installs_that_gave_up_a_month_ago_are_pruned(): void
+    {
+        PluginAuthFailure::create([
+            'host' => 'ancient.test',
+            'first_seen_at' => now()->subDays(90), 'last_seen_at' => now()->subDays(45), 'failures' => 9,
+        ]);
+        PluginAuthFailure::create([
+            'host' => 'current.test',
+            'first_seen_at' => now()->subDays(5), 'last_seen_at' => now(), 'failures' => 9,
+        ]);
+
+        $this->assertSame(1, PluginAuthHealth::prune());
+        $this->assertSame(['current.test'], PluginAuthFailure::pluck('host')->all());
     }
 
     public function test_the_digest_reports_it_once_with_how_long_it_has_been_broken(): void
@@ -158,17 +208,26 @@ class PluginAuthHealthTest extends TestCase
         Mail::fake();
         User::factory()->create(['is_admin' => true]);
         $website = $this->site('pubgnamegenerator.net');
-        WebsitePluginInstall::create([
-            'website_id' => $website->id,
-            'auth_failing_since' => now()->subDays(63),
-            'last_auth_failure_at' => now()->subMinutes(20),
+        PluginAuthFailure::create([
+            'host' => 'pubgnamegenerator.net', 'website_id' => $website->id,
+            'first_seen_at' => now()->subDays(63), 'last_seen_at' => now()->subMinutes(20),
+            'failures' => 1500, 'plugin_version' => '2.0.22',
+        ]);
+        PluginAuthFailure::create([
+            'host' => 'gbwhatsapp.app', 'website_id' => null,
+            'first_seen_at' => now()->subDays(14), 'last_seen_at' => now()->subMinutes(5),
+            'failures' => 268, 'plugin_version' => '1.0.5',
         ]);
 
         $this->artisan(SendFailedJobsAlert::class)->assertSuccessful();
 
         Mail::assertSent(FailedJobsDigestMail::class, fn (FailedJobsDigestMail $mail) => str_contains($mail->body, 'PLUGIN AUTH')
             && str_contains($mail->body, 'pubgnamegenerator.net')
-            && str_contains($mail->body, '63d'));
+            && str_contains($mail->body, '63d')
+            && str_contains($mail->body, 'reconnect')
+            && str_contains($mail->body, 'gbwhatsapp.app')
+            && str_contains($mail->body, 'no longer exists')
+            && str_contains($mail->body, 'plugin 1.0.5'));
 
         // Second run in the same week says nothing — an unreconnected client
         // must not re-report every fifteen minutes.
