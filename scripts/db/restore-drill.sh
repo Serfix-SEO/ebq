@@ -19,7 +19,19 @@ set -euo pipefail
 
 ENV_FILE="${EBQ_BACKUP_ENV:-/etc/ebq-backup.env}"
 [ -f "$ENV_FILE" ] && . "$ENV_FILE"
-: "${DB_USER:?set DB_USER}" "${DB_PASS:?set DB_PASS}" "${LOCAL_DIR:=/var/backups/ebq}"
+: "${LOCAL_DIR:=/var/backups/ebq}"
+
+# The drill needs CREATE/DROP, which the BACKUP user deliberately does not have
+# — it can read every schema and write none, and that boundary is worth keeping
+# (it is also why the old version's disaster would have needed a privileged user
+# to happen at all). So: run this as root, where MariaDB's unix-socket auth
+# applies, or set DRILL_USER/DRILL_PASS for an account with rights on the
+# scratch database. DB_USER/DB_PASS from the backup env are not used here.
+if [ -n "${DRILL_USER:-}" ]; then
+  MYSQL=(mysql -u "$DRILL_USER" -p"${DRILL_PASS:-}")
+else
+  MYSQL=(mysql)
+fi
 
 # Which schema to prove. The app's data by default; override to drill another.
 SOURCE_DB="${SOURCE_DB:-ebq_v2}"
@@ -66,21 +78,20 @@ fi
 LINES="$(extract | wc -l)"
 [ "$LINES" -gt 100 ] || { echo "refusing: only $LINES lines extracted for $SOURCE_DB — wrong schema name?"; exit 1; }
 
-mysql -u "$DB_USER" -p"$DB_PASS" -e \
-  "DROP DATABASE IF EXISTS \`$DRILL_DB\`; CREATE DATABASE \`$DRILL_DB\`;"
+"${MYSQL[@]}" -e "DROP DATABASE IF EXISTS \`$DRILL_DB\`; CREATE DATABASE \`$DRILL_DB\`;"
 
 # --one-database is a third belt: even a USE that somehow reached the client is
 # ignored unless it names the default schema.
-extract | mysql --one-database -u "$DB_USER" -p"$DB_PASS" "$DRILL_DB"
+extract | "${MYSQL[@]}" --one-database "$DRILL_DB"
 
-TABLES="$(mysql -N -u "$DB_USER" -p"$DB_PASS" -e \
+TABLES="$("${MYSQL[@]}" -N -e \
   "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DRILL_DB';")"
-LIVE="$(mysql -N -u "$DB_USER" -p"$DB_PASS" -e \
+LIVE="$("${MYSQL[@]}" -N -e \
   "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$SOURCE_DB';")"
 echo "[$(date -Is)] restored OK — $TABLES tables in $DRILL_DB (live $SOURCE_DB has $LIVE)"
 if [ "$TABLES" -lt "$LIVE" ]; then
   echo "WARNING: the restore has fewer tables than the live schema — investigate before trusting this backup"
 fi
 
-mysql -u "$DB_USER" -p"$DB_PASS" -e "DROP DATABASE \`$DRILL_DB\`;"
+"${MYSQL[@]}" -e "DROP DATABASE \`$DRILL_DB\`;"
 echo "[$(date -Is)] drill cleaned up. Restore path verified."
