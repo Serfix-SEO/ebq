@@ -32,7 +32,11 @@ OUT="$LOCAL_DIR/ebq-$STAMP.sql.gz"
 # directory both sides share. Written on success AND on failure — a backup that
 # dies silently is the exact shape this codebase keeps getting bitten by, and an
 # absent heartbeat is what the digest reads as "stale".
-STATUS_FILE="${STATUS_FILE:-/var/www/ebq/storage/app/backup-status.json}"
+# storage/app/PRIVATE, not storage/app: Laravel 11 roots the `local` disk at
+# storage/app/private, and Storage::disk('local') is what reads this. Dropping it
+# a directory higher leaves the alarm reporting "no backup has ever reported in"
+# while the backups run perfectly.
+STATUS_FILE="${STATUS_FILE:-/var/www/ebq/storage/app/private/backup-status.json}"
 write_status() {
   local ok="$1" bytes="${2:-0}" median="${3:-0}" err="${4:-}"
   mkdir -p "$(dirname "$STATUS_FILE")" 2>/dev/null || true
