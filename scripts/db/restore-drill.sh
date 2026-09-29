@@ -56,6 +56,11 @@ echo "[$(date -Is)] drilling $SOURCE_DB from $LATEST -> $DRILL_DB"
 # nothing in the stream can redirect the restore. Two independent defences: the
 # section filter, and the strip. Either alone would do; both, because the cost
 # of being wrong here is the production database.
+# NOTE: every grep here carries -a. A real dump contains NUL bytes (binary
+# columns), and GNU grep then treats the stream as binary: instead of filtering
+# it prints "binary file matches" and emits nothing, which silently empties the
+# pipeline feeding the restore. The marketing schema has no binary data, so a
+# drill against it passes while ebq_v2 dies — test on the schema you care about.
 extract() {
   gunzip -c "$LATEST" \
     | awk -v want="$SOURCE_DB" '
@@ -67,11 +72,11 @@ extract() {
         }
         preamble || keep
       ' \
-    | grep -viE '^[[:space:]]*(CREATE[[:space:]]+DATABASE|USE[[:space:]])'
+    | grep -a -viE '^[[:space:]]*(CREATE[[:space:]]+DATABASE|USE[[:space:]])'
 }
 
 # Paranoid check before anything is written: if a USE survived the filter, stop.
-if extract | grep -qiE '^[[:space:]]*USE[[:space:]]'; then
+if extract | grep -a -qiE '^[[:space:]]*USE[[:space:]]'; then
   echo "refusing: a USE statement survived filtering — restore would not stay in $DRILL_DB"
   exit 1
 fi
