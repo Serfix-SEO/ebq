@@ -9,8 +9,33 @@
 > 1. **Local-only.** `SB_HOST`/`SB_USER` are unset, so every dump sits on the same
 >    machine as the database it protects. Survives a bad query; does not survive
 >    losing that box. Ordering the Storage Box is the only outstanding step.
-> 2. **Never restored.** `restore-drill.sh` exists and has no evidence of ever
->    having been run. A backup nobody has restored is not yet a backup.
+> 2. ~~Never restored.~~ **Drilled 2026-09-29**: the newest dump restored into a
+>    throwaway schema, **128 tables, matching live `ebq_v2`**, in ~28 minutes
+>    (17.5 GB, load ~3-4 on box D), then dropped. The restore path works.
+>
+> ⛔ **Running that drill for the first time found that it would have destroyed
+> production.** `backup.sh` dumps with `--databases`, so the file carries
+> `CREATE DATABASE` + `USE` for all seven schemas on the box — `ebq`, `ebq_v2`,
+> `marketing`, `marketing_test`, `postal`, `postal-server-1`, `restore_test`. A
+> `USE` inside the stream **overrides the database named on the mysql command
+> line**, so the old one-line `gunzip -c dump | mysql "$DRILL_DB"` would have
+> restored the 03:30 snapshot over LIVE `ebq_v2` and over Postal's mail database.
+> It had never been run, which is the only reason that never happened.
+> **Never pipe a `--databases` dump at a target schema.** The drill now extracts
+> one schema's section, strips every `CREATE DATABASE`/`USE`, verifies none
+> survived before writing anything, passes `--one-database` as a third defence,
+> and refuses a target whose name lacks `test`.
+>
+> Two further traps found by actually running it, both of which let a broken
+> drill look healthy:
+> - **`grep` needs `-a`.** A real dump has NUL bytes in binary columns, so GNU
+>   grep decides the stream is binary, prints `binary file matches` and emits
+>   **nothing** — silently emptying the pipeline that feeds the restore.
+> - **Drill on the schema you care about.** `marketing` (30 tables, no binary
+>   data) passed cleanly while `ebq_v2` failed on exactly that bug.
+> - The **backup user cannot run the drill** (`ebq_backup` can read every schema
+>   and write none — worth keeping). It runs as root on unix-socket auth, or with
+>   `DRILL_USER`/`DRILL_PASS`.
 >
 > The backup now has an **alarm**: `App\Support\BackupHealth` reads the heartbeat
 > `backup.sh` writes to `storage/app/backup-status.json` (that path exists because
