@@ -2394,6 +2394,28 @@ financial loss.
 
   One digest line per day per condition. Pinned by
   `tests/Feature/Content/ContentImageOutageAlertTest.php`.
+
+  ⚠️ **The imageless detector measured a moving target and cried wolf**
+  (2026-09-29). A digest reported "IMAGE GENERATION LOOKS DOWN — 9 articles"
+  on a night when every client's images were fine: all 17 topics written in the
+  window got their images 2–12 minutes after the article row, all before the
+  04:15 digest, and nothing shipped imageless. Two mechanisms, both fixed in
+  `imageHealthLine()`:
+  - **No grace period.** The digest runs every 15 minutes and images land 2–12
+    minutes after the article, so the nightly burst always holds a few articles
+    legitimately between written and illustrated. `IMAGE_GRACE_MINUTES = 30`
+    (double the measured worst case) now excludes them.
+  - **Keyed on one article row.** The check asked whether the row with
+    `is_current = true` had an image, but `storeVersion()` re-points images to
+    each new crown (`ContentArticle:88`), so mid-revise the images belong to a
+    row that is no longer current and the check reads "no images". It now asks
+    whether the **topic** has one, which is what the client actually sees.
+
+  A real blackout still trips it — no version of the topic has an image — and
+  that is pinned by its own test, because a fix that blinds the alarm would be
+  worse than the noise. Note for anyone auditing a past alarm: you **cannot**
+  reconstruct what it counted, since `is_current` and `content_images.article_id`
+  both move afterwards. Measure the present instead.
 - ⚠️ **Brand guardrails on every image** (`App\Support\ContentImageGuardrails`,
   2026-08-16). A client's hero image carried a **competitor's** signage — "Al Noor
   Medical Center" on a TMC General Clinic article. Two causes, both fixed:

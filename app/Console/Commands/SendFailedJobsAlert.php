@@ -397,11 +397,32 @@ class SendFailedJobsAlert extends Command
         // Articles finished in the last day that have no image at all. Plans
         // that turned images off are excluded — that is a client's choice, not
         // a fault. Cheap: one indexed range scan plus a NOT EXISTS.
+        //
+        // Two things this must NOT count, both of which fired a false "looks
+        // down" on 2026-09-29 while every client's images were fine:
+        //
+        //  1. **Articles still being made.** Images land 2–12 minutes after the
+        //     article row (measured across a night's output), and the digest
+        //     runs every 15 minutes, so the nightly burst always has a handful
+        //     of articles legitimately between written and illustrated.
+        //     IMAGE_GRACE_MINUTES keeps them out.
+        //  2. **Images on a sibling version.** Every consumer reads images off
+        //     the CURRENT row, and `ContentArticle::storeVersion()` re-points
+        //     them to each new crown — so during a revise pass the image rows
+        //     briefly belong to a row that is no longer current, and a check
+        //     keyed on one article id reads that as "no images". The question
+        //     that matches what a client actually sees is whether the TOPIC
+        //     has an image, so ask it that way.
+        //
+        // A blackout still trips this: when the provider is down, no version of
+        // the topic has an image and the count climbs exactly as before.
         $imageless = ContentArticle::query()
             ->where('content_articles.created_at', '>=', now()->subDay())
+            ->where('content_articles.created_at', '<=', now()->subMinutes(self::IMAGE_GRACE_MINUTES))
             ->where('is_current', true)
             ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('content_images')
-                ->whereColumn('content_images.article_id', 'content_articles.id')
+                ->join('content_articles as sibling', 'sibling.id', '=', 'content_images.article_id')
+                ->whereColumn('sibling.topic_id', 'content_articles.topic_id')
                 ->where('content_images.status', ContentImage::STATUS_GENERATED))
             ->whereExists(fn ($q) => $q->select(DB::raw(1))->from('content_topics')
                 ->whereColumn('content_topics.id', 'content_articles.topic_id')
@@ -462,6 +483,15 @@ class SendFailedJobsAlert extends Command
      * above the usual trickle of one-offs.
      */
     private const IMAGELESS_ALERT_THRESHOLD = 5;
+
+    /**
+     * How long an article is given to acquire its images before its absence
+     * means anything. Measured 2026-09-29 over a full night's output: images
+     * appear 2–12 minutes after the article row, worst case 12. Thirty minutes
+     * is double the worst case and still an order of magnitude below the 24h
+     * window, so a real outage is late by half an hour and no more.
+     */
+    private const IMAGE_GRACE_MINUTES = 30;
 
     /**
      * Same-failure identity: job class + exception first line with ids and

@@ -7,11 +7,13 @@ use App\Models\ContentArticle;
 use App\Models\ContentImage;
 use App\Models\ContentPlan;
 use App\Models\ContentTopic;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\IdeogramClient;
 use App\Support\ContentImageHealth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -43,8 +45,14 @@ class ContentImageOutageAlertTest extends TestCase
         User::factory()->create(['is_admin' => true]);
     }
 
-    /** @return ContentArticle a finished article on a plan that wants images */
-    private function article(bool $withImage = false, bool $planWantsImages = true): ContentArticle
+    /**
+     * @param  int  $ageMinutes  how long ago the article was written. The default
+     *                           clears IMAGE_GRACE_MINUTES, because an article
+     *                           younger than that is still being illustrated and
+     *                           deliberately does not count as imageless.
+     * @return ContentArticle a finished article on a plan that wants images
+     */
+    private function article(bool $withImage = false, bool $planWantsImages = true, int $ageMinutes = 60): ContentArticle
     {
         $website = Website::factory()->for(User::factory())->create();
         $plan = ContentPlan::factory()->create([
@@ -60,6 +68,7 @@ class ContentImageOutageAlertTest extends TestCase
             'html' => '<p>body</p>',
             'word_count' => 400,
         ]);
+        $article->forceFill(['created_at' => now()->subMinutes($ageMinutes)])->save();
 
         if ($withImage) {
             ContentImage::create([
@@ -146,7 +155,7 @@ class ContentImageOutageAlertTest extends TestCase
         // Carbon 3 returns a SIGNED difference, so compare the absolute age.
         $this->assertGreaterThanOrEqual(
             71,
-            abs(now()->diffInHours(\Illuminate\Support\Carbon::parse($auth['since']))),
+            abs(now()->diffInHours(Carbon::parse($auth['since']))),
             'the outage must be dated from the first rejection, not the most recent one',
         );
     }
@@ -166,6 +175,70 @@ class ContentImageOutageAlertTest extends TestCase
         $body = $this->digest();
         $this->assertStringContainsString('IMAGE GENERATION LOOKS DOWN', $body);
         $this->assertStringContainsString('spend cap', $body, 'the meter is the first thing to check in this shape');
+    }
+
+    /**
+     * The 2026-09-29 false alarm, half one: the nightly burst always holds a
+     * few articles between written and illustrated. Images arrive 2–12 minutes
+     * after the row and the digest runs every 15, so without a grace period a
+     * perfectly healthy night reports an outage — and an alarm that cries wolf
+     * on healthy nights is one nobody reads on the night it matters.
+     */
+    public function test_articles_still_being_illustrated_are_not_an_outage(): void
+    {
+        for ($i = 0; $i < 8; $i++) {
+            $this->article(ageMinutes: 5);
+        }
+
+        $this->noDigest();
+    }
+
+    /**
+     * The 2026-09-29 false alarm, half two: a revise pass writes a new version
+     * and `storeVersion()` re-points the images to it, so a check keyed on one
+     * article id can look at a row whose images belong to a sibling. The client
+     * sees a fully illustrated post, so this must not alarm.
+     */
+    public function test_images_on_a_sibling_version_still_count_as_illustrated(): void
+    {
+        for ($i = 0; $i < 6; $i++) {
+            $article = $this->article(withImage: true);
+            // A later version becomes the crown. The images stay on the old row
+            // here on purpose — the check must find them through the topic.
+            $article->forceFill(['is_current' => false])->save();
+            ContentArticle::create([
+                'topic_id' => $article->topic_id,
+                'version' => 2,
+                'is_current' => true,
+                'h1' => 'A Revised Article',
+                'html' => '<p>revised</p>',
+                'word_count' => 420,
+            ])->forceFill(['created_at' => now()->subHour()])->save();
+        }
+
+        $this->noDigest();
+    }
+
+    /**
+     * And the thing all of that must not break: when the provider really is
+     * down, no version of the topic has an image and the alarm still fires.
+     */
+    public function test_a_real_blackout_still_alarms_across_versions(): void
+    {
+        for ($i = 0; $i < 6; $i++) {
+            $article = $this->article();
+            $article->forceFill(['is_current' => false])->save();
+            ContentArticle::create([
+                'topic_id' => $article->topic_id,
+                'version' => 2,
+                'is_current' => true,
+                'h1' => 'A Revised Article',
+                'html' => '<p>revised</p>',
+                'word_count' => 420,
+            ])->forceFill(['created_at' => now()->subHour()])->save();
+        }
+
+        $this->assertStringContainsString('IMAGE GENERATION LOOKS DOWN', $this->digest());
     }
 
     /** A trickle is normal — a rejected render must not page anyone. */
@@ -199,7 +272,7 @@ class ContentImageOutageAlertTest extends TestCase
     /** The global kill-switch means "off on purpose" — silence, not an alarm. */
     public function test_the_platform_kill_switch_silences_the_alarm(): void
     {
-        \App\Models\Setting::set('content.images.enabled', false);
+        Setting::set('content.images.enabled', false);
         ContentImageHealth::recordFailure('ideogram_http_401', 401);
 
         $this->noDigest();
