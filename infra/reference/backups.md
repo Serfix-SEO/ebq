@@ -1,9 +1,25 @@
-# Backups & point-in-time recovery (Phase 0)
+# Backups & point-in-time recovery
 
-> **Tooling ships in `scripts/db/`; applying it is an operator step** (a one-time
-> MariaDB restart + a Hetzner Storage Box). This closes the "no backups, binlog
-> off — data loss is permanent" hole called out in root `CLAUDE.md`, and is the
-> prerequisite for the sharded-tenant move backups and the production ULID cutover.
+> **Status, verified 2026-09-29:** nightly logical backups are **running on box D**
+> — `ebq-db-backup.timer` fires `scripts/db/backup.sh` at 03:30, 14 consecutive
+> successes, ~1 GB gzipped each, 15 kept in `/var/backups/ebq`. Binlog is on
+> (`ebq-bin.*`, `expire_logs_days = 7`).
+>
+> **Two gaps remain**, and both matter:
+> 1. **Local-only.** `SB_HOST`/`SB_USER` are unset, so every dump sits on the same
+>    machine as the database it protects. Survives a bad query; does not survive
+>    losing that box. Ordering the Storage Box is the only outstanding step.
+> 2. **Never restored.** `restore-drill.sh` exists and has no evidence of ever
+>    having been run. A backup nobody has restored is not yet a backup.
+>
+> The backup now has an **alarm**: `App\Support\BackupHealth` reads the heartbeat
+> `backup.sh` writes to `storage/app/backup-status.json` (that path exists because
+> `/var/backups` is **not visible inside the app container**), and
+> `ebq:failed-jobs-alert` reports missing / stale / failed / truncated, once a day,
+> silent while healthy. Pinned by `tests/Feature/Ops/BackupHealthAlertTest.php`.
+> ⚠️ The truncation check is the one worth understanding: a dump can exit 0 and
+> still be a fraction of its usual size, and that looks exactly like a backup right
+> up until the restore. It compares against the median of the dumps on disk.
 
 ## What it gives you
 1. **Binary logging** → point-in-time recovery + the foundation for a read replica.

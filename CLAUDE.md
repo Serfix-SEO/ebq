@@ -1,9 +1,17 @@
-# ⛔ READ FIRST — DATABASE SAFETY (production server, no backups)
+# ⛔ READ FIRST — DATABASE SAFETY (production server, one nightly backup)
 
 This repo is deployed on a **production server** whose default DB connection is
-**live MySQL `ebq`**. Binary logging is OFF and there are no DB backups, so any
-data loss is **permanent**. On 2026-06-07 a `php artisan test` run wiped the
-production database — `RefreshDatabase` ran `migrate:fresh` on MySQL because a
+**live MySQL `ebq`**. There is now **one nightly logical backup** (03:30, kept 14
+days, `scripts/db/backup.sh` under the `ebq-db-backup` systemd timer, verified
+running 2026-09-29) — but treat data loss as **effectively permanent** anyway:
+
+- the dumps are **local-only**, on the same box as the database, so they survive
+  a bad query and not the loss of that machine (the script supports a Hetzner
+  Storage Box; `SB_HOST`/`SB_USER` are unset);
+- the granularity is **24 hours**, so anything written since 03:30 is gone;
+- restoring 17.5 GB is an outage, not an undo.
+
+On 2026-06-07 a `php artisan test` run wiped the production database — `RefreshDatabase` ran `migrate:fresh` on MySQL because a
 **cached config** (`bootstrap/cache/config.php`, written by `php artisan optimize`)
 overrode the `phpunit.xml` sqlite setting. Never again.
 

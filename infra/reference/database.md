@@ -16,7 +16,7 @@ to find which table owns what, how rows cascade, and where the deep docs live.
 
 - **Driver `mysql` on MariaDB 10.11** (`10.11.14-MariaDB`, Ubuntu 24.04). Laravel's `mysql`
   grammar targets it; a few migrations use MySQL-online DDL (`ALGORITHM=INPLACE, LOCK=NONE`)
-  and are written re-entry-safe + no-op on sqlite (dev/test). **Production has no DB backups**
+  and are written re-entry-safe + no-op on sqlite (dev/test). **Production has ONE nightly local-only backup** (03:30, 14 days; see [backups.md](./backups.md)) — not offsite, not restore-tested, 24h granularity
   — see root `CLAUDE.md`. Tests run on **sqlite `:memory:`** (`phpunit.xml`), guarded by
   `tests/TestCase`.
 - **Migration naming**: `0001_01_01_*` for the four framework tables (users/cache/jobs), then

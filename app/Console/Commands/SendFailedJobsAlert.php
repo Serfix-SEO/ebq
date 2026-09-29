@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Website;
 use App\Services\Content\Aeo\AeoSignalReader;
 use App\Services\Reports\DataForSeoSpendMeter;
+use App\Support\BackupHealth;
 use App\Support\ContentAutopilotConfig;
 use App\Support\ContentImageHealth;
 use App\Support\FailedJobAlertBuffer;
@@ -79,6 +80,7 @@ class SendFailedJobsAlert extends Command
         $aeoLine = $this->aeoIngestLine();
         $pluginAuthLine = $this->pluginAuthLine();
         $probeLine = $this->aeoProbeLine();
+        $backupLine = $this->backupLine();
 
         // Collapse repeats (2026-08-26: ONE broken Hindi article re-failed on
         // every 15-min dispatcher tick → six identical digest emails). Each
@@ -127,7 +129,7 @@ class SendFailedJobsAlert extends Command
 
         if ($freshGroups === [] && $stuckPending->isEmpty() && $spendLine === null
             && $failedCatalogRuns->isEmpty() && $imageLine === null && $aeoLine === null
-            && $pluginAuthLine === null && $probeLine === null) {
+            && $pluginAuthLine === null && $probeLine === null && $backupLine === null) {
             $this->rememberGroups($freshGroups, $mutedGroups);
             $this->info($mutedGroups === []
                 ? 'Nothing to report.'
@@ -137,6 +139,12 @@ class SendFailedJobsAlert extends Command
         }
 
         $lines = [];
+        // First, because a broken backup outranks everything else in here: the
+        // rest cost you articles, this one costs you the database.
+        if ($backupLine !== null) {
+            $lines[] = $backupLine;
+            $lines[] = '';
+        }
         if ($imageLine !== null) {
             $lines[] = $imageLine;
             $lines[] = '';
@@ -298,6 +306,46 @@ class SendFailedJobsAlert extends Command
      * someone running our plugin against a deleted account — they need to
      * uninstall it, and until they do they will hammer us forever.
      */
+    /**
+     * The nightly database backup, as reported by scripts/db/backup.sh.
+     *
+     * Silent until something is wrong, then once a day, like the others. A
+     * healthy backup says nothing — an ops digest that prints "backup ok" every
+     * night trains people to skim it.
+     */
+    private function backupLine(): ?string
+    {
+        $health = BackupHealth::check();
+        if ($health['state'] === 'ok') {
+            return null;
+        }
+
+        $flag = 'backup-health-warned:'.now()->utc()->format('Y-m-d').':'.$health['state'];
+        if ($this->option('dry-run')
+            ? Cache::has($flag)
+            : ! Cache::add($flag, true, now()->addDay())) {
+            return null;   // already reported today
+        }
+
+        return sprintf(
+            'DATABASE BACKUP %s — %s. The dump is written by scripts/db/backup.sh under the '
+            .'ebq-db-backup systemd timer on the app box; check `systemctl status ebq-db-backup.service` '
+            .'and `journalctl -u ebq-db-backup.service`. Prove the fix with `scripts/db/restore-drill.sh`, '
+            .'which restores the newest dump into a throwaway database — a backup nobody has restored is '
+            .'not yet a backup.%s',
+            match ($health['state']) {
+                'missing' => 'IS NOT RUNNING',
+                'stale' => 'IS STALE',
+                'failed' => 'FAILED',
+                'truncated' => 'LOOKS TRUNCATED',
+                default => 'NEEDS ATTENTION',
+            },
+            $health['detail'],
+            $health['offsite'] ? '' : ' Note: backups are LOCAL-ONLY — they sit on the same machine as '
+                .'the database, so they survive a bad query but not the loss of that box.',
+        );
+    }
+
     private function pluginAuthLine(): ?string
     {
         $failing = PluginAuthHealth::failingInstalls();

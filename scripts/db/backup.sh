@@ -27,6 +27,23 @@ mkdir -p "$LOCAL_DIR"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 OUT="$LOCAL_DIR/ebq-$STAMP.sql.gz"
 
+# Heartbeat for the ops digest. /var/backups is NOT visible inside the app
+# container, so the only way the alarm can see this job is a status file in a
+# directory both sides share. Written on success AND on failure — a backup that
+# dies silently is the exact shape this codebase keeps getting bitten by, and an
+# absent heartbeat is what the digest reads as "stale".
+STATUS_FILE="${STATUS_FILE:-/var/www/ebq/storage/app/backup-status.json}"
+write_status() {
+  local ok="$1" bytes="${2:-0}" median="${3:-0}" err="${4:-}"
+  mkdir -p "$(dirname "$STATUS_FILE")" 2>/dev/null || true
+  printf '{"ok":%s,"at":"%s","bytes":%s,"median_bytes":%s,"offsite":%s,"error":"%s"}\n' \
+    "$ok" "$(date -Is)" "$bytes" "$median" \
+    "$([ -n "${SB_HOST:-}" ] && [ -n "${SB_USER:-}" ] && echo true || echo false)" \
+    "$(printf '%s' "$err" | tr -d '"' | cut -c1-200)" > "$STATUS_FILE" 2>/dev/null || true
+}
+# set -e means any failure below lands here; the digest then sees ok:false.
+trap 'write_status false 0 0 "backup.sh failed at line $LINENO"' ERR
+
 echo "[$(date -Is)] dumping all databases -> $OUT"
 # --single-transaction = consistent snapshot without locking (InnoDB);
 # routines/triggers/events for a complete restore.
@@ -50,5 +67,13 @@ if [ -n "${SB_HOST:-}" ] && [ -n "${SB_USER:-}" ]; then
 else
   echo "[$(date -Is)] SB_HOST/SB_USER unset — local-only backup (configure the Storage Box to go offsite)"
 fi
+
+# Median of the dumps we keep, so the alarm can spot a truncated dump that
+# still "succeeded" — a 12 MB file where yesterday's was 1 GB is a failure that
+# exits 0.
+BYTES="$(stat -c%s "$OUT" 2>/dev/null || echo 0)"
+MEDIAN="$(find "$LOCAL_DIR" -name 'ebq-*.sql.gz' -printf '%s\n' 2>/dev/null \
+  | sort -n | awk '{a[NR]=$1} END {print (NR ? a[int((NR+1)/2)] : 0)}')"
+write_status true "$BYTES" "${MEDIAN:-0}"
 
 echo "[$(date -Is)] backup ok: $OUT ($(du -h "$OUT" | cut -f1))"

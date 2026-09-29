@@ -40,4 +40,13 @@ return [
     | LinkVerifier tests enable it explicitly.
     */
     'article_link_verify' => (bool) env('CONTENT_LINK_VERIFY', true),
+
+    /*
+    | Whether this box is supposed to be taking nightly database backups. True
+    | on the app box, where the ebq-db-backup timer runs; a dev checkout and the
+    | test suite have no backup job, and an ops digest that shouted "BACKUP IS
+    | NOT RUNNING" at every developer would teach everyone to ignore the one
+    | alarm you cannot afford to have ignored. Pinned OFF in phpunit.xml.
+    */
+    'backups_expected' => (bool) env('OPS_BACKUPS_EXPECTED', true),
 ];
