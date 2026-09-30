@@ -287,6 +287,11 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-30 — `meet.ebq.io` retired** (owner: "we don't need meet"). It was
+  already down — DNS → box D, no meet vhost there, jitsi running on box A where
+  nothing resolves, bookings dead since June. jicofo + videobridge stopped and
+  disabled, vhost disabled, logs cleared; ~360 MB RAM back. Packages left
+  installed so it is reversible; the DNS record still needs removing by hand.
 - **2026-09-30 — Box A's replica was filling its own disk; replication stopped
   and the stale schema dropped.** The replica's SQL thread had been dead since
   ~09-16 (error 1032 on `ebq_v2.sessions`) while its IO thread kept fetching, so
