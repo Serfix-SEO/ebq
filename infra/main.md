@@ -291,7 +291,12 @@ known gaps were flagged during the sweep:
   already down — DNS → box D, no meet vhost there, jitsi running on box A where
   nothing resolves, bookings dead since June. jicofo + videobridge stopped and
   disabled, vhost disabled, logs cleared; ~360 MB RAM back. Packages left
-  installed so it is reversible; the DNS record still needs removing by hand.
+  then purged entirely. ⚠️ Purging only jicofo/videobridge/prosody/jitsi-meet
+  **installs `prosody-trunk`** (jitsi-meet-prosody depends on
+  `prosody | prosody-trunk`) — simulate with `apt-get purge -s` and take the whole
+  stack at once, which removes 12 packages and installs none. The purge re-runs
+  ufw triggers; the orphaned 10000/udp and 4443/tcp rules were deleted by hand.
+  The DNS record still needs removing.
 - **2026-09-30 — Box A's replica was filling its own disk; replication stopped
   and the stale schema dropped.** The replica's SQL thread had been dead since
   ~09-16 (error 1032 on `ebq_v2.sessions`) while its IO thread kept fetching, so
