@@ -287,6 +287,21 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-09-30 — Box A's replica was filling its own disk; replication stopped
+  and the stale schema dropped.** The replica's SQL thread had been dead since
+  ~09-16 (error 1032 on `ebq_v2.sessions`) while its IO thread kept fetching, so
+  relay logs grew ~10 GB/day and twice took the disk to 100%, which disables
+  Redis writes (`MISCONF`) and fails ~40 tests. ⚠️ **`STOP SLAVE` + `START SLAVE`
+  discards un-executed relay logs** — they are a disposable cache that the
+  replica re-requests from the master. Those logs held binlogs 000022–000044,
+  which the master had already expired (`expire_logs_days = 7`), so restarting
+  the threads destroyed the only incremental repair path. Replication is now
+  removed and the 19-day-stale `ebq_v2` dropped: disk 100% → 31%.
+  All domains already point at box D, box B is idle on an unreachable subnet, and
+  box A holds no unique data — what remains is a decommission, not a migration.
+  ⚠️ `meet.ebq.io` is **down** independently: DNS → D, no meet vhost on D, jitsi
+  still on A.
+
 - **2026-09-27 — AEO phases 2 and 3: write to be quoted, then measure whether
   you are.** A second `AeoScorer` (never folded into the SEO score — the publish
   floor gates on that one) rewards answer-first openings, question headings and
